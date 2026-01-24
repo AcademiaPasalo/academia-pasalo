@@ -2,21 +2,29 @@
 
 import Link from "next/link";
 import { useState } from "react";
+import { usePathname } from "next/navigation";
 import Image from "next/image";
 import MobileSidebar from "./MobileSidebar";
 
 const navItems = [
-  { label: "Inicio", href: "#inicio" },
-  { label: "Nosotros", href: "#nosotros" },
-  { label: "Modalidades", href: "#modalidades" },
-  { label: "Cursos", href: "#cursos" },
-  { label: "Testimonios", href: "#testimonios" },
-  { label: "Contacto", href: "#contacto" },
+  { label: "Inicio", href: "/#inicio" },
+  { label: "Nosotros", href: "/#nosotros" },
+  { label: "Modalidades", href: "/#modalidades" },
+  { label: "Cursos", href: "/#cursos" },
+  { label: "Testimonios", href: "/#testimonios" },
+  { label: "Contacto", href: "/#contacto" },
 ];
 
 export default function TopBar() {
+  const pathname = usePathname();
   const [activeSection, setActiveSection] = useState("inicio");
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+
+  // Determinar si estamos en la página principal
+  const isLandingPage = pathname === "/" || pathname === "/landing";
+  
+  // Solo mostrar sección activa si estamos en la landing page
+  const displayActiveSection = isLandingPage ? activeSection : "";
 
   return (
     <header className="w-full bg-white border-b border-stroke-primary sticky top-0 z-50">
@@ -43,14 +51,15 @@ export default function TopBar() {
                 className="group relative flex items-center px-2 py-1"
               >
                 <span
-                  className={`text-base transition-colors ${activeSection === item.label.toLowerCase()
-                    ? "text-accent-primary"
-                    : "text-tertiary hover:text-accent-secondary"
-                    }`}
+                  className={`text-base transition-colors ${
+                    displayActiveSection === item.label.toLowerCase()
+                      ? "text-accent-primary font-medium"
+                      : "text-tertiary hover:text-accent-secondary"
+                  }`}
                 >
                   {item.label}
                 </span>
-                {activeSection === item.label.toLowerCase() && (
+                {displayActiveSection === item.label.toLowerCase() && (
                   <div className="absolute bottom-0 left-0 right-0 h-[3px] bg-main rounded-full mx-2" />
                 )}
               </Link>
@@ -97,7 +106,7 @@ export default function TopBar() {
       <MobileSidebar
         isOpen={isMobileMenuOpen}
         onClose={() => setIsMobileMenuOpen(false)}
-        activeSection={activeSection}
+        activeSection={displayActiveSection}
         onSectionChange={setActiveSection}
       />
     </header>

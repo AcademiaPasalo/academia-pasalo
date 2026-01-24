@@ -12,12 +12,12 @@ interface MobileSidebarProps {
 }
 
 const navItems = [
-  { label: "Inicio", href: "#inicio" },
-  { label: "Nosotros", href: "#nosotros" },
-  { label: "Modalidades", href: "#modalidades" },
-  { label: "Cursos", href: "#cursos" },
-  { label: "Testimonios", href: "#testimonios" },
-  { label: "Contacto", href: "#contacto" },
+  { label: "Inicio", href: "/#inicio" },
+  { label: "Nosotros", href: "/#nosotros" },
+  { label: "Modalidades", href: "/#modalidades" },
+  { label: "Cursos", href: "/#cursos" },
+  { label: "Testimonios", href: "/#testimonios" },
+  { label: "Contacto", href: "/#contacto" },
 ];
 
 export default function MobileSidebar({

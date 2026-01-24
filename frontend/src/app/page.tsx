@@ -1,5 +1,12 @@
-import { redirect } from "next/navigation";
+import LandingLayout from "@/components/layouts/LandingLayout";
 
 export default function Home() {
-  redirect("/landing");
+  return (
+    <LandingLayout>
+      <div className="container mx-auto px-4 py-20">
+        {/* Hero Section */}
+        
+      </div>
+    </LandingLayout>
+  );
 }
