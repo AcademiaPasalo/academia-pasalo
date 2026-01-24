@@ -14,6 +14,9 @@ module.exports = {
           3: "#12232E",
         },
       },
+      fontFamily: {
+        sans: ["var(--font-poppins)", "sans-serif"],
+      },
     },
   },
   plugins: [],
