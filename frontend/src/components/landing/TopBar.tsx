@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import Image from "next/image";
+import MobileSidebar from "./MobileSidebar";
 
 const navItems = [
   { label: "Inicio", href: "#inicio" },
@@ -15,6 +16,7 @@ const navItems = [
 
 export default function TopBar() {
   const [activeSection, setActiveSection] = useState("inicio");
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   return (
     <header className="w-full bg-white border-b border-stroke-primary sticky top-0 z-50">
@@ -80,12 +82,24 @@ export default function TopBar() {
             </Link>
 
             {/* Menu Sidebar */}
-            <button className="lg:hidden text-tertiary">
-              <span className="material-symbols-outlined text-6xl">menu</span>
+            <button 
+              onClick={() => setIsMobileMenuOpen(true)}
+              className="lg:hidden text-tertiary hover:text-accent-primary transition-colors"
+              aria-label="Abrir menú"
+            >
+              <span className="material-symbols-outlined text-4xl">menu</span>
             </button>
           </div>
         </div>
       </div>
+
+      {/* Mobile Sidebar */}
+      <MobileSidebar
+        isOpen={isMobileMenuOpen}
+        onClose={() => setIsMobileMenuOpen(false)}
+        activeSection={activeSection}
+        onSectionChange={setActiveSection}
+      />
     </header>
   );
 }
