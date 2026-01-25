@@ -1,0 +1,75 @@
+ARQUITECTURA DE SOFTWARE - ACADEMIA PASALO
+==========================================
+
+1. ESTRUCTURA DE DIRECTORIOS (Modular DDD)
+------------------------------------------
+src/
+│
+├── modules/                  # Dominios de Negocio
+│   ├── auth/                 # Autenticación y Tokens
+│   ├── users/                # Usuarios y Perfiles
+│   ├── courses/              # Cursos (Catálogo)
+│   ├── cycles/               # Ciclos Académicos
+│   ├── enrollments/          # Matrículas
+│   ├── evaluations/          # Exámenes
+│   ├── materials/            # Contenidos y Archivos
+│   ├── events/               # Calendario
+│   ├── notifications/        # Notificaciones
+│   ├── audit/                # Auditoría Histórica
+│   ├── security/             # Seguridad (Geo, Sesiones)
+│   ├── settings/             # Configuración Sistema
+│   └── feedback/             # Testimonios
+│
+├── common/                   # Código compartido y transversal
+│   ├── decorators/           # @Auth(), @CurrentUser()
+│   ├── filters/              # Manejo global de excepciones
+│   ├── interceptors/         # Transformación de respuestas
+│   ├── guards/               # RBAC, Permissions
+│   └── interfaces/           # Contratos genéricos
+│
+└── infrastructure/           # Implementaciones técnicas
+    ├── database/             # TypeORM Config
+    ├── storage/              # File System / S3
+    ├── mail/                 # SMTP / APIs
+    └── cache/                # Redis Service Wrapper
+
+2. ESTRATEGIAS TRANSVERSALES (CROSS-CUTTING CONCERNS)
+-----------------------------------------------------
+
+A. GESTIÓN DE LOGS (Logging Strategy)
+   - Objetivo: Trazabilidad y monitoreo profesional.
+   - Formato: JSON Estructurado (para entornos productivos).
+     Ejemplo: `{"level": "error", "timestamp": "...", "context": "AuthService", "message": "Invalid password", "userId": 15}`
+   - Justificación: Permite indexación automática en herramientas de monitoreo (Datadog, CloudWatch, ELK). Un log de texto plano es difícil de filtrar cuando hay millones de líneas.
+   - Entorno Local: Se permite "Pretty Print" (colores/texto) solo en desarrollo para facilitar lectura humana, pero manteniendo la estructura de datos interna.
+   - Regla: CERO EMOJIS.
+
+B. MANEJO DE ERRORES (Global Exception Filter)
+   - Ubicación: `src/common/filters/all-exceptions.filter.ts`
+   - Función: Capturar cualquier error (HttpException o crash inesperado).
+   - Salida al Cliente: Siempre JSON seguro.
+     {
+       "statusCode": 400,
+       "message": "El correo ya está registrado",
+       "error": "Bad Request",
+       "timestamp": "2026-01-23T10:00:00Z"
+     }
+
+C. RESPUESTA UNIFICADA (Response Interceptor)
+   - Ubicación: `src/common/interceptors/transform.interceptor.ts`
+   - Objetivo: Que el frontend siempre sepa dónde buscar la data.
+   - Formato Estándar:
+     {
+       "statusCode": 200,
+       "message": "Operación exitosa", // OBLIGATORIO: Texto amigable para mostrar en UI (Toasts/Alerts).
+       "data": { ... } | [ ... ] | null, // null si la operación no retorna valor (ej. void)
+       "timestamp": "..."
+     }
+   - Caso "Void" (Ej. Eliminar/Editar sin retorno): `data` será `null`, pero `statusCode` confirmará el éxito (200).
+
+D. ESTRATEGIA DE CACHÉ (Redis)
+   - Implementación: Service Wrapper en `src/infrastructure/cache/redis-cache.service.ts`.
+   - Abstracción: No usar `CacheManager` directo en los servicios de dominio.
+   - Eliminación Grupal (Bulk Invalidation):
+     - Estrategia: Uso de "Key Namespacing" (ej. `cache:course:123`, `cache:course:list`).
+     - Método `invalidateGroup(pattern: string)`: Utilizar comandos eficientes (SCAN) para limpiar patrones específicos sin bloquear el servidor.
