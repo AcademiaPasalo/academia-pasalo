@@ -1,0 +1,107 @@
+PLAN DE DESARROLLO BACKEND - ACADEMIA PASALO
+==============================================
+Objetivo: Construir un backend robusto, seguro y escalable para una plataforma académica profesional.
+Enfoque: Desarrollo iterativo por fases, priorizando la infraestructura y seguridad antes de la funcionalidad de negocio.
+
+IMPORTANTE: Este plan asume el uso de TypeORM dado que contamos con un esquema SQL ya definido y robusto. Si prefieres Prisma, por favor indicarlo antes de iniciar la Fase 1.
+
+FASE 1: Cimientos e Infraestructura (Setup & Configuration)
+-----------------------------------------------------------
+Objetivo: Preparar el entorno para que el resto del desarrollo fluya sin fricción.
+Entregables:
+1.  Instalación de dependencias Core:
+    -   ORM: TypeORM + mysql2 (Compatible con tu script SQL).
+    -   Validación: class-validator, class-transformer.
+    -   Configuración: @nestjs/config (Manejo de variables de entorno).
+2.  Configuración de Base de Datos:
+    -   Conexión asíncrona a la BD.
+    -   **Mapeo de Entidades (Entity Mapping):** Creación manual de clases TypeORM que reflejen EXACTAMENTE el esquema SQL existente.
+    -   **PROHIBIDO:** Usar `synchronize: true` o migraciones automáticas que alteren el esquema. El control del esquema es 100% manual vía SQL Workbench.
+4.  Estandarización y Rutas:
+    -   Configuración de API_PREFIX vía variables de entorno (con fallback).
+    -   Implementación de Interceptors para formato de respuesta JSON unificado.
+    -   Implementación de Exception Filters para manejo de errores elegante y seguro (no exponer stack traces).
+
+FASE 2: Identidad y Seguridad (IAM) - [ÉPICA: Autenticación y sesión]
+---------------------------------------------------------------------
+Objetivo: Garantizar que solo usuarios autorizados accedan y que se controle el "préstamo de cuentas".
+Entregables:
+1.  Módulo Users:
+    -   CRUD básico de usuarios.
+    -   Gestión de Roles (Guardar relación user_role).
+2.  Módulo Auth (Google Only):
+    -   **Login con Google (OAuth/Token Verification):** Validación de tokens de Google.
+    -   Generación de JWT Interno (Access Token + Refresh Token) tras validar con Google.
+    -   **Gestión de Sesiones (user_session):**
+        -   Captura de IP, User-Agent.
+        -   Lógica para detectar y registrar Latitud/Longitud (Geolocalización).
+        -   Validación de sesiones activas concurrentes (Evitar cuentas compartidas).
+3.  Módulo Security (Base):
+    -   Detección básica de anomalías (Eventos de seguridad).
+
+FASE 3: Definición Académica (Core Data) - [ÉPICA: Cursos]
+----------------------------------------------------------
+Objetivo: Modelar la oferta académica de la institución.
+Entregables:
+1.  Módulos Auxiliares:
+    -   CycleLevels, CourseTypes (Catálogos).
+2.  Módulo Cycles (Ciclos Académicos):
+    -   Gestión de periodos (2024-I, 2024-II) con fechas de inicio/fin estrictas.
+3.  Módulo Courses (Cursos):
+    -   Creación de cursos y asociación con tipos y niveles.
+    -   Creación de `CourseCycle` (Instancias del curso en un ciclo).
+    -   Asignación de Profesores (`course_cycle_professor`).
+
+FASE 4: Operativa Diaria (The "Running" Business) - [ÉPICA: Cursos / Calendario]
+--------------------------------------------------------------------------------
+Objetivo: Permitir que la academia funcione (alumnos estudiando y rindiendo exámenes).
+Entregables:
+1.  Módulo Enrollments (Matrículas):
+    -   Lógica de inscripción general.
+    -   **Lógica Granular (`enrollment_evaluation`):** Sistema para habilitar/revocar acceso a exámenes específicos por alumno.
+2.  Módulo Evaluations:
+    -   Creación de evaluaciones (Exámenes, PCs) ligadas a un CourseCycle.
+3.  Módulo Events (Calendario):
+    -   Gestión de eventos académicos visibles en calendario.
+
+FASE 5: Gestión de Contenidos (Assets) - [ÉPICA: Cursos]
+--------------------------------------------------------
+Objetivo: Gestión segura y eficiente de archivos educativos.
+Entregables:
+1.  Infraestructura Storage:
+    -   Servicio agnóstico para subir archivos (LocalFS inicialmente, preparado para S3).
+2.  Módulo Materials:
+    -   Gestión de Carpetas (Jerarquía).
+    -   Subida de Archivos (`file_resource` con cálculo de HASH para deduplicación).
+    -   Gestión de Versiones (`file_version`) y publicación (`material`).
+    -   Control de visibilidad por fechas.
+
+FASE 6: Feedback y Reputación - [ÉPICA: Gestión de Perfiles (Extendido)]
+------------------------------------------------------------------------
+Objetivo: Recopilar y mostrar la satisfacción del alumnado.
+Entregables:
+1.  Módulo Feedback:
+    -   CRUD de Testimonios (`course_testimony`) con validación de "un testimonio por alumno por ciclo".
+    -   Sistema de aprobación y destacado (`featured_testimony`).
+2.  Integración de Fotos:
+    -   Soporte para fotos en Usuarios y Testimonios usando el servicio de Storage.
+
+FASE 7: Gobernanza, Auditoría y Notificaciones - [ÉPICA: Admin & Notificaciones]
+--------------------------------------------------------------------------------
+Objetivo: Control total sobre lo que ocurre en la plataforma.
+Entregables:
+1.  Módulo Audit (Avanzado):
+    -   Interceptors globales para registrar acciones críticas automáticamente en `audit_log`.
+2.  Solicitudes de Borrado (`deletion_request`):
+    -   Flujo de "Solicitar borrado" -> "Aprobar/Rechazar" para materiales.
+3.  Módulo Notifications:
+    -   Sistema de notificaciones internas (Leído/No leído).
+    -   (Opcional) Envío de correos electrónicos.
+
+FASE 8: Pulido y Pruebas
+------------------------
+Objetivo: Asegurar calidad antes de entrega.
+Entregables:
+1.  Tests E2E de flujos críticos (Login, Matrícula, Examen).
+2.  Revisión de Índices de Base de Datos y Performance.
+3.  Documentación de API (Swagger).

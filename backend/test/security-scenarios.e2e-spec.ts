@@ -1,0 +1,241 @@
+import { Test, TestingModule } from '@nestjs/testing';
+import { INestApplication, UnauthorizedException } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { JwtModule, JwtService } from '@nestjs/jwt';
+import { DataSource } from 'typeorm';
+import { AuthService } from '../src/modules/auth/application/auth.service';
+import { SessionService } from '../src/modules/auth/application/session.service';
+import { SecurityEventService } from '../src/modules/auth/application/security-event.service';
+import { SessionStatusService } from '../src/modules/auth/application/session-status.service';
+import { AuthSettingsService } from '../src/modules/auth/application/auth-settings.service';
+import { GeolocationService } from '../src/modules/auth/application/geolocation.service';
+import { GeoIpService } from '../src/modules/auth/application/geo-ip.service';
+import { UsersService } from '../src/modules/users/application/users.service';
+import { UserSessionRepository } from '../src/modules/auth/infrastructure/user-session.repository';
+import { SecurityEventRepository } from '../src/modules/auth/infrastructure/security-event.repository';
+import { SecurityEventTypeRepository } from '../src/modules/auth/infrastructure/security-event-type.repository';
+import { SessionStatusRepository } from '../src/modules/auth/infrastructure/session-status.repository';
+import { SystemSettingRepository } from '../src/modules/auth/infrastructure/system-setting.repository';
+import { RequestMetadata } from '../src/modules/auth/interfaces/request-metadata.interface';
+import { JwtStrategy } from '../src/modules/auth/strategies/jwt.strategy';
+
+describe('Security Scenarios (Integration)', () => {
+  let app: INestApplication;
+  let authService: AuthService;
+  let jwtService: JwtService;
+  let securityEventService: SecurityEventService;
+
+  const mockUser = {
+    id: '1',
+    email: 'hacker@test.com',
+    roles: [{ code: 'STUDENT' }],
+  };
+
+  const mockMetadata: RequestMetadata = {
+    ipAddress: '192.168.1.1',
+    userAgent: 'Mozilla/5.0',
+    deviceId: 'device-A',
+    latitude: 40.416775,
+    longitude: -3.70379,
+  };
+
+  const mockDataSource = {
+    transaction: jest.fn((cb) => cb(mockDataSource.manager)),
+    manager: {},
+  };
+
+  const mockUsersService = {
+    findByEmail: jest.fn().mockResolvedValue(mockUser),
+    findOne: jest.fn().mockResolvedValue(mockUser),
+  };
+
+  const mockUserSessionRepository = {
+    create: jest.fn(),
+    findOtherActiveSession: jest.fn(),
+    findLatestSessionByUserId: jest.fn(),
+    findByRefreshTokenHash: jest.fn(),
+    findByRefreshTokenHashForUpdate: jest.fn(),
+    findById: jest.fn(),
+    findByIdForUpdate: jest.fn(),
+    update: jest.fn(),
+    deactivateSession: jest.fn(),
+  };
+
+  const mockSecurityEventRepository = {
+    create: jest.fn().mockResolvedValue({ id: '999' }),
+  };
+
+  const mockSecurityEventTypeRepository = {
+    findByCode: jest.fn().mockResolvedValue({ id: '1', code: 'LOGIN_SUCCESS' }),
+  };
+
+  const mockSessionStatusRepository = {
+    findByCode: jest.fn((code) => Promise.resolve({ id: '100', code })),
+  };
+
+  const mockSystemSettingRepository = {
+    findByKey: jest.fn((key) => {
+      const settings = {
+        REFRESH_TOKEN_TTL_DAYS: '7',
+        ACCESS_TOKEN_TTL_MINUTES: '15',
+        SESSION_EXPIRATION_WARNING_MINUTES: '5',
+        GEO_GPS_ANOMALY_TIME_WINDOW_MINUTES: '60',
+        GEO_GPS_ANOMALY_DISTANCE_KM: '500',
+      };
+      return Promise.resolve({ settingValue: settings[key] });
+    }),
+  };
+
+  const mockGeoIpService = {
+    resolve: jest.fn().mockResolvedValue(null),
+  };
+
+  beforeEach(async () => {
+    jest.clearAllMocks();
+
+    const moduleFixture: TestingModule = await Test.createTestingModule({
+      imports: [JwtModule.register({ secret: 'secret' })],
+      providers: [
+        AuthService,
+        SessionService,
+        SecurityEventService,
+        SessionStatusService,
+        AuthSettingsService,
+        GeolocationService,
+        JwtStrategy,
+        { provide: DataSource, useValue: mockDataSource },
+        { provide: ConfigService, useValue: { get: () => 'secret' } },
+        { provide: UsersService, useValue: mockUsersService },
+        { provide: UserSessionRepository, useValue: mockUserSessionRepository },
+        { provide: SecurityEventRepository, useValue: mockSecurityEventRepository },
+        { provide: SecurityEventTypeRepository, useValue: mockSecurityEventTypeRepository },
+        { provide: SessionStatusRepository, useValue: mockSessionStatusRepository },
+        { provide: SystemSettingRepository, useValue: mockSystemSettingRepository },
+        { provide: GeoIpService, useValue: mockGeoIpService },
+      ],
+    }).compile();
+
+    app = moduleFixture.createNestApplication();
+    authService = moduleFixture.get<AuthService>(AuthService);
+    jwtService = moduleFixture.get<JwtService>(JwtService);
+    securityEventService = moduleFixture.get<SecurityEventService>(SecurityEventService);
+    
+    // Bypass Google Verification for tests
+    (authService as any).verifyCodeAndGetEmail = jest.fn().mockResolvedValue(mockUser.email);
+  });
+
+  describe('ATOMICITY & TRANSACTIONS', () => {
+    it('should fail login atomically if concurrent-session audit logging fails', async () => {
+      mockUserSessionRepository.findLatestSessionByUserId.mockResolvedValue(null);
+      mockUserSessionRepository.findOtherActiveSession.mockResolvedValue({
+        id: '55',
+        deviceId: 'device-B-existing',
+      });
+      mockUserSessionRepository.create.mockResolvedValue({ id: '123' });
+      jest.spyOn(securityEventService, 'logEvent').mockRejectedValue(new Error('DB Error'));
+
+      await expect(authService.loginWithGoogle('token', mockMetadata)).rejects.toThrow('DB Error');
+      expect(mockDataSource.transaction).toHaveBeenCalled();
+      expect(mockUserSessionRepository.create).toHaveBeenCalled();
+    });
+  });
+
+  describe('CONCURRENT SESSIONS (Anti-Hijacking)', () => {
+    it('should return PENDING_CONCURRENT_RESOLUTION if another active session exists', async () => {
+      mockUserSessionRepository.findOtherActiveSession.mockResolvedValue({
+        id: '55',
+        deviceId: 'device-B-existing',
+      });
+      mockUserSessionRepository.create.mockResolvedValue({ id: '123', sessionStatusId: '2' });
+
+      const result = await authService.loginWithGoogle('token', mockMetadata);
+      expect(result.sessionStatus).toBe('PENDING_CONCURRENT_RESOLUTION');
+      expect(result.concurrentSessionId).toBe('55');
+    });
+
+    it('should return ACTIVE if no other session exists', async () => {
+      mockUserSessionRepository.findOtherActiveSession.mockResolvedValue(null);
+      mockUserSessionRepository.create.mockResolvedValue({ id: '123', sessionStatusId: '1' });
+
+      const result = await authService.loginWithGoogle('token', mockMetadata);
+      expect(result.sessionStatus).toBe('ACTIVE');
+    });
+  });
+
+  describe('IMPOSSIBLE TRAVEL (Anomaly Detection)', () => {
+    it('should BLOCK session if user moves too fast (Madrid -> Tokyo in 5 mins)', async () => {
+      mockUserSessionRepository.findLatestSessionByUserId.mockResolvedValue({
+        id: '50',
+        createdAt: new Date(Date.now() - 5 * 60 * 1000),
+        latitude: 35.6762,
+        longitude: 139.6503,
+      });
+
+      mockUserSessionRepository.create.mockResolvedValue({ id: '123' });
+      const result = await authService.loginWithGoogle('token', mockMetadata);
+      expect(result.sessionStatus).toBe('BLOCKED_PENDING_REAUTH');
+    });
+  });
+
+  describe('SESSION RESOLUTION FLOWS', () => {
+    it('should RESOLVE concurrent session by keeping NEW and revoking OLD', async () => {
+      const refreshToken = jwtService.sign({ sub: mockUser.id, deviceId: mockMetadata.deviceId, type: 'refresh' });
+
+      mockUserSessionRepository.findByRefreshTokenHashForUpdate.mockResolvedValue({
+        id: '200',
+        userId: mockUser.id,
+        deviceId: mockMetadata.deviceId,
+        sessionStatusId: '100',
+      });
+
+      mockUserSessionRepository.findOtherActiveSession.mockResolvedValue({ id: '100', deviceId: 'device-B' });
+      mockUserSessionRepository.findByIdForUpdate.mockResolvedValue({ id: '100' });
+      mockUserSessionRepository.update.mockResolvedValue({});
+
+      const result = await authService.resolveConcurrentSession(refreshToken, mockMetadata.deviceId, 'KEEP_NEW', mockMetadata);
+
+      expect(result.keptSessionId).toBe('200');
+      expect(mockUserSessionRepository.update).toHaveBeenCalled();
+    });
+
+    it('should RE-AUTHENTICATE anomalous session successfully', async () => {
+      const refreshToken = jwtService.sign({ sub: mockUser.id, deviceId: mockMetadata.deviceId, type: 'refresh' });
+
+      mockUserSessionRepository.findByRefreshTokenHash.mockResolvedValue({
+        id: '300',
+        userId: mockUser.id,
+        deviceId: mockMetadata.deviceId,
+        sessionStatusId: '100',
+      });
+      
+      mockUserSessionRepository.update.mockResolvedValue({});
+
+      const result = await authService.reauthAnomalousSession('google-token', refreshToken, mockMetadata.deviceId, mockMetadata);
+
+      expect(result.accessToken).toBeDefined();
+      expect(mockUserSessionRepository.update).toHaveBeenCalled();
+    });
+  });
+
+  describe('JWT STRATEGY & ACCESS CONTROL', () => {
+    it('should REJECT access if session is BLOCKED in database', async () => {
+      const strategy = new JwtStrategy(
+        { get: () => 'secret' } as any,
+        mockUsersService as any,
+        mockUserSessionRepository as any,
+        { getIdByCode: () => Promise.resolve('1') } as any,
+      );
+
+      const payload = { sub: '1', email: 'h@t.com', roles: [], sessionId: '500' };
+
+      mockUserSessionRepository.findById.mockResolvedValue({
+        id: '500',
+        isActive: false,
+        sessionStatusId: '99',
+        expiresAt: new Date(Date.now() + 10000),
+      });
+
+      await expect(strategy.validate(payload)).rejects.toThrow(UnauthorizedException);
+    });
+  });
+});
