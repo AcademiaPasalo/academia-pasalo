@@ -7,6 +7,7 @@ import { UsersService } from '@modules/users/application/users.service';
 import { User } from '@modules/users/domain/user.entity';
 import { UserSessionRepository } from '@modules/auth/infrastructure/user-session.repository';
 import { SessionStatusService } from '@modules/auth/application/session-status.service';
+import { RedisCacheService } from '@infrastructure/cache/redis-cache.service';
 
 export type UserWithSession = User & { sessionId: string };
 
@@ -17,6 +18,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     private readonly usersService: UsersService,
     private readonly userSessionRepository: UserSessionRepository,
     private readonly sessionStatusService: SessionStatusService,
+    private readonly cacheService: RedisCacheService,
   ) {
     const secret = configService.get<string>('JWT_SECRET');
     if (!secret) {
@@ -31,6 +33,13 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   }
 
   async validate(payload: JwtPayload): Promise<UserWithSession> {
+    const cacheKey = `cache:session:${payload.sessionId}:user`;
+    const cachedUser = await this.cacheService.get<UserWithSession>(cacheKey);
+
+    if (cachedUser) {
+      return cachedUser;
+    }
+
     const activeStatusId =
       await this.sessionStatusService.getIdByCode('ACTIVE');
 
@@ -51,6 +60,9 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     }
 
     const userWithSession: UserWithSession = { ...user, sessionId: payload.sessionId };
+    
+    await this.cacheService.set(cacheKey, userWithSession, 3600);
+    
     return userWithSession;
   }
 }

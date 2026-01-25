@@ -15,6 +15,7 @@ import { AuthSettingsService } from '@modules/auth/application/auth-settings.ser
 import { User } from '@modules/users/domain/user.entity';
 import { JwtPayload } from '@modules/auth/interfaces/jwt-payload.interface';
 import { RequestMetadata } from '@modules/auth/interfaces/request-metadata.interface';
+import { RedisCacheService } from '@infrastructure/cache/redis-cache.service';
 
 type RefreshTokenPayload = {
   sub: string;
@@ -38,6 +39,7 @@ export class AuthService {
     private readonly securityEventService: SecurityEventService,
     private readonly sessionStatusService: SessionStatusService,
     private readonly authSettingsService: AuthSettingsService,
+    private readonly cacheService: RedisCacheService,
   ) {
     const googleClientId = this.configService.get<string>('GOOGLE_CLIENT_ID');
     const googleClientSecret = this.configService.get<string>('GOOGLE_CLIENT_SECRET');
@@ -91,7 +93,8 @@ export class AuthService {
         this.logger.warn({
           level: 'warn',
           context: AuthService.name,
-          message: `Inicio de sesión condicional - Estado: ${sessionStatus}`,
+          message: 'Inicio de sesión condicional',
+          sessionStatus: sessionStatus,
           userId: user.id,
           email: user.email,
         });
@@ -124,6 +127,8 @@ export class AuthService {
     );
 
     const user = await this.usersService.findOne(payload.sub);
+
+    await this.cacheService.del(`cache:session:${session.id}:user`);
 
     const refreshTtlDays = await this.authSettingsService.getRefreshTokenTtlDays();
     const newRefreshToken = this.jwtService.sign(
@@ -167,6 +172,7 @@ export class AuthService {
 
   async logout(sessionId: string, userId: string): Promise<void> {
     await this.sessionService.deactivateSession(sessionId);
+    await this.cacheService.del(`cache:session:${sessionId}:user`);
   }
 
   async resolveConcurrentSession(
@@ -197,6 +203,8 @@ export class AuthService {
     if (!keptSessionId) {
       return { keptSessionId: null };
     }
+
+    await this.cacheService.del(`cache:session:${keptSessionId}:user`);
 
     const user = await this.usersService.findOne(payload.sub);
     const accessPayload: JwtPayload = {
@@ -275,6 +283,7 @@ export class AuthService {
         }
 
         await this.sessionService.deactivateSession(lockedSession.id, manager);
+        await this.cacheService.del(`cache:session:${lockedSession.id}:user`);
 
         await this.securityEventService.logEvent(
           payload.sub,
@@ -318,6 +327,8 @@ export class AuthService {
       }
 
       await this.sessionService.activateBlockedSession(lockedSession.id, manager);
+
+      await this.cacheService.del(`cache:session:${lockedSession.id}:user`);
 
       await this.securityEventService.logEvent(
         payload.sub,
