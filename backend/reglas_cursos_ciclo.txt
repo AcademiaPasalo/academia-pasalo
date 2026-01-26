@@ -1,0 +1,267 @@
+1. CONCEPTOS BASE (NO INTERPRETABLES)
+1.1 Curso
+
+Representa una materia (ej. Física, Química).
+
+Un curso existe a través de ciclos académicos.
+
+Un curso NO es consumible por sí solo, siempre se consume en un ciclo.
+
+1.2 Ciclo Académico
+
+Existe solo un ciclo activo a nivel sistema.
+
+Existen ciclos pasados (históricos).
+
+Los cursos se vinculan a los ciclos mediante course_cycle.
+
+1.3 Curso en un Ciclo (course_cycle)
+
+Es la unidad real de operación.
+
+Todo acceso, material, evaluación y matrícula se hace contra course_cycle.
+
+2. MATRÍCULAS (ENROLLMENT)
+2.1 Matrícula al curso
+
+Un alumno se matricula al curso en un ciclo específico (course_cycle).
+
+La matrícula puede ser:
+
+Curso completo del ciclo
+
+Parcial (PC / EX específicos)
+
+2.2 Matrícula de curso completo
+
+Cuando un alumno compra el curso completo del ciclo actual:
+
+Tiene acceso automático a:
+
+Todas las evaluaciones (PC, EX, LAB) existentes y futuras
+
+Todo el material del curso
+
+El acceso a ciclos pasados del mismo curso:
+
+ES CONFIGURABLE
+
+Siempre controlado por admin / superadmin
+
+No es automático por defecto
+
+2.3 Matrícula parcial (PC / EX)
+
+El alumno solo tiene acceso a:
+
+La evaluación específica
+
+El material asociado a esa evaluación
+
+NO tiene acceso a otras evaluaciones
+
+SÍ tiene acceso al banco de enunciados del curso (ver sección 4)
+
+3. EVALUACIONES (PC / EX / LAB)
+3.1 Definición
+
+Las evaluaciones:
+
+Son instancias numeradas (PC1, PC2, EX1, etc.)
+
+Existen dentro de un course_cycle
+
+Una evaluación:
+
+Tiene fechas
+
+Tiene su propia estructura de carpetas
+
+Puede no existir aún (evaluaciones futuras)
+
+3.2 Acceso a evaluaciones
+
+El acceso a evaluaciones se controla exclusivamente por:
+
+enrollment_evaluation
+
+Fechas de acceso
+
+Estado activo / revocado
+
+NO se infiere acceso por carpeta
+
+NO se asume acceso por número
+
+4. BANCO DE ENUNCIADOS (REGLA CRÍTICA)
+4.1 Definición
+
+El banco de enunciados:
+
+Es una CARPETA DEL CURSO
+
+Asociada a un course_cycle
+
+NO pertenece a ninguna evaluación
+
+NO depende de PC ni EX
+
+4.2 Visibilidad
+
+El banco de enunciados:
+
+Es SIEMPRE visible para:
+
+Cualquier alumno matriculado en el curso
+
+Sin importar:
+
+Si la matrícula es parcial o completa
+
+Si es para PC, EX o todo el curso
+
+4.3 Regla de acceso
+
+Para acceder al banco de enunciados solo se valida:
+
+Que exista una enrollment activa al course_cycle
+
+NO se valida:
+
+evaluation
+
+fechas de evaluación
+
+enrollment_evaluation
+
+5. ESTRUCTURA DE CARPETAS (MODELO OBLIGATORIO)
+5.1 Estructura conceptual (para UI y backend)
+Curso
+│
+├── Banco de Enunciados            [CURSO]
+│   ├── Tema 1
+│   ├── Tema 2
+│   └── PDFs comunes
+│
+├── PC1                            [EVALUACIÓN]
+│   ├── Material
+│   └── Soluciones
+│
+├── PC2
+│
+├── EX1
+│
+└── LAB
+
+5.2 Reglas de jerarquía
+
+Las carpetas pueden ser:
+
+Nivel Curso (ej. Banco de Enunciados)
+
+Nivel Evaluación (PC / EX / LAB)
+
+No se mezclan responsabilidades
+
+No se simula el banco como evaluación
+
+6. NUMERACIÓN Y ORDEN (IMPORTANTE)
+6.1 Evaluaciones
+
+Las evaluaciones se enumeran explícitamente:
+
+PC1, PC2, PC3…
+
+EX1, EX2…
+
+El número:
+
+No implica acceso
+
+No implica existencia futura
+
+Es solo identificador funcional
+
+6.2 Carpetas
+
+Las carpetas:
+
+Pueden existir o no
+
+Se crean conforme avanza el ciclo
+
+Si el alumno está matriculado al curso completo:
+
+Puede ver la estructura
+
+Aunque esté vacía
+
+7. ARCHIVOS Y VERSIONADO
+7.1 Reglas de archivos
+
+Los archivos:
+
+Se almacenan con hash (checksum)
+
+No se duplican físicamente
+
+Si el mismo PDF se usa en múltiples carpetas:
+
+Se referencia
+
+No se vuelve a subir o cargar al storage
+
+7.2 Versionado
+
+Un archivo puede tener múltiples versiones
+
+El material siempre apunta a:
+
+una versión específica
+
+El histórico se conserva
+
+8. CONTROL ADMINISTRATIVO
+8.1 Admin / Superadmin puede:
+
+Habilitar acceso a ciclos pasados
+
+Revocar accesos parciales
+
+Reordenar visibilidad
+
+Controlar featured content
+
+Administrar estructura de carpetas
+
+9. PRINCIPIOS QUE NO SE DEBEN ROMPER
+
+❌ No inferir acceso por estructura de carpetas
+
+❌ No inferir acceso por numeración
+
+❌ No mezclar curso con evaluación
+
+✅ El banco de enunciados es curso-level
+
+✅ Las evaluaciones son evaluation-level
+
+✅ El acceso siempre se valida por matrícula
+
+10. RESUMEN EJECUTIVO (PARA EL AGENTE)
+
+Banco de enunciados = carpeta del curso
+
+Siempre visible al alumno matriculado
+
+No depende de evaluación
+
+Evaluaciones tienen acceso propio
+
+Curso completo ≠ acceso automático a ciclos pasados (admin decide)
+
+Las carpetas se crean dinámicamente o pueden crearse todas en conjunto
+
+El acceso no se deduce por existir carpetas, siempre va a depender si es 
+matricula de todo un curso o para una evaluacion (pj. PC1 en especifica o mas)
+asi que debe ser flexible
