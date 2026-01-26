@@ -10,6 +10,8 @@ import { GeolocationService } from '@modules/auth/application/geolocation.servic
 import { GeoIpService } from '@modules/auth/application/geo-ip.service';
 import { SecurityEventService } from '@modules/auth/application/security-event.service';
 import { SessionStatusService } from '@modules/auth/application/session-status.service';
+import { GoogleProviderService } from '@modules/auth/application/google-provider.service';
+import { TokenService } from '@modules/auth/application/token.service';
 import { AuthController } from '@modules/auth/presentation/auth.controller';
 import { UserSession } from '@modules/auth/domain/user-session.entity';
 import { SecurityEvent } from '@modules/auth/domain/security-event.entity';
@@ -61,6 +63,8 @@ import { UsersModule } from '@modules/users/users.module';
     GeoIpService,
     GeolocationService,
     SecurityEventService,
+    GoogleProviderService,
+    TokenService,
     UserSessionRepository,
     SecurityEventRepository,
     SecurityEventTypeRepository,
@@ -68,6 +72,6 @@ import { UsersModule } from '@modules/users/users.module';
     SystemSettingRepository,
     JwtStrategy,
   ],
-  exports: [AuthService, SessionService, JwtModule, PassportModule],
+  exports: [AuthService, SessionService, GoogleProviderService, TokenService, JwtModule, PassportModule],
 })
 export class AuthModule {}

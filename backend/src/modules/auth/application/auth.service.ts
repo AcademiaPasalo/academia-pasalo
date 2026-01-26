@@ -1,9 +1,6 @@
 import { Injectable, UnauthorizedException, Logger } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import { JwtService } from '@nestjs/jwt';
 import { DataSource } from 'typeorm';
 import type { EntityManager } from 'typeorm';
-import { OAuth2Client } from 'google-auth-library';
 import { UsersService } from '@modules/users/application/users.service';
 import { SessionService } from '@modules/auth/application/session.service';
 import { SecurityEventService } from '@modules/auth/application/security-event.service';
@@ -12,27 +9,18 @@ import {
   SessionStatusService,
 } from '@modules/auth/application/session-status.service';
 import { AuthSettingsService } from '@modules/auth/application/auth-settings.service';
+import { GoogleProviderService } from '@modules/auth/application/google-provider.service';
+import { TokenService } from '@modules/auth/application/token.service';
 import { User } from '@modules/users/domain/user.entity';
 import { JwtPayload } from '@modules/auth/interfaces/jwt-payload.interface';
 import { RequestMetadata } from '@modules/auth/interfaces/request-metadata.interface';
 import { RedisCacheService } from '@infrastructure/cache/redis-cache.service';
 
-type RefreshTokenPayload = {
-  sub: string;
-  deviceId: string;
-  type: 'refresh';
-  iat?: number;
-  exp?: number;
-};
-
 @Injectable()
 export class AuthService {
   private readonly logger = new Logger(AuthService.name);
-  private readonly googleClient: OAuth2Client;
 
   constructor(
-    private readonly configService: ConfigService,
-    private readonly jwtService: JwtService,
     private readonly dataSource: DataSource,
     private readonly usersService: UsersService,
     private readonly sessionService: SessionService,
@@ -40,21 +28,9 @@ export class AuthService {
     private readonly sessionStatusService: SessionStatusService,
     private readonly authSettingsService: AuthSettingsService,
     private readonly cacheService: RedisCacheService,
-  ) {
-    const googleClientId = this.configService.get<string>('GOOGLE_CLIENT_ID');
-    const googleClientSecret = this.configService.get<string>('GOOGLE_CLIENT_SECRET');
-    const googleRedirectUri = this.configService.get<string>('GOOGLE_REDIRECT_URI');
-
-    if (!googleClientId || !googleClientSecret) {
-      throw new Error('Configuración de Google OAuth incompleta (Client ID o Secret)');
-    }
-
-    this.googleClient = new OAuth2Client(
-      googleClientId,
-      googleClientSecret,
-      googleRedirectUri || 'postmessage',
-    );
-  }
+    private readonly googleProviderService: GoogleProviderService,
+    private readonly tokenService: TokenService,
+  ) {}
 
   async loginWithGoogle(
     authCode: string,
@@ -66,7 +42,7 @@ export class AuthService {
     sessionStatus: SessionStatusCode;
     concurrentSessionId: string | null;
   }> {
-    const googleEmail = await this.verifyCodeAndGetEmail(authCode);
+    const googleEmail = await this.googleProviderService.verifyCodeAndGetEmail(authCode);
 
     const user = await this.usersService.findByEmail(googleEmail);
 
@@ -94,7 +70,7 @@ export class AuthService {
           level: 'warn',
           context: AuthService.name,
           message: 'Inicio de sesión condicional',
-          sessionStatus: sessionStatus,
+          sessionStatus,
           userId: user.id,
           email: user.email,
         });
@@ -114,7 +90,7 @@ export class AuthService {
     refreshToken: string,
     deviceId: string,
   ): Promise<{ accessToken: string; refreshToken: string }> {
-    const payload = this.verifyRefreshToken(refreshToken);
+    const payload = this.tokenService.verifyRefreshToken(refreshToken);
 
     if (payload.deviceId !== deviceId) {
       throw new UnauthorizedException('Dispositivo no autorizado');
@@ -130,21 +106,8 @@ export class AuthService {
 
     await this.cacheService.del(`cache:session:${session.id}:user`);
 
-    const refreshTtlDays = await this.authSettingsService.getRefreshTokenTtlDays();
-    const newRefreshToken = this.jwtService.sign(
-      {
-        sub: user.id,
-        deviceId,
-        type: 'refresh',
-      },
-      {
-        expiresIn: `${refreshTtlDays}d`,
-      },
-    );
-
-    const newExpiresAt = new Date(
-      Date.now() + refreshTtlDays * 24 * 60 * 60 * 1000,
-    );
+    const { token: newRefreshToken, expiresAt: newExpiresAt } = 
+      await this.tokenService.generateRefreshToken(user.id, deviceId);
 
     await this.sessionService.rotateRefreshToken(
       session.id,
@@ -159,10 +122,7 @@ export class AuthService {
       sessionId: session.id,
     };
 
-    const accessTokenTtlMinutes = await this.authSettingsService.getAccessTokenTtlMinutes();
-    const newAccessToken = this.jwtService.sign(accessPayload, {
-      expiresIn: `${accessTokenTtlMinutes}m`,
-    });
+    const newAccessToken = await this.tokenService.generateAccessToken(accessPayload);
 
     return {
       accessToken: newAccessToken,
@@ -186,7 +146,7 @@ export class AuthService {
     refreshToken?: string;
     expiresIn?: number;
   }> {
-    const payload = this.verifyRefreshToken(refreshToken);
+    const payload = this.tokenService.verifyRefreshToken(refreshToken);
     if (payload.deviceId !== deviceId) {
       throw new UnauthorizedException('Dispositivo no autorizado');
     }
@@ -214,10 +174,8 @@ export class AuthService {
       sessionId: keptSessionId,
     };
 
+    const accessToken = await this.tokenService.generateAccessToken(accessPayload);
     const accessTokenTtlMinutes = await this.authSettingsService.getAccessTokenTtlMinutes();
-    const accessToken = this.jwtService.sign(accessPayload, {
-      expiresIn: `${accessTokenTtlMinutes}m`,
-    });
 
     return {
       keptSessionId,
@@ -233,7 +191,7 @@ export class AuthService {
     deviceId: string,
     metadata: RequestMetadata,
   ): Promise<{ accessToken: string; refreshToken: string; expiresIn: number }> {
-    const payload = this.verifyRefreshToken(refreshToken);
+    const payload = this.tokenService.verifyRefreshToken(refreshToken);
     if (payload.deviceId !== deviceId) {
       throw new UnauthorizedException('Dispositivo no autorizado');
     }
@@ -253,7 +211,7 @@ export class AuthService {
     let userByEmail: User | null;
 
     try {
-      googleUserEmail = await this.verifyCodeAndGetEmail(authCode);
+      googleUserEmail = await this.googleProviderService.verifyCodeAndGetEmail(authCode);
       userByEmail = await this.usersService.findByEmail(googleUserEmail);
       if (!userByEmail || userByEmail.id !== payload.sub) {
         throw new UnauthorizedException('Token de Google inválido o expirado');
@@ -342,21 +300,8 @@ export class AuthService {
         manager,
       );
 
-      const refreshTtlDays = await this.authSettingsService.getRefreshTokenTtlDays();
-      const newRefreshToken = this.jwtService.sign(
-        {
-          sub: payload.sub,
-          deviceId,
-          type: 'refresh',
-        },
-        {
-          expiresIn: `${refreshTtlDays}d`,
-        },
-      );
-
-      const newExpiresAt = new Date(
-        Date.now() + refreshTtlDays * 24 * 60 * 60 * 1000,
-      );
+      const { token: newRefreshToken, expiresAt: newExpiresAt } = 
+        await this.tokenService.generateRefreshToken(payload.sub, deviceId);
 
       await this.sessionService.rotateRefreshToken(
         lockedSession.id,
@@ -372,10 +317,8 @@ export class AuthService {
         sessionId: lockedSession.id,
       };
 
+      const accessToken = await this.tokenService.generateAccessToken(accessPayload);
       const accessTokenTtlMinutes = await this.authSettingsService.getAccessTokenTtlMinutes();
-      const accessToken = this.jwtService.sign(accessPayload, {
-        expiresIn: `${accessTokenTtlMinutes}m`,
-      });
 
       return {
         accessToken,
@@ -383,34 +326,6 @@ export class AuthService {
         expiresIn: accessTokenTtlMinutes * 60,
       };
     });
-  }
-
-  private async verifyCodeAndGetEmail(code: string): Promise<string> {
-    try {
-      const { tokens } = await this.googleClient.getToken(code);
-      this.googleClient.setCredentials(tokens);
-
-      const ticket = await this.googleClient.verifyIdToken({
-        idToken: tokens.id_token!,
-        audience: this.configService.get<string>('GOOGLE_CLIENT_ID'),
-      });
-
-      const payload = ticket.getPayload();
-
-      if (!payload || !payload.email) {
-        throw new UnauthorizedException('El token de Google no contiene un correo válido');
-      }
-
-      return payload.email;
-    } catch (error) {
-      this.logger.error({
-        level: 'error',
-        context: AuthService.name,
-        message: 'Error al intercambiar código de Google por tokens',
-        error: error instanceof Error ? error.message : String(error),
-      });
-      throw new UnauthorizedException('Error de autenticación con Google');
-    }
   }
 
   private async generateTokens(
@@ -423,20 +338,8 @@ export class AuthService {
     sessionStatus: SessionStatusCode;
     concurrentSessionId: string | null;
   }> {
-    const refreshTtlDays = await this.authSettingsService.getRefreshTokenTtlDays();
-    const refreshPayload: RefreshTokenPayload = {
-      sub: user.id,
-      deviceId: metadata.deviceId,
-      type: 'refresh',
-    };
-
-    const refreshToken = this.jwtService.sign(refreshPayload, {
-      expiresIn: `${refreshTtlDays}d`,
-    });
-
-    const expiresAt = new Date(
-      Date.now() + refreshTtlDays * 24 * 60 * 60 * 1000,
-    );
+    const { token: refreshToken, expiresAt } = 
+      await this.tokenService.generateRefreshToken(user.id, metadata.deviceId);
 
     const { session, sessionStatus, concurrentSessionId } =
       await this.sessionService.createSession(
@@ -454,36 +357,8 @@ export class AuthService {
       sessionId: session.id,
     };
 
-    const accessTokenTtlMinutes = await this.authSettingsService.getAccessTokenTtlMinutes();
-    const accessToken = this.jwtService.sign(accessTokenPayload, {
-      expiresIn: `${accessTokenTtlMinutes}m`,
-    });
+    const accessToken = await this.tokenService.generateAccessToken(accessTokenPayload);
 
     return { accessToken, refreshToken, sessionStatus, concurrentSessionId };
-  }
-
-  private verifyRefreshToken(token: string): RefreshTokenPayload {
-    try {
-      const payload = this.jwtService.verify<RefreshTokenPayload>(token);
-
-      if (
-        !payload ||
-        payload.type !== 'refresh' ||
-        typeof payload.sub !== 'string' ||
-        typeof payload.deviceId !== 'string'
-      ) {
-        throw new UnauthorizedException('Refresh token inválido');
-      }
-
-      return payload;
-    } catch (error) {
-      this.logger.warn({
-        level: 'warn',
-        context: AuthService.name,
-        message: 'Refresh token inválido o expirado',
-        error: error instanceof Error ? error.message : String(error),
-      });
-      throw new UnauthorizedException('Refresh token inválido o expirado');
-    }
   }
 }
