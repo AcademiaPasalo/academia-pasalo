@@ -1,98 +1,111 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
-</p>
+# Academia Pasalo - Backend
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+API REST desarrollada con NestJS para la gestión integral de la plataforma educativa Academia Pasalo. Este proyecto sigue una arquitectura modular y escalable, utilizando prácticas de desarrollo profesionales y tipado estricto.
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+## Requisitos Previos
 
-## Description
+Asegúrese de tener instalado el siguiente software antes de comenzar:
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+- Node.js (v20 o superior recomendado)
+- Docker Desktop (para servicios de infraestructura como Redis)
+- MySQL 8.0
+- npm (gestor de paquetes)
 
-## Project setup
+## Instalación y Configuración
+
+Siga estos pasos para configurar el entorno de desarrollo local.
+
+### 1. Clonar el repositorio y acceder al directorio
 
 ```bash
-$ npm install
+git clone <url-del-repositorio>
+cd academia-pasalo/backend
 ```
 
-## Compile and run the project
+### 2. Instalar dependencias
 
 ```bash
-# development
-$ npm run start
-
-# watch mode
-$ npm run start:dev
-
-# production mode
-$ npm run start:prod
+npm install
 ```
 
-## Run tests
+### 3. Configuración de Variables de Entorno
+
+El proyecto utiliza un archivo `.env` para gestionar la configuración. Se proporciona un archivo de plantilla con las claves necesarias.
 
 ```bash
-# unit tests
-$ npm run test
-
-# e2e tests
-$ npm run test:e2e
-
-# test coverage
-$ npm run test:cov
+cp .env.example .env
 ```
 
-## Deployment
+Abra el archivo `.env` recién creado y complete los valores correspondientes a su entorno local (Base de Datos, Google OAuth, etc.).
 
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
+### 4. Base de Datos (MySQL)
 
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
+Este proyecto **NO** utiliza sincronización automática (`synchronize: true`) por seguridad y control estricto del esquema.
+
+1. Cree la base de datos `academia_pasalo` en su servidor MySQL.
+2. Ejecute manualmente los scripts SQL ubicados en la raíz del proyecto para crear las tablas y datos iniciales:
+   - `creacion_tablas_academia_pasalo_v1.sql`
+   - `datos_iniciales_academa_pasalo_v1.sql` (si aplica)
+
+### 5. Servicios de Infraestructura (Docker)
+
+El proyecto utiliza Docker Compose para gestionar servicios auxiliares como Redis.
+
+**Iniciar Redis (Obligatorio para Auth y Caché):**
 
 ```bash
-$ npm install -g @nestjs/mau
-$ mau deploy
+docker compose up -d redis
+```
+Esto levantará una instancia de Redis 8.0 (Alpine) optimizada para caché y gestión de sesiones.
+
+### 6. Actualizar Base de Datos de GeoIP
+
+Para las funcionalidades de seguridad y detección de ubicación, es necesario descargar la base de datos local de GeoIP.
+
+```bash
+npm run geoip:update
 ```
 
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
+## Ejecución del Proyecto
 
-## Resources
+### Desarrollo (Watch Mode)
 
-Check out a few resources that may come in handy when working with NestJS:
+```bash
+npm run start:dev
+```
+La API estará disponible en `http://localhost:3000/api/v1` (o el puerto configurado).
 
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
+### Producción
 
-## Support
+```bash
+npm run build
+npm run start:prod
+```
 
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
+## Pruebas (Testing)
 
-## Stay in touch
+El proyecto cuenta con suites de pruebas unitarias y de extremo a extremo (E2E) para garantizar la calidad y seguridad.
 
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
+```bash
+# Pruebas Unitarias
+npm run test
 
-## License
+# Pruebas E2E (Seguridad y Flujos Críticos)
+npm run test:e2e
+```
 
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+## Infraestructura y Futuro
+
+Actualmente, la infraestructura Docker soporta:
+
+- **Redis 8.0:** Utilizado para caché de alto rendimiento (Cache-Aside) y gestión segura de sesiones distribuidas.
+
+**Planificación Futura:**
+Se tiene previsto integrar los siguientes servicios en el contenedor de Docker para soportar la escalabilidad del sistema:
+
+- **BullMQ:** Para el manejo de colas de tareas en segundo plano (emails, procesamiento de videos).
+- **ELK Stack:** Para centralización de logs y observabilidad avanzada.
+
+## Contribución
+
+Por favor, revise los archivos `CONTRIBUTING.md` y `arquitectura_deseable.txt` antes de realizar cambios. Se aplican reglas estrictas de estilo, tipado y arquitectura.
