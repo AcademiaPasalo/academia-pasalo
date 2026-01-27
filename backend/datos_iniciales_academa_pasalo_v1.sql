@@ -30,7 +30,8 @@ INSERT INTO evaluation_type (code, name) VALUES
 ('PC', 'Práctica Calificada'),
 ('EX', 'Examen'),
 ('LAB', 'Laboratorio'),
-('TUTORING', 'Tutoría Especializada');
+('TUTORING', 'Tutoría Especializada'),
+('BANCO_ENUNCIADOS', 'Banco de Enunciados');
 
 INSERT INTO folder_status (code, name) VALUES
 ('ACTIVE', 'Activa'),
@@ -57,12 +58,6 @@ INSERT INTO audit_action (code, name) VALUES
 ('FILE_ARCHIVE', 'Archivado de archivo o carpeta'),
 ('CONTENT_DISABLE', 'Desactivación de contenido');
 
-INSERT INTO session_status (code, name) VALUES
-('ACTIVE', 'Activa'),
-('PENDING_CONCURRENT_RESOLUTION', 'Pendiente de resolución por sesión concurrente'),
-('BLOCKED_PENDING_REAUTH', 'Bloqueada pendiente de reautenticación'),
-('REVOKED', 'Revocada');
-
 INSERT INTO security_event_type (code, name) VALUES
 ('CONCURRENT_SESSION_DETECTED', 'Detección de sesión concurrente'),
 ('CONCURRENT_SESSION_RESOLVED', 'Resolución de sesión concurrente'),
@@ -71,6 +66,10 @@ INSERT INTO security_event_type (code, name) VALUES
 ('ANOMALOUS_LOGIN_REAUTH_FAILED', 'Reautenticación fallida tras login anómalo'),
 ('LOGIN_SUCCESS', 'Inicio de sesión de manera exitosa'),
 ('LOGOUT_SUCCESS', 'Cierre de sesión exitoso');
+
+INSERT INTO enrollment_type (code, name) VALUES
+('FULL', 'Curso Completo'),
+('PARTIAL', 'Por Evaluación');
 
 
 INSERT INTO system_setting (setting_key, setting_value, description, created_at) VALUES
@@ -84,5 +83,10 @@ INSERT INTO system_setting (setting_key, setting_value, description, created_at)
 
 -- Umbrales por geolocalización real (GPS / navegador)
 ('GEO_GPS_ANOMALY_TIME_WINDOW_MINUTES', '30', 'Ventana de tiempo (min) para evaluar anomalías usando geolocalización real.', NOW()),
-('GEO_GPS_ANOMALY_DISTANCE_KM', '10', 'Distancia (km) para detectar cambios anómalos a nivel urbano/distrital.', NOW());
+('GEO_GPS_ANOMALY_DISTANCE_KM', '10', 'Distancia (km) para detectar cambios anómalos a nivel urbano/distrital.', NOW()),
+
+('ACCESS_TOKEN_TTL_MINUTES', '180', 'Tiempo de vida del access token en minutos (3 horas).', NOW());
+INSERT INTO system_setting (setting_key, setting_value, description, created_at) VALUES
+('SESSION_EXPIRATION_WARNING_MINUTES', '10', 'Minutos antes de que expire el token para mostrar advertencia al
+     usuario.', NOW());
 

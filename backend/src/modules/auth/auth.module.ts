@@ -72,6 +72,6 @@ import { UsersModule } from '@modules/users/users.module';
     SystemSettingRepository,
     JwtStrategy,
   ],
-  exports: [AuthService, SessionService, GoogleProviderService, TokenService, JwtModule, PassportModule],
+  exports: [AuthService, SessionService, GoogleProviderService, TokenService, JwtModule, PassportModule, AuthSettingsService],
 })
 export class AuthModule {}

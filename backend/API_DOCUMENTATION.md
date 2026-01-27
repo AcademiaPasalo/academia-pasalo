@@ -145,7 +145,7 @@ Base URL: `/api/v1/auth`
 
 ---
 
-## 👥 Módulo de Usuarios (Users)
+## 👥 ÉPICA 2: Módulo de Usuarios (Users)
 
 Base URL: `/api/v1/users`
 *Todos los endpoints requieren JWT y una sesión activa en BD.*
@@ -159,6 +159,45 @@ Base URL: `/api/v1/users`
 | DELETE | `/:id` | ADMIN, SUPER_ADMIN | Eliminar un usuario del sistema. |
 | POST | `/:id/roles/:code` | SUPER_ADMIN | Asignar un rol específico (Operación atómica). |
 | DELETE | `/:id/roles/:code` | SUPER_ADMIN | Remover un rol específico (Operación atómica). |
+
+---
+
+## 📚 ÉPICA 3: Cursos y Ciclos (Courses)
+
+Base URL: `/api/v1/courses`
+*Gestión del catálogo académico.*
+
+| Método | Endpoint | Roles / Permisos | Descripción |
+| :--- | :--- | :--- | :--- |
+| POST | `/` | ADMIN, SUPER_ADMIN | **Crear Materia.** Registra una nueva materia en el sistema (ej. "Física I"). |
+| GET | `/` | ADMIN, SUPER_ADMIN | **Listar Materias.** Obtiene todas las materias registradas. |
+| GET | `/types` | ADMIN, SUPER_ADMIN | Listar tipos de cursos (Ciencias, Letras, Facultad). |
+| GET | `/levels` | ADMIN, SUPER_ADMIN | Listar niveles académicos (1er Ciclo, etc.). |
+| GET | `/:id` | ADMIN, SUPER_ADMIN | Obtener detalle de una materia. |
+| POST | `/assign-cycle` | ADMIN, SUPER_ADMIN | **Aperturar Materia en Ciclo.** Vincula una materia a un ciclo académico (ej. Física I en 2026-0). Esto crea el `CourseCycle`. |
+
+---
+
+## 📝 ÉPICA 4: Evaluaciones Académicas (Evaluations)
+
+Base URL: `/api/v1/evaluations`
+*Gestión de exámenes, PCs y estructura del curso.*
+
+| Método | Endpoint | Roles / Permisos | Descripción |
+| :--- | :--- | :--- | :--- |
+| POST | `/` | ADMIN, SUPER_ADMIN | **Crear Evaluación.** Registra una PC, Examen o Banco. <br>⚠️ **Disparador:** Al crearla, si existen alumnos matriculados FULL, se les otorga acceso automático. |
+| GET | `/course-cycle/:id` | ADMIN, SUPER_ADMIN | Listar todas las evaluaciones de un curso en un ciclo específico. |
+
+---
+
+## 🎓 ÉPICA 5: Matrículas (Enrollments)
+
+Base URL: `/api/v1/enrollments`
+*Proceso de inscripción y compra de accesos.*
+
+| Método | Endpoint | Roles / Permisos | Descripción |
+| :--- | :--- | :--- | :--- |
+| POST | `/` | ADMIN, SUPER_ADMIN | **Matricular Alumno.** <br>Crea la matrícula y calcula los accesos iniciales según el tipo (`FULL` o `PARTIAL`). <br> - **FULL:** Acceso a todo el ciclo actual + histórico.<br> - **PARTIAL:** Acceso solo a evaluaciones pagadas + Banco (con vigencia recortada). |
 
 ---
 

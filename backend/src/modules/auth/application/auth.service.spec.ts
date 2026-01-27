@@ -8,9 +8,12 @@ import { AuthSettingsService } from '@modules/auth/application/auth-settings.ser
 import { SecurityEventService } from '@modules/auth/application/security-event.service';
 import { SessionService } from '@modules/auth/application/session.service';
 import { SessionStatusService } from '@modules/auth/application/session-status.service';
+import { GoogleProviderService } from '@modules/auth/application/google-provider.service';
+import { TokenService } from '@modules/auth/application/token.service';
 import { RequestMetadata } from '@modules/auth/interfaces/request-metadata.interface';
 import { UsersService } from '@modules/users/application/users.service';
 import { PhotoSource } from '@modules/users/domain/user.entity';
+import { RedisCacheService } from '@infrastructure/cache/redis-cache.service';
 
 describe('AuthService', () => {
   let authService: AuthService;
@@ -19,8 +22,27 @@ describe('AuthService', () => {
   const configServiceMock = {
     get: (key: string) => {
       if (key === 'GOOGLE_CLIENT_ID') return 'test-google-client-id';
+      if (key === 'GOOGLE_CLIENT_SECRET') return 'test-google-client-secret';
+      if (key === 'GOOGLE_REDIRECT_URI') return 'postmessage';
       return undefined;
     },
+  };
+
+  const googleProviderServiceMock = {
+    verifyCodeAndGetEmail: jest.fn(),
+  };
+
+  let tokenServiceMock: {
+    generateAccessToken: jest.Mock;
+    generateRefreshToken: jest.Mock;
+    verifyRefreshToken: jest.Mock;
+  };
+
+  const redisCacheServiceMock = {
+    get: jest.fn().mockResolvedValue(null),
+    set: jest.fn().mockResolvedValue(null),
+    del: jest.fn().mockResolvedValue(null),
+    invalidateGroup: jest.fn().mockResolvedValue(null),
   };
 
   const usersServiceMock = {
@@ -83,6 +105,12 @@ describe('AuthService', () => {
     jest.clearAllMocks();
     verifyIdTokenMock = jest.fn();
 
+    tokenServiceMock = {
+      generateAccessToken: jest.fn(),
+      generateRefreshToken: jest.fn(),
+      verifyRefreshToken: jest.fn(),
+    };
+
     const moduleRef = await Test.createTestingModule({
       imports: [JwtModule.register({ secret: 'unit-test-jwt-secret' })],
       providers: [
@@ -94,17 +122,47 @@ describe('AuthService', () => {
         { provide: SecurityEventService, useValue: securityEventServiceMock },
         { provide: SessionStatusService, useValue: sessionStatusServiceMock },
         { provide: AuthSettingsService, useValue: authSettingsServiceMock },
+        { provide: GoogleProviderService, useValue: googleProviderServiceMock },
+        { provide: TokenService, useValue: tokenServiceMock },
+        { provide: RedisCacheService, useValue: redisCacheServiceMock },
       ],
     }).compile();
 
     authService = moduleRef.get(AuthService);
     jwtService = moduleRef.get(JwtService);
 
-    (authService as any).verifyCodeAndGetEmail = jest.fn();
+    tokenServiceMock.verifyRefreshToken.mockImplementation((token: string) => {
+      try {
+        const payload = jwtService.verify(token);
+        if (payload.type !== 'refresh' || !payload.sub || !payload.deviceId) {
+          throw new UnauthorizedException('Refresh token inválido');
+        }
+        return payload;
+      } catch {
+        throw new UnauthorizedException('Refresh token inválido o expirado');
+      }
+    });
+
+    tokenServiceMock.generateAccessToken.mockImplementation((payload: any) => {
+      return Promise.resolve(jwtService.sign(payload));
+    });
+
+    tokenServiceMock.generateRefreshToken.mockImplementation((userId: string, deviceId: string) => {
+      const token = jwtService.sign({
+        sub: userId,
+        deviceId,
+        type: 'refresh',
+        iat: Date.now(), // Force unique token
+      });
+      return Promise.resolve({
+        token,
+        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+      });
+    });
   });
 
   it('loginWithGoogle: éxito -> retorna tokens', async () => {
-    (authService as any).verifyCodeAndGetEmail.mockResolvedValue(baseUser.email);
+    googleProviderServiceMock.verifyCodeAndGetEmail.mockResolvedValue(baseUser.email);
     usersServiceMock.findByEmail.mockResolvedValue(baseUser);
     sessionServiceMock.createSession.mockResolvedValue({
       session: { id: '777' },
@@ -151,7 +209,7 @@ describe('AuthService', () => {
   });
 
   it('loginWithGoogle: correo no registrado -> 401', async () => {
-    (authService as any).verifyCodeAndGetEmail.mockResolvedValue('nope@test.com');
+    googleProviderServiceMock.verifyCodeAndGetEmail.mockResolvedValue('nope@test.com');
     usersServiceMock.findByEmail.mockResolvedValue(null);
 
     await expect(
@@ -163,7 +221,7 @@ describe('AuthService', () => {
   });
 
   it('loginWithGoogle: token inválido/verificación falla -> 401', async () => {
-    (authService as any).verifyCodeAndGetEmail.mockRejectedValue(new UnauthorizedException());
+    googleProviderServiceMock.verifyCodeAndGetEmail.mockRejectedValue(new UnauthorizedException());
 
     await expect(
       authService.loginWithGoogle('bad-code', metadata),
@@ -268,7 +326,7 @@ describe('AuthService', () => {
     sessionServiceMock.findSessionByRefreshTokenForUpdate.mockResolvedValue(blockedSession);
 
     sessionStatusServiceMock.getIdByCode.mockResolvedValue('9');
-    (authService as any).verifyCodeAndGetEmail.mockResolvedValue(baseUser.email);
+    googleProviderServiceMock.verifyCodeAndGetEmail.mockResolvedValue(baseUser.email);
 
     usersServiceMock.findByEmail.mockResolvedValue(baseUser);
     sessionServiceMock.activateBlockedSession.mockResolvedValue(undefined);

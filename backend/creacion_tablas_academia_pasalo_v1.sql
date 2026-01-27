@@ -71,6 +71,14 @@ CREATE TABLE security_event_type (
   name VARCHAR(200) NOT NULL
 );
 
+CREATE TABLE enrollment_type (
+    id BIGINT NOT NULL AUTO_INCREMENT,
+    code VARCHAR(32) NOT NULL,
+    name VARCHAR(100) NOT NULL,
+    PRIMARY KEY (id),
+    UNIQUE KEY uq_enrollment_type_code (code)
+);
+
 CREATE TABLE user (
   id BIGINT PRIMARY KEY AUTO_INCREMENT,
   email VARCHAR(255) NOT NULL,
@@ -167,11 +175,13 @@ CREATE TABLE enrollment (
   user_id BIGINT NOT NULL,
   course_cycle_id BIGINT NOT NULL,
   enrollment_status_id BIGINT NOT NULL,
+  enrollment_type_id BIGINT NOT NULL,
   enrolled_at DATETIME NOT NULL,
   cancelled_at DATETIME,
   FOREIGN KEY (user_id) REFERENCES user(id),
   FOREIGN KEY (course_cycle_id) REFERENCES course_cycle(id),
-  FOREIGN KEY (enrollment_status_id) REFERENCES enrollment_status(id)
+  FOREIGN KEY (enrollment_status_id) REFERENCES enrollment_status(id),
+  FOREIGN KEY (enrollment_type_id) REFERENCES enrollment_type (id)
 );
 
 CREATE TABLE enrollment_evaluation (
