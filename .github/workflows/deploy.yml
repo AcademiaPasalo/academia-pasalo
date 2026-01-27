@@ -18,7 +18,7 @@ jobs:
         run: |
           INSTANCE_ID="i-075c22a8bf3645192"
           echo "Starting instance"
-          aws ec2 start-instances --instance-ids "$INSTANCE_ID" --ouput table
+          aws ec2 start-instances --instance-ids "$INSTANCE_ID" --output table
 
           echo "Wait til EC2 it's on"
           aws ec2 wait instance-running --instance-ids "$INSTANCE_ID"
