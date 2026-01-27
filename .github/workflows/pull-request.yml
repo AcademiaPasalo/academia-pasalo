@@ -2,21 +2,24 @@
 name: Check-branch
 
 on:
-  workflow_dispatch:
   pull_request:
-    branches:
-      - main
+    branches: [main]
 
 jobs:
   check-branch:
+    name: check-branch
     runs-on: ubuntu-latest
     steps:
       - name: Fail if PR is not from develop
         run: |
-          echo "PR base (destino): ${{ github.base_ref }}"
-          echo "PR head (origen): ${{ github.head_ref }}"
-          if [ "${{ github.base_ref }}" == "main" ] && [ "${{ github.head_ref }}" != "develop" ]; then
+          BASE="${{ github.event.pull_request.base.ref }}"
+          HEAD="${{ github.event.pull_request.head.ref }}"
+          echo "PR base (destino): $BASE"
+          echo "PR head (origen): $HEAD"
+
+          if [ "$BASE" = "main" ] && [ "$HEAD" != "develop" ]; then
             echo "ERROR: Solo se permiten pull requests desde 'develop' hacia 'main'." >&2
             exit 1
           fi
+
           echo "PR desde develop hacia main, permitido."
