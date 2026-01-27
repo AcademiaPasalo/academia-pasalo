@@ -1,9 +1,7 @@
 name: Start EC2
 on:
   workflow_dispatch:
-  push:
-    branches: [main]
-
+    
 jobs:
   start-ec2:
     runs-on: ubuntu-latest
@@ -14,14 +12,23 @@ jobs:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: us-east-1
-      - name: Start EC2 instance
+      - name: Start EC2 instance if stopped
         run: |
           INSTANCE_ID="i-075c22a8bf3645192"
-          echo "Starting instance"
-          aws ec2 start-instances --instance-ids "$INSTANCE_ID" --output table
-
-          echo "Wait til EC2 it's on"
-          aws ec2 wait instance-running --instance-ids "$INSTANCE_ID"
+          echo "Checking instance state..."
+          STATE=$(aws ec2 describe-instances --instance-ids "$INSTANCE_ID" --query "Reservations[0].Instances[0].State.Name" --output text)
+          echo "Current state: $STATE"
+          if [ "$STATE" = "stopped" ]; then
+            echo "Starting instance..."
+            aws ec2 start-instances --instance-ids "$INSTANCE_ID" --output table
+            echo "Waiting for EC2 to be running..."
+            aws ec2 wait instance-running --instance-ids "$INSTANCE_ID"
+            echo "EC2 started."
+          elif [ "$STATE" = "running" ]; then
+            echo "Instance is already running."
+          else
+            echo "Instance is in state: $STATE. No action taken."
+          fi
           
 
 
