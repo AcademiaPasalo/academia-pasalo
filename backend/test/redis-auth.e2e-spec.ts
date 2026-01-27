@@ -41,6 +41,16 @@ describe('Redis Auth Security & Performance (E2E)', () => {
     await dataSource.query(`DELETE FROM user_session WHERE user_id IN (SELECT id FROM user WHERE email = '${mockUserEmail}')`);
     await dataSource.query(`DELETE FROM user WHERE email = '${mockUserEmail}'`);
     
+    // Asegurar estados de sesión requeridos por deactivateSession
+    const statusRepo = dataSource.getRepository('SessionStatus');
+    const statuses = ['ACTIVE', 'REVOKED'];
+    for (const code of statuses) {
+      const exists = await statusRepo.findOne({ where: { code } });
+      if (!exists) {
+        await statusRepo.save(statusRepo.create({ code, name: code }));
+      }
+    }
+
     const insertUser = await dataSource.query(`
       INSERT INTO user (email, first_name, last_name_1, last_name_2, profile_photo_url, photo_source, created_at)
       VALUES ('${mockUserEmail}', 'Redis', 'Tester', 'Automated', 'http://img.com', 'none', NOW())
@@ -87,7 +97,6 @@ describe('Redis Auth Security & Performance (E2E)', () => {
     }, { secret: process.env.JWT_SECRET });
 
     expect(authToken).toBeDefined();
-    console.log('      Token generado manualmente para testing');
   });
 
   it('STEP 2: [PERFORMANCE] Primera petición debe ser Cache Miss (Hit DB) y guardar en Redis', async () => {
@@ -113,8 +122,7 @@ describe('Redis Auth Security & Performance (E2E)', () => {
     // Verificar que la key existe físicamente en Redis
     const cachedValue = await redisService.get(`cache:session:${sessionId}:user`);
     expect(cachedValue).toBeDefined();
-    console.log('      Cache Miss verificado: Se leyó de BD y se guardó en Redis');
-    
+
     repoSpy.mockClear();
     redisSetSpy.mockClear();
   });
@@ -127,29 +135,29 @@ describe('Redis Auth Security & Performance (E2E)', () => {
       .set('Authorization', `Bearer ${authToken}`)
       .expect(200);
 
-    // CRÍTICO: El repositorio NO debe haber sido llamado
     expect(repoSpy).not.toHaveBeenCalled();
-    console.log('      Cache Hit verificado: CERO llamadas a la BD');
   });
 
   it('STEP 4: [SECURITY] Logout debe invalidar el token inmediatamente (Borrar caché)', async () => {
     // Ejecutamos Logout
-    await request(app.getHttpServer())
+    const res = await request(app.getHttpServer())
       .post('/api/v1/auth/logout')
-      .set('Authorization', `Bearer ${authToken}`)
-      .expect(200); // OK
+      .set('Authorization', `Bearer ${authToken}`);
+      
+    if (res.status !== 200) {
+        console.error('Logout Error Body:', JSON.stringify(res.body, null, 2));
+    }
+
+    expect(res.status).toBe(200); // OK
 
     // Verificamos que se borró de Redis
     const cachedValue = await redisService.get(`cache:session:${sessionId}:user`);
     expect(cachedValue).toBeNull();
 
-    // Intentamos usar el mismo token -> Debe fallar
     await request(app.getHttpServer())
-        .get(`/api/v1/users/${userId}`)
-        .set('Authorization', `Bearer ${authToken}`)
-        .expect(401);
-
-    console.log('      Seguridad verificada: Token invalidado tras logout');
+      .get(`/api/v1/users/${userId}`)
+      .set('Authorization', `Bearer ${authToken}`)
+      .expect(401);
   });
 
   it('STEP 5: [SECURITY] Eliminación manual de caché (Simular Ban) bloquea acceso', async () => {
@@ -166,12 +174,9 @@ describe('Redis Auth Security & Performance (E2E)', () => {
     await redisService.del(`cache:session:${sessionId}:user`);
     await dataSource.query(`UPDATE user_session SET is_active = 0 WHERE id = ${sessionId}`);
 
-    // 4. Intento de acceso
     await request(app.getHttpServer())
       .get(`/api/v1/users/${userId}`)
       .set('Authorization', `Bearer ${authToken}`)
       .expect(401);
-      
-    console.log('      Ban Hammer verificado: Usuario bloqueado instantáneamente');
   });
 });

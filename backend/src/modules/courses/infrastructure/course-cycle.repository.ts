@@ -24,4 +24,11 @@ export class CourseCycleRepository {
       },
     });
   }
+
+  async findById(id: string): Promise<CourseCycle | null> {
+    return await this.ormRepository.findOne({
+      where: { id },
+      relations: { academicCycle: true },
+    });
+  }
 }

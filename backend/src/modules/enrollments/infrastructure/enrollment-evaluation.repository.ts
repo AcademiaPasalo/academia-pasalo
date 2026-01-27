@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, EntityManager, LessThanOrEqual, MoreThanOrEqual } from 'typeorm';
+import { Repository, EntityManager, LessThanOrEqual, MoreThanOrEqual, IsNull } from 'typeorm';
 import { EnrollmentEvaluation } from '@modules/enrollments/domain/enrollment-evaluation.entity';
 
 @Injectable()
@@ -36,7 +36,7 @@ export class EnrollmentEvaluationRepository {
         accessEndDate: MoreThanOrEqual(now),
         enrollment: {
           userId,
-          cancelledAt: null,
+          cancelledAt: IsNull(),
         },
       },
       relations: {

@@ -19,6 +19,10 @@ import { SystemSettingRepository } from '../src/modules/auth/infrastructure/syst
 import { RequestMetadata } from '../src/modules/auth/interfaces/request-metadata.interface';
 import { JwtStrategy } from '../src/modules/auth/strategies/jwt.strategy';
 
+import { RedisCacheService } from '../src/infrastructure/cache/redis-cache.service';
+import { TokenService } from '../src/modules/auth/application/token.service';
+import { GoogleProviderService } from '../src/modules/auth/application/google-provider.service';
+
 describe('Security Scenarios (Integration)', () => {
   let app: INestApplication;
   let authService: AuthService;
@@ -112,6 +116,32 @@ describe('Security Scenarios (Integration)', () => {
         { provide: SessionStatusRepository, useValue: mockSessionStatusRepository },
         { provide: SystemSettingRepository, useValue: mockSystemSettingRepository },
         { provide: GeoIpService, useValue: mockGeoIpService },
+        {
+          provide: RedisCacheService,
+          useValue: {
+            get: jest.fn().mockResolvedValue(null),
+            set: jest.fn().mockResolvedValue(null),
+            del: jest.fn().mockResolvedValue(null),
+            invalidateGroup: jest.fn().mockResolvedValue(null),
+          },
+        },
+        {
+          provide: TokenService,
+          useValue: {
+            generatePair: jest.fn().mockResolvedValue({ accessToken: 'a', refreshToken: 'b' }),
+            generateAccessToken: jest.fn().mockResolvedValue('new_access_token'),
+            generateRefreshToken: jest.fn().mockResolvedValue({ token: 'new_refresh', expiresAt: new Date() }),
+            verifyAccessToken: jest.fn().mockResolvedValue({ sub: '1' }),
+            verifyRefreshToken: jest.fn().mockReturnValue({ deviceId: 'device-A', sub: '1' }),
+          },
+        },
+        {
+          provide: GoogleProviderService,
+          useValue: {
+            verify: jest.fn().mockResolvedValue({ email: 'hacker@test.com' }),
+            verifyCodeAndGetEmail: jest.fn().mockResolvedValue('hacker@test.com'),
+          },
+        },
       ],
     }).compile();
 
@@ -224,6 +254,7 @@ describe('Security Scenarios (Integration)', () => {
         mockUsersService as any,
         mockUserSessionRepository as any,
         { getIdByCode: () => Promise.resolve('1') } as any,
+        { get: jest.fn().mockResolvedValue(null), set: jest.fn() } as any, // Mock RedisCacheService
       );
 
       const payload = { sub: '1', email: 'h@t.com', roles: [], sessionId: '500' };

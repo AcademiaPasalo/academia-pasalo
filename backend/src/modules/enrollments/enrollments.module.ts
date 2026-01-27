@@ -3,9 +3,11 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { Enrollment } from './domain/enrollment.entity';
 import { EnrollmentStatus } from './domain/enrollment-status.entity';
 import { EnrollmentEvaluation } from './domain/enrollment-evaluation.entity';
+import { EnrollmentType } from './domain/enrollment-type.entity';
 import { EnrollmentRepository } from './infrastructure/enrollment.repository';
 import { EnrollmentStatusRepository } from './infrastructure/enrollment-status.repository';
 import { EnrollmentEvaluationRepository } from './infrastructure/enrollment-evaluation.repository';
+import { EnrollmentTypeRepository } from './infrastructure/enrollment-type.repository';
 import { EnrollmentsService } from './application/enrollments.service';
 import { AccessEngineService } from './application/access-engine.service';
 import { EnrollmentsController } from './presentation/enrollments.controller';
@@ -15,7 +17,7 @@ import { EvaluationsModule } from '@modules/evaluations/evaluations.module';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Enrollment, EnrollmentStatus, EnrollmentEvaluation]),
+    TypeOrmModule.forFeature([Enrollment, EnrollmentStatus, EnrollmentEvaluation, EnrollmentType]),
     AuthModule,
     CoursesModule,
     EvaluationsModule,
@@ -25,6 +27,7 @@ import { EvaluationsModule } from '@modules/evaluations/evaluations.module';
     EnrollmentRepository,
     EnrollmentStatusRepository,
     EnrollmentEvaluationRepository,
+    EnrollmentTypeRepository,
     EnrollmentsService,
     AccessEngineService,
   ],
@@ -32,6 +35,7 @@ import { EvaluationsModule } from '@modules/evaluations/evaluations.module';
     EnrollmentRepository,
     EnrollmentStatusRepository,
     EnrollmentEvaluationRepository,
+    EnrollmentTypeRepository,
     EnrollmentsService,
     AccessEngineService,
   ],

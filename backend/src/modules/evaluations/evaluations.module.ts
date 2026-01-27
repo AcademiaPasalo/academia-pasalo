@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { Evaluation } from '@modules/evaluations/domain/evaluation.entity';
 import { EvaluationType } from '@modules/evaluations/domain/evaluation-type.entity';
@@ -9,14 +9,16 @@ import { CoursesModule } from '@modules/courses/courses.module';
 import { CyclesModule } from '@modules/cycles/cycles.module';
 import { AuthModule } from '@modules/auth/auth.module';
 
+import { EvaluationSubscriber } from '@modules/evaluations/infrastructure/evaluation.subscriber';
+
 @Module({
   imports: [
     TypeOrmModule.forFeature([Evaluation, EvaluationType]),
     AuthModule,
-    CoursesModule,
+    forwardRef(() => CoursesModule),
     CyclesModule,
   ],
-  providers: [EvaluationRepository, EvaluationsService],
+  providers: [EvaluationRepository, EvaluationsService, EvaluationSubscriber],
   controllers: [EvaluationsController],
   exports: [EvaluationRepository, EvaluationsService, TypeOrmModule],
 })

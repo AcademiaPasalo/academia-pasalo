@@ -43,9 +43,12 @@ export class CoursesController {
   @HttpCode(HttpStatus.CREATED)
   @ResponseMessage('Materia vinculada al ciclo exitosamente')
   async assignToCycle(@Body() dto: AssignCourseToCycleDto) {
-    const courseCycle = await this.coursesService.assignToCycle(dto);
-    // Retornamos el objeto básico de vinculación
-    return courseCycle;
+    const result = await this.coursesService.assignToCycle(dto);
+    return {
+      statusCode: 201,
+      message: 'Curso asignado al ciclo exitosamente',
+      data: result,
+    };
   }
 
   @Get()

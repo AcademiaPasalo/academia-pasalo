@@ -1,18 +1,20 @@
-import { IsString, IsNotEmpty, IsInt, IsDateString, IsDefined, Min } from 'class-validator';
+import { IsString, IsNotEmpty, IsInt, IsDateString, IsDefined, Min, MaxLength } from 'class-validator';
 
 export class CreateEvaluationDto {
   @IsString()
   @IsNotEmpty()
   @IsDefined()
+  @MaxLength(20)
   courseCycleId: string;
 
   @IsString()
   @IsNotEmpty()
   @IsDefined()
+  @MaxLength(20)
   evaluationTypeId: string;
 
   @IsInt()
-  @Min(1)
+  @Min(0)
   @IsDefined()
   number: number;
 

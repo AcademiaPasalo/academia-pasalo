@@ -1,22 +1,33 @@
-import { IsString, IsNotEmpty, IsBoolean, IsArray, IsOptional, IsDefined } from 'class-validator';
+import { IsString, IsNotEmpty, IsArray, IsOptional, IsDefined, MaxLength } from 'class-validator';
 
 export class CreateEnrollmentDto {
   @IsString()
   @IsNotEmpty()
   @IsDefined()
+  @MaxLength(20)
   userId: string;
 
   @IsString()
   @IsNotEmpty()
   @IsDefined()
+  @MaxLength(20)
   courseCycleId: string;
 
-  @IsBoolean()
+  @IsString()
+  @IsNotEmpty()
   @IsDefined()
-  isFullCourse: boolean;
+  @MaxLength(32)
+  enrollmentTypeCode: string;
 
   @IsArray()
   @IsOptional()
   @IsString({ each: true })
+  @MaxLength(20, { each: true })
   evaluationIds?: string[];
+
+  @IsArray()
+  @IsOptional()
+  @IsString({ each: true })
+  @MaxLength(20, { each: true })
+  historicalCourseCycleIds?: string[];
 }

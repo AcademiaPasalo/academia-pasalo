@@ -2,6 +2,7 @@ import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn, CreateDa
 import { User } from '@modules/users/domain/user.entity';
 import { CourseCycle } from '@modules/courses/domain/course-cycle.entity';
 import { EnrollmentStatus } from '@modules/enrollments/domain/enrollment-status.entity';
+import { EnrollmentType } from '@modules/enrollments/domain/enrollment-type.entity';
 
 @Entity('enrollment')
 export class Enrollment {
@@ -16,6 +17,9 @@ export class Enrollment {
 
   @Column({ name: 'enrollment_status_id', type: 'bigint' })
   enrollmentStatusId: string;
+
+  @Column({ name: 'enrollment_type_id', type: 'bigint' })
+  enrollmentTypeId: string;
 
   @CreateDateColumn({ name: 'enrolled_at' })
   enrolledAt: Date;
@@ -34,4 +38,8 @@ export class Enrollment {
   @ManyToOne(() => EnrollmentStatus)
   @JoinColumn({ name: 'enrollment_status_id' })
   status: EnrollmentStatus;
+
+  @ManyToOne(() => EnrollmentType)
+  @JoinColumn({ name: 'enrollment_type_id' })
+  type: EnrollmentType;
 }
