@@ -1,0 +1,29 @@
+name: Start EC2
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+jobs:
+  start-ec2:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v5.1.1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+      - name: Start EC2 instance
+        run: |
+          INSTANCE_ID="i-075c22a8bf3645192"
+          echo "Starting instance"
+          aws ec2 start-instances --instance-ids "$INSTANCE_ID" --ouput table
+
+          echo "Wait til EC2 it's on"
+          aws ec2 wait instance-running --instance-ids "$INSTANCE_ID"
+          
+
+
+
+  
