@@ -1,0 +1,25 @@
+name: Check-branch
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+jobs:
+  check-branch:
+    name: check-branch
+    runs-on: ubuntu-latest
+    steps:
+      - name: Gate PRs main <- develop
+        if: ${{ github.event_name == 'pull_request' }}
+        run: |
+          BASE="${{ github.event.pull_request.base.ref }}"
+          HEAD="${{ github.event.pull_request.head.ref }}"
+          echo "BASE=$BASE"
+          echo "HEAD=$HEAD"
+
+          if [ "$BASE" = "main" ] && [ "$HEAD" != "develop" ]; then
+            echo "ERROR: Solo se permiten PRs desde develop hacia main." >&2
+            exit 1
+          fi
+
+          echo "OK: PR develop -> main"
