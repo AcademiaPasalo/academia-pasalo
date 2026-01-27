@@ -11,7 +11,7 @@ Este documento centraliza la hoja de ruta para las épicas de Cursos, Ciclos, Ma
 - [x] FASE 6: CRUD de Evaluaciones Académicas
 - [x] FASE 7: Infraestructura de Almacenamiento (Storage Service)
 - [x] FASE 8: Jerarquía de Carpetas (Material Folders)
-- [ ] FASE 9: Gestión de Materiales y Versionado (Files) - PENDIENTE VALIDACIÓN
+- [x] FASE 9: Gestión de Materiales y Versionado (Files) (Completada)
 
 ## DETALLE TÉCNICO POR ÉPICA
 

@@ -1,6 +1,5 @@
 import { Injectable, InternalServerErrorException, Logger } from '@nestjs/common';
 import { SystemSettingRepository } from '@modules/auth/infrastructure/system-setting.repository';
-import { RedisCacheService } from '@infrastructure/cache/redis-cache.service';
 
 export type SystemSettingKey =
   | 'REFRESH_TOKEN_TTL_DAYS'
@@ -18,7 +17,6 @@ export class AuthSettingsService {
 
   constructor(
     private readonly systemSettingRepository: SystemSettingRepository,
-    private readonly cacheService: RedisCacheService,
   ) {}
 
   async getActiveCycleId(): Promise<string> {
@@ -54,13 +52,6 @@ export class AuthSettingsService {
   }
 
   private async getSetting(key: SystemSettingKey): Promise<string> {
-    const cacheKey = `cache:setting:${key}`;
-    const cached = await this.cacheService.get<string>(cacheKey);
-    
-    if (cached !== null) {
-      return cached;
-    }
-
     const row = await this.systemSettingRepository.findByKey(key);
     if (!row) {
       this.logger.error({
@@ -71,7 +62,6 @@ export class AuthSettingsService {
       throw new InternalServerErrorException('Configuración del sistema incompleta');
     }
 
-    await this.cacheService.set(cacheKey, row.settingValue, 3600);
     return row.settingValue;
   }
 
@@ -81,7 +71,7 @@ export class AuthSettingsService {
 
     if (!Number.isFinite(value) || value <= 0) {
       this.logger.error({
-        message: 'Configuración del sistema con valor inválido (se esperaba entero positivo)',
+        message: 'Configuración del sistema con valor inválido',
         key,
         value: rawValue,
         timestamp: new Date().toISOString(),
@@ -92,4 +82,3 @@ export class AuthSettingsService {
     return value;
   }
 }
-

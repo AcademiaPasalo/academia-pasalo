@@ -7,9 +7,13 @@ import {
   UseGuards,
   HttpCode,
   HttpStatus,
+  UseInterceptors,
+  UploadedFile,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { MaterialsService } from '@modules/materials/application/materials.service';
 import { CreateFolderDto } from '@modules/materials/dto/create-folder.dto';
+import { CreateMaterialDto } from '@modules/materials/dto/create-material.dto';
 import { JwtAuthGuard } from '@common/guards/jwt-auth.guard';
 import { RolesGuard } from '@common/guards/roles.guard';
 import { Roles } from '@common/decorators/roles.decorator';
@@ -35,5 +39,18 @@ export class MaterialsController {
   @ResponseMessage('Estructura de carpetas obtenida exitosamente')
   async getFoldersByEvaluation(@Param('id') id: string) {
     return await this.materialsService.getFoldersByEvaluation(id);
+  }
+
+  @Post('upload')
+  @Roles('ADMIN', 'SUPER_ADMIN')
+  @UseInterceptors(FileInterceptor('file'))
+  @HttpCode(HttpStatus.CREATED)
+  @ResponseMessage('Material subido y versionado correctamente')
+  async uploadMaterial(
+    @Body() dto: CreateMaterialDto,
+    @UploadedFile() file: { buffer: Buffer; originalname: string; mimetype: string; size: number },
+    @CurrentUser() user: User,
+  ) {
+    return await this.materialsService.uploadMaterial(dto, file, user.id);
   }
 }
