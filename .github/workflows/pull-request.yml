@@ -1,5 +1,5 @@
 # Reglas: Solo se permiten PRs a main desde develop
-name: Only allow PRs to main from develop
+name: Check-branch
 
 on:
   workflow_dispatch:
