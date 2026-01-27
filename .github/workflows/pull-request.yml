@@ -1,0 +1,21 @@
+# Reglas: Solo se permiten PRs a main desde develop
+name: Only allow PRs to main from develop
+
+on:
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  check-branch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fail if PR is not from develop
+        run: |
+          echo "PR base (destino): ${{ github.base_ref }}"
+          echo "PR head (origen): ${{ github.head_ref }}"
+          if [ "${{ github.base_ref }}" == "main" ] && [ "${{ github.head_ref }}" != "develop" ]; then
+            echo "ERROR: Solo se permiten pull requests desde 'develop' hacia 'main'." >&2
+            exit 1
+          fi
+          echo "PR desde develop hacia main, permitido."
