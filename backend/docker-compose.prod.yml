@@ -1,8 +1,6 @@
 services:
   backend:
-    build:
-      context: .
-      dockerfile: Dockerfile
+    image: ${DOCKER_USERNAME}/academia-pasalo-backend:latest
     container_name: academia-pasalo-backend
     restart: unless-stopped
     ports:
@@ -10,16 +8,16 @@ services:
     environment:
       - DB_HOST=mysql
       - DB_PORT=3306
-      - DB_USER=${DB_USER:-root}
-      - DB_PASSWORD=${DB_PASSWORD:-root_password}
-      - DB_NAME=${DB_NAME:-academia_pasalo}
+      - DB_USER=root
+      - DB_PASSWORD=${DB_PASSWORD}
+      - DB_NAME=${DB_NAME}
       - REDIS_HOST=redis
       - REDIS_PORT=6379
-      - JWT_SECRET=${JWT_SECRET:-desarrollo_secret_key_123}
-      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID:-dummy_client_id_for_testing}
-      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET:-dummy_secret_for_testing}
-      - GOOGLE_REDIRECT_URI=${GOOGLE_REDIRECT_URI:-postmessage}
-      - API_PREFIX=${API_PREFIX:-api/v1}
+      - JWT_SECRET=${JWT_SECRET}
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
+      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
+      - GOOGLE_REDIRECT_URI=${GOOGLE_REDIRECT_URI}
+      - API_PREFIX=api/v1
       - NODE_ENV=production
       - PORT=3001
     depends_on:
@@ -29,17 +27,9 @@ services:
         condition: service_healthy
     networks:
       - academia-network
-    healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3001/api/v1/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
 
   frontend:
-    build:
-      context: ../frontend
-      dockerfile: Dockerfile
+    image: ${DOCKER_USERNAME}/academia-pasalo-frontend:latest
     container_name: academia-pasalo-frontend
     restart: unless-stopped
     ports:
@@ -57,7 +47,7 @@ services:
     container_name: academia-pasalo-redis
     restart: unless-stopped
     ports:
-      - "${REDIS_PORT:-6379}:6379"
+      - "6379:6379"
     command: redis-server --save 60 1 --loglevel warning --maxmemory 256mb --maxmemory-policy allkeys-lru
     volumes:
       - redis_data:/data
@@ -74,10 +64,10 @@ services:
     container_name: academia-pasalo-mysql
     restart: unless-stopped
     ports:
-      - "${DB_PORT:-3306}:3306"
+      - "3306:3306"
     environment:
-      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD:-root_password}
-      MYSQL_DATABASE: ${DB_NAME:-academia_pasalo}
+      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD}
+      MYSQL_DATABASE: ${DB_NAME}
     volumes:
       - mysql_data:/var/lib/mysql
       - ./creacion_tablas_academia_pasalo_v1.sql:/docker-entrypoint-initdb.d/01-schema.sql
@@ -85,7 +75,7 @@ services:
     networks:
       - academia-network
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${DB_PASSWORD:-root_password}"]
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${DB_PASSWORD}"]
       interval: 10s
       timeout: 5s
       retries: 5
