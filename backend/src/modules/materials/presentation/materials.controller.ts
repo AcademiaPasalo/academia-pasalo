@@ -48,6 +48,20 @@ export class MaterialsController {
     return stream;
   }
 
+  @Post(':id/versions')
+  @Roles('ADMIN', 'PROFESSOR', 'SUPER_ADMIN')
+  @UseInterceptors(FileInterceptor('file'))
+  @HttpCode(HttpStatus.CREATED)
+  @ResponseMessage('Nueva versión subida exitosamente')
+  async addVersion(
+    @CurrentUser() user: User,
+    @Param('id') materialId: string,
+    @UploadedFile() file: Express.Multer.File,
+  ) {
+    if (!file) throw new Error('No se ha adjuntado ningún archivo.');
+    return await this.materialsService.addVersion(user.id, materialId, file);
+  }
+
   @Post(':id/request-deletion')
   @Roles('PROFESSOR', 'ADMIN', 'SUPER_ADMIN')
   @HttpCode(HttpStatus.OK)

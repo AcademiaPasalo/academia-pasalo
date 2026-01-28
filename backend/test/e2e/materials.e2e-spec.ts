@@ -2,7 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import request from 'supertest';
-import { AppModule } from '../../src/app.module';
+import { AppModule } from '@src/app.module';
 import { DataSource } from 'typeorm';
 import { TestSeeder } from './test-utils';
 import { StorageService } from '@infrastructure/storage/storage.service';
@@ -10,6 +10,9 @@ import { TransformInterceptor } from '@common/interceptors/transform.interceptor
 import * as path from 'path';
 import * as os from 'os';
 import * as fs from 'fs';
+import { User } from '@modules/users/domain/user.entity';
+import { CourseCycle } from '@modules/courses/domain/course-cycle.entity';
+import { Evaluation } from '@modules/evaluations/domain/evaluation.entity';
 
 describe('E2E: Gestión de Materiales y Seguridad', () => {
   let app: INestApplication;
@@ -18,12 +21,12 @@ describe('E2E: Gestión de Materiales y Seguridad', () => {
   let storageService: StorageService;
 
   // Entidades base
-  let admin: any;
-  let professor: any;
-  let studentWithAccess: any;
-  let studentWithoutAccess: any;
-  let courseCycle: any;
-  let evaluation: any;
+  let admin: { user: User; token: string };
+  let professor: { user: User; token: string };
+  let studentWithAccess: { user: User; token: string };
+  let studentWithoutAccess: { user: User; token: string };
+  let courseCycle: CourseCycle;
+  let evaluation: Evaluation;
   let rootFolderId: string;
 
   // Fechas
@@ -63,6 +66,13 @@ describe('E2E: Gestión de Materiales y Seguridad', () => {
     dataSource = app.get(DataSource);
     storageService = app.get(StorageService);
     seeder = new TestSeeder(dataSource, app);
+
+    // Limpieza de tablas de materiales para evitar datos sucios (paths inexistentes)
+    await dataSource.query('DELETE FROM deletion_request');
+    await dataSource.query('DELETE FROM material');
+    await dataSource.query('DELETE FROM file_version');
+    await dataSource.query('DELETE FROM file_resource');
+    await dataSource.query('DELETE FROM material_folder');
 
     // 1. Setup Base
     await seeder.ensureMaterialStatuses();

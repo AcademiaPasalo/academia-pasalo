@@ -2,12 +2,13 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import request from 'supertest';
-import { AppModule } from '../../src/app.module';
+import { AppModule } from '@src/app.module';
 import { DataSource } from 'typeorm';
 import { TestSeeder } from './test-utils';
 import { StorageService } from '@infrastructure/storage/storage.service';
 import { TransformInterceptor } from '@common/interceptors/transform.interceptor';
 import { MaterialsAdminController } from '@modules/materials/presentation/materials-admin.controller';
+import { User } from '@modules/users/domain/user.entity';
 
 describe('E2E: Administración de Materiales (Aprobaciones y Limpieza)', () => {
   let app: INestApplication;
@@ -15,10 +16,10 @@ describe('E2E: Administración de Materiales (Aprobaciones y Limpieza)', () => {
   let seeder: TestSeeder;
 
   // Actores
-  let superAdmin: any;
-  let admin: any;
-  let professor: any;
-  let student: any;
+  let superAdmin: { user: User; token: string };
+  let admin: { user: User; token: string };
+  let professor: { user: User; token: string };
+  let student: { user: User; token: string };
 
   // Recursos
   let folderId: string;
@@ -44,13 +45,6 @@ describe('E2E: Administración de Materiales (Aprobaciones y Limpieza)', () => {
       onModuleInit: jest.fn(),
     })
     .compile();
-
-    try {
-        const ctrl = moduleFixture.get(MaterialsAdminController);
-        console.log('DEBUG: MaterialsAdminController found instance:', !!ctrl);
-    } catch (e) {
-        console.error('DEBUG: MaterialsAdminController NOT FOUND in moduleFixture');
-    }
 
     app = moduleFixture.createNestApplication();
     app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
@@ -79,7 +73,6 @@ describe('E2E: Administración de Materiales (Aprobaciones y Limpieza)', () => {
         .set('Authorization', `Bearer ${admin.token}`)
         .send({ evaluationId: evaluation.id, name: 'Root', visibleFrom: new Date().toISOString() });
     
-    if (folderRes.status !== 201) console.error('Folder create failed', folderRes.body);
     folderId = folderRes.body.data.id;
 
     // Material 1 (Para borrar)

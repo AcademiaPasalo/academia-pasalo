@@ -61,7 +61,6 @@ export class MaterialsAdminService {
         throw new InternalServerErrorException('Estados de sistema faltantes (APPROVED/ARCHIVED)');
     }
 
-    // 1. Actualizar solicitud
     await manager.getRepository('DeletionRequest').update(requestId, {
       deletionRequestStatusId: approvedStatus.id,
       reviewedById: adminId,
@@ -69,10 +68,9 @@ export class MaterialsAdminService {
       updatedAt: new Date(),
     });
 
-    // 2. Archivar material (Soft Delete lógico)
     await manager.getRepository('Material').update(materialId, {
       materialStatusId: archivedMaterialStatus.id,
-      visibleUntil: new Date(), // Ocultar inmediatamente
+      visibleUntil: new Date(),
       updatedAt: new Date(),
     });
   }
@@ -98,22 +96,14 @@ export class MaterialsAdminService {
       throw new BadRequestException('Solo se pueden eliminar físicamente materiales que estén ARCHIVADOS.');
     }
 
-    // Operación Destructiva: Transacción necesaria para consistencia BD vs Disco
     await this.dataSource.transaction(async (manager) => {
-      // 1. Borrar de BD
+      const material = await manager.getRepository('Material').findOne({ where: { id: materialId } });
+      
       await manager.getRepository('Material').delete(materialId);
-      
-      // Nota: Aquí deberíamos borrar también FileVersion y FileResource si ya no se usan.
-      // Por simplicidad en esta fase, asumimos que FileResource podría ser compartido.
-      // Si queremos limpiar disco, necesitamos verificar uso.
-      // Para este MVP profesional, mantendremos el recurso físico por auditoría o implementaremos limpieza en job aparte.
-      // PERO, si la regla es "Hard Delete", se espera borrado físico.
-      // Como FileResource es inmutable y compartido, borrarlo requiere cuidado.
-      // Decisión de diseño: Hard Delete solo borra el metadato del material en este contexto, 
-      // dejando el archivo huérfano para limpieza por Job, O borramos si es la única referencia.
-      
-      // Dado que no tenemos implementación de conteo de referencias aún, 
-      // solo borramos el registro lógico 'Material'.
+
+      if (material && material.fileVersionId) {
+        await manager.getRepository('FileVersion').delete(material.fileVersionId);
+      }
     });
 
     this.logger.warn({

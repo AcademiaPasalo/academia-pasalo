@@ -18,4 +18,8 @@ export class FileResourceRepository {
     });
     return await repo.save(resource);
   }
+
+  async findByHash(hash: string): Promise<FileResource | null> {
+    return await this.ormRepository.findOne({ where: { checksumHash: hash } });
+  }
 }

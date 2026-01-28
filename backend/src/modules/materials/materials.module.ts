@@ -18,8 +18,10 @@ import { DeletionRequestRepository } from '@modules/materials/infrastructure/del
 import { DeletionRequestStatusRepository } from '@modules/materials/infrastructure/deletion-request-status.repository';
 import { MaterialsService } from '@modules/materials/application/materials.service';
 import { MaterialFoldersService } from '@modules/materials/application/material-folders.service';
+import { MaterialsAdminService } from '@modules/materials/application/materials-admin.service';
 import { MaterialsController } from '@modules/materials/presentation/materials.controller';
 import { MaterialFoldersController } from '@modules/materials/presentation/material-folders.controller';
+import { MaterialsAdminController } from '@modules/materials/presentation/materials-admin.controller';
 import { AuthModule } from '@modules/auth/auth.module';
 import { EvaluationsModule } from '@modules/evaluations/evaluations.module';
 import { EnrollmentsModule } from '@modules/enrollments/enrollments.module';
@@ -51,8 +53,9 @@ import { EnrollmentsModule } from '@modules/enrollments/enrollments.module';
     DeletionRequestStatusRepository,
     MaterialsService,
     MaterialFoldersService,
+    MaterialsAdminService,
   ],
-  controllers: [MaterialsController, MaterialFoldersController],
+  controllers: [MaterialsController, MaterialFoldersController, MaterialsAdminController],
   exports: [
     MaterialFolderRepository,
     FolderStatusRepository,

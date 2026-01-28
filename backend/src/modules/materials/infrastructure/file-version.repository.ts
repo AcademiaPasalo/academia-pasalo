@@ -22,4 +22,9 @@ export class FileVersionRepository {
   async findById(id: string): Promise<FileVersion | null> {
     return await this.ormRepository.findOne({ where: { id } });
   }
+
+  async deleteById(id: string, manager?: EntityManager): Promise<void> {
+    const repo = manager ? manager.getRepository(FileVersion) : this.ormRepository;
+    await repo.delete(id);
+  }
 }

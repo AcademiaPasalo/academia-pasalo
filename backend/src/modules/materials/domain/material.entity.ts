@@ -1,4 +1,4 @@
-import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn, CreateDateColumn, UpdateDateColumn } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn } from 'typeorm';
 import { MaterialFolder } from './material-folder.entity';
 import { FileResource } from './file-resource.entity';
 import { FileVersion } from './file-version.entity';

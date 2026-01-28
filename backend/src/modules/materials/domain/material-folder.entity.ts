@@ -1,4 +1,4 @@
-import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn, CreateDateColumn, UpdateDateColumn, OneToMany } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn, OneToMany } from 'typeorm';
 import { Evaluation } from '@modules/evaluations/domain/evaluation.entity';
 import { FolderStatus } from './folder-status.entity';
 import { User } from '@modules/users/domain/user.entity';
