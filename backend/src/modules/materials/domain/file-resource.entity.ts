@@ -20,6 +20,6 @@ export class FileResource {
   @Column({ name: 'storage_url', length: 500 })
   storageUrl: string;
 
-  @CreateDateColumn({ name: 'created_at' })
+  @Column({ name: 'created_at', type: 'datetime' })
   createdAt: Date;
 }

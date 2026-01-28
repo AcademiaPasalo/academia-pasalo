@@ -10,18 +10,16 @@ export class FileVersionRepository {
     private readonly ormRepository: Repository<FileVersion>,
   ) {}
 
-  async findLatestVersionNumber(fileResourceId: string, manager?: EntityManager): Promise<number> {
-    const repo = manager ? manager.getRepository(FileVersion) : this.ormRepository;
-    const latest = await repo.findOne({
-      where: { fileResourceId },
-      order: { versionNumber: 'DESC' },
-    });
-    return latest ? latest.versionNumber : 0;
-  }
-
   async create(data: Partial<FileVersion>, manager?: EntityManager): Promise<FileVersion> {
     const repo = manager ? manager.getRepository(FileVersion) : this.ormRepository;
-    const version = repo.create(data);
+    const version = repo.create({
+      ...data,
+      createdAt: new Date(),
+    });
     return await repo.save(version);
+  }
+
+  async findById(id: string): Promise<FileVersion | null> {
+    return await this.ormRepository.findOne({ where: { id } });
   }
 }

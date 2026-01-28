@@ -1,18 +1,7 @@
-import {
-  Controller,
-  Post,
-  Body,
-  Get,
-  Param,
-  UseGuards,
-  HttpCode,
-  HttpStatus,
-  UseInterceptors,
-  UploadedFile,
-} from '@nestjs/common';
+import { Controller, Post, Body, Get, Param, UseGuards, HttpStatus, HttpCode, UploadedFile, UseInterceptors, Res } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
+import type { Response } from 'express';
 import { MaterialsService } from '@modules/materials/application/materials.service';
-import { CreateFolderDto } from '@modules/materials/dto/create-folder.dto';
 import { CreateMaterialDto } from '@modules/materials/dto/create-material.dto';
 import { JwtAuthGuard } from '@common/guards/jwt-auth.guard';
 import { RolesGuard } from '@common/guards/roles.guard';
@@ -26,31 +15,48 @@ import { ResponseMessage } from '@common/decorators/response-message.decorator';
 export class MaterialsController {
   constructor(private readonly materialsService: MaterialsService) {}
 
-  @Post('folders')
-  @Roles('ADMIN', 'SUPER_ADMIN')
-  @HttpCode(HttpStatus.CREATED)
-  @ResponseMessage('Carpeta creada exitosamente')
-  async createFolder(@Body() dto: CreateFolderDto, @CurrentUser() user: User) {
-    return await this.materialsService.createFolder(dto, user.id);
-  }
-
-  @Get('folders/evaluation/:id')
-  @Roles('ADMIN', 'SUPER_ADMIN')
-  @ResponseMessage('Estructura de carpetas obtenida exitosamente')
-  async getFoldersByEvaluation(@Param('id') id: string) {
-    return await this.materialsService.getFoldersByEvaluation(id);
-  }
-
-  @Post('upload')
-  @Roles('ADMIN', 'SUPER_ADMIN')
+  @Post()
+  @Roles('ADMIN', 'PROFESSOR', 'SUPER_ADMIN')
   @UseInterceptors(FileInterceptor('file'))
   @HttpCode(HttpStatus.CREATED)
-  @ResponseMessage('Material subido y versionado correctamente')
-  async uploadMaterial(
-    @Body() dto: CreateMaterialDto,
-    @UploadedFile() file: { buffer: Buffer; originalname: string; mimetype: string; size: number },
+  @ResponseMessage('Material subido exitosamente')
+  async create(
     @CurrentUser() user: User,
+    @Body() dto: CreateMaterialDto,
+    @UploadedFile() file: Express.Multer.File,
   ) {
-    return await this.materialsService.uploadMaterial(dto, file, user.id);
+    if (!file) {
+      throw new Error('No se ha adjuntado ningún archivo.');
+    }
+    return await this.materialsService.create(user.id, dto, file);
+  }
+
+  @Get(':id/download')
+  @Roles('STUDENT', 'ADMIN', 'PROFESSOR', 'SUPER_ADMIN')
+  async download(
+    @CurrentUser() user: User,
+    @Param('id') materialId: string,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const { stream, fileName, mimeType } = await this.materialsService.download(user.id, materialId);
+    
+    res.set({
+      'Content-Type': mimeType,
+      'Content-Disposition': `attachment; filename="${fileName}"`,
+    });
+
+    return stream;
+  }
+
+  @Post(':id/request-deletion')
+  @Roles('PROFESSOR', 'ADMIN', 'SUPER_ADMIN')
+  @HttpCode(HttpStatus.OK)
+  @ResponseMessage('Solicitud de eliminación registrada')
+  async requestDeletion(
+    @CurrentUser() user: User,
+    @Param('id') materialId: string,
+    @Body('reason') reason: string,
+  ) {
+    await this.materialsService.requestDeletion(user.id, materialId, reason);
   }
 }

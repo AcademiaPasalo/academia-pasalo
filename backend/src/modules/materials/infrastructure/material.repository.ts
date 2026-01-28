@@ -12,18 +12,18 @@ export class MaterialRepository {
 
   async create(data: Partial<Material>, manager?: EntityManager): Promise<Material> {
     const repo = manager ? manager.getRepository(Material) : this.ormRepository;
-    const material = repo.create(data);
+    const material = repo.create({
+      ...data,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
     return await repo.save(material);
   }
 
   async findById(id: string): Promise<Material | null> {
     return await this.ormRepository.findOne({
       where: { id },
-      relations: {
-        currentVersion: true,
-        fileResource: true,
-        status: true,
-      },
+      relations: { fileResource: true },
     });
   }
 }

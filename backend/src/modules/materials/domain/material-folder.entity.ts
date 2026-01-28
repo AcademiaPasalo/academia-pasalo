@@ -29,10 +29,10 @@ export class MaterialFolder {
   @Column({ name: 'created_by', type: 'bigint' })
   createdBy: string;
 
-  @CreateDateColumn({ name: 'created_at' })
+  @Column({ name: 'created_at', type: 'datetime' })
   createdAt: Date;
 
-  @UpdateDateColumn({ name: 'updated_at' })
+  @Column({ name: 'updated_at', type: 'datetime' })
   updatedAt: Date;
 
   @ManyToOne(() => Evaluation)

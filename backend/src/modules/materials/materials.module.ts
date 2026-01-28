@@ -1,21 +1,28 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { MaterialFolder } from './domain/material-folder.entity';
-import { FolderStatus } from './domain/folder-status.entity';
-import { Material } from './domain/material.entity';
-import { MaterialStatus } from './domain/material-status.entity';
-import { FileResource } from './domain/file-resource.entity';
-import { FileVersion } from './domain/file-version.entity';
-import { MaterialFolderRepository } from './infrastructure/material-folder.repository';
-import { FolderStatusRepository } from './infrastructure/folder-status.repository';
-import { MaterialRepository } from './infrastructure/material.repository';
-import { MaterialStatusRepository } from './infrastructure/material-status.repository';
-import { FileResourceRepository } from './infrastructure/file-resource.repository';
-import { FileVersionRepository } from './infrastructure/file-version.repository';
-import { MaterialsService } from './application/materials.service';
-import { MaterialsController } from './presentation/materials.controller';
+import { MaterialFolder } from '@modules/materials/domain/material-folder.entity';
+import { FolderStatus } from '@modules/materials/domain/folder-status.entity';
+import { Material } from '@modules/materials/domain/material.entity';
+import { MaterialStatus } from '@modules/materials/domain/material-status.entity';
+import { FileResource } from '@modules/materials/domain/file-resource.entity';
+import { FileVersion } from '@modules/materials/domain/file-version.entity';
+import { DeletionRequest } from '@modules/materials/domain/deletion-request.entity';
+import { DeletionRequestStatus } from '@modules/materials/domain/deletion-request-status.entity';
+import { MaterialFolderRepository } from '@modules/materials/infrastructure/material-folder.repository';
+import { FolderStatusRepository } from '@modules/materials/infrastructure/folder-status.repository';
+import { MaterialRepository } from '@modules/materials/infrastructure/material.repository';
+import { MaterialStatusRepository } from '@modules/materials/infrastructure/material-status.repository';
+import { FileResourceRepository } from '@modules/materials/infrastructure/file-resource.repository';
+import { FileVersionRepository } from '@modules/materials/infrastructure/file-version.repository';
+import { DeletionRequestRepository } from '@modules/materials/infrastructure/deletion-request.repository';
+import { DeletionRequestStatusRepository } from '@modules/materials/infrastructure/deletion-request-status.repository';
+import { MaterialsService } from '@modules/materials/application/materials.service';
+import { MaterialFoldersService } from '@modules/materials/application/material-folders.service';
+import { MaterialsController } from '@modules/materials/presentation/materials.controller';
+import { MaterialFoldersController } from '@modules/materials/presentation/material-folders.controller';
 import { AuthModule } from '@modules/auth/auth.module';
 import { EvaluationsModule } from '@modules/evaluations/evaluations.module';
+import { EnrollmentsModule } from '@modules/enrollments/enrollments.module';
 
 @Module({
   imports: [
@@ -26,9 +33,12 @@ import { EvaluationsModule } from '@modules/evaluations/evaluations.module';
       MaterialStatus,
       FileResource,
       FileVersion,
+      DeletionRequest,
+      DeletionRequestStatus,
     ]),
     AuthModule,
     EvaluationsModule,
+    EnrollmentsModule,
   ],
   providers: [
     MaterialFolderRepository,
@@ -37,14 +47,19 @@ import { EvaluationsModule } from '@modules/evaluations/evaluations.module';
     MaterialStatusRepository,
     FileResourceRepository,
     FileVersionRepository,
+    DeletionRequestRepository,
+    DeletionRequestStatusRepository,
     MaterialsService,
+    MaterialFoldersService,
   ],
-  controllers: [MaterialsController],
+  controllers: [MaterialsController, MaterialFoldersController],
   exports: [
     MaterialFolderRepository,
     FolderStatusRepository,
     MaterialRepository,
     MaterialsService,
+    MaterialFoldersService,
+    DeletionRequestRepository,
   ],
 })
 export class MaterialsModule {}

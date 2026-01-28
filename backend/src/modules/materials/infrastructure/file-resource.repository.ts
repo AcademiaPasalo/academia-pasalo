@@ -10,14 +10,12 @@ export class FileResourceRepository {
     private readonly ormRepository: Repository<FileResource>,
   ) {}
 
-  async findByHash(hash: string, manager?: EntityManager): Promise<FileResource | null> {
-    const repo = manager ? manager.getRepository(FileResource) : this.ormRepository;
-    return await repo.findOne({ where: { checksumHash: hash } });
-  }
-
   async create(data: Partial<FileResource>, manager?: EntityManager): Promise<FileResource> {
     const repo = manager ? manager.getRepository(FileResource) : this.ormRepository;
-    const resource = repo.create(data);
+    const resource = repo.create({
+      ...data,
+      createdAt: new Date(),
+    });
     return await repo.save(resource);
   }
 }

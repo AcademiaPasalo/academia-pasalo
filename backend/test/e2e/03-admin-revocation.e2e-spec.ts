@@ -19,6 +19,8 @@ describe('E2E: Revocación Administrativa', () => {
   let enrollmentId: string;
 
   const now = new Date();
+  const yesterday = new Date(now);
+  yesterday.setDate(now.getDate() - 1);
   const nextMonth = new Date();
   nextMonth.setMonth(now.getMonth() + 1);
   const formatDate = (d: Date) => d.toISOString().split('T')[0];
@@ -40,7 +42,7 @@ describe('E2E: Revocación Administrativa', () => {
     const cycle = await seeder.createCycle(`2026-REV-${uniqueSuffix}`, formatDate(now), formatDate(nextMonth));
     const course = await seeder.createCourse(`REV101_REV_${uniqueSuffix}`, 'Revocación Test');
     courseCycle = await seeder.linkCourseCycle(course.id, cycle.id);
-    pc1 = await seeder.createEvaluation(courseCycle.id, 'PC', 1, formatDate(now), formatDate(nextMonth));
+    pc1 = await seeder.createEvaluation(courseCycle.id, 'PC', 1, formatDate(yesterday), formatDate(nextMonth));
 
     const adminEmail = TestSeeder.generateUniqueEmail('admin_rev');
     const userTargetEmail = TestSeeder.generateUniqueEmail('target_rev');
