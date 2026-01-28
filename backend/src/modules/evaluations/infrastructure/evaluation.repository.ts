@@ -18,20 +18,16 @@ export class EvaluationRepository {
     return await repo.findOne({ where: { code } });
   }
 
-  async findByCourseCycle(courseCycleId: string, manager?: EntityManager): Promise<Evaluation[]> {
-    const repo = manager ? manager.getRepository(Evaluation) : this.evaluationOrm;
-    return await repo.find({
+  async findByCourseCycle(courseCycleId: string): Promise<Evaluation[]> {
+    return await this.evaluationOrm.find({
       where: { courseCycleId },
-      relations: { evaluationType: true },
+      relations: ['evaluationType'],
+      order: { number: 'ASC' },
     });
   }
 
-  async findByIds(ids: string[], manager?: EntityManager): Promise<Evaluation[]> {
-    const repo = manager ? manager.getRepository(Evaluation) : this.evaluationOrm;
-    return await repo.find({
-      where: ids.map(id => ({ id })),
-      relations: { evaluationType: true },
-    });
+  async findById(id: string): Promise<Evaluation | null> {
+    return await this.evaluationOrm.findOne({ where: { id } });
   }
 
   async create(data: Partial<Evaluation>, manager?: EntityManager): Promise<Evaluation> {

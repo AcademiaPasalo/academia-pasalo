@@ -19,11 +19,7 @@ export class MaterialRepository {
   async findById(id: string): Promise<Material | null> {
     return await this.ormRepository.findOne({
       where: { id },
-      relations: {
-        currentVersion: true,
-        fileResource: true,
-        status: true,
-      },
+      relations: { fileResource: true },
     });
   }
 }

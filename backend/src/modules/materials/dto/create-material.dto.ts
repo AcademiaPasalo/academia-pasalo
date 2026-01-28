@@ -1,22 +1,23 @@
-import { IsString, IsNotEmpty, MaxLength, IsOptional, IsDefined, IsDateString } from 'class-validator';
+import { IsNotEmpty, IsString, IsOptional, MaxLength, IsDefined } from 'class-validator';
 
 export class CreateMaterialDto {
   @IsString()
   @IsNotEmpty()
   @IsDefined()
+  @MaxLength(20)
   materialFolderId: string;
 
   @IsString()
   @IsNotEmpty()
-  @MaxLength(255)
   @IsDefined()
+  @MaxLength(255)
   displayName: string;
 
-  @IsDateString()
+  @IsString()
   @IsOptional()
   visibleFrom?: string;
 
-  @IsDateString()
+  @IsString()
   @IsOptional()
   visibleUntil?: string;
 }

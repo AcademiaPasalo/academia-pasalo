@@ -1,26 +1,28 @@
-import { IsString, IsNotEmpty, MaxLength, IsOptional, IsDefined, IsDateString } from 'class-validator';
+import { IsNotEmpty, IsString, IsOptional, MaxLength, IsDefined } from 'class-validator';
 
 export class CreateFolderDto {
   @IsString()
   @IsNotEmpty()
   @IsDefined()
+  @MaxLength(20)
   evaluationId: string;
 
   @IsString()
   @IsOptional()
+  @MaxLength(20)
   parentFolderId?: string;
 
   @IsString()
   @IsNotEmpty()
-  @MaxLength(255)
   @IsDefined()
+  @MaxLength(255)
   name: string;
 
-  @IsDateString()
+  @IsString()
   @IsOptional()
   visibleFrom?: string;
 
-  @IsDateString()
+  @IsString()
   @IsOptional()
   visibleUntil?: string;
 }
