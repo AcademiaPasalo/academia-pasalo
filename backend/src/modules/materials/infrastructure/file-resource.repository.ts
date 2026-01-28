@@ -12,7 +12,10 @@ export class FileResourceRepository {
 
   async create(data: Partial<FileResource>, manager?: EntityManager): Promise<FileResource> {
     const repo = manager ? manager.getRepository(FileResource) : this.ormRepository;
-    const resource = repo.create(data);
+    const resource = repo.create({
+      ...data,
+      createdAt: new Date(),
+    });
     return await repo.save(resource);
   }
 }

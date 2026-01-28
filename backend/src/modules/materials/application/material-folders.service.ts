@@ -37,29 +37,35 @@ export class MaterialFoldersService {
 
     const activeStatus = await this.folderStatusRepository.findByCode('ACTIVE');
     if (!activeStatus) {
+      this.logger.error('Estado ACTIVE no encontrado en folderStatusRepository');
       throw new InternalServerErrorException('Error de configuración: Estado ACTIVE no encontrado.');
     }
 
     return await this.dataSource.transaction(async (manager) => {
-      const folder = await this.folderRepository.create({
-        evaluationId: dto.evaluationId,
-        parentFolderId: dto.parentFolderId || null,
-        folderStatusId: activeStatus.id,
-        name: dto.name,
-        visibleFrom: dto.visibleFrom ? new Date(dto.visibleFrom) : null,
-        visibleUntil: dto.visibleUntil ? new Date(dto.visibleUntil) : null,
-        createdBy: userId,
-      }, manager);
+      try {
+        const folder = await this.folderRepository.create({
+          evaluationId: dto.evaluationId,
+          parentFolderId: dto.parentFolderId || null,
+          folderStatusId: activeStatus.id,
+          name: dto.name,
+          visibleFrom: dto.visibleFrom ? new Date(dto.visibleFrom) : null,
+          visibleUntil: dto.visibleUntil ? new Date(dto.visibleUntil) : null,
+          createdBy: userId,
+        }, manager);
 
-      this.logger.log({
-        message: 'Carpeta de material creada',
-        folderId: folder.id,
-        userId,
-        evaluationId: dto.evaluationId,
-        timestamp: new Date().toISOString(),
-      });
+        this.logger.log({
+          message: 'Carpeta de material creada',
+          folderId: folder.id,
+          userId,
+          evaluationId: dto.evaluationId,
+          timestamp: new Date().toISOString(),
+        });
 
-      return folder;
+        return folder;
+      } catch (e) {
+        this.logger.error('Error creando carpeta', e);
+        throw e;
+      }
     });
   }
 

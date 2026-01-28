@@ -99,6 +99,21 @@ export class TestSeeder {
     return courseCycle;
   }
 
+  async ensureMaterialStatuses() {
+    const fsRepo = this.dataSource.getRepository('FolderStatus');
+    const msRepo = this.dataSource.getRepository('MaterialStatus');
+    const drsRepo = this.dataSource.getRepository('DeletionRequestStatus');
+
+    if (!await fsRepo.findOne({ where: { code: 'ACTIVE' } })) 
+      await fsRepo.save(fsRepo.create({ code: 'ACTIVE', name: 'Activa' }));
+    
+    if (!await msRepo.findOne({ where: { code: 'ACTIVE' } })) 
+      await msRepo.save(msRepo.create({ code: 'ACTIVE', name: 'Activo' }));
+
+    if (!await drsRepo.findOne({ where: { code: 'PENDING' } })) 
+      await drsRepo.save(drsRepo.create({ code: 'PENDING', name: 'Pendiente' }));
+  }
+
   async createEvaluation(courseCycleId: string, typeCode: string, number: number, start: string, end: string) {
     const typeRepo = this.dataSource.getRepository('EvaluationType');
     let type = await typeRepo.findOne({ where: { code: typeCode } });

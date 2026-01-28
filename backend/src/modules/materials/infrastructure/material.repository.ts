@@ -12,7 +12,11 @@ export class MaterialRepository {
 
   async create(data: Partial<Material>, manager?: EntityManager): Promise<Material> {
     const repo = manager ? manager.getRepository(Material) : this.ormRepository;
-    const material = repo.create(data);
+    const material = repo.create({
+      ...data,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
     return await repo.save(material);
   }
 

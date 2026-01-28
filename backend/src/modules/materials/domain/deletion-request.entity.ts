@@ -19,7 +19,7 @@ export class DeletionRequest {
   @Column({ name: 'entity_id', type: 'bigint' })
   entityId: string;
 
-  @Column({ length: 500, nullable: true })
+  @Column({ type: 'varchar', length: 500, nullable: true })
   reason: string | null;
 
   @Column({ name: 'reviewed_by', type: 'bigint', nullable: true })
@@ -28,10 +28,10 @@ export class DeletionRequest {
   @Column({ name: 'reviewed_at', type: 'datetime', nullable: true })
   reviewedAt: Date | null;
 
-  @CreateDateColumn({ name: 'created_at' })
+  @Column({ name: 'created_at', type: 'datetime' })
   createdAt: Date;
 
-  @UpdateDateColumn({ name: 'updated_at' })
+  @Column({ name: 'updated_at', type: 'datetime' })
   updatedAt: Date;
 
   @ManyToOne(() => User)

@@ -12,7 +12,11 @@ export class MaterialFolderRepository {
 
   async create(data: Partial<MaterialFolder>, manager?: EntityManager): Promise<MaterialFolder> {
     const repo = manager ? manager.getRepository(MaterialFolder) : this.ormRepository;
-    const folder = repo.create(data);
+    const folder = repo.create({
+      ...data,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
     return await repo.save(folder);
   }
 

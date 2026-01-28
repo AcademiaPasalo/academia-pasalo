@@ -12,7 +12,10 @@ export class FileVersionRepository {
 
   async create(data: Partial<FileVersion>, manager?: EntityManager): Promise<FileVersion> {
     const repo = manager ? manager.getRepository(FileVersion) : this.ormRepository;
-    const version = repo.create(data);
+    const version = repo.create({
+      ...data,
+      createdAt: new Date(),
+    });
     return await repo.save(version);
   }
 

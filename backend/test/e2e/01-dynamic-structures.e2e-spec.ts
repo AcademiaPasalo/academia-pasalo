@@ -20,6 +20,8 @@ describe('E2E: Estructuras Dinámicas y Acceso Evolutivo', () => {
 
   // Fechas dinámicas
   const now = new Date();
+  const yesterday = new Date(now);
+  yesterday.setDate(now.getDate() - 1);
   const nextMonth = new Date();
   nextMonth.setMonth(now.getMonth() + 1);
   const prevMonth = new Date();
@@ -49,7 +51,7 @@ describe('E2E: Estructuras Dinámicas y Acceso Evolutivo', () => {
     courseCycle = await seeder.linkCourseCycle(course.id, currentCycle.id);
 
     // 2. Crear PC1 Inicial (IMPORTANTE: Antes de las matrículas)
-    pc1 = await seeder.createEvaluation(courseCycle.id, 'PC', 1, formatDate(now), formatDate(nextMonth));
+    pc1 = await seeder.createEvaluation(courseCycle.id, 'PC', 1, formatDate(yesterday), formatDate(nextMonth));
 
     // 3. Crear Usuarios
     const adminEmail = TestSeeder.generateUniqueEmail('admin_dyn');
@@ -91,8 +93,8 @@ describe('E2E: Estructuras Dinámicas y Acceso Evolutivo', () => {
 
   it('Caso 1: Creación tardía de PC2 - Usuario Full debe tener acceso automático', async () => {
     // A. Crear PC2 DESPUÉS de la matrícula
-    // Usamos 'now' para que sea accesible inmediatamente (checkAccess valida fechas)
-    const pc2 = await seeder.createEvaluation(courseCycle.id, 'PC', 2, formatDate(now), formatDate(next2Months));
+    // Usamos 'yesterday' para asegurar que sea accesible inmediatamente
+    const pc2 = await seeder.createEvaluation(courseCycle.id, 'PC', 2, formatDate(yesterday), formatDate(next2Months));
 
     // B. Verificar acceso Full (Debería ser TRUE gracias al EvaluationSubscriber)
     const hasAccess = await accessEngine.hasAccess(userFull.id, pc2.id);
