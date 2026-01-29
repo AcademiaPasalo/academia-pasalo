@@ -46,7 +46,7 @@ export default function Sidebar({
 
   return (
     <aside
-      className={`${isCollapsed ? 'w-[68px]' : 'w-[240px]'} flex flex-col transition-all duration-300 border-r border-stroke-secondary`}
+      className={`${isCollapsed ? 'w-[68px]' : 'w-[240px]'} flex flex-col transition-all duration-300 border-r border-stroke-secondary bg-white`}
     >
       {/* Header: Logo + Role */}
       {isCollapsed ? (

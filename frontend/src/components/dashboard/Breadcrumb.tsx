@@ -1,5 +1,7 @@
 'use client';
 
+import Icon from "../ui/Icon";
+
 export interface BreadcrumbItem {
   icon?: string;
   label: string;
@@ -12,10 +14,10 @@ export interface BreadcrumbProps {
   showToggle?: boolean;
 }
 
-export default function Breadcrumb({ 
-  items, 
+export default function Breadcrumb({
+  items,
   onToggleSidebar,
-  showToggle = true 
+  showToggle = true
 }: BreadcrumbProps) {
   return (
     <div className="flex items-center">
@@ -23,44 +25,35 @@ export default function Breadcrumb({
       {showToggle && (
         <button
           onClick={onToggleSidebar}
-          className="p-2 hover:bg-gray-100 rounded-lg transition-colors mr-2"
+          className="flex items-center justify-center w-9 h-9 hover:bg-secondary-hover rounded-lg transition-colors mr-2"
           aria-label="Toggle Sidebar"
         >
-          <span className="material-symbols-outlined text-gray-600 text-[20px]">menu</span>
+          <Icon name="bottom_navigation" size={20} variant="rounded" className="text-tertiary" />
         </button>
       )}
 
       {/* Breadcrumb Items */}
-      <div className="pl-2 border-l border-gray-200 flex items-center gap-2 text-sm">
+      <div className="pl-5 border-l border-stroke-secondary flex items-center gap-2 text-sm">
         {items.map((item, index) => (
           <div key={index} className="flex items-center gap-2">
             {index > 0 && (
-              <span className="material-symbols-outlined text-gray-400 text-[16px]">
-                chevron_right
-              </span>
+              <Icon name="chevron_right" size={16} className="text-tertiary" />
             )}
             {item.href ? (
-              <a 
+              <a
                 href={item.href}
-                className="flex items-center gap-1 hover:text-deep-blue-700 transition-colors"
+                className="flex items-center gap-1 hover:text-accent-solid transition-colors"
               >
                 {item.icon && (
-                  <span className="material-symbols-outlined text-deep-blue-600 text-[18px]">
-                    {item.icon}
-                  </span>
+                  <Icon name={item.icon} size={18} className="text-accent-solid" />
                 )}
-                <span className={`font-medium ${index === items.length - 1 ? 'text-deep-blue-600' : 'text-gray-600'}`}>
+                <span className={`font-medium ${index === items.length - 1 ? 'text-accent-solid' : 'text-secondary'}`}>
                   {item.label}
                 </span>
               </a>
             ) : (
               <div className="flex items-center gap-1">
-                {item.icon && (
-                  <span className="material-symbols-outlined text-deep-blue-600 text-[18px]">
-                    {item.icon}
-                  </span>
-                )}
-                <span className="font-medium text-deep-blue-600">{item.label}</span>
+                <span className="font-medium text-secondary">{item.label}</span>
               </div>
             )}
           </div>

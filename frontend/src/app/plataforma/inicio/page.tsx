@@ -71,18 +71,12 @@ export default function InicioPage() {
       {/* Main Content */}
       <div className="flex-1 flex flex-col">
         {/* Top Bar */}
-        <header className="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-6">
+        <header className="h-14 bg-white border-b border-stroke-secondary flex items-center justify-between p-4">
           <Breadcrumb 
             items={breadcrumbItems}
             onToggleSidebar={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
           />
-          <TopBar 
-            user={user}
-            notificationCount={2}
-          />
         </header>
-
-
       </div>
     </div>
   );
