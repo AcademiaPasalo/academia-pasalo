@@ -75,13 +75,13 @@ export default function Sidebar({
       )}
 
       {/* Navigation */}
-      <nav className="p-3 flex-1 space-y-2">
+      <nav className="p-3 flex-1 space-y-1">
         {navItems.map((item, index) => (
           <div key={index}>
             {item.expandable ? (
               <button
                 onClick={() => toggleExpand(item.label)}
-                className={`w-full flex items-center ${isCollapsed ? 'justify-center px-3' : 'justify-between px-2'} py-2 ${item.active
+                className={`h-[43px] w-full flex items-center ${isCollapsed ? 'justify-center px-3' : 'justify-between px-2'} py-2 ${item.active
                   ? 'bg-accent-solid text-white'
                   : 'text-secondary hover:bg-secondary-hover'
                   } rounded-xl font-medium transition-colors`}

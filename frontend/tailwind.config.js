@@ -43,6 +43,16 @@ module.exports = {
         "accent-light-hover": "var(--bg-accent-light-hover)",
         "accent-light-pressed": "var(--bg-accent-light-pressed)",
 
+        // Aliases de estados (error, success, warning, info)
+        "error-solid": "var(--bg-error-solid)",
+        "error-light": "var(--bg-error-light)",
+        "success-solid": "var(--bg-success-solid)",
+        "success-light": "var(--bg-success-light)",
+        "warning-solid": "var(--bg-warning-solid)",
+        "warning-light": "var(--bg-warning-light)",
+        "info-primary-solid": "var(--bg-info-primary-solid)",
+        "info-secondary-solid": "var(--bg-info-secondary-solid)",
+
         // Base colors
         base: {
           white: "var(--base-white)",

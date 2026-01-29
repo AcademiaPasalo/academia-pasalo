@@ -28,7 +28,7 @@ export default function Breadcrumb({
           className="flex items-center justify-center w-9 h-9 hover:bg-secondary-hover rounded-lg transition-colors mr-2"
           aria-label="Toggle Sidebar"
         >
-          <Icon name="bottom_navigation" size={20} variant="rounded" className="text-tertiary" />
+          <Icon name="bottom_navigation" size={20} variant="rounded" filled className="text-tertiary" />
         </button>
       )}
 
