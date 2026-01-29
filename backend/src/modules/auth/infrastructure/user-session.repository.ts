@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, InternalServerErrorException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import type { EntityManager } from 'typeorm';
@@ -128,7 +128,7 @@ export class UserSessionRepository {
     await repo.update(id, sessionData);
     const session = await this.findById(id, manager);
     if (!session) {
-      throw new Error('Sesión no encontrada después de actualizar');
+      throw new InternalServerErrorException('Sesión no encontrada después de actualizar');
     }
     return session;
   }

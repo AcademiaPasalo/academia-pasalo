@@ -8,7 +8,6 @@ import {
   Delete,
   HttpCode,
   HttpStatus,
-  UseGuards,
   ForbiddenException,
 } from '@nestjs/common';
 import { UsersService } from '@modules/users/application/users.service';
@@ -17,14 +16,13 @@ import { UpdateUserDto } from '@modules/users/dto/update-user.dto';
 import { UserResponseDto } from '@modules/users/dto/user-response.dto';
 import { ResponseMessage } from '@common/decorators/response-message.decorator';
 import { plainToInstance } from 'class-transformer';
-import { JwtAuthGuard } from '@common/guards/jwt-auth.guard';
-import { RolesGuard } from '@common/guards/roles.guard';
+import { Auth } from '@common/decorators/auth.decorator';
 import { Roles } from '@common/decorators/roles.decorator';
 import { CurrentUser } from '@common/decorators/current-user.decorator';
 import { User } from '@modules/users/domain/user.entity';
 
 @Controller('users')
-@UseGuards(JwtAuthGuard, RolesGuard)
+@Auth()
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}
 

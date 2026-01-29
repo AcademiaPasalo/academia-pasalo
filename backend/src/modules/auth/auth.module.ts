@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, InternalServerErrorException } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
@@ -43,7 +43,7 @@ import { UsersModule } from '@modules/users/users.module';
         secret: (() => {
           const secret = configService.get<string>('JWT_SECRET');
           if (!secret) {
-            throw new Error('JWT_SECRET no está configurado');
+            throw new InternalServerErrorException('JWT_SECRET no está configurado');
           }
           return secret;
         })(),

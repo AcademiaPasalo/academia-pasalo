@@ -89,4 +89,10 @@ INSERT INTO system_setting (setting_key, setting_value, description, created_at)
 INSERT INTO system_setting (setting_key, setting_value, description, created_at) VALUES
 ('SESSION_EXPIRATION_WARNING_MINUTES', '10', 'Minutos antes de que expire el token para mostrar advertencia al
      usuario.', NOW());
+     
+INSERT INTO session_status (code, name) VALUES
+('ACTIVE', 'Sesión Activa'),
+('PENDING_CONCURRENT_RESOLUTION', 'Resolución de Sesión Concurrente Pendiente'),
+('BLOCKED_PENDING_REAUTH', 'Bloqueado por Anomalía (Requiere Re-autenticación)'),
+('REVOKED', 'Sesión Revocada / Cerrada');
 
