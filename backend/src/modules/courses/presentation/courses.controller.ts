@@ -4,7 +4,6 @@ import {
   Post,
   Body,
   Param,
-  UseGuards,
   HttpCode,
   HttpStatus,
 } from '@nestjs/common';
@@ -16,14 +15,13 @@ import {
 } from '@modules/courses/dto/course-response.dto';
 import { CreateCourseDto } from '@modules/courses/dto/create-course.dto';
 import { AssignCourseToCycleDto } from '@modules/courses/dto/assign-course-to-cycle.dto';
-import { JwtAuthGuard } from '@common/guards/jwt-auth.guard';
-import { RolesGuard } from '@common/guards/roles.guard';
+import { Auth } from '@common/decorators/auth.decorator';
 import { Roles } from '@common/decorators/roles.decorator';
 import { ResponseMessage } from '@common/decorators/response-message.decorator';
 import { plainToInstance } from 'class-transformer';
 
 @Controller('courses')
-@UseGuards(JwtAuthGuard, RolesGuard)
+@Auth()
 export class CoursesController {
   constructor(private readonly coursesService: CoursesService) {}
 

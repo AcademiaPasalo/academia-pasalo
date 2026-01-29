@@ -1,17 +1,16 @@
-import { Controller, Post, Body, Get, Param, UseGuards, HttpStatus, HttpCode, UploadedFile, UseInterceptors, Res } from '@nestjs/common';
+import { Controller, Post, Body, Get, Param, HttpStatus, HttpCode, UploadedFile, UseInterceptors, Res, BadRequestException } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import type { Response } from 'express';
 import { MaterialsService } from '@modules/materials/application/materials.service';
 import { CreateMaterialDto } from '@modules/materials/dto/create-material.dto';
-import { JwtAuthGuard } from '@common/guards/jwt-auth.guard';
-import { RolesGuard } from '@common/guards/roles.guard';
+import { Auth } from '@common/decorators/auth.decorator';
 import { Roles } from '@common/decorators/roles.decorator';
 import { CurrentUser } from '@common/decorators/current-user.decorator';
 import { User } from '@modules/users/domain/user.entity';
 import { ResponseMessage } from '@common/decorators/response-message.decorator';
 
 @Controller('materials')
-@UseGuards(JwtAuthGuard, RolesGuard)
+@Auth()
 export class MaterialsController {
   constructor(private readonly materialsService: MaterialsService) {}
 
@@ -26,7 +25,7 @@ export class MaterialsController {
     @UploadedFile() file: Express.Multer.File,
   ) {
     if (!file) {
-      throw new Error('No se ha adjuntado ningún archivo.');
+      throw new BadRequestException('No se ha adjuntado ningún archivo.');
     }
     return await this.materialsService.create(user.id, dto, file);
   }
@@ -58,7 +57,7 @@ export class MaterialsController {
     @Param('id') materialId: string,
     @UploadedFile() file: Express.Multer.File,
   ) {
-    if (!file) throw new Error('No se ha adjuntado ningún archivo.');
+    if (!file) throw new BadRequestException('No se ha adjuntado ningún archivo.');
     return await this.materialsService.addVersion(user.id, materialId, file);
   }
 
