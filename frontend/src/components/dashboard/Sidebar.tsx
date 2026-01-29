@@ -75,7 +75,7 @@ export default function Sidebar({
       )}
 
       {/* Navigation */}
-      <nav className="p-3 flex-1 space-y-1">
+      <nav className="p-3 flex-1 space-y-2">
         {navItems.map((item, index) => (
           <div key={index}>
             {item.expandable ? (
@@ -106,7 +106,7 @@ export default function Sidebar({
             ) : (
               <a
                 href={item.href}
-                className={`flex items-center ${isCollapsed ? 'justify-center px-3' : 'gap-2 px-2'} py-2 ${item.active
+                className={`h-[43px] flex items-center ${isCollapsed ? 'justify-center px-3' : 'gap-2 px-2'} py-2 ${item.active
                   ? 'bg-accent-solid text-white'
                   : 'text-secondary hover:bg-secondary-hover'
                   } rounded-xl font-medium transition-colors`}
@@ -123,17 +123,25 @@ export default function Sidebar({
             )}
 
             {/* Sub-items */}
-            {!isCollapsed && item.expandable && expandedItems.includes(item.label) && item.subItems && (
-              <div className="ml-[18px] space-y-1 border-l border-stroke-primary pl-2.5">
-                {item.subItems.map((subItem, subIndex) => (
-                  <a
-                    key={subIndex}
-                    href={subItem.href}
-                    className="font-medium flex items-center gap-3 px-4 py-2 text-secondary hover:bg-secondary-hover rounded-lg text-sm transition-colors"
-                  >
-                    {subItem.label}
-                  </a>
-                ))}
+            {!isCollapsed && item.expandable && item.subItems && (
+              <div
+                className={`ml-[18px] border-l border-stroke-primary pl-2.5 overflow-hidden transition-all duration-300 ease-in-out ${
+                  expandedItems.includes(item.label)
+                    ? 'max-h-[500px] opacity-100 mt-1'
+                    : 'max-h-0 opacity-0'
+                }`}
+              >
+                <div className="space-y-1">
+                  {item.subItems.map((subItem, subIndex) => (
+                    <a
+                      key={subIndex}
+                      href={subItem.href}
+                      className="font-medium flex items-center gap-3 px-4 py-2 text-secondary hover:bg-secondary-hover rounded-lg text-sm transition-colors"
+                    >
+                      {subItem.label}
+                    </a>
+                  ))}
+                </div>
               </div>
             )}
           </div>
@@ -142,15 +150,15 @@ export default function Sidebar({
 
       {/* User Profile */}
       <div className="p-5">
-        <button className={`w-full flex items-center ${isCollapsed ? 'justify-center' : 'gap-3'} hover:bg-bg-secondary rounded-xl transition-colors`}>
+        <button className={`w-full flex items-center ${isCollapsed ? 'justify-center' : 'gap-2'} rounded-xl transition-colors`}>
           <div
-            className={`w-10 h-10 ${user.avatarColor || 'bg-[#7C3AED]'} rounded-full flex items-center justify-center text-white font-bold text-sm flex-shrink-0`}
+            className={`w-9 h-9 ${user.avatarColor || 'bg-info-primary-solid'} rounded-full flex items-center justify-center text-white font-bold text-sm flex-shrink-0`}
           >
             {user.initials}
           </div>
           {!isCollapsed && (
             <div className="flex-1 min-w-0 text-left">
-              <p className="text-primary font-medium truncate">{user.name}</p>
+              <p className="text-sm text-primary truncate">{user.name}</p>
             </div>
           )}
           {!isCollapsed && (
