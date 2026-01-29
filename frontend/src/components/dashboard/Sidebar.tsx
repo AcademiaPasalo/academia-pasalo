@@ -81,15 +81,15 @@ export default function Sidebar({
             {item.expandable ? (
               <button
                 onClick={() => toggleExpand(item.label)}
-                className={`flex items-center ${isCollapsed ? 'justify-center px-3' : 'gap-2 px-2'} py-2 ${item.active
-                  ? 'bg-[#1E40AF] text-white'
-                  : 'text-secondary hover:bg-gray-50'
+                className={`w-full flex items-center ${isCollapsed ? 'justify-center px-3' : 'justify-between px-2'} py-2 ${item.active
+                  ? 'bg-accent-solid text-white'
+                  : 'text-secondary hover:bg-secondary-hover'
                   } rounded-xl font-medium transition-colors`}
               >
                 <div className="flex items-center gap-3">
-                  <Icon 
-                    name={item.icon} 
-                    size={24} 
+                  <Icon
+                    name={item.icon}
+                    size={24}
                     variant={item.iconVariant}
                     filled={item.iconFilled}
                   />
@@ -108,12 +108,12 @@ export default function Sidebar({
                 href={item.href}
                 className={`flex items-center ${isCollapsed ? 'justify-center px-3' : 'gap-2 px-2'} py-2 ${item.active
                   ? 'bg-accent-solid text-white'
-                  : 'text-secondary hover:bg-gray-50'
+                  : 'text-secondary hover:bg-secondary-hover'
                   } rounded-xl font-medium transition-colors`}
                 title={isCollapsed ? item.label : undefined}
               >
-                <Icon 
-                  name={item.icon} 
+                <Icon
+                  name={item.icon}
                   size={24}
                   variant={item.iconVariant}
                   filled={item.iconFilled}
@@ -124,19 +124,13 @@ export default function Sidebar({
 
             {/* Sub-items */}
             {!isCollapsed && item.expandable && expandedItems.includes(item.label) && item.subItems && (
-              <div className="ml-4 mt-1 space-y-1">
+              <div className="ml-[18px] space-y-1 border-l border-stroke-primary pl-2.5">
                 {item.subItems.map((subItem, subIndex) => (
                   <a
                     key={subIndex}
                     href={subItem.href}
-                    className="flex items-center gap-3 px-4 py-2 text-[#6B7280] hover:bg-gray-50 rounded-lg text-sm transition-colors"
+                    className="font-medium flex items-center gap-3 px-4 py-2 text-secondary hover:bg-secondary-hover rounded-lg text-sm transition-colors"
                   >
-                    <Icon 
-                      name={subItem.icon} 
-                      size={20}
-                      variant={subItem.iconVariant}
-                      filled={subItem.iconFilled}
-                    />
                     {subItem.label}
                   </a>
                 ))}
@@ -148,7 +142,7 @@ export default function Sidebar({
 
       {/* User Profile */}
       <div className="p-5">
-        <button className={`w-full flex items-center ${isCollapsed ? 'justify-center' : 'gap-3'} hover:bg-gray-50 rounded-xl transition-colors`}>
+        <button className={`w-full flex items-center ${isCollapsed ? 'justify-center' : 'gap-3'} hover:bg-bg-secondary rounded-xl transition-colors`}>
           <div
             className={`w-10 h-10 ${user.avatarColor || 'bg-[#7C3AED]'} rounded-full flex items-center justify-center text-white font-bold text-sm flex-shrink-0`}
           >
@@ -156,11 +150,11 @@ export default function Sidebar({
           </div>
           {!isCollapsed && (
             <div className="flex-1 min-w-0 text-left">
-              <p className="text-[#111827] font-medium truncate">{user.name}</p>
+              <p className="text-primary font-medium truncate">{user.name}</p>
             </div>
           )}
           {!isCollapsed && (
-            <Icon name="unfold_more" size={20} className="text-[#6B7280]" />
+            <Icon name="unfold_more" size={20} className="text-tertiary" />
           )}
         </button>
       </div>

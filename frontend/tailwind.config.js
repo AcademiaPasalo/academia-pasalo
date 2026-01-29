@@ -7,10 +7,29 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        // Alias principal para mantener compatibilidad
+        // ===== ALIASES PRINCIPALES (nivel raíz para usar como text-X, bg-X, border-X) =====
+        
+        // Alias de color principal
         main: "var(--deep-blue-800)",
+        "main-color": "var(--main-color-main-color)",
 
-        // Flat semantic aliases (permiten clases como `text-accent-primary`, `bg-accent-solid`)
+        // Aliases semánticos de texto
+        primary: "var(--text-primary)",
+        secondary: "var(--text-secondary)",
+        tertiary: "var(--text-tertiary)",
+        
+        // Aliases semánticos de background (para usar bg-X directamente)
+        "bg-primary": "var(--bg-primary)",
+        "bg-secondary": "var(--bg-secondary)",
+        "bg-tertiary": "var(--bg-tertiary)",
+        "bg-primary-hover": "var(--bg-primary-hover)",
+        "bg-secondary-hover": "var(--bg-secondary-hover)",
+        "bg-tertiary-hover": "var(--bg-tertiary-hover)",
+        "primary-hover": "var(--bg-primary-hover)",
+        "secondary-hover": "var(--bg-secondary-hover)",
+        "tertiary-hover": "var(--bg-tertiary-hover)",
+        
+        // Aliases de accent (texto y fondo)
         "accent-primary": "var(--text-accent-primary)",
         "accent-primary-hover": "var(--text-accent-primary-hover)",
         "accent-primary-pressed": "var(--text-accent-primary-pressed)",
@@ -23,8 +42,6 @@ module.exports = {
         "accent-light": "var(--bg-accent-light)",
         "accent-light-hover": "var(--bg-accent-light-hover)",
         "accent-light-pressed": "var(--bg-accent-light-pressed)",
-        "tertiary": "var(--text-tertiary)",
-        "main-color": "var(--main-color-main-color)",
 
         // Base colors
         base: {
