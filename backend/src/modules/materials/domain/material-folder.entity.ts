@@ -1,8 +1,8 @@
-import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn, OneToMany, CreateDateColumn, UpdateDateColumn } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn, OneToMany } from 'typeorm';
 import { Evaluation } from '@modules/evaluations/domain/evaluation.entity';
 import { User } from '@modules/users/domain/user.entity';
-import { Material } from './material.entity';
-import { FolderStatus } from './folder-status.entity';
+import { Material } from '@modules/materials/domain/material.entity';
+import { FolderStatus } from '@modules/materials/domain/folder-status.entity';
 
 @Entity('material_folder')
 export class MaterialFolder {
@@ -52,9 +52,9 @@ export class MaterialFolder {
   @JoinColumn({ name: 'created_by' })
   createdBy: User;
 
-  @CreateDateColumn({ name: 'created_at' })
+  @Column({ name: 'created_at', type: 'datetime' })
   createdAt: Date;
 
-  @UpdateDateColumn({ name: 'updated_at' })
-  updatedAt: Date;
+  @Column({ name: 'updated_at', type: 'datetime', nullable: true })
+  updatedAt: Date | null;
 }

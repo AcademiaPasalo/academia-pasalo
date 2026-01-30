@@ -1,5 +1,5 @@
-import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn, CreateDateColumn } from 'typeorm';
-import { FileResource } from './file-resource.entity';
+import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn } from 'typeorm';
+import { FileResource } from '@modules/materials/domain/file-resource.entity';
 import { User } from '@modules/users/domain/user.entity';
 
 @Entity('file_version')
@@ -20,7 +20,7 @@ export class FileVersion {
   @Column({ name: 'storage_url', type: 'varchar', length: 500 })
   storageUrl: string;
 
-  @CreateDateColumn({ name: 'created_at' })
+  @Column({ name: 'created_at', type: 'datetime' })
   createdAt: Date;
 
   @Column({ name: 'created_by', type: 'bigint' })

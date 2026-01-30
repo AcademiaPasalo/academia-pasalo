@@ -168,7 +168,7 @@ describe('E2E: Gestión de Materiales y Seguridad', () => {
         .set('Authorization', `Bearer ${professor.token}`)
         .field('materialFolderId', rootFolderId)
         .field('displayName', 'Fail File')
-        .expect(500); // El interceptor atrapa el error "No se ha adjuntado..."
+        .expect(400); // Bad Request (Validación correcta)
     });
   });
 

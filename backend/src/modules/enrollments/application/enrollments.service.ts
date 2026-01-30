@@ -4,7 +4,6 @@ import { EnrollmentRepository } from '@modules/enrollments/infrastructure/enroll
 import { EnrollmentStatusRepository } from '@modules/enrollments/infrastructure/enrollment-status.repository';
 import { EnrollmentEvaluationRepository } from '@modules/enrollments/infrastructure/enrollment-evaluation.repository';
 import { EnrollmentTypeRepository } from '@modules/enrollments/infrastructure/enrollment-type.repository';
-import { EvaluationRepository } from '@modules/evaluations/infrastructure/evaluation.repository';
 import { CreateEnrollmentDto } from '@modules/enrollments/dto/create-enrollment.dto';
 import { Enrollment } from '@modules/enrollments/domain/enrollment.entity';
 import { CourseCycle } from '@modules/courses/domain/course-cycle.entity';

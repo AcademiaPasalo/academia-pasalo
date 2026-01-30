@@ -1,13 +1,10 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { MaterialsController } from './materials.controller';
 import { MaterialFoldersController } from './material-folders.controller';
-import { MaterialsService } from '../application/materials.service';
+import { MaterialsService } from '@modules/materials/application/materials.service';
 import { JwtAuthGuard } from '@common/guards/jwt-auth.guard';
-import { RolesGuard } from '@common/guards/roles.guard';
 import { Reflector } from '@nestjs/core';
-import { ExecutionContext, ForbiddenException } from '@nestjs/common';
 
-// Mock del Servicio (ya probamos que funciona, ahora solo queremos ver si el controller lo llama o bloquea)
 const mockMaterialsService = {
   uploadMaterial: jest.fn(),
   createFolder: jest.fn(),
@@ -27,20 +24,16 @@ describe('Materials Controllers RBAC Security', () => {
           provide: MaterialsService,
           useValue: mockMaterialsService,
         },
-        Reflector, // Necesario para leer metadata de @Roles
+        Reflector,
       ],
     })
     .overrideGuard(JwtAuthGuard)
-    .useValue({ canActivate: () => true }) // Bypass Auth básica, nos enfocamos en Roles
+    .useValue({ canActivate: () => true })
     .compile();
 
     materialsController = module.get<MaterialsController>(MaterialsController);
     foldersController = module.get<MaterialFoldersController>(MaterialFoldersController);
   });
-
-  // Nota: En pruebas unitarias de NestJS, los Guards globales o de clase a veces requieren setup especial.
-  // Sin embargo, podemos verificar la METADATA de los decoradores para asegurar que están configurados.
-  // Es la forma más rápida y precisa de saber si la ruta está protegida sin levantar todo un servidor HTTP.
 
   describe('MaterialsController RBAC', () => {
     it('endpoint "upload" should restrict access to ADMIN, PROFESSOR, SUPER_ADMIN', () => {
@@ -48,13 +41,13 @@ describe('Materials Controllers RBAC Security', () => {
       expect(roles).toBeDefined();
       expect(roles).toContain('PROFESSOR');
       expect(roles).toContain('ADMIN');
-      expect(roles).not.toContain('STUDENT'); // CRÍTICO: Estudiante NO debe estar aquí
+      expect(roles).not.toContain('STUDENT');
     });
 
     it('endpoint "requestDeletion" should restrict access to PROFESSOR, ADMIN, SUPER_ADMIN', () => {
-        const roles = Reflect.getMetadata('roles', materialsController.requestDeletion);
-        expect(roles).toContain('PROFESSOR');
-        expect(roles).not.toContain('STUDENT');
+      const roles = Reflect.getMetadata('roles', materialsController.requestDeletion);
+      expect(roles).toContain('PROFESSOR');
+      expect(roles).not.toContain('STUDENT');
     });
   });
 
@@ -63,17 +56,17 @@ describe('Materials Controllers RBAC Security', () => {
       const roles = Reflect.getMetadata('roles', foldersController.create);
       expect(roles).toBeDefined();
       expect(roles).toContain('PROFESSOR');
-      expect(roles).not.toContain('STUDENT'); // CRÍTICO
+      expect(roles).not.toContain('STUDENT');
     });
 
     it('endpoint "getRoots" should ALLOW STUDENT', () => {
       const roles = Reflect.getMetadata('roles', foldersController.getRoots);
-      expect(roles).toContain('STUDENT'); // Estudiante SÍ puede leer
+      expect(roles).toContain('STUDENT');
     });
 
     it('endpoint "getContents" should ALLOW STUDENT', () => {
-        const roles = Reflect.getMetadata('roles', foldersController.getContents);
-        expect(roles).toContain('STUDENT'); // Estudiante SÍ puede leer
-      });
+      const roles = Reflect.getMetadata('roles', foldersController.getContents);
+      expect(roles).toContain('STUDENT');
+    });
   });
 });

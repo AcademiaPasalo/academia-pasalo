@@ -1,9 +1,9 @@
-import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn, CreateDateColumn, UpdateDateColumn } from 'typeorm';
-import { MaterialFolder } from './material-folder.entity';
-import { FileResource } from './file-resource.entity';
-import { FileVersion } from './file-version.entity';
+import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn } from 'typeorm';
+import { MaterialFolder } from '@modules/materials/domain/material-folder.entity';
+import { FileResource } from '@modules/materials/domain/file-resource.entity';
+import { FileVersion } from '@modules/materials/domain/file-version.entity';
 import { User } from '@modules/users/domain/user.entity';
-import { MaterialStatus } from './material-status.entity';
+import { MaterialStatus } from '@modules/materials/domain/material-status.entity';
 
 @Entity('material')
 export class Material {
@@ -54,9 +54,9 @@ export class Material {
   @JoinColumn({ name: 'created_by' })
   createdBy: User;
 
-  @CreateDateColumn({ name: 'created_at' })
+  @Column({ name: 'created_at', type: 'datetime' })
   createdAt: Date;
 
-  @UpdateDateColumn({ name: 'updated_at' })
-  updatedAt: Date;
+  @Column({ name: 'updated_at', type: 'datetime', nullable: true })
+  updatedAt: Date | null;
 }

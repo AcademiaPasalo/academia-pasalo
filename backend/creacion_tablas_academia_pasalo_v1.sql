@@ -232,6 +232,7 @@ CREATE TABLE file_version (
   storage_url VARCHAR(500) NOT NULL,
   created_at DATETIME NOT NULL,
   created_by BIGINT NOT NULL,
+  CONSTRAINT uq_resource_version UNIQUE (file_resource_id, version_number),
   FOREIGN KEY (file_resource_id) REFERENCES file_resource(id),
   FOREIGN KEY (created_by) REFERENCES user(id)
 );
@@ -441,5 +442,14 @@ ON featured_testimony(course_cycle_id, is_active);
 
 CREATE INDEX idx_featured_testimony_order
 ON featured_testimony(course_cycle_id, display_order);
+
+CREATE INDEX idx_enrollment_eval_eval_active_dates
+ON enrollment_evaluation (evaluation_id, is_active, access_start_date, access_end_date);
+
+CREATE INDEX idx_enrollment_user_active
+ON enrollment (user_id, cancelled_at);
+
+CREATE INDEX idx_enrollment_user_status_active
+ON enrollment (user_id, enrollment_status_id, cancelled_at);
 
 
