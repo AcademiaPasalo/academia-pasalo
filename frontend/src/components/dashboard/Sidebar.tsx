@@ -252,7 +252,7 @@ export default function Sidebar({
 
         {/* Menú desplegable */}
         {isUserMenuOpen && !isCollapsed && (
-          <div className="absolute bottom-full left-5 right-5 mb-2 bg-white border border-stroke-primary rounded-xl shadow-lg overflow-hidden">
+          <div className="absolute bottom-full left-5 right-5 bg-white border border-stroke-primary rounded-xl overflow-hidden">
             <button
               onClick={handleLogout}
               className="w-full flex items-center gap-3 px-4 py-3 text-left text-error-solid hover:bg-error-hover transition-colors"
