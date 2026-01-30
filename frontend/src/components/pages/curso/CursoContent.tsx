@@ -209,11 +209,12 @@ export default function CursoContent({ cursoId }: CursoContentProps) {
             className={`self-stretch p-2 rounded-lg ${activeTab === 'vigente' ? 'bg-bg-accent-light border-r-4 border-accent-primary' : 'bg-bg-primary'} inline-flex justify-start items-center gap-2 transition-colors`}
           >
             <div className="flex-1 flex justify-start items-center gap-2">
-              <Icon 
-                name="event_available" 
-                size={24} 
-                variant="rounded" 
+              <Icon
+                name="event_available"
+                size={24}
+                variant="rounded"
                 className={activeTab === 'vigente' ? 'text-icon-accent-primary' : 'text-icon-secondary'}
+                filled
               />
               <div className={`flex-1 text-base font-medium font-['Poppins'] leading-4 ${activeTab === 'vigente' ? 'text-text-accent-primary' : 'text-text-secondary'}`}>
                 Ciclo Vigente
@@ -226,11 +227,12 @@ export default function CursoContent({ cursoId }: CursoContentProps) {
             className={`self-stretch p-2 rounded-lg ${activeTab === 'anteriores' ? 'bg-bg-accent-light border-r-4 border-accent-primary' : 'bg-bg-primary'} inline-flex justify-start items-center gap-2 transition-colors`}
           >
             <div className="flex-1 flex justify-start items-center gap-2">
-              <Icon 
-                name="history" 
-                size={24} 
-                variant="rounded" 
+              <Icon
+                name="history"
+                size={24}
+                variant="rounded"
                 className={activeTab === 'anteriores' ? 'text-icon-accent-primary' : 'text-icon-secondary'}
+                filled
               />
               <div className={`flex-1 text-base font-medium font-['Poppins'] leading-4 ${activeTab === 'anteriores' ? 'text-text-accent-primary' : 'text-text-secondary'}`}>
                 Ciclos Anteriores
@@ -243,11 +245,12 @@ export default function CursoContent({ cursoId }: CursoContentProps) {
             className={`self-stretch p-2 rounded-lg ${activeTab === 'banco' ? 'bg-bg-accent-light border-r-4 border-accent-primary' : 'bg-bg-primary'} inline-flex justify-start items-center gap-2 transition-colors`}
           >
             <div className="flex-1 flex justify-start items-center gap-2">
-              <Icon 
-                name="topic" 
-                size={24} 
-                variant="rounded" 
+              <Icon
+                name="topic"
+                size={24}
+                variant="rounded"
                 className={activeTab === 'banco' ? 'text-icon-accent-primary' : 'text-icon-secondary'}
+                filled
               />
               <div className={`flex-1 text-base font-medium font-['Poppins'] leading-4 ${activeTab === 'banco' ? 'text-text-accent-primary' : 'text-text-secondary'}`}>
                 Banco de Enunciados
@@ -279,10 +282,10 @@ export default function CursoContent({ cursoId }: CursoContentProps) {
                       {/* Icon and Status Badge */}
                       <div className="self-stretch inline-flex justify-between items-start">
                         <div className={`p-2 ${getEstadoBgColor(evaluacion.estado)} rounded-full flex justify-start items-center`}>
-                          <Icon 
-                            name={getEstadoIcon(evaluacion.estado)} 
-                            size={24} 
-                            variant="rounded" 
+                          <Icon
+                            name={getEstadoIcon(evaluacion.estado)}
+                            size={24}
+                            variant="rounded"
                             className={getEstadoIconColor(evaluacion.estado)}
                             filled
                           />
@@ -302,9 +305,7 @@ export default function CursoContent({ cursoId }: CursoContentProps) {
                           {evaluacion.titulo}
                         </div>
                         <div className={`self-stretch text-xs font-normal font-['Poppins'] leading-4 ${disabled ? 'text-text-tertiary' : 'text-text-secondary'}`}>
-                          {evaluacion.tipo === 'examen' ? 'Examen Parcial' :
-                            evaluacion.tipo === 'tarea' ? 'Práctica Calificada' :
-                              'Evaluación'}
+                          {getEvaluacionSubtitulo(evaluacion)}
                         </div>
                       </div>
 
@@ -316,10 +317,10 @@ export default function CursoContent({ cursoId }: CursoContentProps) {
                         <div className={`text-sm font-medium font-['Poppins'] leading-4 ${disabled ? 'text-text-disabled' : 'text-text-accent-primary'}`}>
                           Ver Clases
                         </div>
-                        <Icon 
-                          name="arrow_forward" 
-                          size={16} 
-                          variant="rounded" 
+                        <Icon
+                          name="arrow_forward"
+                          size={16}
+                          variant="rounded"
                           className={disabled ? 'text-icon-disabled' : 'text-icon-accent-primary'}
                         />
                       </button>
@@ -347,66 +348,56 @@ export default function CursoContent({ cursoId }: CursoContentProps) {
                         <Icon name="calendar_today" size={20} variant="rounded" className="text-icon-secondary" />
                         <h3 className="text-lg font-semibold text-text-primary">{ciclo.titulo}</h3>
                       </div>
-                      
+
                       <div className="grid grid-cols-3 gap-4">
-                        {ciclo.evaluaciones.map((evaluacion) => (
-                          <div
-                            key={evaluacion.id}
-                            className="p-6 bg-bg-primary rounded-2xl outline outline-1 outline-offset-[-1px] outline-stroke-primary inline-flex flex-col justify-start items-end gap-4"
-                          >
-                            {/* Icon and Status Badge */}
-                            <div className="self-stretch inline-flex justify-between items-start">
-                              <div className="p-2 bg-success-light rounded-full flex justify-start items-center">
-                                <Icon 
-                                  name="check_circle" 
-                                  size={24} 
-                                  variant="rounded" 
-                                  className="text-success-primary"
-                                  filled
-                                />
-                              </div>
-                              <div className="flex justify-start items-start">
-                                <div className="px-2.5 py-1.5 bg-success-light rounded-full flex justify-center items-center gap-1">
-                                  <div className="text-xs font-medium font-['Poppins'] leading-3 text-text-success-primary">
-                                    Nota: {evaluacion.calificacion}
-                                  </div>
+                        {ciclo.evaluaciones.map((evaluacion) => {
+                          const disabled = isDisabled(evaluacion.estado);
+                          return (
+                            <div
+                              key={evaluacion.id}
+                              className={`p-6 bg-bg-primary rounded-2xl outline outline-1 outline-offset-[-1px] outline-stroke-primary inline-flex flex-col justify-start items-end gap-4`}
+                            >
+                              {/* Icon and Archivado Badge */}
+                              <div className="self-stretch inline-flex justify-between items-start">
+                                <div className="p-2 bg-gray-200 rounded-full flex justify-start items-center">
+                                  <Icon
+                                    name="inventory_2"
+                                    size={24}
+                                    variant="rounded"
+                                    className="text-icon-tertiary"
+                                    filled
+                                  />
                                 </div>
                               </div>
-                            </div>
 
-                            {/* Title and Description */}
-                            <div className="self-stretch flex flex-col justify-start items-start gap-1">
-                              <div className="self-stretch text-lg font-semibold font-['Poppins'] leading-5 text-text-primary">
-                                {evaluacion.titulo}
+                              {/* Title and Description */}
+                              <div className="self-stretch flex flex-col justify-start items-start gap-1">
+                                <div className="self-stretch text-lg font-semibold font-['Poppins'] leading-5 text-text-primary">
+                                  {evaluacion.titulo}
+                                </div>
+                                <div className="self-stretch text-xs font-normal font-['Poppins'] leading-4 text-text-secondary">
+                                  {evaluacion.tipo === 'examen' ? 'Examen' : 'Práctica Calificada'}
+                                </div>
                               </div>
-                              <div className="self-stretch text-xs font-normal font-['Poppins'] leading-4 text-text-secondary">
-                                {evaluacion.tipo === 'examen' ? 'Examen' :
-                                  evaluacion.tipo === 'tarea' ? 'Práctica Calificada' :
-                                  evaluacion.tipo === 'quiz' ? 'Quiz' : 'Evaluación'}
-                              </div>
-                              <div className="self-stretch text-xs font-normal font-['Poppins'] leading-4 text-text-tertiary">
-                                {new Date(evaluacion.fecha).toLocaleDateString('es-ES', { 
-                                  day: '2-digit', 
-                                  month: 'long', 
-                                  year: 'numeric' 
-                                })}
-                              </div>
-                            </div>
 
-                            {/* Link Button */}
-                            <button className="p-1 rounded-lg inline-flex justify-center items-center gap-1.5 hover:bg-bg-accent-light transition-colors">
-                              <div className="text-sm font-medium font-['Poppins'] leading-4 text-text-accent-primary">
-                                Ver Material
-                              </div>
-                              <Icon 
-                                name="arrow_forward" 
-                                size={16} 
-                                variant="rounded" 
-                                className="text-icon-accent-primary"
-                              />
-                            </button>
-                          </div>
-                        ))}
+                              {/* Link Button */}
+                              <button
+                                disabled={disabled}
+                                className={`p-1 rounded-lg inline-flex justify-center items-center gap-1.5 ${disabled ? 'cursor-not-allowed' : 'hover:bg-bg-accent-light transition-colors'}`}
+                              >
+                                <div className={`text-sm font-medium font-['Poppins'] leading-4 ${disabled ? 'text-text-disabled' : 'text-text-accent-primary'}`}>
+                                  Ver Material
+                                </div>
+                                <Icon
+                                  name="arrow_forward"
+                                  size={16}
+                                  variant="rounded"
+                                  className={disabled ? 'text-icon-disabled' : 'text-icon-accent-primary'}
+                                />
+                              </button>
+                            </div>
+                          );
+                        })}
                       </div>
                     </div>
                   ))}
@@ -470,10 +461,10 @@ export default function CursoContent({ cursoId }: CursoContentProps) {
                         {/* Icon and Difficulty Badge */}
                         <div className="self-stretch inline-flex justify-between items-start">
                           <div className="p-2 bg-bg-accent-light rounded-full flex justify-start items-center">
-                            <Icon 
-                              name="description" 
-                              size={24} 
-                              variant="rounded" 
+                            <Icon
+                              name="description"
+                              size={24}
+                              variant="rounded"
                               className="text-icon-accent-primary"
                               filled
                             />
@@ -495,8 +486,8 @@ export default function CursoContent({ cursoId }: CursoContentProps) {
                           <div className="self-stretch text-xs font-normal font-['Poppins'] leading-4 text-text-secondary">
                             {enunciado.tipo === 'examen' ? 'Examen' :
                               enunciado.tipo === 'tarea' ? 'Práctica' :
-                              enunciado.tipo === 'quiz' ? 'Quiz' : 
-                              enunciado.tipo === 'proyecto' ? 'Proyecto' : 'Material'}
+                                enunciado.tipo === 'quiz' ? 'Quiz' :
+                                  enunciado.tipo === 'proyecto' ? 'Proyecto' : 'Material'}
                           </div>
                           <div className="self-stretch text-xs font-normal font-['Poppins'] leading-4 text-text-tertiary">
                             Tema: {enunciado.tema}
@@ -508,10 +499,10 @@ export default function CursoContent({ cursoId }: CursoContentProps) {
                           <div className="text-sm font-medium font-['Poppins'] leading-4 text-text-accent-primary">
                             Descargar
                           </div>
-                          <Icon 
-                            name="download" 
-                            size={16} 
-                            variant="rounded" 
+                          <Icon
+                            name="download"
+                            size={16}
+                            variant="rounded"
                             className="text-icon-accent-primary"
                           />
                         </button>
@@ -534,4 +525,28 @@ export default function CursoContent({ cursoId }: CursoContentProps) {
       </div>
     </div>
   );
+}
+
+// Utilidad para obtener el subtítulo correcto de una evaluación
+function getEvaluacionSubtitulo(evaluacion: { tipo: string; titulo: string }): string {
+  if (evaluacion.tipo === 'examen') {
+    if (evaluacion.titulo.startsWith('EX')) {
+      return evaluacion.titulo === 'EX1' ? 'Examen Parcial' : 'Examen Final';
+    }
+    return 'Examen';
+  }
+  if (evaluacion.tipo === 'tarea') {
+    if (evaluacion.titulo.startsWith('PC')) {
+      const num = evaluacion.titulo.replace('PC', '');
+      return `Práctica Calificada ${num}`;
+    }
+    return 'Práctica Calificada';
+  }
+  if (evaluacion.tipo === 'quiz') {
+    return 'Quiz';
+  }
+  if (evaluacion.tipo === 'proyecto') {
+    return 'Proyecto';
+  }
+  return '';
 }

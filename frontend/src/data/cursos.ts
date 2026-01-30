@@ -103,21 +103,11 @@ export const cursosDetalleData: Record<string, CursoDetalle> = {
         }
       ],
       evaluaciones: [
-        {
-          id: 'e1',
-          titulo: 'Examen Parcial 1',
-          tipo: 'examen',
-          fecha: '2026-02-15',
-          calificacion: 9.0,
-          estado: 'calificado'
-        },
-        {
-          id: 'e2',
-          titulo: 'Tarea 3',
-          tipo: 'tarea',
-          fecha: '2026-02-20',
-          estado: 'pendiente'
-        }
+        { id: 'pc1', titulo: 'PC1', tipo: 'tarea', fecha: '2026-02-10', estado: 'entregado' }, // Próximamente
+        { id: 'pc2', titulo: 'PC2', tipo: 'tarea', fecha: '2026-02-17', estado: 'entregado' }, // Próximamente
+        { id: 'pc3', titulo: 'PC3', tipo: 'tarea', fecha: '2026-02-24', estado: 'pendiente' }, // En curso
+        { id: 'ex1', titulo: 'EX1', tipo: 'examen', fecha: '2026-03-03', estado: 'calificado' }, // Completado
+        { id: 'ex2', titulo: 'EX2', tipo: 'examen', fecha: '2026-03-10', estado: 'entregado' } // Próximamente
       ],
       materiales: [
         {
@@ -154,14 +144,11 @@ export const cursosDetalleData: Record<string, CursoDetalle> = {
         }
       ],
       evaluaciones: [
-        {
-          id: 'e1',
-          titulo: 'Quiz 1',
-          tipo: 'quiz',
-          fecha: '2026-02-10',
-          calificacion: 8.5,
-          estado: 'calificado'
-        }
+        { id: 'pc1', titulo: 'PC1', tipo: 'tarea', fecha: '2026-02-10', estado: 'entregado' },
+        { id: 'pc2', titulo: 'PC2', tipo: 'tarea', fecha: '2026-02-17', estado: 'entregado' },
+        { id: 'pc3', titulo: 'PC3', tipo: 'tarea', fecha: '2026-02-24', estado: 'pendiente' },
+        { id: 'ex1', titulo: 'EX1', tipo: 'examen', fecha: '2026-03-03', estado: 'calificado' },
+        { id: 'ex2', titulo: 'EX2', tipo: 'examen', fecha: '2026-03-10', estado: 'entregado' }
       ],
       materiales: [
         {
@@ -198,48 +185,11 @@ export const cursosDetalleData: Record<string, CursoDetalle> = {
         }
       ],
       evaluaciones: [
-        {
-          id: 'e1',
-          titulo: 'Laboratorio 1',
-          tipo: 'proyecto',
-          fecha: '2026-02-18',
-          estado: 'entregado'
-        },
-		{
-          id: 'e2',
-          titulo: 'Laboratorio 2',
-          tipo: 'proyecto',
-          fecha: '2026-02-18',
-          estado: 'entregado'
-        },
-		{
-          id: 'e3',
-          titulo: 'Laboratorio 3',
-          tipo: 'proyecto',
-          fecha: '2026-02-18',
-          estado: 'entregado'
-        },
-		{
-          id: 'e4',
-          titulo: 'Laboratorio 4',
-          tipo: 'proyecto',
-          fecha: '2026-02-18',
-          estado: 'entregado'
-        },
-		{
-          id: 'e5',
-          titulo: 'Laboratorio 5',
-          tipo: 'proyecto',
-          fecha: '2026-02-18',
-          estado: 'entregado'
-        },
-		{
-          id: 'e6',
-          titulo: 'Laboratorio 6',
-          tipo: 'proyecto',
-          fecha: '2026-02-18',
-          estado: 'entregado'
-        },		
+        { id: 'pc1', titulo: 'PC1', tipo: 'tarea', fecha: '2026-02-10', estado: 'entregado' },
+        { id: 'pc2', titulo: 'PC2', tipo: 'tarea', fecha: '2026-02-17', estado: 'entregado' },
+        { id: 'pc3', titulo: 'PC3', tipo: 'tarea', fecha: '2026-02-24', estado: 'pendiente' },
+        { id: 'ex1', titulo: 'EX1', tipo: 'examen', fecha: '2026-03-03', estado: 'calificado' },
+        { id: 'ex2', titulo: 'EX2', tipo: 'examen', fecha: '2026-03-10', estado: 'entregado' }
       ],
       materiales: [
         {
@@ -263,10 +213,8 @@ export const ciclosAnterioresData: Record<string, Record<string, {
   periodo: string;
   evaluaciones: Array<{
     id: string;
-    titulo: string;
-    tipo: 'examen' | 'tarea' | 'quiz' | 'proyecto';
-    fecha: string;
-    calificacion?: number;
+    titulo: string; // PC1, PC2, EX1, EX2
+    tipo: 'examen' | 'tarea';
     estado: 'calificado' | 'pendiente' | 'entregado' | 'vencido';
   }>;
 }>> = {
@@ -275,92 +223,23 @@ export const ciclosAnterioresData: Record<string, Record<string, {
       titulo: 'Ciclo 2025-2',
       periodo: '2025-2',
       evaluaciones: [
-        {
-          id: 'e1',
-          titulo: 'Práctica Calificada 1',
-          tipo: 'tarea',
-          fecha: '2025-09-15',
-          calificacion: 16,
-          estado: 'calificado'
-        },
-        {
-          id: 'e2',
-          titulo: 'Práctica Calificada 2',
-          tipo: 'tarea',
-          fecha: '2025-10-02',
-          calificacion: 18,
-          estado: 'calificado'
-        },
-        {
-          id: 'e3',
-          titulo: 'Examen Parcial',
-          tipo: 'examen',
-          fecha: '2025-10-20',
-          calificacion: 15,
-          estado: 'calificado'
-        },
-        {
-          id: 'e4',
-          titulo: 'Práctica Calificada 3',
-          tipo: 'tarea',
-          fecha: '2025-11-05',
-          calificacion: 17,
-          estado: 'calificado'
-        },
-        {
-          id: 'e5',
-          titulo: 'Examen Final',
-          tipo: 'examen',
-          fecha: '2025-12-10',
-          calificacion: 16,
-          estado: 'calificado'
-        }
+        { id: 'pc1', titulo: 'PC1', tipo: 'tarea', estado: 'calificado' },
+        { id: 'pc2', titulo: 'PC2', tipo: 'tarea', estado: 'calificado' },
+        { id: 'ex1', titulo: 'EX1', tipo: 'examen', estado: 'calificado' },
+        { id: 'pc3', titulo: 'PC3', tipo: 'tarea', estado: 'pendiente' },
+        { id: 'ex2', titulo: 'EX2', tipo: 'examen', estado: 'entregado' },
+        { id: 'pc4', titulo: 'PC4', tipo: 'tarea', estado: 'vencido' }
       ]
     },
     '2025-1': {
       titulo: 'Ciclo 2025-1',
       periodo: '2025-1',
       evaluaciones: [
-        {
-          id: 'e1',
-          titulo: 'Práctica Calificada 1',
-          tipo: 'tarea',
-          fecha: '2025-03-15',
-          calificacion: 14,
-          estado: 'calificado'
-        },
-        {
-          id: 'e2',
-          titulo: 'Práctica Calificada 2',
-          tipo: 'tarea',
-          fecha: '2025-04-02',
-          calificacion: 15,
-          estado: 'calificado'
-        },
-        {
-          id: 'e3',
-          titulo: 'Examen Parcial',
-          tipo: 'examen',
-          fecha: '2025-04-25',
-          calificacion: 13,
-          estado: 'calificado'
-        },
-        {
-          id: 'e4',
-          titulo: 'Práctica Calificada 3',
-          tipo: 'tarea',
-          fecha: '2025-05-10',
-          calificacion: 16,
-          estado: 'calificado'
-        },
-        {
-          id: 'e5',
-          titulo: 'Examen Final',
-          tipo: 'examen',
-          fecha: '2025-06-15',
-          calificacion: 14,
-          estado: 'calificado'
-        }
+        { id: 'pc1', titulo: 'PC1', tipo: 'tarea', estado: 'calificado' },
+        { id: 'pc2', titulo: 'PC2', tipo: 'tarea', estado: 'calificado' },
+        { id: 'ex1', titulo: 'EX1', tipo: 'examen', estado: 'calificado' },
+        { id: 'pc3', titulo: 'PC3', tipo: 'tarea', estado: 'calificado' },
+        { id: 'ex2', titulo: 'EX2', tipo: 'examen', estado: 'calificado' }
       ]
     }
   },
@@ -369,46 +248,11 @@ export const ciclosAnterioresData: Record<string, Record<string, {
       titulo: 'Ciclo 2025-2',
       periodo: '2025-2',
       evaluaciones: [
-        {
-          id: 'e1',
-          titulo: 'Quiz 1',
-          tipo: 'quiz',
-          fecha: '2025-09-10',
-          calificacion: 18,
-          estado: 'calificado'
-        },
-        {
-          id: 'e2',
-          titulo: 'Práctica Calificada 1',
-          tipo: 'tarea',
-          fecha: '2025-09-25',
-          calificacion: 17,
-          estado: 'calificado'
-        },
-        {
-          id: 'e3',
-          titulo: 'Examen Parcial',
-          tipo: 'examen',
-          fecha: '2025-10-18',
-          calificacion: 19,
-          estado: 'calificado'
-        },
-        {
-          id: 'e4',
-          titulo: 'Práctica Calificada 2',
-          tipo: 'tarea',
-          fecha: '2025-11-08',
-          calificacion: 18,
-          estado: 'calificado'
-        },
-        {
-          id: 'e5',
-          titulo: 'Examen Final',
-          tipo: 'examen',
-          fecha: '2025-12-05',
-          calificacion: 20,
-          estado: 'calificado'
-        }
+        { id: 'pc1', titulo: 'PC1', tipo: 'tarea', estado: 'calificado' },
+        { id: 'pc2', titulo: 'PC2', tipo: 'tarea', estado: 'calificado' },
+        { id: 'ex1', titulo: 'EX1', tipo: 'examen', estado: 'calificado' },
+        { id: 'pc3', titulo: 'PC3', tipo: 'tarea', estado: 'pendiente' },
+        { id: 'ex2', titulo: 'EX2', tipo: 'examen', estado: 'entregado' }
       ]
     }
   },
@@ -417,46 +261,11 @@ export const ciclosAnterioresData: Record<string, Record<string, {
       titulo: 'Ciclo 2025-2',
       periodo: '2025-2',
       evaluaciones: [
-        {
-          id: 'e1',
-          titulo: 'Tarea 1',
-          tipo: 'tarea',
-          fecha: '2025-09-12',
-          calificacion: 15,
-          estado: 'calificado'
-        },
-        {
-          id: 'e2',
-          titulo: 'Tarea 2',
-          tipo: 'tarea',
-          fecha: '2025-09-28',
-          calificacion: 16,
-          estado: 'calificado'
-        },
-        {
-          id: 'e3',
-          titulo: 'Examen Parcial',
-          tipo: 'examen',
-          fecha: '2025-10-22',
-          calificacion: 14,
-          estado: 'calificado'
-        },
-        {
-          id: 'e4',
-          titulo: 'Tarea 3',
-          tipo: 'tarea',
-          fecha: '2025-11-10',
-          calificacion: 17,
-          estado: 'calificado'
-        },
-        {
-          id: 'e5',
-          titulo: 'Examen Final',
-          tipo: 'examen',
-          fecha: '2025-12-08',
-          calificacion: 15,
-          estado: 'calificado'
-        }
+        { id: 'pc1', titulo: 'PC1', tipo: 'tarea', estado: 'calificado' },
+        { id: 'pc2', titulo: 'PC2', tipo: 'tarea', estado: 'calificado' },
+        { id: 'ex1', titulo: 'EX1', tipo: 'examen', estado: 'pendiente' },
+        { id: 'pc3', titulo: 'PC3', tipo: 'tarea', estado: 'entregado' },
+        { id: 'ex2', titulo: 'EX2', tipo: 'examen', estado: 'vencido' }
       ]
     }
   }
