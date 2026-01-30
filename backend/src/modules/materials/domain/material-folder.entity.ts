@@ -1,7 +1,8 @@
-import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn, OneToMany } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn, OneToMany, CreateDateColumn, UpdateDateColumn } from 'typeorm';
 import { Evaluation } from '@modules/evaluations/domain/evaluation.entity';
-import { FolderStatus } from './folder-status.entity';
 import { User } from '@modules/users/domain/user.entity';
+import { Material } from './material.entity';
+import { FolderStatus } from './folder-status.entity';
 
 @Entity('material_folder')
 export class MaterialFolder {
@@ -11,13 +12,31 @@ export class MaterialFolder {
   @Column({ name: 'evaluation_id', type: 'bigint' })
   evaluationId: string;
 
+  @ManyToOne(() => Evaluation)
+  @JoinColumn({ name: 'evaluation_id' })
+  evaluation: Evaluation;
+
   @Column({ name: 'parent_folder_id', type: 'bigint', nullable: true })
   parentFolderId: string | null;
+
+  @ManyToOne(() => MaterialFolder, (folder) => folder.subFolders)
+  @JoinColumn({ name: 'parent_folder_id' })
+  parentFolder: MaterialFolder;
+
+  @OneToMany(() => MaterialFolder, (folder) => folder.parentFolder)
+  subFolders: MaterialFolder[];
+
+  @OneToMany(() => Material, (material) => material.materialFolder)
+  materials: Material[];
 
   @Column({ name: 'folder_status_id', type: 'bigint' })
   folderStatusId: string;
 
-  @Column({ length: 255 })
+  @ManyToOne(() => FolderStatus)
+  @JoinColumn({ name: 'folder_status_id' })
+  folderStatus: FolderStatus;
+
+  @Column({ type: 'varchar', length: 255 })
   name: string;
 
   @Column({ name: 'visible_from', type: 'datetime', nullable: true })
@@ -27,30 +46,15 @@ export class MaterialFolder {
   visibleUntil: Date | null;
 
   @Column({ name: 'created_by', type: 'bigint' })
-  createdBy: string;
-
-  @Column({ name: 'created_at', type: 'datetime' })
-  createdAt: Date;
-
-  @Column({ name: 'updated_at', type: 'datetime' })
-  updatedAt: Date;
-
-  @ManyToOne(() => Evaluation)
-  @JoinColumn({ name: 'evaluation_id' })
-  evaluation: Evaluation;
-
-  @ManyToOne(() => MaterialFolder, (folder) => folder.subfolders)
-  @JoinColumn({ name: 'parent_folder_id' })
-  parentFolder: MaterialFolder | null;
-
-  @OneToMany(() => MaterialFolder, (folder) => folder.parentFolder)
-  subfolders: MaterialFolder[];
-
-  @ManyToOne(() => FolderStatus)
-  @JoinColumn({ name: 'folder_status_id' })
-  status: FolderStatus;
+  createdById: string;
 
   @ManyToOne(() => User)
   @JoinColumn({ name: 'created_by' })
-  creator: User;
+  createdBy: User;
+
+  @CreateDateColumn({ name: 'created_at' })
+  createdAt: Date;
+
+  @UpdateDateColumn({ name: 'updated_at' })
+  updatedAt: Date;
 }

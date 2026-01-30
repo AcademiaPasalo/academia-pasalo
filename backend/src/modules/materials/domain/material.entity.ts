@@ -1,9 +1,9 @@
-import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn, CreateDateColumn, UpdateDateColumn } from 'typeorm';
 import { MaterialFolder } from './material-folder.entity';
 import { FileResource } from './file-resource.entity';
 import { FileVersion } from './file-version.entity';
-import { MaterialStatus } from './material-status.entity';
 import { User } from '@modules/users/domain/user.entity';
+import { MaterialStatus } from './material-status.entity';
 
 @Entity('material')
 export class Material {
@@ -13,16 +13,32 @@ export class Material {
   @Column({ name: 'material_folder_id', type: 'bigint' })
   materialFolderId: string;
 
+  @ManyToOne(() => MaterialFolder, (folder) => folder.materials)
+  @JoinColumn({ name: 'material_folder_id' })
+  materialFolder: MaterialFolder;
+
   @Column({ name: 'file_resource_id', type: 'bigint' })
   fileResourceId: string;
+
+  @ManyToOne(() => FileResource)
+  @JoinColumn({ name: 'file_resource_id' })
+  fileResource: FileResource;
 
   @Column({ name: 'file_version_id', type: 'bigint' })
   fileVersionId: string;
 
+  @ManyToOne(() => FileVersion)
+  @JoinColumn({ name: 'file_version_id' })
+  fileVersion: FileVersion;
+
   @Column({ name: 'material_status_id', type: 'bigint' })
   materialStatusId: string;
 
-  @Column({ name: 'display_name', length: 255 })
+  @ManyToOne(() => MaterialStatus)
+  @JoinColumn({ name: 'material_status_id' })
+  materialStatus: MaterialStatus;
+
+  @Column({ name: 'display_name', type: 'varchar', length: 255 })
   displayName: string;
 
   @Column({ name: 'visible_from', type: 'datetime', nullable: true })
@@ -32,31 +48,15 @@ export class Material {
   visibleUntil: Date | null;
 
   @Column({ name: 'created_by', type: 'bigint' })
-  createdBy: string;
-
-  @Column({ name: 'created_at', type: 'datetime' })
-  createdAt: Date;
-
-  @Column({ name: 'updated_at', type: 'datetime' })
-  updatedAt: Date;
-
-  @ManyToOne(() => MaterialFolder)
-  @JoinColumn({ name: 'material_folder_id' })
-  folder: MaterialFolder;
-
-  @ManyToOne(() => FileResource)
-  @JoinColumn({ name: 'file_resource_id' })
-  fileResource: FileResource;
-
-  @ManyToOne(() => FileVersion)
-  @JoinColumn({ name: 'file_version_id' })
-  currentVersion: FileVersion;
-
-  @ManyToOne(() => MaterialStatus)
-  @JoinColumn({ name: 'material_status_id' })
-  status: MaterialStatus;
+  createdById: string;
 
   @ManyToOne(() => User)
   @JoinColumn({ name: 'created_by' })
-  creator: User;
+  createdBy: User;
+
+  @CreateDateColumn({ name: 'created_at' })
+  createdAt: Date;
+
+  @UpdateDateColumn({ name: 'updated_at' })
+  updatedAt: Date;
 }
