@@ -1,6 +1,6 @@
-import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn, CreateDateColumn, UpdateDateColumn } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn } from 'typeorm';
 import { User } from '@modules/users/domain/user.entity';
-import { DeletionRequestStatus } from './deletion-request-status.entity';
+import { DeletionRequestStatus } from '@modules/materials/domain/deletion-request-status.entity';
 
 @Entity('deletion_request')
 export class DeletionRequest {
@@ -40,9 +40,9 @@ export class DeletionRequest {
   @Column({ name: 'reviewed_at', type: 'datetime', nullable: true })
   reviewedAt: Date | null;
 
-  @CreateDateColumn({ name: 'created_at' })
+  @Column({ name: 'created_at', type: 'datetime' })
   createdAt: Date;
 
-  @UpdateDateColumn({ name: 'updated_at' })
-  updatedAt: Date;
+  @Column({ name: 'updated_at', type: 'datetime', nullable: true })
+  updatedAt: Date | null;
 }

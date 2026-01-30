@@ -4,6 +4,7 @@ import { Course } from '@modules/courses/domain/course.entity';
 import { CourseType } from '@modules/courses/domain/course-type.entity';
 import { CycleLevel } from '@modules/courses/domain/cycle-level.entity';
 import { CourseCycle } from '@modules/courses/domain/course-cycle.entity';
+import { CourseCycleProfessor } from '@modules/courses/domain/course-cycle-professor.entity';
 import { CourseRepository } from '@modules/courses/infrastructure/course.repository';
 import { CourseTypeRepository } from '@modules/courses/infrastructure/course-type.repository';
 import { CycleLevelRepository } from '@modules/courses/infrastructure/cycle-level.repository';
@@ -16,7 +17,13 @@ import { CyclesModule } from '@modules/cycles/cycles.module';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Course, CourseType, CycleLevel, CourseCycle]),
+    TypeOrmModule.forFeature([
+      Course,
+      CourseType,
+      CycleLevel,
+      CourseCycle,
+      CourseCycleProfessor,
+    ]),
     AuthModule,
     forwardRef(() => EvaluationsModule),
     CyclesModule,

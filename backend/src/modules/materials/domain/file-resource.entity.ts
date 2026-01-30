@@ -1,4 +1,4 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn } from 'typeorm';
 
 @Entity('file_resource')
 export class FileResource {
@@ -20,6 +20,6 @@ export class FileResource {
   @Column({ name: 'storage_url', type: 'varchar', length: 500 })
   storageUrl: string;
 
-  @CreateDateColumn({ name: 'created_at' })
+  @Column({ name: 'created_at', type: 'datetime' })
   createdAt: Date;
 }

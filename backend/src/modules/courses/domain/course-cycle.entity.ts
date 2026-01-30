@@ -2,6 +2,7 @@ import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn, OneToMan
 import { Course } from '@modules/courses/domain/course.entity';
 import { AcademicCycle } from '@modules/cycles/domain/academic-cycle.entity';
 import { Evaluation } from '@modules/evaluations/domain/evaluation.entity';
+import { CourseCycleProfessor } from '@modules/courses/domain/course-cycle-professor.entity';
 
 @Entity('course_cycle')
 export class CourseCycle {
@@ -24,4 +25,7 @@ export class CourseCycle {
 
   @OneToMany(() => Evaluation, (evaluation) => evaluation.courseCycle)
   evaluations: Evaluation[];
+
+  @OneToMany(() => CourseCycleProfessor, (ccp) => ccp.courseCycle)
+  professors: CourseCycleProfessor[];
 }

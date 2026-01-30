@@ -66,6 +66,6 @@ import { GeoModule } from '@infrastructure/geo/geo.module';
     SessionStatusRepository,
     SystemSettingRepository,
   ],
-  exports: [AuthService, SessionService, SessionStatusRepository],
+  exports: [AuthService, SessionService, AuthSettingsService, SessionStatusRepository],
 })
 export class AuthModule {}

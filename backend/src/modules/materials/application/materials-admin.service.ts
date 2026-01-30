@@ -6,6 +6,9 @@ import { MaterialCatalogRepository } from '@modules/materials/infrastructure/mat
 import { DeletionRequest } from '@modules/materials/domain/deletion-request.entity';
 import { DeletionReviewAction, ReviewDeletionRequestDto } from '@modules/materials/dto/review-deletion-request.dto';
 import { StorageService } from '@infrastructure/storage/storage.service';
+import { FileVersion } from '@modules/materials/domain/file-version.entity';
+import { FileResource } from '@modules/materials/domain/file-resource.entity';
+import { Material } from '@modules/materials/domain/material.entity';
 
 @Injectable()
 export class MaterialsAdminService {
@@ -66,8 +69,7 @@ export class MaterialsAdminService {
       updatedAt: new Date(),
     });
 
-    // Nota: Usamos manager directamente para evitar dependencias circulares de repositorios en transacciones
-    await manager.getRepository('Material').update(materialId, {
+    await manager.update(Material, materialId, {
       materialStatusId: archivedMaterialStatus.id,
       visibleUntil: new Date(),
       updatedAt: new Date(),
@@ -95,17 +97,49 @@ export class MaterialsAdminService {
       throw new BadRequestException('Solo se pueden eliminar físicamente materiales que estén ARCHIVADOS.');
     }
 
-    await this.dataSource.transaction(async (manager) => {
-      // Obtenemos el registro antes de borrar para saber el fileVersionId
-      const materialRecord = await manager.getRepository('Material').findOne({ where: { id: materialId } });
-      
-      await manager.getRepository('Material').delete(materialId);
+    let fileToDeletePath: string | null = null;
 
-      if (materialRecord && materialRecord.fileVersionId) {
-        // Nota: El borrado físico del archivo en storage se podría implementar aquí si no hay más versiones
-        await manager.getRepository('FileVersion').delete(materialRecord.fileVersionId);
+    await this.dataSource.transaction(async (manager) => {
+      const materialRecord = await manager.findOne(Material, { 
+        where: { id: materialId }, 
+        relations: { fileVersion: true } 
+      });
+      
+      if (!materialRecord) return;
+
+      const versionId = materialRecord.fileVersionId;
+      const resourceId = materialRecord.fileVersion.fileResourceId;
+
+      await manager.delete(Material, materialId);
+
+      const materialRefs = await manager.count(Material, { where: { fileVersionId: versionId } });
+
+      if (materialRefs === 0) {
+        await manager.delete(FileVersion, versionId);
+
+        const versionRefs = await manager.count(FileVersion, { where: { fileResourceId: resourceId } });
+
+        if (versionRefs === 0) {
+          const resource = await manager.findOne(FileResource, { where: { id: resourceId } });
+          if (resource) {
+            fileToDeletePath = resource.storageUrl;
+            await manager.delete(FileResource, resourceId);
+          }
+        }
       }
     });
+
+    if (fileToDeletePath) {
+      const pathString = fileToDeletePath as string;
+      const fileName = pathString.split(/[\/]/).pop();
+      if (fileName) {
+        await this.storageService.deleteFile(fileName);
+        this.logger.warn({
+          message: 'Archivo físico eliminado (Garbage Collection)',
+          file: fileName,
+        });
+      }
+    }
 
     this.logger.warn({
       message: 'Material eliminado físicamente (Hard Delete)',

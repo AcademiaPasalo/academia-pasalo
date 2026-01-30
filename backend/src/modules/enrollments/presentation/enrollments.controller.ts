@@ -1,6 +1,7 @@
 import {
   Controller,
   Post,
+  Get,
   Body,
   HttpCode,
   HttpStatus,
@@ -9,6 +10,8 @@ import { EnrollmentsService } from '@modules/enrollments/application/enrollments
 import { CreateEnrollmentDto } from '@modules/enrollments/dto/create-enrollment.dto';
 import { Auth } from '@common/decorators/auth.decorator';
 import { Roles } from '@common/decorators/roles.decorator';
+import { CurrentUser } from '@common/decorators/current-user.decorator';
+import { User } from '@modules/users/domain/user.entity';
 import { ResponseMessage } from '@common/decorators/response-message.decorator';
 
 @Controller('enrollments')
@@ -23,5 +26,12 @@ export class EnrollmentsController {
   async enroll(@Body() dto: CreateEnrollmentDto) {
     const enrollment = await this.enrollmentsService.enroll(dto);
     return enrollment;
+  }
+
+  @Get('my-courses')
+  @Roles('STUDENT', 'ADMIN', 'PROFESSOR', 'SUPER_ADMIN')
+  @ResponseMessage('Listado de cursos obtenido exitosamente')
+  async getMyCourses(@CurrentUser() user: User) {
+    return await this.enrollmentsService.findMyEnrollments(user.id);
   }
 }
