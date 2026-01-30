@@ -1,0 +1,102 @@
+name: Deploy
+on:
+    workflow_dispatch:
+    push:
+      branches: [main]
+
+jobs:
+  validate-ec2-status:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v5.1.1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+      - name: Validate status
+        run: |
+          INSTANCE_ID="i-075c22a8bf3645192"
+          echo "Checking instance state..."
+          STATE=$(aws ec2 describe-instances --instance-ids "$INSTANCE_ID" --query "Reservations[0].Instances[0].State.Name" --output text)
+          echo "Current state: $STATE"
+          if [ "$STATE" = "stopped" ]; then
+            echo "EC2 Instance must be ON in order to make the DEPLOY"
+            exit 1
+          else
+            echo "EC2 Instance is running"
+          fi
+
+  build-and-push:
+    needs: validate-ec2-status
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Build and push backend image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./backend
+          push: true
+          tags: |
+            ${{ secrets.DOCKER_USERNAME }}/academia-pasalo-backend:latest
+            ${{ secrets.DOCKER_USERNAME }}/academia-pasalo-backend:${{ github.sha }}
+
+      - name: Build and push frontend image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./frontend
+          push: true
+          tags: |
+            ${{ secrets.DOCKER_USERNAME }}/academia-pasalo-frontend:latest
+            ${{ secrets.DOCKER_USERNAME }}/academia-pasalo-frontend:${{ github.sha }}
+
+  deploy:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy to EC2
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            cd /home/ubuntu/academia-pasalo || git clone https://github.com/${{ github.repository }}.git /home/ubuntu/academia-pasalo
+            cd /home/ubuntu/academia-pasalo
+            git pull origin main
+            
+            # Log in to Docker Hub
+            echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u ${{ secrets.DOCKER_USERNAME }} --password-stdin
+            
+            # Create .env file
+            cd backend
+            cat > .env << EOF
+            GITHUB_REPOSITORY=${{ github.repository }}
+            DOCKER_USERNAME=${{ secrets.DOCKER_USERNAME }}
+            DB_PASSWORD=${{ secrets.DB_PASSWORD }}
+            DB_NAME=${{ secrets.DB_NAME }}
+            JWT_SECRET=${{ secrets.JWT_SECRET }}
+            GOOGLE_CLIENT_ID=${{ secrets.GOOGLE_CLIENT_ID }}
+            GOOGLE_CLIENT_SECRET=${{ secrets.GOOGLE_CLIENT_SECRET }}
+            GOOGLE_REDIRECT_URI=${{ secrets.GOOGLE_REDIRECT_URI }}
+            EOF
+            
+            # Pull images and deploy
+            docker compose -f docker-compose.prod.yml pull
+            docker compose -f docker-compose.prod.yml down
+            docker compose -f docker-compose.prod.yml up -d
+            
+            # Clean up
+            docker image prune -f
+            
+            echo "✅ Deployment completed!"
+            docker ps 
+          
