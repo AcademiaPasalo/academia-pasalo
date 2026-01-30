@@ -1,0 +1,91 @@
+services:
+  backend:
+    image: ${DOCKER_USERNAME}/academia-pasalo-backend:latest
+    container_name: academia-pasalo-backend
+    restart: unless-stopped
+    ports:
+      - "3001:3001"
+    environment:
+      - DB_HOST=mysql
+      - DB_PORT=3306
+      - DB_USER=root
+      - DB_PASSWORD=${DB_PASSWORD}
+      - DB_NAME=${DB_NAME}
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - JWT_SECRET=${JWT_SECRET}
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
+      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
+      - GOOGLE_REDIRECT_URI=${GOOGLE_REDIRECT_URI}
+      - API_PREFIX=api/v1
+      - NODE_ENV=production
+      - PORT=3001
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - academia-network
+
+  frontend:
+    image: ${DOCKER_USERNAME}/academia-pasalo-frontend:latest
+    container_name: academia-pasalo-frontend
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+    depends_on:
+      - backend
+    networks:
+      - academia-network
+
+  redis:
+    image: redis:8.0-alpine
+    container_name: academia-pasalo-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    command: redis-server --save 60 1 --loglevel warning --maxmemory 256mb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis_data:/data
+    networks:
+      - academia-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  mysql:
+    image: mysql:8.0
+    container_name: academia-pasalo-mysql
+    restart: unless-stopped
+    ports:
+      - "3306:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD}
+      MYSQL_DATABASE: ${DB_NAME}
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./creacion_tablas_academia_pasalo_v1.sql:/docker-entrypoint-initdb.d/01-schema.sql
+      - ./datos_iniciales_academa_pasalo_v1.sql:/docker-entrypoint-initdb.d/02-data.sql
+    networks:
+      - academia-network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${DB_PASSWORD}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+networks:
+  academia-network:
+    driver: bridge
+
+volumes:
+  redis_data:
+    driver: local
+  mysql_data:
+    driver: local

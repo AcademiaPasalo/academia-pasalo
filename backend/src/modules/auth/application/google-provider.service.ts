@@ -1,4 +1,4 @@
-import { Injectable, UnauthorizedException, Logger } from '@nestjs/common';
+import { Injectable, UnauthorizedException, Logger, InternalServerErrorException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { OAuth2Client } from 'google-auth-library';
 
@@ -13,7 +13,7 @@ export class GoogleProviderService {
     const googleRedirectUri = this.configService.get<string>('GOOGLE_REDIRECT_URI');
 
     if (!googleClientId || !googleClientSecret) {
-      throw new Error('Configuración de Google OAuth incompleta');
+      throw new InternalServerErrorException('Configuración de Google OAuth incompleta');
     }
 
     this.googleClient = new OAuth2Client(

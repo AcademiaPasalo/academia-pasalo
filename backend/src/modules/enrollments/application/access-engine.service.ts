@@ -1,0 +1,28 @@
+import { Injectable, Logger } from '@nestjs/common';
+import { EnrollmentEvaluationRepository } from '@modules/enrollments/infrastructure/enrollment-evaluation.repository';
+import { RedisCacheService } from '@infrastructure/cache/redis-cache.service';
+
+@Injectable()
+export class AccessEngineService {
+  private readonly logger = new Logger(AccessEngineService.name);
+
+  constructor(
+    private readonly enrollmentEvaluationRepository: EnrollmentEvaluationRepository,
+    private readonly cacheService: RedisCacheService,
+  ) {}
+
+  async hasAccess(userId: string, evaluationId: string): Promise<boolean> {
+    const cacheKey = `cache:access:user:${userId}:eval:${evaluationId}`;
+    
+    const cachedAccess = await this.cacheService.get<boolean>(cacheKey);
+    if (cachedAccess !== null) {
+      return cachedAccess;
+    }
+
+    const hasAccess = await this.enrollmentEvaluationRepository.checkAccess(userId, evaluationId);
+
+    await this.cacheService.set(cacheKey, hasAccess, 3600);
+
+    return hasAccess;
+  }
+}

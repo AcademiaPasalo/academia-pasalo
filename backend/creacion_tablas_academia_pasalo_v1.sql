@@ -71,6 +71,14 @@ CREATE TABLE security_event_type (
   name VARCHAR(200) NOT NULL
 );
 
+CREATE TABLE enrollment_type (
+    id BIGINT NOT NULL AUTO_INCREMENT,
+    code VARCHAR(32) NOT NULL,
+    name VARCHAR(100) NOT NULL,
+    PRIMARY KEY (id),
+    UNIQUE KEY uq_enrollment_type_code (code)
+);
+
 CREATE TABLE user (
   id BIGINT PRIMARY KEY AUTO_INCREMENT,
   email VARCHAR(255) NOT NULL,
@@ -167,11 +175,13 @@ CREATE TABLE enrollment (
   user_id BIGINT NOT NULL,
   course_cycle_id BIGINT NOT NULL,
   enrollment_status_id BIGINT NOT NULL,
+  enrollment_type_id BIGINT NOT NULL,
   enrolled_at DATETIME NOT NULL,
   cancelled_at DATETIME,
   FOREIGN KEY (user_id) REFERENCES user(id),
   FOREIGN KEY (course_cycle_id) REFERENCES course_cycle(id),
-  FOREIGN KEY (enrollment_status_id) REFERENCES enrollment_status(id)
+  FOREIGN KEY (enrollment_status_id) REFERENCES enrollment_status(id),
+  FOREIGN KEY (enrollment_type_id) REFERENCES enrollment_type (id)
 );
 
 CREATE TABLE enrollment_evaluation (
@@ -222,6 +232,7 @@ CREATE TABLE file_version (
   storage_url VARCHAR(500) NOT NULL,
   created_at DATETIME NOT NULL,
   created_by BIGINT NOT NULL,
+  CONSTRAINT uq_resource_version UNIQUE (file_resource_id, version_number),
   FOREIGN KEY (file_resource_id) REFERENCES file_resource(id),
   FOREIGN KEY (created_by) REFERENCES user(id)
 );
@@ -431,5 +442,14 @@ ON featured_testimony(course_cycle_id, is_active);
 
 CREATE INDEX idx_featured_testimony_order
 ON featured_testimony(course_cycle_id, display_order);
+
+CREATE INDEX idx_enrollment_eval_eval_active_dates
+ON enrollment_evaluation (evaluation_id, is_active, access_start_date, access_end_date);
+
+CREATE INDEX idx_enrollment_user_active
+ON enrollment (user_id, cancelled_at);
+
+CREATE INDEX idx_enrollment_user_status_active
+ON enrollment (user_id, enrollment_status_id, cancelled_at);
 
 

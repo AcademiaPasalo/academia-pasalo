@@ -1,4 +1,4 @@
-import { Injectable, InternalServerErrorException } from '@nestjs/common';
+import { Injectable, InternalServerErrorException, Logger } from '@nestjs/common';
 import { SystemSettingRepository } from '@modules/auth/infrastructure/system-setting.repository';
 
 export type SystemSettingKey =
@@ -8,13 +8,20 @@ export type SystemSettingKey =
   | 'GEO_IP_ANOMALY_TIME_WINDOW_MINUTES'
   | 'GEO_IP_ANOMALY_DISTANCE_KM'
   | 'GEO_GPS_ANOMALY_TIME_WINDOW_MINUTES'
-  | 'GEO_GPS_ANOMALY_DISTANCE_KM';
+  | 'GEO_GPS_ANOMALY_DISTANCE_KM'
+  | 'ACTIVE_CYCLE_ID';
 
 @Injectable()
 export class AuthSettingsService {
-  private readonly cache = new Map<SystemSettingKey, number>();
+  private readonly logger = new Logger(AuthSettingsService.name);
 
-  constructor(private readonly systemSettingRepository: SystemSettingRepository) {}
+  constructor(
+    private readonly systemSettingRepository: SystemSettingRepository,
+  ) {}
+
+  async getActiveCycleId(): Promise<string> {
+    return await this.getSetting('ACTIVE_CYCLE_ID');
+  }
 
   async getRefreshTokenTtlDays(): Promise<number> {
     return await this.getPositiveInt('REFRESH_TOKEN_TTL_DAYS');
@@ -44,28 +51,34 @@ export class AuthSettingsService {
     return await this.getPositiveInt('GEO_IP_ANOMALY_DISTANCE_KM');
   }
 
-  private async getPositiveInt(key: SystemSettingKey): Promise<number> {
-    const cached = this.cache.get(key);
-    if (cached !== undefined) {
-      return cached;
-    }
-
+  private async getSetting(key: SystemSettingKey): Promise<string> {
     const row = await this.systemSettingRepository.findByKey(key);
     if (!row) {
-      throw new InternalServerErrorException(
-        'Configuración del sistema incompleta',
-      );
+      this.logger.error({
+        message: 'Configuración del sistema no encontrada',
+        key,
+        timestamp: new Date().toISOString(),
+      });
+      throw new InternalServerErrorException('Configuración del sistema incompleta');
     }
 
-    const value = Number.parseInt(row.settingValue, 10);
+    return row.settingValue;
+  }
+
+  private async getPositiveInt(key: SystemSettingKey): Promise<number> {
+    const rawValue = await this.getSetting(key);
+    const value = Number.parseInt(rawValue, 10);
+
     if (!Number.isFinite(value) || value <= 0) {
-      throw new InternalServerErrorException(
-        'Configuración del sistema inválida',
-      );
+      this.logger.error({
+        message: 'Configuración del sistema con valor inválido',
+        key,
+        value: rawValue,
+        timestamp: new Date().toISOString(),
+      });
+      throw new InternalServerErrorException('Configuración del sistema inválida');
     }
 
-    this.cache.set(key, value);
     return value;
   }
 }
-

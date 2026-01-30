@@ -17,12 +17,13 @@ import { SessionStatusService } from './../src/modules/auth/application/session-
 import { UsersController } from './../src/modules/users/presentation/users.controller';
 import { UsersService } from './../src/modules/users/application/users.service';
 import { PhotoSource } from './../src/modules/users/domain/user.entity';
+import { RedisCacheService } from '../src/infrastructure/cache/redis-cache.service';
+
+const JWT_SECRET = 'test-jwt-secret';
 
 describe('IAM (e2e)', () => {
   let app: INestApplication;
   let jwtService: JwtService;
-
-  const JWT_SECRET = 'test-jwt-secret';
 
   const adminUser = {
     id: '1',
@@ -120,6 +121,15 @@ describe('IAM (e2e)', () => {
         { provide: UserSessionRepository, useValue: userSessionRepositoryMock },
         { provide: SessionStatusService, useValue: sessionStatusServiceMock },
         { provide: DataSource, useValue: {} },
+        {
+          provide: RedisCacheService,
+          useValue: {
+            get: jest.fn().mockResolvedValue(null),
+            set: jest.fn().mockResolvedValue(null),
+            del: jest.fn().mockResolvedValue(null),
+            invalidateGroup: jest.fn().mockResolvedValue(null),
+          },
+        },
       ],
     }).compile();
 
@@ -157,14 +167,13 @@ describe('IAM (e2e)', () => {
     });
   }
 
-  it('POST /api/v1/auth/google retorna tokens dentro de data', async () => {
-    const response = await request(app.getHttpServer())
-      .post('/api/v1/auth/google')
-      .send({ googleToken: 't', deviceId: 'device-1' })
-      .expect(200);
-
-    expect(response.body).toMatchObject({
-      statusCode: 200,
+      it('POST /api/v1/auth/google retorna tokens dentro de data', async () => {
+      const response = await request(app.getHttpServer())
+        .post('/api/v1/auth/google')
+        .send({ code: 't', deviceId: 'device-1' })
+        .expect(200);
+  
+      expect(response.body).toMatchObject({      statusCode: 200,
       message: 'Inicio de sesión exitoso',
     });
     expect(response.body.data).toMatchObject({

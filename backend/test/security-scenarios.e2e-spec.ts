@@ -9,7 +9,7 @@ import { SecurityEventService } from '../src/modules/auth/application/security-e
 import { SessionStatusService } from '../src/modules/auth/application/session-status.service';
 import { AuthSettingsService } from '../src/modules/auth/application/auth-settings.service';
 import { GeolocationService } from '../src/modules/auth/application/geolocation.service';
-import { GeoIpService } from '../src/modules/auth/application/geo-ip.service';
+import { GeoProvider } from '../src/common/interfaces/geo-provider.interface';
 import { UsersService } from '../src/modules/users/application/users.service';
 import { UserSessionRepository } from '../src/modules/auth/infrastructure/user-session.repository';
 import { SecurityEventRepository } from '../src/modules/auth/infrastructure/security-event.repository';
@@ -18,6 +18,10 @@ import { SessionStatusRepository } from '../src/modules/auth/infrastructure/sess
 import { SystemSettingRepository } from '../src/modules/auth/infrastructure/system-setting.repository';
 import { RequestMetadata } from '../src/modules/auth/interfaces/request-metadata.interface';
 import { JwtStrategy } from '../src/modules/auth/strategies/jwt.strategy';
+
+import { RedisCacheService } from '../src/infrastructure/cache/redis-cache.service';
+import { TokenService } from '../src/modules/auth/application/token.service';
+import { GoogleProviderService } from '../src/modules/auth/application/google-provider.service';
 
 describe('Security Scenarios (Integration)', () => {
   let app: INestApplication;
@@ -86,7 +90,8 @@ describe('Security Scenarios (Integration)', () => {
     }),
   };
 
-  const mockGeoIpService = {
+  // Mock actualizado para usar el Puerto
+  const mockGeoProvider = {
     resolve: jest.fn().mockResolvedValue(null),
   };
 
@@ -111,7 +116,34 @@ describe('Security Scenarios (Integration)', () => {
         { provide: SecurityEventTypeRepository, useValue: mockSecurityEventTypeRepository },
         { provide: SessionStatusRepository, useValue: mockSessionStatusRepository },
         { provide: SystemSettingRepository, useValue: mockSystemSettingRepository },
-        { provide: GeoIpService, useValue: mockGeoIpService },
+        // Injection Token corregido
+        { provide: GeoProvider, useValue: mockGeoProvider },
+        {
+          provide: RedisCacheService,
+          useValue: {
+            get: jest.fn().mockResolvedValue(null),
+            set: jest.fn().mockResolvedValue(null),
+            del: jest.fn().mockResolvedValue(null),
+            invalidateGroup: jest.fn().mockResolvedValue(null),
+          },
+        },
+        {
+          provide: TokenService,
+          useValue: {
+            generatePair: jest.fn().mockResolvedValue({ accessToken: 'a', refreshToken: 'b' }),
+            generateAccessToken: jest.fn().mockResolvedValue('new_access_token'),
+            generateRefreshToken: jest.fn().mockResolvedValue({ token: 'new_refresh', expiresAt: new Date() }),
+            verifyAccessToken: jest.fn().mockResolvedValue({ sub: '1' }),
+            verifyRefreshToken: jest.fn().mockReturnValue({ deviceId: 'device-A', sub: '1' }),
+          },
+        },
+        {
+          provide: GoogleProviderService,
+          useValue: {
+            verify: jest.fn().mockResolvedValue({ email: 'hacker@test.com' }),
+            verifyCodeAndGetEmail: jest.fn().mockResolvedValue('hacker@test.com'),
+          },
+        },
       ],
     }).compile();
 
@@ -120,9 +152,10 @@ describe('Security Scenarios (Integration)', () => {
     jwtService = moduleFixture.get<JwtService>(JwtService);
     securityEventService = moduleFixture.get<SecurityEventService>(SecurityEventService);
     
-    // Bypass Google Verification for tests
     (authService as any).verifyCodeAndGetEmail = jest.fn().mockResolvedValue(mockUser.email);
   });
+
+  // ... (RESTO DE PRUEBAS SE MANTIENEN IGUAL) ...
 
   describe('ATOMICITY & TRANSACTIONS', () => {
     it('should fail login atomically if concurrent-session audit logging fails', async () => {
@@ -224,6 +257,7 @@ describe('Security Scenarios (Integration)', () => {
         mockUsersService as any,
         mockUserSessionRepository as any,
         { getIdByCode: () => Promise.resolve('1') } as any,
+        { get: jest.fn().mockResolvedValue(null), set: jest.fn() } as any, // Mock RedisCacheService
       );
 
       const payload = { sub: '1', email: 'h@t.com', roles: [], sessionId: '500' };

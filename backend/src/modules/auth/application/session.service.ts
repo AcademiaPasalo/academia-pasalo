@@ -5,7 +5,7 @@ import { UserSessionRepository } from '@modules/auth/infrastructure/user-session
 import { SecurityEventService } from '@modules/auth/application/security-event.service';
 import { GeolocationService } from '@modules/auth/application/geolocation.service';
 import { AuthSettingsService } from '@modules/auth/application/auth-settings.service';
-import { GeoIpService } from '@modules/auth/application/geo-ip.service';
+import { GeoProvider } from '@common/interfaces/geo-provider.interface';
 import { UserSession } from '@modules/auth/domain/user-session.entity';
 import { RequestMetadata } from '@modules/auth/interfaces/request-metadata.interface';
 import {
@@ -25,7 +25,7 @@ export class SessionService {
     private readonly geolocationService: GeolocationService,
     private readonly sessionStatusService: SessionStatusService,
     private readonly authSettingsService: AuthSettingsService,
-    private readonly geoIpService: GeoIpService,
+    private readonly geoProvider: GeoProvider,
   ) {}
 
   async createSession(
@@ -389,7 +389,11 @@ export class SessionService {
       return { metadata, locationSource: 'gps' };
     }
 
-    const geo = this.geoIpService.resolve(metadata.ipAddress);
+    // 5. GeoIP Lookup (Local DB)
+    const geo = this.geoProvider.resolve(metadata.ipAddress);
+    
+    // 6. Security Checks
+    // A. Impossible Travel Check
     if (!geo) {
       return { metadata, locationSource: 'none' };
     }
