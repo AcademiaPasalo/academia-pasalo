@@ -1,9 +1,10 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Image from 'next/image';
 import { usePathname, useRouter } from 'next/navigation';
 import Icon from '@/components/ui/Icon';
+import { useAuth } from '@/contexts/AuthContext';
 
 export interface SidebarNavItem {
   icon: string;
@@ -37,6 +38,9 @@ export default function Sidebar({
 }: SidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
+  const { logout } = useAuth();
+  const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
+  const userMenuRef = useRef<HTMLDivElement>(null);
   
   // Auto-expandir items cuando un subitem está activo (inicialización)
   const getInitialExpandedItems = () => {
@@ -68,6 +72,20 @@ export default function Sidebar({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pathname]);
 
+  // Cerrar menú de usuario cuando se hace clic fuera
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (userMenuRef.current && !userMenuRef.current.contains(event.target as Node)) {
+        setIsUserMenuOpen(false);
+      }
+    }
+
+    if (isUserMenuOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [isUserMenuOpen]);
+
   const toggleExpand = (label: string) => {
     setExpandedItems(prev =>
       prev.includes(label)
@@ -81,6 +99,22 @@ export default function Sidebar({
     if (href !== '#') {
       router.push(href);
     }
+  };
+
+  const handleLogout = async () => {
+    try {
+      setIsUserMenuOpen(false); // Cerrar el menú primero
+      await logout();
+      // El AuthContext ya maneja la redirección a /plataforma
+    } catch (error) {
+      console.error('Error al cerrar sesión:', error);
+      // Incluso si hay error, intentar redirigir al login
+      router.push('/plataforma');
+    }
+  };
+
+  const toggleUserMenu = () => {
+    setIsUserMenuOpen(!isUserMenuOpen);
   };
 
   return (
@@ -192,8 +226,11 @@ export default function Sidebar({
       </nav>
 
       {/* User Profile */}
-      <div className="p-5">
-        <button className={`w-full flex items-center ${isCollapsed ? 'justify-center' : 'gap-2'} rounded-xl transition-colors`}>
+      <div className="p-5 relative" ref={userMenuRef}>
+        <button 
+          onClick={toggleUserMenu}
+          className={`w-full flex items-center ${isCollapsed ? 'justify-center' : 'gap-2'} rounded-xl transition-colors hover:bg-secondary-hover p-2`}
+        >
           <div
             className={`w-9 h-9 bg-info-primary-solid rounded-full flex items-center justify-center text-white font-bold text-sm flex-shrink-0`}
           >
@@ -205,9 +242,26 @@ export default function Sidebar({
             </div>
           )}
           {!isCollapsed && (
-            <Icon name="unfold_more" size={20} className="text-tertiary" />
+            <Icon 
+              name="unfold_more" 
+              size={20} 
+              className={`text-tertiary transition-transform ${isUserMenuOpen ? 'rotate-180' : ''}`} 
+            />
           )}
         </button>
+
+        {/* Menú desplegable */}
+        {isUserMenuOpen && !isCollapsed && (
+          <div className="absolute bottom-full left-5 right-5 mb-2 bg-white border border-stroke-primary rounded-xl shadow-lg overflow-hidden">
+            <button
+              onClick={handleLogout}
+              className="w-full flex items-center gap-3 px-4 py-3 text-left text-error-solid hover:bg-error-hover transition-colors"
+            >
+              <Icon name="logout" size={20} variant="rounded" />
+              <span className="text-sm font-medium">Cerrar Sesión</span>
+            </button>
+          </div>
+        )}
       </div>
     </aside>
   );
