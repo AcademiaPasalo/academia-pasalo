@@ -25,4 +25,17 @@ export class EnrollmentRepository {
       },
     });
   }
+
+  async findMyEnrollments(userId: string): Promise<Enrollment[]> {
+    return await this.ormRepository.createQueryBuilder('enrollment')
+      .innerJoinAndSelect('enrollment.courseCycle', 'courseCycle')
+      .innerJoinAndSelect('courseCycle.course', 'course')
+      .innerJoinAndSelect('courseCycle.academicCycle', 'academicCycle')
+      .leftJoinAndSelect('courseCycle.professors', 'courseCycleProfessor', 'courseCycleProfessor.revokedAt IS NULL')
+      .leftJoinAndSelect('courseCycleProfessor.professor', 'professor')
+      .where('enrollment.userId = :userId', { userId })
+      .andWhere('enrollment.cancelledAt IS NULL')
+      .orderBy('enrollment.enrolledAt', 'DESC')
+      .getMany();
+  }
 }

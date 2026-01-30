@@ -9,10 +9,12 @@ import { Enrollment } from '@modules/enrollments/domain/enrollment.entity';
 import { CourseCycle } from '@modules/courses/domain/course-cycle.entity';
 import { Evaluation } from '@modules/evaluations/domain/evaluation.entity';
 import { RedisCacheService } from '@infrastructure/cache/redis-cache.service';
+import { MyEnrollmentsResponseDto } from '@modules/enrollments/dto/my-enrollments-response.dto';
 
 @Injectable()
 export class EnrollmentsService {
   private readonly logger = new Logger(EnrollmentsService.name);
+  private readonly DASHBOARD_CACHE_TTL = 3600;
 
   constructor(
     private readonly dataSource: DataSource,
@@ -22,6 +24,58 @@ export class EnrollmentsService {
     private readonly enrollmentTypeRepository: EnrollmentTypeRepository,
     private readonly cacheService: RedisCacheService,
   ) {}
+
+  async findMyEnrollments(userId: string): Promise<MyEnrollmentsResponseDto[]> {
+    const cacheKey = `cache:enrollment:user:${userId}:dashboard`;
+    
+    const cachedData = await this.cacheService.get<MyEnrollmentsResponseDto[]>(cacheKey);
+    if (cachedData) return cachedData;
+
+    const enrollments = await this.enrollmentRepository.findMyEnrollments(userId);
+    
+    const now = new Date();
+    now.setHours(0, 0, 0, 0);
+
+    const result = enrollments.map((enrollment) => {
+      const startDate = new Date(enrollment.courseCycle.academicCycle.startDate);
+      startDate.setHours(0, 0, 0, 0);
+      
+      const endDate = new Date(enrollment.courseCycle.academicCycle.endDate);
+      endDate.setHours(0, 0, 0, 0);
+
+      const isCurrent = now >= startDate && now <= endDate;
+
+      return {
+        id: enrollment.id,
+        enrolledAt: enrollment.enrolledAt,
+        courseCycle: {
+          id: enrollment.courseCycle.id,
+          course: {
+            id: enrollment.courseCycle.course.id,
+            code: enrollment.courseCycle.course.code,
+            name: enrollment.courseCycle.course.name,
+          },
+          academicCycle: {
+            id: enrollment.courseCycle.academicCycle.id,
+            code: enrollment.courseCycle.academicCycle.code,
+            startDate: enrollment.courseCycle.academicCycle.startDate,
+            endDate: enrollment.courseCycle.academicCycle.endDate,
+            isCurrent,
+          },
+          professors: (enrollment.courseCycle.professors || []).map(p => ({
+            id: p.professor.id,
+            firstName: p.professor.firstName,
+            lastName1: p.professor.lastName1 || '',
+            lastName2: p.professor.lastName2 || '',
+            profilePhotoUrl: p.professor.profilePhotoUrl,
+          })),
+        },
+      };
+    });
+
+    await this.cacheService.set(cacheKey, result, this.DASHBOARD_CACHE_TTL);
+    return result;
+  }
 
   async enroll(dto: CreateEnrollmentDto): Promise<Enrollment> {
     const existing = await this.enrollmentRepository.findActiveByUserAndCourseCycle(dto.userId, dto.courseCycleId);
@@ -141,7 +195,7 @@ export class EnrollmentsService {
       return newEnrollment;
     });
 
-    await this.cacheService.del(`cache:enrollment:user:${dto.userId}`);
+    await this.cacheService.del(`cache:enrollment:user:${dto.userId}:dashboard`);
     await this.cacheService.invalidateGroup(`cache:access:user:${dto.userId}:*`);
 
     this.logger.log({

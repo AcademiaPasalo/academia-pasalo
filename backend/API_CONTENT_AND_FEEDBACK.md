@@ -84,6 +84,56 @@ Esta API gestiona dos pilares fundamentales de la experiencia educativa:
 
 ## 2. MÓDULO DE FEEDBACK (`/feedback`)
 
+... (contenido anterior) ...
+
+## 3. MÓDULO DE MATRÍCULAS (`/enrollments`)
+
+### A. Alumnos (Dashboard)
+
+#### 1. Ver mis Cursos Matriculados
+Obtiene el listado completo de cursos donde el alumno está inscrito, con detalles del ciclo y profesores.
+*   **Endpoint:** `GET /enrollments/my-courses`
+*   **Roles:** `STUDENT`, `ADMIN`
+*   **Caché:** 1 hora (Se invalida automáticamente al matricularse en un nuevo curso).
+*   **Respuesta (200):**
+    ```json
+    {
+      "statusCode": 200,
+      "message": "Listado de cursos obtenido exitosamente",
+      "data": [
+        {
+          "id": "1",
+          "enrolledAt": "2026-01-20T10:00:00Z",
+          "courseCycle": {
+            "id": "10",
+            "course": {
+              "id": "101",
+              "code": "FIS-1",
+              "name": "Física I"
+            },
+            "academicCycle": {
+              "id": "5",
+              "code": "2026-1",
+              "startDate": "2026-01-01",
+              "endDate": "2026-06-30",
+              "isCurrent": true
+            },
+            "professors": [
+              {
+                "id": "15",
+                "firstName": "Juan",
+                "lastName1": "Pérez",
+                "lastName2": "García",
+                "profilePhotoUrl": "https://..."
+              }
+            ]
+          }
+        }
+      ]
+    }
+    ```
+
+
 ### A. Alumnos (Creación)
 
 #### 1. Crear Testimonio
