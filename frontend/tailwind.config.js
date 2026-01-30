@@ -48,6 +48,7 @@ module.exports = {
         "error-light": "var(--bg-error-light)",
         "success-solid": "var(--bg-success-solid)",
         "success-light": "var(--bg-success-light)",
+        "success-primary": "var(--text-success-primary)",
         "warning-solid": "var(--bg-warning-solid)",
         "warning-light": "var(--bg-warning-light)",
         "info-primary-solid": "var(--bg-info-primary-solid)",

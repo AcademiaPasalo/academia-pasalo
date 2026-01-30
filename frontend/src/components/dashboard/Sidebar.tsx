@@ -46,7 +46,7 @@ export default function Sidebar({
 
   return (
     <aside
-      className={`${isCollapsed ? 'w-[68px]' : 'w-[240px]'} flex flex-col transition-all duration-300 border-r border-stroke-secondary bg-white`}
+      className={`${isCollapsed ? 'w-[68px]' : 'w-[240px]'} flex flex-col transition-all duration-300 border-r border-stroke-secondary bg-white h-full`}
     >
       {/* Header: Logo + Role */}
       {isCollapsed ? (
@@ -152,7 +152,7 @@ export default function Sidebar({
       <div className="p-5">
         <button className={`w-full flex items-center ${isCollapsed ? 'justify-center' : 'gap-2'} rounded-xl transition-colors`}>
           <div
-            className={`w-9 h-9 ${user.avatarColor || 'bg-info-primary-solid'} rounded-full flex items-center justify-center text-white font-bold text-sm flex-shrink-0`}
+            className={`w-9 h-9 bg-info-primary-solid rounded-full flex items-center justify-center text-white font-bold text-sm flex-shrink-0`}
           >
             {user.initials}
           </div>

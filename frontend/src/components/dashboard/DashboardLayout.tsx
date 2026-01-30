@@ -162,7 +162,7 @@ export default function DashboardLayout({
             </div>
 
             {/* Right Side */}
-            <div className="flex items-center gap-2">
+            {/*<div className="flex items-center gap-2">
               <TopBar 
                 user={topBarUser}
                 showNotifications={true}
@@ -171,12 +171,12 @@ export default function DashboardLayout({
                 onUserClick={onUserMenuClick}
               />
               {actions}
-            </div>
+            </div>*/}
           </header>
         )}
 
         {/* Page Content */}
-        <main className="flex-1 p-4 lg:p-6">
+        <main className="flex-1 p-12">
           {children}
         </main>
       </div>
