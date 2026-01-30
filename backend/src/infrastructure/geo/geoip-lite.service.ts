@@ -1,16 +1,12 @@
 import { Injectable, Logger } from '@nestjs/common';
 import * as geoip from 'geoip-lite';
+import { GeoProvider, GeoLocationResult } from '@common/interfaces/geo-provider.interface';
 
 @Injectable()
-export class GeoIpService {
-  private readonly logger = new Logger(GeoIpService.name);
+export class GeoIpLiteService implements GeoProvider {
+  private readonly logger = new Logger(GeoIpLiteService.name);
 
-  resolve(ipAddress: string): {
-    latitude: number;
-    longitude: number;
-    city: string | null;
-    country: string | null;
-  } | null {
+  resolve(ipAddress: string): GeoLocationResult | null {
     const ip = this.normalizeIp(ipAddress);
     if (!ip) {
       if (process.env.MOCK_GEO_ENABLED === 'true') {
@@ -47,11 +43,10 @@ export class GeoIpService {
       };
     } catch (error) {
       this.logger.warn({
-        level: 'warn',
-        context: GeoIpService.name,
         message: 'GeoIP lookup failed',
         ip,
         error: error instanceof Error ? error.message : String(error),
+        timestamp: new Date().toISOString(),
       });
       return null;
     }
@@ -70,4 +65,3 @@ export class GeoIpService {
     return trimmed;
   }
 }
-

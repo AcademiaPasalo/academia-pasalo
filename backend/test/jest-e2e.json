@@ -8,7 +8,8 @@
     "^@modules/(.*)$": "<rootDir>/src/modules/$1",
     "^@common/(.*)$": "<rootDir>/src/common/$1",
     "^@infrastructure/(.*)$": "<rootDir>/src/infrastructure/$1",
-    "^@config/(.*)$": "<rootDir>/src/config/$1"
+    "^@config/(.*)$": "<rootDir>/src/config/$1",
+    "^@src/(.*)$": "<rootDir>/src/$1"
   },
   "transform": {
     "^.+\\.(t|j)s$": "ts-jest"

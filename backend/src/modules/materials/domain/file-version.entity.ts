@@ -10,23 +10,23 @@ export class FileVersion {
   @Column({ name: 'file_resource_id', type: 'bigint' })
   fileResourceId: string;
 
-  @Column({ name: 'version_number' })
-  versionNumber: number;
-
-  @Column({ name: 'storage_url', length: 500 })
-  storageUrl: string;
-
-  @Column({ name: 'created_at', type: 'datetime' })
-  createdAt: Date;
-
-  @Column({ name: 'created_by', type: 'bigint' })
-  createdBy: string;
-
   @ManyToOne(() => FileResource)
   @JoinColumn({ name: 'file_resource_id' })
   fileResource: FileResource;
 
+  @Column({ name: 'version_number', type: 'int' })
+  versionNumber: number;
+
+  @Column({ name: 'storage_url', type: 'varchar', length: 500 })
+  storageUrl: string;
+
+  @CreateDateColumn({ name: 'created_at' })
+  createdAt: Date;
+
+  @Column({ name: 'created_by', type: 'bigint' })
+  createdById: string;
+
   @ManyToOne(() => User)
   @JoinColumn({ name: 'created_by' })
-  creator: User;
+  createdBy: User;
 }

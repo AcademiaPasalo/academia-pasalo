@@ -1,14 +1,13 @@
-import { Controller, Get, Param, UseGuards } from '@nestjs/common';
+import { Controller, Get, Param } from '@nestjs/common';
 import { CyclesService } from '@modules/cycles/application/cycles.service';
 import { AcademicCycleResponseDto } from '@modules/cycles/dto/academic-cycle-response.dto';
-import { JwtAuthGuard } from '@common/guards/jwt-auth.guard';
-import { RolesGuard } from '@common/guards/roles.guard';
+import { Auth } from '@common/decorators/auth.decorator';
 import { Roles } from '@common/decorators/roles.decorator';
 import { ResponseMessage } from '@common/decorators/response-message.decorator';
 import { plainToInstance } from 'class-transformer';
 
 @Controller('cycles')
-@UseGuards(JwtAuthGuard, RolesGuard)
+@Auth()
 export class CyclesController {
   constructor(private readonly cyclesService: CyclesService) {}
 

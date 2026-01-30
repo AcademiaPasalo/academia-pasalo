@@ -1,34 +1,36 @@
 import { Module } from '@nestjs/common';
-import { ConfigModule, ConfigService } from '@nestjs/config';
-import { JwtModule } from '@nestjs/jwt';
-import { PassportModule } from '@nestjs/passport';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { AuthService } from '@modules/auth/application/auth.service';
-import { AuthSettingsService } from '@modules/auth/application/auth-settings.service';
-import { SessionService } from '@modules/auth/application/session.service';
-import { GeolocationService } from '@modules/auth/application/geolocation.service';
-import { GeoIpService } from '@modules/auth/application/geo-ip.service';
-import { SecurityEventService } from '@modules/auth/application/security-event.service';
-import { SessionStatusService } from '@modules/auth/application/session-status.service';
-import { GoogleProviderService } from '@modules/auth/application/google-provider.service';
-import { TokenService } from '@modules/auth/application/token.service';
-import { AuthController } from '@modules/auth/presentation/auth.controller';
-import { UserSession } from '@modules/auth/domain/user-session.entity';
-import { SecurityEvent } from '@modules/auth/domain/security-event.entity';
-import { SecurityEventType } from '@modules/auth/domain/security-event-type.entity';
-import { SessionStatus } from '@modules/auth/domain/session-status.entity';
-import { SystemSetting } from '@modules/auth/domain/system-setting.entity';
-import { UserSessionRepository } from '@modules/auth/infrastructure/user-session.repository';
-import { SecurityEventRepository } from '@modules/auth/infrastructure/security-event.repository';
-import { SecurityEventTypeRepository } from '@modules/auth/infrastructure/security-event-type.repository';
-import { SessionStatusRepository } from '@modules/auth/infrastructure/session-status.repository';
-import { SystemSettingRepository } from '@modules/auth/infrastructure/system-setting.repository';
-import { JwtStrategy } from '@modules/auth/strategies/jwt.strategy';
+import { PassportModule } from '@nestjs/passport';
+import { JwtModule } from '@nestjs/jwt';
+import { ConfigModule, ConfigService } from '@nestjs/config';
+import { AuthController } from './presentation/auth.controller';
+import { AuthService } from './application/auth.service';
+import { SessionService } from './application/session.service';
+import { TokenService } from './application/token.service';
+import { GoogleProviderService } from './application/google-provider.service';
+import { SessionStatusService } from './application/session-status.service';
+import { SecurityEventService } from './application/security-event.service';
+import { AuthSettingsService } from './application/auth-settings.service';
+import { GeolocationService } from './application/geolocation.service';
+import { JwtStrategy } from './strategies/jwt.strategy';
+import { User } from '@modules/users/domain/user.entity';
+import { UserSession } from './domain/user-session.entity';
+import { SecurityEvent } from './domain/security-event.entity';
+import { SecurityEventType } from './domain/security-event-type.entity';
+import { SessionStatus } from './domain/session-status.entity';
+import { SystemSetting } from './domain/system-setting.entity';
+import { UserSessionRepository } from './infrastructure/user-session.repository';
+import { SecurityEventRepository } from './infrastructure/security-event.repository';
+import { SecurityEventTypeRepository } from './infrastructure/security-event-type.repository';
+import { SessionStatusRepository } from './infrastructure/session-status.repository';
+import { SystemSettingRepository } from './infrastructure/system-setting.repository';
 import { UsersModule } from '@modules/users/users.module';
+import { GeoModule } from '@infrastructure/geo/geo.module';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([
+      User,
       UserSession,
       SecurityEvent,
       SecurityEventType,
@@ -40,38 +42,30 @@ import { UsersModule } from '@modules/users/users.module';
       imports: [ConfigModule],
       inject: [ConfigService],
       useFactory: (configService: ConfigService) => ({
-        secret: (() => {
-          const secret = configService.get<string>('JWT_SECRET');
-          if (!secret) {
-            throw new Error('JWT_SECRET no está configurado');
-          }
-          return secret;
-        })(),
-        signOptions: {
-          expiresIn: '15m',
-        },
+        secret: configService.get<string>('JWT_SECRET'),
+        signOptions: { expiresIn: '15m' },
       }),
     }),
     UsersModule,
+    GeoModule,
   ],
   controllers: [AuthController],
   providers: [
     AuthService,
-    AuthSettingsService,
     SessionService,
-    SessionStatusService,
-    GeoIpService,
-    GeolocationService,
-    SecurityEventService,
-    GoogleProviderService,
     TokenService,
+    GoogleProviderService,
+    SessionStatusService,
+    SecurityEventService,
+    AuthSettingsService,
+    GeolocationService,
+    JwtStrategy,
     UserSessionRepository,
     SecurityEventRepository,
     SecurityEventTypeRepository,
     SessionStatusRepository,
     SystemSettingRepository,
-    JwtStrategy,
   ],
-  exports: [AuthService, SessionService, GoogleProviderService, TokenService, JwtModule, PassportModule, AuthSettingsService],
+  exports: [AuthService, SessionService, SessionStatusRepository],
 })
 export class AuthModule {}

@@ -1,9 +1,12 @@
 import { DataSource } from 'typeorm';
 import { INestApplication } from '@nestjs/common';
-import request from 'supertest';
 import { JwtService } from '@nestjs/jwt';
-import { CreateCourseDto } from '@modules/courses/dto/create-course.dto';
-import { CreateEvaluationDto } from '@modules/evaluations/dto/create-evaluation.dto';
+import request from 'supertest';
+import { AcademicCycle } from '@modules/cycles/domain/academic-cycle.entity';
+import { Course } from '@modules/courses/domain/course.entity';
+import { CourseCycle } from '@modules/courses/domain/course-cycle.entity';
+import { Evaluation } from '@modules/evaluations/domain/evaluation.entity';
+import { User } from '@modules/users/domain/user.entity';
 
 export class TestSeeder {
   private jwtService: JwtService;
@@ -16,8 +19,8 @@ export class TestSeeder {
     return `${prefix}_${Date.now()}_${Math.floor(Math.random() * 10000)}@test.com`;
   }
 
-  async createCycle(code: string, start: string, end: string) {
-    const repo = this.dataSource.getRepository('AcademicCycle');
+  async createCycle(code: string, start: string, end: string): Promise<AcademicCycle> {
+    const repo = this.dataSource.getRepository(AcademicCycle);
     return await repo.save(repo.create({ 
       code, 
       startDate: start, 
@@ -26,7 +29,7 @@ export class TestSeeder {
     }));
   }
 
-  async createCourse(code: string, name: string) {
+  async createCourse(code: string, name: string): Promise<Course> {
     const typeRepo = this.dataSource.getRepository('CourseType');
     const levelRepo = this.dataSource.getRepository('CycleLevel');
     
@@ -36,7 +39,7 @@ export class TestSeeder {
     let level = await levelRepo.findOne({ where: {} });
     if (!level) level = await levelRepo.save(levelRepo.create({ levelNumber: 1, name: 'L1' }));
 
-    const repo = this.dataSource.getRepository('Course');
+    const repo = this.dataSource.getRepository(Course);
     return await repo.save(repo.create({ 
       code, 
       name, 
@@ -46,10 +49,10 @@ export class TestSeeder {
     }));
   }
 
-  async linkCourseCycle(courseId: string, cycleId: string) {
+  async linkCourseCycle(courseId: string, cycleId: string): Promise<CourseCycle> {
     // We need an admin token for this, or simulate DB insertion directly
     // To simplify, we'll do DB insertion directly as this is a setup step
-    const repo = this.dataSource.getRepository('CourseCycle');
+    const repo = this.dataSource.getRepository(CourseCycle);
     const existing = await repo.findOne({ where: { courseId, academicCycleId: cycleId } });
     if (existing) return existing;
 
@@ -59,22 +62,24 @@ export class TestSeeder {
     }));
 
     // Create Banco de Enunciados manually as we skipped the service logic
-    const evalRepo = this.dataSource.getRepository('Evaluation');
+    const evalRepo = this.dataSource.getRepository(Evaluation);
     const typeRepo = this.dataSource.getRepository('EvaluationType');
     
     let bankType = await typeRepo.findOne({ where: { code: 'BANCO_ENUNCIADOS' } });
     if (!bankType) bankType = await typeRepo.save(typeRepo.create({ code: 'BANCO_ENUNCIADOS', name: 'Banco' }));
 
     // Get cycle dates
-    const cycle = await this.dataSource.getRepository('AcademicCycle').findOne({ where: { id: cycleId } });
+    const cycle = await this.dataSource.getRepository(AcademicCycle).findOne({ where: { id: cycleId } });
 
-    await evalRepo.save(evalRepo.create({
-      courseCycleId: courseCycle.id,
-      evaluationTypeId: bankType.id,
-      number: 0,
-      startDate: cycle.startDate,
-      endDate: cycle.endDate
-    }));
+    if (cycle) {
+        await evalRepo.save(evalRepo.create({
+        courseCycleId: courseCycle.id,
+        evaluationTypeId: bankType.id,
+        number: 0,
+        startDate: cycle.startDate,
+        endDate: cycle.endDate
+        }));
+    }
 
     // Ensure EnrollmentTypes exist
     const typeRepoEnroll = this.dataSource.getRepository('EnrollmentType');
@@ -114,12 +119,12 @@ export class TestSeeder {
       await drsRepo.save(drsRepo.create({ code: 'PENDING', name: 'Pendiente' }));
   }
 
-  async createEvaluation(courseCycleId: string, typeCode: string, number: number, start: string, end: string) {
+  async createEvaluation(courseCycleId: string, typeCode: string, number: number, start: string, end: string): Promise<Evaluation> {
     const typeRepo = this.dataSource.getRepository('EvaluationType');
     let type = await typeRepo.findOne({ where: { code: typeCode } });
     if (!type) type = await typeRepo.save(typeRepo.create({ code: typeCode, name: typeCode }));
 
-    const repo = this.dataSource.getRepository('Evaluation');
+    const repo = this.dataSource.getRepository(Evaluation);
     const evaluation = repo.create({
       courseCycleId,
       evaluationTypeId: type.id,
@@ -130,8 +135,8 @@ export class TestSeeder {
     return await repo.save(evaluation);
   }
 
-  async createAuthenticatedUser(email: string, roles: string[] = ['STUDENT']) {
-    const userRepo = this.dataSource.getRepository('User');
+  async createAuthenticatedUser(email: string, roles: string[] = ['STUDENT']): Promise<{ user: User; token: string }> {
+    const userRepo = this.dataSource.getRepository(User);
     let user = await userRepo.findOne({ where: { email } });
     
     if (!user) {
@@ -196,8 +201,8 @@ export class TestSeeder {
     return { user, token };
   }
 
-  async createUser(email: string) {
-    const repo = this.dataSource.getRepository('User');
+  async createUser(email: string): Promise<User> {
+    const repo = this.dataSource.getRepository(User);
     let user = await repo.findOne({ where: { email } });
     if (!user) {
       user = await repo.save(repo.create({ 

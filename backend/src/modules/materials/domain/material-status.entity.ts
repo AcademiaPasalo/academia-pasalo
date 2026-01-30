@@ -5,9 +5,9 @@ export class MaterialStatus {
   @PrimaryGeneratedColumn({ type: 'bigint' })
   id: string;
 
-  @Column({ length: 50 })
+  @Column({ type: 'varchar', length: 50 })
   code: string;
 
-  @Column({ length: 100 })
+  @Column({ type: 'varchar', length: 100 })
   name: string;
 }

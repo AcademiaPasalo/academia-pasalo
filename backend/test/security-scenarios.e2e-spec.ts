@@ -9,7 +9,7 @@ import { SecurityEventService } from '../src/modules/auth/application/security-e
 import { SessionStatusService } from '../src/modules/auth/application/session-status.service';
 import { AuthSettingsService } from '../src/modules/auth/application/auth-settings.service';
 import { GeolocationService } from '../src/modules/auth/application/geolocation.service';
-import { GeoIpService } from '../src/modules/auth/application/geo-ip.service';
+import { GeoProvider } from '../src/common/interfaces/geo-provider.interface';
 import { UsersService } from '../src/modules/users/application/users.service';
 import { UserSessionRepository } from '../src/modules/auth/infrastructure/user-session.repository';
 import { SecurityEventRepository } from '../src/modules/auth/infrastructure/security-event.repository';
@@ -90,7 +90,8 @@ describe('Security Scenarios (Integration)', () => {
     }),
   };
 
-  const mockGeoIpService = {
+  // Mock actualizado para usar el Puerto
+  const mockGeoProvider = {
     resolve: jest.fn().mockResolvedValue(null),
   };
 
@@ -115,7 +116,8 @@ describe('Security Scenarios (Integration)', () => {
         { provide: SecurityEventTypeRepository, useValue: mockSecurityEventTypeRepository },
         { provide: SessionStatusRepository, useValue: mockSessionStatusRepository },
         { provide: SystemSettingRepository, useValue: mockSystemSettingRepository },
-        { provide: GeoIpService, useValue: mockGeoIpService },
+        // Injection Token corregido
+        { provide: GeoProvider, useValue: mockGeoProvider },
         {
           provide: RedisCacheService,
           useValue: {
@@ -150,9 +152,10 @@ describe('Security Scenarios (Integration)', () => {
     jwtService = moduleFixture.get<JwtService>(JwtService);
     securityEventService = moduleFixture.get<SecurityEventService>(SecurityEventService);
     
-    // Bypass Google Verification for tests
     (authService as any).verifyCodeAndGetEmail = jest.fn().mockResolvedValue(mockUser.email);
   });
+
+  // ... (RESTO DE PRUEBAS SE MANTIENEN IGUAL) ...
 
   describe('ATOMICITY & TRANSACTIONS', () => {
     it('should fail login atomically if concurrent-session audit logging fails', async () => {

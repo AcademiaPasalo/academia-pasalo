@@ -1,10 +1,14 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import request from 'supertest';
-import { AppModule } from '../../src/app.module';
+import { AppModule } from '@src/app.module';
 import { DataSource } from 'typeorm';
 import { TestSeeder } from './test-utils';
 import { AccessEngineService } from '@modules/enrollments/application/access-engine.service';
+import { AcademicCycle } from '@modules/cycles/domain/academic-cycle.entity';
+import { CourseCycle } from '@modules/courses/domain/course-cycle.entity';
+import { User } from '@modules/users/domain/user.entity';
+import { Evaluation } from '@modules/evaluations/domain/evaluation.entity';
 
 describe('E2E: Acceso Histórico y Ciclos Pasados', () => {
   let app: INestApplication;
@@ -12,12 +16,12 @@ describe('E2E: Acceso Histórico y Ciclos Pasados', () => {
   let seeder: TestSeeder;
   let accessEngine: AccessEngineService;
 
-  let pastCycle: any;
-  let currentCycle: any;
-  let pastCourseCycle: any;
-  let currentCourseCycle: any;
-  let userFull: any;
-  let pastPC1: any;
+  let pastCycle: AcademicCycle;
+  let currentCycle: AcademicCycle;
+  let pastCourseCycle: CourseCycle;
+  let currentCourseCycle: CourseCycle;
+  let userFull: User;
+  let pastPC1: Evaluation;
 
   const now = new Date();
   const pastDateStart = new Date();

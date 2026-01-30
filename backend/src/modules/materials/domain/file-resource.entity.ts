@@ -5,21 +5,21 @@ export class FileResource {
   @PrimaryGeneratedColumn({ type: 'bigint' })
   id: string;
 
-  @Column({ name: 'checksum_hash', length: 255 })
+  @Column({ name: 'checksum_hash', type: 'varchar', length: 255 })
   checksumHash: string;
 
-  @Column({ name: 'original_name', length: 255 })
+  @Column({ name: 'original_name', type: 'varchar', length: 255 })
   originalName: string;
 
-  @Column({ name: 'mime_type', length: 100 })
+  @Column({ name: 'mime_type', type: 'varchar', length: 100 })
   mimeType: string;
 
   @Column({ name: 'size_bytes', type: 'bigint' })
   sizeBytes: string;
 
-  @Column({ name: 'storage_url', length: 500 })
+  @Column({ name: 'storage_url', type: 'varchar', length: 500 })
   storageUrl: string;
 
-  @Column({ name: 'created_at', type: 'datetime' })
+  @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
 }

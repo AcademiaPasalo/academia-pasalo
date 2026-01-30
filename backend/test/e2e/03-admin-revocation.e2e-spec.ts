@@ -1,10 +1,13 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import request from 'supertest';
-import { AppModule } from '../../src/app.module';
+import { AppModule } from '@src/app.module';
 import { DataSource } from 'typeorm';
 import { TestSeeder } from './test-utils';
 import { AccessEngineService } from '@modules/enrollments/application/access-engine.service';
+import { CourseCycle } from '@modules/courses/domain/course-cycle.entity';
+import { User } from '@modules/users/domain/user.entity';
+import { Evaluation } from '@modules/evaluations/domain/evaluation.entity';
 import { RedisCacheService } from '@infrastructure/cache/redis-cache.service';
 
 describe('E2E: Revocación Administrativa', () => {
@@ -13,9 +16,9 @@ describe('E2E: Revocación Administrativa', () => {
   let seeder: TestSeeder;
   let accessEngine: AccessEngineService;
 
-  let courseCycle: any;
-  let userTarget: any;
-  let pc1: any;
+  let courseCycle: CourseCycle;
+  let userTarget: User;
+  let pc1: Evaluation;
   let enrollmentId: string;
 
   const now = new Date();

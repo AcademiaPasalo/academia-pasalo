@@ -1,16 +1,14 @@
-import { Controller, Get, Post, Param, Body, UseGuards, HttpCode, HttpStatus, Delete } from '@nestjs/common';
+import { Controller, Get, Post, Param, Body, HttpCode, HttpStatus, Delete } from '@nestjs/common';
 import { MaterialsAdminService } from '@modules/materials/application/materials-admin.service';
 import { ReviewDeletionRequestDto } from '@modules/materials/dto/review-deletion-request.dto';
-import { JwtAuthGuard } from '@common/guards/jwt-auth.guard';
-import { RolesGuard } from '@common/guards/roles.guard';
+import { Auth } from '@common/decorators/auth.decorator';
 import { Roles } from '@common/decorators/roles.decorator';
 import { CurrentUser } from '@common/decorators/current-user.decorator';
 import { User } from '@modules/users/domain/user.entity';
 import { ResponseMessage } from '@common/decorators/response-message.decorator';
 
 @Controller('admin/materials')
-@UseGuards(JwtAuthGuard, RolesGuard)
-@Roles('ADMIN', 'SUPER_ADMIN')
+@Auth('ADMIN', 'SUPER_ADMIN')
 export class MaterialsAdminController {
   constructor(private readonly adminService: MaterialsAdminService) {}
 

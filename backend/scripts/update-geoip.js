@@ -24,8 +24,8 @@ const updateGeoIp = () => {
     });
     console.log('Actualización de GeoIP completada exitosamente.');
   } catch (error) {
-    console.error('Fallo al actualizar la base de datos GeoIP.');
-    console.error(error.message);
+    process.stderr.write('Fallo al actualizar la base de datos GeoIP.\n');
+    process.stderr.write(error.message + '\n');
     process.exit(1);
   }
 };

@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, IsNull, EntityManager } from 'typeorm';
+import { Repository, IsNull } from 'typeorm';
 import { MaterialFolder } from '@modules/materials/domain/material-folder.entity';
 
 @Injectable()
@@ -10,30 +10,39 @@ export class MaterialFolderRepository {
     private readonly ormRepository: Repository<MaterialFolder>,
   ) {}
 
-  async create(data: Partial<MaterialFolder>, manager?: EntityManager): Promise<MaterialFolder> {
-    const repo = manager ? manager.getRepository(MaterialFolder) : this.ormRepository;
-    const folder = repo.create({
-      ...data,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    });
-    return await repo.save(folder);
+  async create(folder: Partial<MaterialFolder>): Promise<MaterialFolder> {
+    const newFolder = this.ormRepository.create(folder);
+    return await this.ormRepository.save(newFolder);
   }
 
   async findById(id: string): Promise<MaterialFolder | null> {
     return await this.ormRepository.findOne({
       where: { id },
-      relations: { subfolders: true }, 
+      relations: {
+        folderStatus: true,
+        parentFolder: true,
+      },
     });
   }
 
-  async findRootsByEvaluation(evaluationId: string): Promise<MaterialFolder[]> {
+  async findRootsByEvaluation(evaluationId: string, statusId: string): Promise<MaterialFolder[]> {
     return await this.ormRepository.find({
-      where: {
-        evaluationId,
+      where: { 
+        evaluationId, 
         parentFolderId: IsNull(),
+        folderStatusId: statusId 
       },
-      relations: { status: true },
+      order: { name: 'ASC' },
+    });
+  }
+
+  async findSubFolders(parentFolderId: string, statusId: string): Promise<MaterialFolder[]> {
+    return await this.ormRepository.find({
+      where: { 
+        parentFolderId,
+        folderStatusId: statusId 
+      },
+      order: { name: 'ASC' },
     });
   }
 }
