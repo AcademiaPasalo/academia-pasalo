@@ -44,9 +44,6 @@ export default function Breadcrumb({
                 href={item.href}
                 className="flex items-center gap-1 hover:text-accent-solid transition-colors"
               >
-                {item.icon && (
-                  <Icon name={item.icon} size={18} className="text-accent-solid" />
-                )}
                 <span className={`font-medium ${index === items.length - 1 ? 'text-accent-solid' : 'text-secondary'}`}>
                   {item.label}
                 </span>

@@ -22,15 +22,12 @@ export const navigationConfig: Record<UserRole, SidebarNavItem[]> = {
     {
       icon: 'class',
       label: 'Mis Cursos',
-      href: '/plataforma/cursos',
+      href: '#',
       expandable: true,
       iconVariant: 'rounded',
       iconFilled: true,
-      subItems: [
-        { icon: 'circle', label: 'En Progreso', href: '/plataforma/cursos/en-progreso' },
-        { icon: 'circle', label: 'Completados', href: '/plataforma/cursos/completados' },
-        { icon: 'circle', label: 'Explorar', href: '/plataforma/cursos/explorar' }
-      ]
+      // Los subItems se cargan dinámicamente desde useDynamicNavigation
+      subItems: []
     },
     {
       icon: 'event',
@@ -40,21 +37,7 @@ export const navigationConfig: Record<UserRole, SidebarNavItem[]> = {
       iconFilled: true
     },
     {
-      icon: 'assignment',
-      label: 'Tareas',
-      href: '/plataforma/tareas',
-      iconVariant: 'rounded',
-      iconFilled: true
-    },
-    {
-      icon: 'grade',
-      label: 'Calificaciones',
-      href: '/plataforma/calificaciones',
-      iconVariant: 'rounded',
-      iconFilled: true
-    },
-    {
-      icon: 'notifications',
+      icon: 'notifications_unread',
       label: 'Notificaciones',
       href: '/plataforma/notificaciones',
       iconVariant: 'rounded',

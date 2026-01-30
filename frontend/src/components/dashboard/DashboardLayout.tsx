@@ -4,16 +4,15 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNavigation } from '@/hooks/useNavigation';
+import { useSidebar } from '@/contexts/SidebarContext';
 import Sidebar, { type SidebarNavItem, type SidebarUser } from '@/components/dashboard/Sidebar';
 import Breadcrumb, { type BreadcrumbItem } from '@/components/dashboard/Breadcrumb';
-import TopBar from '@/components/dashboard/TopBar';
 import Icon from '@/components/ui/Icon';
 
 export interface DashboardLayoutProps {
   children: React.ReactNode;
   breadcrumbItems?: BreadcrumbItem[];
   title?: string;
-  actions?: React.ReactNode;
   // Props opcionales para personalización avanzada
   customNavItems?: SidebarNavItem[];
   customSidebarUser?: SidebarUser;
@@ -21,34 +20,24 @@ export interface DashboardLayoutProps {
   showTopBar?: boolean;
   showBreadcrumb?: boolean;
   showToggle?: boolean;
-  defaultCollapsed?: boolean;
-  // Callbacks opcionales
-  onNavigate?: (href: string) => void;
-  onUserMenuClick?: () => void;
-  onNotificationClick?: () => void;
 }
 
 export default function DashboardLayout({
   children,
   breadcrumbItems,
   title,
-  actions,
   customNavItems,
   customSidebarUser,
   showSidebar = true,
   showTopBar = true,
   showBreadcrumb = true,
   showToggle = true,
-  defaultCollapsed = false,
-  onNavigate,
-  onUserMenuClick,
-  onNotificationClick,
 }: DashboardLayoutProps) {
   const { isAuthenticated, isLoading } = useAuth();
   const router = useRouter();
   const navigation = useNavigation();
+  const { isCollapsed, toggleSidebar } = useSidebar();
   
-  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(defaultCollapsed);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   // Proteger la ruta
@@ -78,12 +67,6 @@ export default function DashboardLayout({
   // Usar navegación personalizada o del sistema
   const navItems = customNavItems || navigation.navItems;
   const sidebarUser = customSidebarUser || navigation.sidebarUser;
-  const topBarUser = navigation.topBarUser;
-
-  // Handler para toggle del sidebar
-  const handleToggleSidebar = () => {
-    setIsSidebarCollapsed(prev => !prev);
-  };
 
   // Handler para cerrar mobile menu
   const handleCloseMobileMenu = () => {
@@ -98,7 +81,7 @@ export default function DashboardLayout({
           <Sidebar 
             user={sidebarUser}
             navItems={navItems}
-            isCollapsed={isSidebarCollapsed}
+            isCollapsed={isCollapsed}
           />
         </div>
       )}
@@ -150,7 +133,7 @@ export default function DashboardLayout({
                 {showBreadcrumb && breadcrumbItems ? (
                   <Breadcrumb 
                     items={breadcrumbItems} 
-                    onToggleSidebar={handleToggleSidebar}
+                    onToggleSidebar={toggleSidebar}
                     showToggle={showToggle && showSidebar}
                   />
                 ) : title ? (

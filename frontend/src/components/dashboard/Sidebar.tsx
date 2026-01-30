@@ -1,7 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Image from 'next/image';
+import { usePathname, useRouter } from 'next/navigation';
 import Icon from '@/components/ui/Icon';
 
 export interface SidebarNavItem {
@@ -34,7 +35,38 @@ export default function Sidebar({
   navItems,
   isCollapsed = false
 }: SidebarProps) {
-  const [expandedItems, setExpandedItems] = useState<string[]>([]);
+  const pathname = usePathname();
+  const router = useRouter();
+  
+  // Auto-expandir items cuando un subitem está activo (inicialización)
+  const getInitialExpandedItems = () => {
+    const itemsToExpand: string[] = [];
+    navItems.forEach(item => {
+      if (item.expandable && item.subItems) {
+        const hasActiveSubItem = item.subItems.some(subItem => 
+          pathname === subItem.href
+        );
+        if (hasActiveSubItem) {
+          itemsToExpand.push(item.label);
+        }
+      }
+    });
+    return itemsToExpand;
+  };
+
+  const [expandedItems, setExpandedItems] = useState<string[]>(getInitialExpandedItems);
+
+  // Actualizar items expandidos cuando cambia la ruta
+  useEffect(() => {
+    const itemsToExpand = getInitialExpandedItems();
+    setExpandedItems(prev => {
+      // Solo actualizar si hay cambios
+      const hasChanges = itemsToExpand.some(item => !prev.includes(item)) ||
+                         prev.some(item => !itemsToExpand.includes(item));
+      return hasChanges ? itemsToExpand : prev;
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pathname]);
 
   const toggleExpand = (label: string) => {
     setExpandedItems(prev =>
@@ -42,6 +74,13 @@ export default function Sidebar({
         ? prev.filter(item => item !== label)
         : [...prev, label]
     );
+  };
+
+  const handleNavigation = (href: string, e: React.MouseEvent) => {
+    e.preventDefault();
+    if (href !== '#') {
+      router.push(href);
+    }
   };
 
   return (
@@ -104,9 +143,9 @@ export default function Sidebar({
                 )}
               </button>
             ) : (
-              <a
-                href={item.href}
-                className={`h-[43px] flex items-center ${isCollapsed ? 'justify-center px-3' : 'gap-2 px-2'} py-2 ${item.active
+              <button
+                onClick={(e) => handleNavigation(item.href, e)}
+                className={`h-[43px] w-full flex items-center ${isCollapsed ? 'justify-center px-3' : 'gap-2 px-2'} py-2 ${item.active
                   ? 'bg-accent-solid text-white'
                   : 'text-secondary hover:bg-secondary-hover'
                   } rounded-xl font-medium transition-colors`}
@@ -119,7 +158,7 @@ export default function Sidebar({
                   filled={item.iconFilled}
                 />
                 {!isCollapsed && <span>{item.label}</span>}
-              </a>
+              </button>
             )}
 
             {/* Sub-items */}
@@ -133,13 +172,17 @@ export default function Sidebar({
               >
                 <div className="space-y-1">
                   {item.subItems.map((subItem, subIndex) => (
-                    <a
+                    <button
                       key={subIndex}
-                      href={subItem.href}
-                      className="font-medium flex items-center gap-3 px-4 py-2 text-secondary hover:bg-secondary-hover rounded-lg text-sm transition-colors"
+                      onClick={(e) => handleNavigation(subItem.href, e)}
+                      className={`w-full font-medium flex items-center justify-start gap-3 px-4 py-2 text-left ${
+                      subItem.active 
+                        ? 'text-accent-solid bg-accent-hover' 
+                        : 'text-secondary hover:bg-secondary-hover'
+                      } rounded-lg text-sm transition-colors`}
                     >
                       {subItem.label}
-                    </a>
+                    </button>
                   ))}
                 </div>
               </div>
