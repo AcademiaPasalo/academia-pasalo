@@ -3,34 +3,37 @@
 import { useEffect, useState } from 'react';
 import { useBreadcrumb } from '@/contexts/BreadcrumbContext';
 import { getCursoDetalle } from '@/services/cursoService';
-import { CursoDetalle, Unidad } from '@/types/curso';
+import { CursoDetalle } from '@/types/curso';
+import Icon from '@/components/ui/Icon';
 
 interface CursoContentProps {
   cursoId: string;
 }
+
+type TabOption = 'vigente' | 'anteriores' | 'banco';
 
 export default function CursoContent({ cursoId }: CursoContentProps) {
   const { setBreadcrumbItems } = useBreadcrumb();
   const [curso, setCurso] = useState<CursoDetalle | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [expandedUnits, setExpandedUnits] = useState<Set<string>>(new Set());
+  const [activeTab, setActiveTab] = useState<TabOption>('vigente');
 
   useEffect(() => {
     async function loadCurso() {
       setLoading(true);
       setError(null);
-      
+
       try {
         const cursoData = await getCursoDetalle(cursoId);
-        
+
         if (!cursoData) {
           setError('Curso no encontrado');
           return;
         }
-        
+
         setCurso(cursoData);
-        
+
         setBreadcrumbItems([
           { icon: 'home', label: 'Inicio', href: '/plataforma/inicio' },
           { label: cursoData.nombre }
@@ -48,25 +51,74 @@ export default function CursoContent({ cursoId }: CursoContentProps) {
     }
   }, [cursoId, setBreadcrumbItems]);
 
-  const toggleUnit = (unitId: string) => {
-    setExpandedUnits(prev => {
-      const newSet = new Set(prev);
-      if (newSet.has(unitId)) {
-        newSet.delete(unitId);
-      } else {
-        newSet.add(unitId);
-      }
-      return newSet;
-    });
+  const getInitials = (name: string) => {
+    return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+  };
+
+  const getEstadoIcon = (estado: string) => {
+    switch (estado) {
+      case 'calificado': return 'check_circle';
+      case 'pendiente': return 'bookmark';
+      case 'entregado': return 'schedule';
+      case 'vencido': return 'lock';
+      default: return 'schedule';
+    }
+  };
+
+  const getEstadoLabel = (estado: string) => {
+    switch (estado) {
+      case 'calificado': return 'Completado';
+      case 'pendiente': return 'En curso';
+      case 'entregado': return 'Próximamente';
+      case 'vencido': return 'Bloqueado';
+      default: return 'Próximamente';
+    }
+  };
+
+  const getEstadoBgColor = (estado: string) => {
+    switch (estado) {
+      case 'calificado': return 'bg-bg-success-light';
+      case 'pendiente': return 'bg-bg-accent-light';
+      case 'entregado': return 'bg-bg-tertiary';
+      case 'vencido': return 'bg-bg-disabled';
+      default: return 'bg-bg-tertiary';
+    }
+  };
+
+  const getEstadoIconColor = (estado: string) => {
+    switch (estado) {
+      case 'calificado': return 'text-icon-success-primary';
+      case 'pendiente': return 'text-icon-accent-primary';
+      case 'entregado': return 'text-icon-tertiary';
+      case 'vencido': return 'text-icon-disabled';
+      default: return 'text-icon-tertiary';
+    }
+  };
+
+  const getEstadoTextColor = (estado: string) => {
+    switch (estado) {
+      case 'calificado': return 'text-text-success-primary';
+      case 'pendiente': return 'text-text-accent-primary';
+      case 'entregado': return 'text-text-secondary';
+      case 'vencido': return 'text-text-disabled';
+      default: return 'text-text-secondary';
+    }
+  };
+
+  const getEstadoCardBg = (estado: string) => {
+    return estado === 'vencido' ? 'bg-bg-secondary' : 'bg-bg-primary';
+  };
+
+  const isDisabled = (estado: string) => {
+    return estado === 'entregado' || estado === 'vencido';
   };
 
   if (loading) {
     return (
-      <div className="space-y-6 animate-pulse">
-        <div className="bg-white rounded-2xl border border-stroke-primary p-6">
-          <div className="h-6 bg-bg-secondary rounded w-1/4 mb-4"></div>
-          <div className="h-10 bg-bg-secondary rounded w-1/2 mb-4"></div>
-          <div className="h-4 bg-bg-secondary rounded w-1/3"></div>
+      <div className="w-full py-12 inline-flex flex-col justify-start items-start overflow-hidden">
+        <div className="self-stretch px-12 pb-8 border-b border-stroke-primary animate-pulse">
+          <div className="h-8 bg-bg-secondary rounded w-1/3 mb-4"></div>
+          <div className="h-12 bg-bg-secondary rounded w-1/2"></div>
         </div>
       </div>
     );
@@ -75,7 +127,7 @@ export default function CursoContent({ cursoId }: CursoContentProps) {
   if (error || !curso) {
     return (
       <div className="bg-white rounded-2xl border border-stroke-primary p-12 text-center">
-        <span className="material-symbols-rounded text-6xl text-error-solid mb-4 block">error</span>
+        <Icon name="error" size={64} variant="rounded" className="text-error-solid mb-4 mx-auto" />
         <h1 className="text-2xl font-bold text-primary mb-2">{error || 'Curso no encontrado'}</h1>
         <p className="text-secondary mb-6">El curso solicitado no está disponible.</p>
       </div>
@@ -83,15 +135,194 @@ export default function CursoContent({ cursoId }: CursoContentProps) {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="bg-white rounded-2xl border border-stroke-primary p-6">
-        <h1 className="text-3xl font-bold text-primary">{curso.nombre}</h1>
-        {curso.profesor && (
-          <div className="flex items-center gap-2 text-secondary mt-2">
-            <span className="material-symbols-rounded">person</span>
-            <span>{curso.profesor}</span>
+    <div className="w-full inline-flex flex-col justify-start items-start overflow-hidden">
+      {/* Header Section */}
+      <div className="self-stretch pb-8 mb-8 border-b border-stroke-primary inline-flex justify-start items-start gap-8 overflow-hidden">
+        {/* Left: Course Info */}
+        <div className="flex-1 inline-flex flex-col justify-start items-start gap-5">
+          {/* Tags */}
+          <div className="inline-flex justify-start items-center gap-2">
+            <div className="px-2.5 py-1.5 bg-bg-success-light rounded-full flex justify-center items-center gap-1">
+              <div className="text-text-success-primary text-xs font-medium font-['Poppins'] leading-3">CIENCIAS</div>
+            </div>
+            <div className="px-2.5 py-1.5 bg-bg-quartiary rounded-full flex justify-center items-center gap-1">
+              <div className="text-text-secondary text-xs font-medium font-['Poppins'] leading-3">1° CICLO</div>
+            </div>
           </div>
-        )}
+
+          {/* Title */}
+          <div className="self-stretch inline-flex justify-start items-center gap-2">
+            <div className="flex-1 text-text-primary text-4xl font-bold font-['Poppins'] leading-[48px]">
+              {curso.nombre}
+            </div>
+          </div>
+
+          {/* Teacher */}
+          {curso.profesor && (
+            <div className="self-stretch flex flex-col justify-start items-start gap-4">
+              <div className="self-stretch inline-flex justify-start items-center gap-2">
+                <div className="w-6 h-6 p-1 bg-bg-success-solid rounded-full flex justify-center items-center gap-2">
+                  <div className="text-center text-text-white text-[10px] font-medium font-['Poppins'] leading-3">
+                    {getInitials(curso.profesor)}
+                  </div>
+                </div>
+                <div className="flex-1 flex justify-start items-start gap-1">
+                  <div className="text-text-secondary text-base font-medium font-['Poppins'] leading-4">Docente:</div>
+                  <div className="flex-1 text-text-secondary text-base font-normal font-['Poppins'] leading-4 line-clamp-1">
+                    {curso.profesor}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Right: Video Player */}
+        <div className="flex-1 px-5 py-14 bg-bg-tertiary rounded-lg outline outline-1 outline-offset-[-1px] outline-stroke-primary inline-flex flex-col justify-center items-center gap-6 overflow-hidden">
+          <div className="p-3 bg-accent-primary rounded-full inline-flex justify-start items-center gap-2">
+            <Icon name="play_arrow" size={32} variant="rounded" filled className="text-white" />
+
+          </div>
+          <div className="self-stretch flex flex-col justify-center items-center gap-1">
+            <div className="self-stretch inline-flex justify-center items-center gap-1">
+              <div className="text-center text-text-secondary text-xs font-medium font-['Poppins'] leading-4">Video:</div>
+              <div className="text-center text-text-secondary text-xs font-medium font-['Poppins'] leading-4">Curso</div>
+              <div className="text-center text-text-secondary text-xs font-medium font-['Poppins'] leading-4">- Clase introductoria</div>
+            </div>
+            <div className="self-stretch inline-flex justify-center items-center gap-1">
+              <div className="text-center text-text-tertiary text-xs font-normal font-['Poppins'] leading-4">Profesor(a):</div>
+              <div className="text-center text-text-tertiary text-xs font-normal font-['Poppins'] leading-4 line-clamp-1">
+                {curso.profesor || 'Nombre Apellido'}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Content Section */}
+      <div className="self-stretch inline-flex justify-start items-start gap-8">
+        {/* Sidebar: Tabs */}
+        <div className="w-64 p-4 bg-bg-primary rounded-3xl outline outline-1 outline-offset-[-1px] outline-stroke-primary inline-flex flex-col justify-start items-start gap-2">
+          <button
+            onClick={() => setActiveTab('vigente')}
+            className={`self-stretch p-2 rounded-lg ${activeTab === 'vigente' ? 'bg-bg-accent-light border-r-4 border-accent-primary' : 'bg-bg-primary'} inline-flex justify-start items-center gap-2 transition-colors`}
+          >
+            <div className="flex-1 flex justify-start items-center gap-2">
+              <Icon 
+                name="event_available" 
+                size={24} 
+                variant="rounded" 
+                className={activeTab === 'vigente' ? 'text-icon-accent-primary' : 'text-icon-secondary'}
+              />
+              <div className={`flex-1 text-base font-medium font-['Poppins'] leading-4 ${activeTab === 'vigente' ? 'text-text-accent-primary' : 'text-text-secondary'}`}>
+                Ciclo Vigente
+              </div>
+            </div>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('anteriores')}
+            className={`self-stretch p-2 rounded-lg ${activeTab === 'anteriores' ? 'bg-bg-accent-light border-r-4 border-accent-primary' : 'bg-bg-primary'} inline-flex justify-start items-center gap-2 transition-colors`}
+          >
+            <div className="flex-1 flex justify-start items-center gap-2">
+              <Icon 
+                name="history" 
+                size={24} 
+                variant="rounded" 
+                className={activeTab === 'anteriores' ? 'text-icon-accent-primary' : 'text-icon-secondary'}
+              />
+              <div className={`flex-1 text-base font-medium font-['Poppins'] leading-4 ${activeTab === 'anteriores' ? 'text-text-accent-primary' : 'text-text-secondary'}`}>
+                Ciclos Anteriores
+              </div>
+            </div>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('banco')}
+            className={`self-stretch p-2 rounded-lg ${activeTab === 'banco' ? 'bg-bg-accent-light border-r-4 border-accent-primary' : 'bg-bg-primary'} inline-flex justify-start items-center gap-2 transition-colors`}
+          >
+            <div className="flex-1 flex justify-start items-center gap-2">
+              <Icon 
+                name="topic" 
+                size={24} 
+                variant="rounded" 
+                className={activeTab === 'banco' ? 'text-icon-accent-primary' : 'text-icon-secondary'}
+              />
+              <div className={`flex-1 text-base font-medium font-['Poppins'] leading-4 ${activeTab === 'banco' ? 'text-text-accent-primary' : 'text-text-secondary'}`}>
+                Banco de Enunciados
+              </div>
+            </div>
+          </button>
+        </div>
+
+        {/* Main Content: Evaluations Grid */}
+        <div className="flex-1 inline-flex flex-col justify-start items-start gap-6 overflow-hidden">
+          <div className="self-stretch h-7 inline-flex justify-start items-center gap-4">
+            <div className="text-text-primary text-xl font-semibold font-['Poppins'] leading-6">
+              Ciclo Vigente 2026-0
+            </div>
+          </div>
+
+          <div className="self-stretch grid grid-cols-3 gap-4">
+            {curso.contenido.evaluaciones.map((evaluacion) => {
+              const disabled = isDisabled(evaluacion.estado);
+
+              return (
+                <div
+                  key={evaluacion.id}
+                  className={`p-6 ${getEstadoCardBg(evaluacion.estado)} rounded-2xl outline outline-1 outline-offset-[-1px] outline-stroke-primary inline-flex flex-col justify-start items-end gap-4`}
+                >
+                  {/* Icon and Status Badge */}
+                  <div className="self-stretch inline-flex justify-between items-start">
+                    <div className={`p-2 ${getEstadoBgColor(evaluacion.estado)} rounded-full flex justify-start items-center`}>
+                      <Icon 
+                        name={getEstadoIcon(evaluacion.estado)} 
+                        size={24} 
+                        variant="rounded" 
+                        className={getEstadoIconColor(evaluacion.estado)}
+                      />
+                    </div>
+                    <div className="flex justify-start items-start">
+                      <div className={`px-2.5 py-1.5 ${getEstadoBgColor(evaluacion.estado)} rounded-full flex justify-center items-center gap-1`}>
+                        <div className={`text-xs font-medium font-['Poppins'] leading-3 ${getEstadoTextColor(evaluacion.estado)}`}>
+                          {getEstadoLabel(evaluacion.estado)}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Title and Description */}
+                  <div className="self-stretch flex flex-col justify-start items-start gap-1">
+                    <div className={`self-stretch text-lg font-semibold font-['Poppins'] leading-5 ${disabled ? 'text-text-secondary' : 'text-text-primary'}`}>
+                      {evaluacion.titulo}
+                    </div>
+                    <div className={`self-stretch text-xs font-normal font-['Poppins'] leading-4 ${disabled ? 'text-text-tertiary' : 'text-text-secondary'}`}>
+                      {evaluacion.tipo === 'examen' ? 'Examen Parcial' :
+                        evaluacion.tipo === 'tarea' ? 'Práctica Calificada' :
+                          'Evaluación'}
+                    </div>
+                  </div>
+
+                  {/* Link Button */}
+                  <button
+                    disabled={disabled}
+                    className={`p-1 rounded-lg inline-flex justify-center items-center gap-1.5 ${disabled ? 'cursor-not-allowed' : 'hover:bg-bg-accent-light transition-colors'}`}
+                  >
+                    <div className={`text-sm font-medium font-['Poppins'] leading-4 ${disabled ? 'text-text-disabled' : 'text-text-accent-primary'}`}>
+                      Ver Clases
+                    </div>
+                    <Icon 
+                      name="arrow_forward" 
+                      size={16} 
+                      variant="rounded" 
+                      className={disabled ? 'text-icon-disabled' : 'text-icon-accent-primary'}
+                    />
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        </div>
       </div>
     </div>
   );

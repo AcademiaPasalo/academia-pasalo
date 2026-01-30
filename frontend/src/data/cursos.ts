@@ -204,7 +204,42 @@ export const cursosDetalleData: Record<string, CursoDetalle> = {
           tipo: 'proyecto',
           fecha: '2026-02-18',
           estado: 'entregado'
-        }
+        },
+		{
+          id: 'e2',
+          titulo: 'Laboratorio 2',
+          tipo: 'proyecto',
+          fecha: '2026-02-18',
+          estado: 'entregado'
+        },
+		{
+          id: 'e3',
+          titulo: 'Laboratorio 3',
+          tipo: 'proyecto',
+          fecha: '2026-02-18',
+          estado: 'entregado'
+        },
+		{
+          id: 'e4',
+          titulo: 'Laboratorio 4',
+          tipo: 'proyecto',
+          fecha: '2026-02-18',
+          estado: 'entregado'
+        },
+		{
+          id: 'e5',
+          titulo: 'Laboratorio 5',
+          tipo: 'proyecto',
+          fecha: '2026-02-18',
+          estado: 'entregado'
+        },
+		{
+          id: 'e6',
+          titulo: 'Laboratorio 6',
+          tipo: 'proyecto',
+          fecha: '2026-02-18',
+          estado: 'entregado'
+        },		
       ],
       materiales: [
         {
