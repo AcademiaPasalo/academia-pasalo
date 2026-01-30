@@ -3,9 +3,10 @@
  * Proporciona navegación configurada según rol y ruta actual
  */
 
-import { useMemo } from 'react';
+import { useMemo, useEffect, useState } from 'react';
 import { usePathname } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
+import { getCursos } from '@/services/cursoService';
 import { 
   getNavigationForRole, 
   setActiveNavItem,
@@ -30,20 +31,64 @@ export interface NavigationData {
 export function useNavigation(): NavigationData | null {
   const { user, isAuthenticated } = useAuth();
   const pathname = usePathname();
+  const [dynamicNavItems, setDynamicNavItems] = useState<SidebarNavItem[]>([]);
+  const [isLoadingCursos, setIsLoadingCursos] = useState(true);
+
+  // Obtener rol principal del usuario
+  const primaryRole = user?.roles?.[0]?.code as UserRole || 'STUDENT';
+
+  // Cargar cursos dinámicamente
+  useEffect(() => {
+    async function loadCursos() {
+      if (!isAuthenticated || !user) {
+        setIsLoadingCursos(false);
+        return;
+      }
+
+      try {
+        const baseNavItems = getNavigationForRole(primaryRole);
+        
+        // Cargar cursos del estudiante
+        const cursos = await getCursos();
+        
+        // Actualizar el item "Mis Cursos" con los cursos reales
+        const updatedNavItems = baseNavItems.map(item => {
+          if (item.label === 'Mis Cursos' && item.expandable) {
+            return {
+              ...item,
+              subItems: cursos.map(curso => ({
+                icon: 'circle',
+                label: curso.nombre,
+                href: `/plataforma/curso/${curso.id}`
+              }))
+            };
+          }
+          return item;
+        });
+
+        setDynamicNavItems(updatedNavItems);
+      } catch (error) {
+        console.error('Error al cargar cursos para navegación:', error);
+        // En caso de error, usar navegación base sin cursos
+        setDynamicNavItems(getNavigationForRole(primaryRole));
+      } finally {
+        setIsLoadingCursos(false);
+      }
+    }
+
+    loadCursos();
+  }, [isAuthenticated, user, primaryRole]);
 
   return useMemo(() => {
-    if (!isAuthenticated || !user) {
+    if (!isAuthenticated || !user || isLoadingCursos) {
       return null;
     }
 
-    // Obtener rol principal del usuario
-    const primaryRole = user.roles[0]?.code as UserRole || 'STUDENT';
-
-    // Obtener navegación para el rol
-    const baseNavItems = getNavigationForRole(primaryRole);
+    // Obtener navegación (ya con cursos cargados)
+    const navItemsToUse = dynamicNavItems.length > 0 ? dynamicNavItems : getNavigationForRole(primaryRole);
 
     // Marcar items activos según ruta actual
-    const navItems = setActiveNavItem(baseNavItems, pathname || '/plataforma/inicio');
+    const navItems = setActiveNavItem(navItemsToUse, pathname || '/plataforma/inicio');
 
     // Construir nombre completo
     const fullName = `${user.firstName} ${user.lastName1 || ''}`.trim();
@@ -80,7 +125,7 @@ export function useNavigation(): NavigationData | null {
       topBarUser,
       currentRole: primaryRole
     };
-  }, [user, isAuthenticated, pathname]);
+  }, [user, isAuthenticated, pathname, dynamicNavItems, isLoadingCursos, primaryRole]);
 }
 
 /**

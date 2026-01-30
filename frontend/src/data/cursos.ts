@@ -12,7 +12,7 @@ import { Curso, CursoDetalle } from '@/types/curso';
 export const cursosData: Curso[] = [
   {
     id: 'amga',
-    nombre: 'Álgebra Matricial y Geometría Analítica',
+    nombre: 'Química Matricial y Geometría Analítica',
     nombreCorto: 'AMGA',
     descripcion: 'Fundamentos de álgebra lineal y geometría analítica aplicada',
     color: '#7C3AED', // Purple

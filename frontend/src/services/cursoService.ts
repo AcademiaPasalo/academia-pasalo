@@ -46,8 +46,15 @@ export async function getCursoDetalle(id: string): Promise<CursoDetalle | null> 
   // const response = await fetch(`/api/cursos/${id}/detalle`);
   // return response.json();
   
+  console.log('🔍 cursoService.getCursoDetalle - ID recibido:', id);
+  console.log('🔍 Buscando en cursosDetalleData:', Object.keys(cursosDetalleData));
+  
   await simulateNetworkDelay();
-  return cursosDetalleData[id] || null;
+  const result = cursosDetalleData[id] || null;
+  
+  console.log('🔍 Resultado encontrado:', result ? result.nombre : 'NULL');
+  
+  return result;
 }
 
 /**
