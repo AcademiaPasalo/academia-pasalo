@@ -1,4 +1,4 @@
-import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn, CreateDateColumn, UpdateDateColumn } from 'typeorm';
 import { User } from '@modules/users/domain/user.entity';
 import { DeletionRequestStatus } from './deletion-request-status.entity';
 
@@ -10,10 +10,18 @@ export class DeletionRequest {
   @Column({ name: 'requested_by', type: 'bigint' })
   requestedById: string;
 
+  @ManyToOne(() => User)
+  @JoinColumn({ name: 'requested_by' })
+  requestedBy: User;
+
   @Column({ name: 'deletion_request_status_id', type: 'bigint' })
   deletionRequestStatusId: string;
 
-  @Column({ name: 'entity_type', length: 50 })
+  @ManyToOne(() => DeletionRequestStatus)
+  @JoinColumn({ name: 'deletion_request_status_id' })
+  deletionRequestStatus: DeletionRequestStatus;
+
+  @Column({ name: 'entity_type', type: 'varchar', length: 50 })
   entityType: string;
 
   @Column({ name: 'entity_id', type: 'bigint' })
@@ -25,24 +33,16 @@ export class DeletionRequest {
   @Column({ name: 'reviewed_by', type: 'bigint', nullable: true })
   reviewedById: string | null;
 
+  @ManyToOne(() => User)
+  @JoinColumn({ name: 'reviewed_by' })
+  reviewedBy: User;
+
   @Column({ name: 'reviewed_at', type: 'datetime', nullable: true })
   reviewedAt: Date | null;
 
-  @Column({ name: 'created_at', type: 'datetime' })
+  @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
 
-  @Column({ name: 'updated_at', type: 'datetime' })
+  @UpdateDateColumn({ name: 'updated_at' })
   updatedAt: Date;
-
-  @ManyToOne(() => User)
-  @JoinColumn({ name: 'requested_by' })
-  requestedBy: User;
-
-  @ManyToOne(() => DeletionRequestStatus)
-  @JoinColumn({ name: 'deletion_request_status_id' })
-  status: DeletionRequestStatus;
-
-  @ManyToOne(() => User)
-  @JoinColumn({ name: 'reviewed_by' })
-  reviewer: User | null;
 }
