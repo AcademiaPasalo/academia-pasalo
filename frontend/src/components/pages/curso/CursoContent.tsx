@@ -77,7 +77,7 @@ export default function CursoContent({ cursoId }: CursoContentProps) {
 
   const getEstadoBgColor = (estado: string) => {
     switch (estado) {
-      case 'calificado': return 'bg-bg-success-light';
+      case 'calificado': return 'bg-success-light';
       case 'pendiente': return 'bg-bg-accent-light';
       case 'entregado': return 'bg-bg-tertiary';
       case 'vencido': return 'bg-bg-disabled';
@@ -87,7 +87,7 @@ export default function CursoContent({ cursoId }: CursoContentProps) {
 
   const getEstadoIconColor = (estado: string) => {
     switch (estado) {
-      case 'calificado': return 'text-icon-success-primary';
+      case 'calificado': return 'text-success-primary';
       case 'pendiente': return 'text-icon-accent-primary';
       case 'entregado': return 'text-icon-tertiary';
       case 'vencido': return 'text-icon-disabled';
@@ -142,10 +142,10 @@ export default function CursoContent({ cursoId }: CursoContentProps) {
         <div className="flex-1 inline-flex flex-col justify-start items-start gap-5">
           {/* Tags */}
           <div className="inline-flex justify-start items-center gap-2">
-            <div className="px-2.5 py-1.5 bg-bg-success-light rounded-full flex justify-center items-center gap-1">
-              <div className="text-text-success-primary text-xs font-medium font-['Poppins'] leading-3">CIENCIAS</div>
+            <div className="px-2.5 py-1.5 bg-success-light rounded-full flex justify-center items-center gap-1">
+              <div className="text-success-primary text-xs font-medium font-['Poppins'] leading-3">CIENCIAS</div>
             </div>
-            <div className="px-2.5 py-1.5 bg-bg-quartiary rounded-full flex justify-center items-center gap-1">
+            <div className="px-2.5 py-1.5 bg-gray-200 rounded-full flex justify-center items-center gap-1">
               <div className="text-text-secondary text-xs font-medium font-['Poppins'] leading-3">1° CICLO</div>
             </div>
           </div>
@@ -202,7 +202,7 @@ export default function CursoContent({ cursoId }: CursoContentProps) {
       {/* Content Section */}
       <div className="self-stretch inline-flex justify-start items-start gap-8">
         {/* Sidebar: Tabs */}
-        <div className="w-64 p-4 bg-bg-primary rounded-3xl outline outline-1 outline-offset-[-1px] outline-stroke-primary inline-flex flex-col justify-start items-start gap-2">
+        <div className="w-72 p-4 bg-bg-primary rounded-3xl outline outline-1 outline-offset-[-1px] outline-stroke-primary inline-flex flex-col justify-start items-start gap-2">
           <button
             onClick={() => setActiveTab('vigente')}
             className={`self-stretch p-2 rounded-lg ${activeTab === 'vigente' ? 'bg-bg-accent-light border-r-4 border-accent-primary' : 'bg-bg-primary'} inline-flex justify-start items-center gap-2 transition-colors`}
@@ -280,6 +280,7 @@ export default function CursoContent({ cursoId }: CursoContentProps) {
                         size={24} 
                         variant="rounded" 
                         className={getEstadoIconColor(evaluacion.estado)}
+                        filled
                       />
                     </div>
                     <div className="flex justify-start items-start">

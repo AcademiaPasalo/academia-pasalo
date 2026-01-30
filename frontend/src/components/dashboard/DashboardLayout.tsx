@@ -159,7 +159,7 @@ export default function DashboardLayout({
         )}
 
         {/* Page Content */}
-        <main className="flex-1 p-12">
+        <main className="flex-1 p-12 bg-bg-secondary">
           {children}
         </main>
       </div>
