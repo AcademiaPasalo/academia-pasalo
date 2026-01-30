@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Icon from '@/components/ui/Icon';
 import CourseCard from '@/components/courses/CourseCard';
+import AgendarTutoriaModal from '@/components/modals/AgendarTutoriaModal';
 import { useBreadcrumb } from '@/contexts/BreadcrumbContext';
 import { getCursos } from '@/services/cursoService';
 import { Curso } from '@/types/curso';
@@ -13,6 +14,7 @@ export default function InicioContent() {
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [courses, setCourses] = useState<Curso[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isModalOpen, setIsModalOpen] = useState(false);
   const router = useRouter();
   
   // Configurar breadcrumb
@@ -38,6 +40,12 @@ export default function InicioContent() {
 
     loadCursos();
   }, []);
+
+  const handleAgendarTutoria = (curso: string, tema: string) => {
+    const mensaje = `¡Hola! Quisiera agendar una tutoría de ${curso} para la evaluación o tema ${tema}`;
+    const url = `https://wa.me/903006775?text=${encodeURIComponent(mensaje)}`;
+    window.open(url, '_blank');
+  };
 
   if (loading) {
     return (
@@ -240,13 +248,23 @@ export default function InicioContent() {
             </p>
           </div>
 
-          <div className="relative z-10 flex justify-end">
-            <button className="px-6 py-4 bg-info-secondary-solid/20 rounded-lg border border-white/20 text-base font-medium text-white hover:bg-info-secondary-solid/30 transition-colors">
+            <div className="relative z-10 flex justify-end">
+            <button
+              onClick={() => setIsModalOpen(true)}
+              className="px-6 py-4 bg-info-secondary-solid/20 rounded-lg border border-white/20 text-base font-medium text-white hover:bg-info-secondary-solid/30 transition-colors"
+            >
               Agendar Tutoría
             </button>
-          </div>
+            </div>
         </div>
       </div>
+
+      {/* Modal de Agendar Tutoría */}
+      <AgendarTutoriaModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        onSubmit={handleAgendarTutoria}
+      />
     </div>
   );
 }
