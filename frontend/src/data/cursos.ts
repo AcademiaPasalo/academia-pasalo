@@ -12,10 +12,10 @@ import { Curso, CursoDetalle } from '@/types/curso';
 export const cursosData: Curso[] = [
   {
     id: 'amga',
-    nombre: 'Química Matricial y Geometría Analítica',
+    nombre: 'Álgebra Matricial y Geometría Analítica',
     nombreCorto: 'AMGA',
     descripcion: 'Fundamentos de álgebra lineal y geometría analítica aplicada',
-    color: '#7C3AED', // Purple
+    color: '#1E40A3', // Purple
     icono: 'calculate',
     profesor: 'Dr. Carlos Méndez',
     creditos: 4,
@@ -28,7 +28,7 @@ export const cursosData: Curso[] = [
     nombre: 'Fundamentos de Cálculo',
     nombreCorto: 'FUCAL',
     descripcion: 'Introducción al cálculo diferencial e integral',
-    color: '#059669', // Green
+    color: '#F13072', // Green
     icono: 'functions',
     profesor: 'Dra. María González',
     creditos: 5,
@@ -41,7 +41,7 @@ export const cursosData: Curso[] = [
     nombre: 'Fundamentos de Física',
     nombreCorto: 'FUFIS',
     descripcion: 'Principios fundamentales de la física clásica',
-    color: '#DC2626', // Red
+    color: '#10B981', // Red
     icono: 'science',
     profesor: 'Dr. Roberto Silva',
     creditos: 4,
