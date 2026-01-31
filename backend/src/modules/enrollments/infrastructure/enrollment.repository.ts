@@ -16,8 +16,13 @@ export class EnrollmentRepository {
     return await repo.save(enrollment);
   }
 
-  async findActiveByUserAndCourseCycle(userId: string, courseCycleId: string): Promise<Enrollment | null> {
-    return await this.ormRepository.findOne({
+  async findActiveByUserAndCourseCycle(
+    userId: string, 
+    courseCycleId: string, 
+    manager?: EntityManager
+  ): Promise<Enrollment | null> {
+    const repo = manager ? manager.getRepository(Enrollment) : this.ormRepository;
+    return await repo.findOne({
       where: {
         userId,
         courseCycleId,
