@@ -80,22 +80,27 @@ jobs:
           key: ${{ secrets.EC2_SSH_KEY }}
           script: |
             set -e
-            
-            cd /home/ubuntu || exit 1
 
-            if [ ! -d "academia-pasalo/.git" ]; then
-              git clone https://github.com/${{ github.repository }}.git academia-pasalo
+            APP_DIR="/home/ubuntu/academia-pasalo"
+
+            # 1) Obtener código (idempotente y a prueba de cambios locales)
+            if [ ! -d "$APP_DIR/.git" ]; then
+              mkdir -p "$APP_DIR"
+              git clone https://github.com/${{ github.repository }}.git "$APP_DIR"
             fi
 
-            cd academia-pasalo
+            cd "$APP_DIR"
             git fetch origin
             git reset --hard origin/main
-            git clean -fd
-            
-            echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u ${{ secrets.DOCKER_USERNAME }} --password-stdin
-            
-            cd backend
-            cat > .env << EOF
+
+            # 2) Limpieza segura (NO tocar letsencrypt/certbot creados por Docker/Certbot)
+            git clean -fd -e letsencrypt/ -e certbot/ || true
+
+            # 3) Login Docker Hub
+            echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
+
+            # 4) Crear .env del backend (en ruta absoluta para evitar errores por cd)
+            cat > "$APP_DIR/backend/.env" << EOF
             GITHUB_REPOSITORY=${{ github.repository }}
             DOCKER_USERNAME=${{ secrets.DOCKER_USERNAME }}
             DB_PASSWORD=${{ secrets.DB_PASSWORD }}
@@ -106,12 +111,15 @@ jobs:
             GOOGLE_REDIRECT_URI=${{ secrets.GOOGLE_REDIRECT_URI }}
             MAXMIND_LICENSE_KEY=${{ secrets.MAXMIND_LICENSE_KEY }}
             EOF
-            
-            docker-compose -f docker-compose.prod.yml pull
-            docker-compose -f docker-compose.prod.yml down -v
-            docker-compose -f docker-compose.prod.yml up -d
-            
+
+            # 5) Deploy con docker-compose (usa ruta absoluta al compose)
+            docker-compose -f "$APP_DIR/docker-compose.prod.yml" pull
+            docker-compose -f "$APP_DIR/docker-compose.prod.yml" down -v
+            docker-compose -f "$APP_DIR/docker-compose.prod.yml" up -d
+
+            # 6) Limpieza de imágenes viejas
             docker image prune -f
-            
+
             echo "✅ Deployment completed!"
             docker ps
+
