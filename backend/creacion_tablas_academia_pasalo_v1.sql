@@ -193,6 +193,7 @@ CREATE TABLE enrollment_evaluation (
   is_active BOOLEAN NOT NULL,
   revoked_at DATETIME,
   revoked_by BIGINT,
+  UNIQUE (enrollment_id, evaluation_id),
   FOREIGN KEY (enrollment_id) REFERENCES enrollment(id),
   FOREIGN KEY (evaluation_id) REFERENCES evaluation(id),
   FOREIGN KEY (revoked_by) REFERENCES user(id)
@@ -451,5 +452,8 @@ ON enrollment (user_id, cancelled_at);
 
 CREATE INDEX idx_enrollment_user_status_active
 ON enrollment (user_id, enrollment_status_id, cancelled_at);
+
+CREATE INDEX idx_user_session_concurrent_check
+ON user_session(user_id, session_status_id, expires_at, device_id);
 
 

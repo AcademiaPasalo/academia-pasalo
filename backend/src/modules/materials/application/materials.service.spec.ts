@@ -23,7 +23,7 @@ const mockFile = () => ({
   originalname: 'test.pdf',
   mimetype: 'application/pdf',
   size: 1024,
-  buffer: Buffer.from('test'),
+  buffer: Buffer.from('%PDF-1.4 content'),
 } as Express.Multer.File);
 
 describe('MaterialsService', () => {

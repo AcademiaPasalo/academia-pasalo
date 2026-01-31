@@ -15,6 +15,7 @@ import { User } from '@modules/users/domain/user.entity';
 import { JwtPayload } from '@modules/auth/interfaces/jwt-payload.interface';
 import { RequestMetadata } from '@modules/auth/interfaces/request-metadata.interface';
 import { RedisCacheService } from '@infrastructure/cache/redis-cache.service';
+import { createHash } from 'crypto';
 
 @Injectable()
 export class AuthService {
@@ -105,6 +106,15 @@ export class AuthService {
     const user = await this.usersService.findOne(payload.sub);
 
     await this.cacheService.del(`cache:session:${session.id}:user`);
+
+    // Invalidar el token antiguo (Blacklist)
+    const oldTokenHash = createHash('sha256').update(refreshToken).digest('hex');
+    const ttlSeconds = 7 * 24 * 60 * 60; // 7 días
+    await this.cacheService.set(
+      `blacklist:refresh:${oldTokenHash}`,
+      { revokedAt: new Date().toISOString(), reason: 'TOKEN_ROTATED' },
+      ttlSeconds
+    );
 
     const { token: newRefreshToken, expiresAt: newExpiresAt } = 
       await this.tokenService.generateRefreshToken(user.id, deviceId);

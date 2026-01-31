@@ -40,9 +40,9 @@ describe('AuthService', () => {
 
   const redisCacheServiceMock = {
     get: jest.fn().mockResolvedValue(null),
-    set: jest.fn().mockResolvedValue(null),
-    del: jest.fn().mockResolvedValue(null),
-    invalidateGroup: jest.fn().mockResolvedValue(null),
+    set: jest.fn().mockResolvedValue(undefined),
+    del: jest.fn().mockResolvedValue(undefined),
+    invalidateGroup: jest.fn().mockResolvedValue(undefined),
   };
 
   const usersServiceMock = {
@@ -84,19 +84,19 @@ describe('AuthService', () => {
     id: '10',
     email: 'user@test.com',
     firstName: 'User',
-    lastName1: null,
-    lastName2: null,
-    phone: null,
-    career: null,
-    profilePhotoUrl: null,
+    lastName1: null as string | null,
+    lastName2: null as string | null,
+    phone: null as string | null,
+    career: null as string | null,
+    profilePhotoUrl: null as string | null,
     photoSource: PhotoSource.NONE,
     createdAt: new Date('2026-01-01T00:00:00.000Z'),
-    updatedAt: null,
+    updatedAt: null as Date | null,
     roles: [{ id: '1', code: 'STUDENT', name: 'Student' }],
   };
 
   const dataSourceMock = {
-    transaction: jest.fn((cb) => cb({})),
+    transaction: jest.fn((cb: any) => cb({})),
   };
 
   let verifyIdTokenMock: jest.Mock;
@@ -258,6 +258,15 @@ describe('AuthService', () => {
     expect(result.refreshToken).not.toBe(refreshToken);
     expect(typeof result.accessToken).toBe('string');
     expect(sessionServiceMock.rotateRefreshToken).toHaveBeenCalledTimes(1);
+
+    // Verify blacklist and cache invalidation
+    expect(redisCacheServiceMock.del).toHaveBeenCalledWith('cache:session:123:user');
+    
+    expect(redisCacheServiceMock.set).toHaveBeenCalledWith(
+      expect.stringMatching(/^blacklist:refresh:/),
+      expect.objectContaining({ reason: 'TOKEN_ROTATED' }),
+      604800
+    );
 
     const decodedAccess = jwtService.verify(result.accessToken) as {
       sub: string;

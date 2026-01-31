@@ -26,6 +26,7 @@ describe('SettingsService', () => {
           useValue: {
             findByKey: jest.fn(),
             updateByKey: jest.fn(),
+            invalidateKey: jest.fn(),
             invalidateAllCache: jest.fn(),
           },
         },

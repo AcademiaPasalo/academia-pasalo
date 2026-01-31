@@ -14,6 +14,13 @@ import { CourseCycle } from '@modules/courses/domain/course-cycle.entity';
 import { CreateCourseDto } from '@modules/courses/dto/create-course.dto';
 import { AssignCourseToCycleDto } from '@modules/courses/dto/assign-course-to-cycle.dto';
 import { CourseContentResponseDto, EvaluationStatusDto } from '@modules/courses/dto/course-content.dto';
+import { Evaluation } from '@modules/evaluations/domain/evaluation.entity';
+import { EnrollmentEvaluation } from '@modules/enrollments/domain/enrollment-evaluation.entity';
+
+type EvaluationWithAccess = Evaluation & {
+  enrollmentEvaluations?: EnrollmentEvaluation[];
+  name?: string;
+};
 
 @Injectable()
 export class CoursesService {
@@ -125,7 +132,7 @@ export class CoursesService {
     
     let rawData = await this.cacheService.get<{
       cycle: CourseCycle;
-      evaluations: any[]; 
+      evaluations: EvaluationWithAccess[]; 
     }>(cacheKey);
 
     if (!rawData) {
@@ -139,7 +146,7 @@ export class CoursesService {
 
       const evaluations = await this.evaluationRepository.findAllWithUserAccess(courseCycleId, userId);
 
-      rawData = { cycle: fullCycle, evaluations };
+      rawData = { cycle: fullCycle, evaluations: evaluations as EvaluationWithAccess[] };
       await this.cacheService.set(cacheKey, rawData, this.CONTENT_CACHE_TTL);
     }
 
@@ -184,8 +191,8 @@ export class CoursesService {
 
         return {
           id: ev.id,
-          name: ev.name,
-          description: null,
+          name: ev.name ?? '',
+          description: null as string | null,
           evaluationType: ev.evaluationType.name,
           startDate: evStartDate,
           endDate: evEndDate,

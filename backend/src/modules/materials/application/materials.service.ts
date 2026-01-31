@@ -70,51 +70,68 @@ export class MaterialsService {
   async uploadMaterial(userId: string, dto: UploadMaterialDto, file: Express.Multer.File): Promise<Material> {
     if (!file) throw new BadRequestException('Archivo requerido');
 
+    const allowedMimeTypes = [
+      'application/pdf',
+      'image/jpeg',
+      'image/png',
+      'image/gif',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'text/plain',
+      'application/zip',
+    ];
+
+    if (!allowedMimeTypes.includes(file.mimetype)) {
+      this.logger.warn({
+        message: 'Intento de subir archivo con tipo no permitido',
+        userId,
+        mimetype: file.mimetype,
+        originalName: file.originalname,
+      });
+      throw new BadRequestException(
+        `Tipo de archivo no permitido. Solo se aceptan documentos educativos (PDF, imágenes, Office).`,
+      );
+    }
+
+    if (file.mimetype === 'application/pdf') {
+      const pdfMagic = file.buffer.slice(0, 4).toString('hex');
+      if (pdfMagic !== '25504446') {
+        throw new BadRequestException('El archivo no es un PDF válido');
+      }
+    }
+
     const activeStatus = await this.getActiveMaterialStatus();
     const folder = await this.folderRepository.findById(dto.materialFolderId);
     if (!folder) throw new NotFoundException('Carpeta destino no encontrada');
 
     const now = new Date();
+    let storagePath = '';
+    let isNewFile = false;
 
-    const result = await this.dataSource.transaction(async (manager) => {
-      const hash = await this.storageService.calculateHash(file.buffer);
-      const existingResource = await this.fileResourceRepository.findByHash(hash);
-      
-      let finalResource: FileResource;
-      let finalVersion: FileVersion;
-      let storagePath = '';
-      let isNewFile = false;
-
-      if (!existingResource) {
-        const uniqueName = `${Date.now()}-${file.originalname}`;
-        storagePath = await this.storageService.saveFile(uniqueName, file.buffer);
-        isNewFile = true;
+    try {
+      const result = await this.dataSource.transaction(async (manager) => {
+        const hash = await this.storageService.calculateHash(file.buffer);
+        const existingResource = await this.fileResourceRepository.findByHash(hash);
         
-        const resourceEntity = manager.create(FileResource, {
-          checksumHash: hash,
-          originalName: file.originalname,
-          mimeType: file.mimetype,
-          sizeBytes: String(file.size),
-          storageUrl: storagePath,
-          createdAt: now,
-        });
-        finalResource = await manager.save(resourceEntity);
+        let finalResource: FileResource;
+        let finalVersion: FileVersion;
 
-        const versionEntity = manager.create(FileVersion, {
-          fileResourceId: finalResource.id,
-          versionNumber: 1,
-          storageUrl: finalResource.storageUrl,
-          createdById: userId,
-          createdAt: now,
-        });
-        finalVersion = await manager.save(versionEntity);
-      } else {
-        finalResource = existingResource;
-        const version1 = await manager.findOne(FileVersion, { 
-          where: { fileResourceId: finalResource.id, versionNumber: 1 } 
-        });
-        
-        if (!version1) {
+        if (!existingResource) {
+          const uniqueName = `${Date.now()}-${file.originalname}`;
+          storagePath = await this.storageService.saveFile(uniqueName, file.buffer);
+          isNewFile = true;
+          
+          const resourceEntity = manager.create(FileResource, {
+            checksumHash: hash,
+            originalName: file.originalname,
+            mimeType: file.mimetype,
+            sizeBytes: String(file.size),
+            storageUrl: storagePath,
+            createdAt: now,
+          });
+          finalResource = await manager.save(resourceEntity);
+
           const versionEntity = manager.create(FileVersion, {
             fileResourceId: finalResource.id,
             versionNumber: 1,
@@ -124,11 +141,25 @@ export class MaterialsService {
           });
           finalVersion = await manager.save(versionEntity);
         } else {
-          finalVersion = version1;
+          finalResource = existingResource;
+          const version1 = await manager.findOne(FileVersion, { 
+            where: { fileResourceId: finalResource.id, versionNumber: 1 } 
+          });
+          
+          if (!version1) {
+            const versionEntity = manager.create(FileVersion, {
+              fileResourceId: finalResource.id,
+              versionNumber: 1,
+              storageUrl: finalResource.storageUrl,
+              createdById: userId,
+              createdAt: now,
+            });
+            finalVersion = await manager.save(versionEntity);
+          } else {
+            finalVersion = version1;
+          }
         }
-      }
 
-      try {
         const materialEntity = manager.create(Material, {
           materialFolderId: folder.id,
           fileResourceId: finalResource.id,
@@ -145,56 +176,55 @@ export class MaterialsService {
 
         this.logSuccess('Material subido', { materialId: savedMaterial.id, userId });
         return savedMaterial;
-      } catch (error) {
-        if (isNewFile && storagePath) await this.rollbackFile(storagePath);
-        throw error;
-      }
-    });
+      });
 
-    await this.invalidateFolderCache(dto.materialFolderId);
-
-    return result;
+      await this.invalidateFolderCache(dto.materialFolderId);
+      return result;
+    } catch (error) {
+      if (isNewFile && storagePath) await this.rollbackFile(storagePath);
+      throw error;
+    }
   }
 
   async addVersion(userId: string, materialId: string, file: Express.Multer.File): Promise<Material> {
     if (!file) throw new BadRequestException('Archivo requerido');
 
     const now = new Date();
+    let storagePath = '';
+    let isNewFile = false;
 
-    const result = await this.dataSource.transaction(async (manager) => {
-      const freshMaterial = await manager.findOne(Material, { 
-          where: { id: materialId },
-          lock: { mode: 'pessimistic_write' }
-      });
-      
-      if (!freshMaterial) throw new NotFoundException('Material no encontrado');
-
-      const hash = await this.storageService.calculateHash(file.buffer);
-      const existingResource = await this.fileResourceRepository.findByHash(hash);
-      
-      let finalResource: FileResource;
-      let storagePath = '';
-      let isNewFile = false;
-
-      if (!existingResource) {
-        const uniqueName = `${Date.now()}-${file.originalname}`;
-        storagePath = await this.storageService.saveFile(uniqueName, file.buffer);
-        isNewFile = true;
-        
-        const resourceEntity = manager.create(FileResource, {
-          checksumHash: hash,
-          originalName: file.originalname,
-          mimeType: file.mimetype,
-          sizeBytes: String(file.size),
-          storageUrl: storagePath,
-          createdAt: now,
+    try {
+      const result = await this.dataSource.transaction(async (manager) => {
+        const freshMaterial = await manager.findOne(Material, { 
+            where: { id: materialId },
+            lock: { mode: 'pessimistic_write' }
         });
-        finalResource = await manager.save(resourceEntity);
-      } else {
-        finalResource = existingResource;
-      }
+        
+        if (!freshMaterial) throw new NotFoundException('Material no encontrado');
 
-      try {
+        const hash = await this.storageService.calculateHash(file.buffer);
+        const existingResource = await this.fileResourceRepository.findByHash(hash);
+        
+        let finalResource: FileResource;
+
+        if (!existingResource) {
+          const uniqueName = `${Date.now()}-${file.originalname}`;
+          storagePath = await this.storageService.saveFile(uniqueName, file.buffer);
+          isNewFile = true;
+          
+          const resourceEntity = manager.create(FileResource, {
+            checksumHash: hash,
+            originalName: file.originalname,
+            mimeType: file.mimetype,
+            sizeBytes: String(file.size),
+            storageUrl: storagePath,
+            createdAt: now,
+          });
+          finalResource = await manager.save(resourceEntity);
+        } else {
+          finalResource = existingResource;
+        }
+
         const lastVersion = await manager.findOne(FileVersion, {
             where: { fileResourceId: finalResource.id },
             order: { versionNumber: 'DESC' }
@@ -219,19 +249,18 @@ export class MaterialsService {
 
         this.logSuccess('Nueva versión agregada', { materialId: updatedMaterial.id, version: nextVersionNumber, userId });
         return updatedMaterial;
-      } catch (error) {
-        if (isNewFile && storagePath) await this.rollbackFile(storagePath);
-        throw error;
-      }
-    });
+      });
 
-    await this.invalidateFolderCache(materialId);
-
-    return result;
+      await this.invalidateFolderCache(materialId);
+      return result;
+    } catch (error) {
+      if (isNewFile && storagePath) await this.rollbackFile(storagePath);
+      throw error;
+    }
   }
 
-  async getRootFolders(user: User, evaluationId: string): Promise<MaterialFolder[]> {
-    await this.checkAccess(user.id, evaluationId);
+  async getRootFolders(userId: string, evaluationId: string): Promise<MaterialFolder[]> {
+    await this.checkAccess(userId, evaluationId);
     
     const cacheKey = `cache:materials:roots:eval:${evaluationId}`;
     const cached = await this.cacheService.get<MaterialFolder[]>(cacheKey);

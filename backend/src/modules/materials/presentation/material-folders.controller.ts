@@ -24,7 +24,7 @@ export class MaterialFoldersController {
   @Roles('STUDENT', 'ADMIN', 'PROFESSOR', 'SUPER_ADMIN')
   @ResponseMessage('Contenido raíz obtenido exitosamente')
   async getRoots(@CurrentUser() user: User, @Param('id') evaluationId: string) {
-    return await this.materialsService.getRootFolders(user, evaluationId);
+    return await this.materialsService.getRootFolders(user.id, evaluationId);
   }
 
   @Get(':id')
