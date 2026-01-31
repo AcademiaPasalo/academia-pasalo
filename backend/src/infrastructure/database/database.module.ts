@@ -22,7 +22,6 @@ import { TypeOrmModule } from '@nestjs/typeorm';
           waitForConnections: true,
           queueLimit: 0,
           connectTimeout: 10000,
-          acquireTimeout: 10000,
         },
       }),
     }),

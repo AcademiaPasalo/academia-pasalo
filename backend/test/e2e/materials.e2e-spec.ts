@@ -13,6 +13,7 @@ import * as fs from 'fs';
 import { User } from '@modules/users/domain/user.entity';
 import { CourseCycle } from '@modules/courses/domain/course-cycle.entity';
 import { Evaluation } from '@modules/evaluations/domain/evaluation.entity';
+import { RedisCacheService } from '@infrastructure/cache/redis-cache.service';
 
 describe('E2E: Gestión de Materiales y Seguridad', () => {
   let app: INestApplication;
@@ -65,14 +66,35 @@ describe('E2E: Gestión de Materiales y Seguridad', () => {
 
     dataSource = app.get(DataSource);
     storageService = app.get(StorageService);
+    const cacheService = app.get(RedisCacheService);
     seeder = new TestSeeder(dataSource, app);
 
-    // Limpieza de tablas de materiales para evitar datos sucios (paths inexistentes)
-    await dataSource.query('DELETE FROM deletion_request');
-    await dataSource.query('DELETE FROM material');
-    await dataSource.query('DELETE FROM file_version');
-    await dataSource.query('DELETE FROM file_resource');
-    await dataSource.query('DELETE FROM material_folder');
+    // Limpieza total para aislamiento de tests
+    // Usamos un patrón más amplio para asegurar que borramos TODO lo relacionado con el test
+    await cacheService.invalidateGroup('*');
+    await dataSource.query('SET FOREIGN_KEY_CHECKS = 0');
+    const tables = [
+      'deletion_request',
+      'enrollment_evaluation',
+      'enrollment',
+      'material',
+      'file_version',
+      'file_resource',
+      'material_folder',
+      'evaluation',
+      'course_cycle_professor',
+      'course_cycle',
+      'academic_cycle',
+      'course',
+      'user_role',
+      'user_session',
+      'security_event',
+      'user',
+    ];
+    for (const table of tables) {
+      await dataSource.query(`DELETE FROM ${table}`);
+    }
+    await dataSource.query('SET FOREIGN_KEY_CHECKS = 1');
 
     // 1. Setup Base
     await seeder.ensureMaterialStatuses();
@@ -148,7 +170,7 @@ describe('E2E: Gestión de Materiales y Seguridad', () => {
 
   describe('Fase 2: Subida de Archivos (Upload)', () => {
     it('Profesor debe poder subir archivo PDF a la carpeta', async () => {
-      const buffer = Buffer.from('Contenido simulado del PDF');
+      const buffer = Buffer.from('%PDF-1.4 content');
       
       const res = await request(app.getHttpServer())
         .post('/materials')
@@ -177,7 +199,7 @@ describe('E2E: Gestión de Materiales y Seguridad', () => {
 
     beforeAll(async () => {
         // Crear un material específico para descargar
-        const buffer = Buffer.from('PDF_TEST');
+        const buffer = Buffer.from('%PDF-1.4 test');
         const res = await request(app.getHttpServer())
             .post('/materials')
             .set('Authorization', `Bearer ${professor.token}`)
@@ -215,7 +237,7 @@ describe('E2E: Gestión de Materiales y Seguridad', () => {
     let materialId: string;
 
     beforeAll(async () => {
-        const buffer = Buffer.from('DEL');
+        const buffer = Buffer.from('%PDF-1.4 del');
         const res = await request(app.getHttpServer())
             .post('/materials')
             .set('Authorization', `Bearer ${professor.token}`)

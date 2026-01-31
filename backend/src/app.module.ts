@@ -13,6 +13,7 @@ import { EnrollmentsModule } from '@modules/enrollments/enrollments.module';
 import { MaterialsModule } from '@modules/materials/materials.module';
 import { FeedbackModule } from '@modules/feedback/feedback.module';
 import { SettingsModule } from '@modules/settings/settings.module';
+import { ClassEventsModule } from '@modules/events/class-events.module';
 import { DatabaseModule } from '@infrastructure/database/database.module';
 import { RedisCacheModule } from '@infrastructure/cache/redis-cache.module';
 import { StorageModule } from '@infrastructure/storage/storage.module';
@@ -39,6 +40,7 @@ import { HealthModule } from './health/health.module';
     EnrollmentsModule,
     MaterialsModule,
     FeedbackModule,
+    ClassEventsModule,
     HealthModule,
   ],
   controllers: [AppController],
