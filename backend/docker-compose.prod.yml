@@ -52,6 +52,7 @@ services:
       - NODE_ENV=production
       - PORT=3000
       - NEXT_PUBLIC_API_URL=/api/v1
+      - NEXT_PUBLIC_GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
     depends_on:
       - backend
     networks:
