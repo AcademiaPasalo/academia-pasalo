@@ -96,3 +96,12 @@ INSERT INTO session_status (code, name) VALUES
 ('BLOCKED_PENDING_REAUTH', 'Bloqueado por Anomalía (Requiere Re-autenticación)'),
 ('REVOKED', 'Sesión Revocada / Cerrada');
 
+-- MI USUARIO DE PRUEBA
+INSERT INTO user (email, first_name, last_name_1, last_name_2, profile_photo_url, photo_source, created_at) 
+VALUES 
+('omar.aedo.alvarez@gmail.com', 'Omar', 'Aedo', 'Alvarez', NULL, 'google', NOW());
+
+INSERT INTO user_role (user_id, role_id) 
+VALUES 
+(LAST_INSERT_ID(), 1);
+
