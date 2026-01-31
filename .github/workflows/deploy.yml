@@ -67,7 +67,6 @@ jobs:
           tags: |
             ${{ secrets.DOCKER_USERNAME }}/academia-pasalo-frontend:latest
             ${{ secrets.DOCKER_USERNAME }}/academia-pasalo-frontend:${{ github.sha }}
-
   deploy:
     needs: build-and-push
     runs-on: ubuntu-latest
@@ -82,10 +81,11 @@ jobs:
             set -e
 
             APP_DIR="/home/ubuntu/academia-pasalo"
+            COMPOSE_FILE="$APP_DIR/backend/docker-compose.prod.yml"
 
-            # 1) Obtener código (idempotente y a prueba de cambios locales)
+            # 1) Obtener código (idempotente)
             if [ ! -d "$APP_DIR/.git" ]; then
-              mkdir -p "$APP_DIR"
+              rm -rf "$APP_DIR"
               git clone https://github.com/${{ github.repository }}.git "$APP_DIR"
             fi
 
@@ -93,13 +93,20 @@ jobs:
             git fetch origin
             git reset --hard origin/main
 
-            # 2) Limpieza segura (NO tocar letsencrypt/certbot creados por Docker/Certbot)
+            # 2) Limpieza segura (no tocar letsencrypt/certbot dentro del repo)
             git clean -fd -e letsencrypt/ -e certbot/ || true
 
-            # 3) Login Docker Hub
+            # 3) Validar que existe el compose
+            if [ ! -f "$COMPOSE_FILE" ]; then
+              echo "ERROR: No existe $COMPOSE_FILE"
+              ls -la "$APP_DIR" "$APP_DIR/backend" || true
+              exit 1
+            fi
+
+            # 4) Login Docker Hub
             echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
 
-            # 4) Crear .env del backend (en ruta absoluta para evitar errores por cd)
+            # 5) Crear .env backend
             cat > "$APP_DIR/backend/.env" << EOF
             GITHUB_REPOSITORY=${{ github.repository }}
             DOCKER_USERNAME=${{ secrets.DOCKER_USERNAME }}
@@ -112,14 +119,13 @@ jobs:
             MAXMIND_LICENSE_KEY=${{ secrets.MAXMIND_LICENSE_KEY }}
             EOF
 
-            # 5) Deploy con docker-compose (usa ruta absoluta al compose)
-            docker-compose -f "$APP_DIR/docker-compose.prod.yml" pull
-            docker-compose -f "$APP_DIR/docker-compose.prod.yml" down -v
-            docker-compose -f "$APP_DIR/docker-compose.prod.yml" up -d
+            # 6) Deploy (compose en backend/)
+            docker-compose -f "$COMPOSE_FILE" pull
+            docker-compose -f "$COMPOSE_FILE" down -v
+            docker-compose -f "$COMPOSE_FILE" up -d
 
-            # 6) Limpieza de imágenes viejas
+            # 7) Limpieza
             docker image prune -f
 
             echo "✅ Deployment completed!"
             docker ps
-
