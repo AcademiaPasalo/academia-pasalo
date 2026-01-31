@@ -50,77 +50,124 @@ export class EvaluationSubscriber implements EntitySubscriberInterface<Evaluatio
       return;
     }
 
+    const BATCH_SIZE = 100;
+    let offset = 0;
+    let hasMore = true;
+    let totalProcessed = 0;
+
     if (evaluationType.code === 'BANCO_ENUNCIADOS') {
-      const allEnrollments = await manager.find(Enrollment, {
-        where: { courseCycleId: evaluation.courseCycleId },
-      });
+      while (hasMore) {
+        const enrollmentsBatch = await manager.find(Enrollment, {
+          where: { courseCycleId: evaluation.courseCycleId },
+          skip: offset,
+          take: BATCH_SIZE,
+        });
 
-      if (allEnrollments.length === 0) return;
-
-      const enrollmentIds = allEnrollments.map(e => e.id);
-      
-      const allExistingAccess = await manager.createQueryBuilder(EnrollmentEvaluation, 'ee')
-        .innerJoinAndSelect('ee.evaluation', 'ev')
-        .innerJoinAndSelect('ev.evaluationType', 'et')
-        .where('ee.enrollmentId IN (:...ids)', { ids: enrollmentIds })
-        .andWhere('et.code != :bancoCode', { bancoCode: 'BANCO_ENUNCIADOS' })
-        .getMany();
-
-      const accessMap = new Map<string, Evaluation[]>();
-      for (const access of allExistingAccess) {
-        if (!accessMap.has(access.enrollmentId)) {
-          accessMap.set(access.enrollmentId, []);
+        if (enrollmentsBatch.length === 0) {
+          hasMore = false;
+          break;
         }
-        accessMap.get(access.enrollmentId)?.push(access.evaluation);
-      }
 
-      const accessEntries: EnrollmentEvaluation[] = [];
+        const enrollmentIds = enrollmentsBatch.map((e) => e.id);
 
-      for (const enrollment of allEnrollments) {
-        let accessEndDate = evaluation.endDate;
+        const allExistingAccess = await manager
+          .createQueryBuilder(EnrollmentEvaluation, 'ee')
+          .innerJoinAndSelect('ee.evaluation', 'ev')
+          .innerJoinAndSelect('ev.evaluationType', 'et')
+          .where('ee.enrollmentId IN (:...ids)', { ids: enrollmentIds })
+          .andWhere('et.code != :bancoCode', { bancoCode: 'BANCO_ENUNCIADOS' })
+          .getMany();
 
-        if (enrollment.enrollmentTypeId !== fullType.id) {
-          const academicEvaluations = accessMap.get(enrollment.id) || [];
-
-          if (academicEvaluations.length > 0) {
-            const maxAcademicEndDate = academicEvaluations.reduce((max, current) => {
-              return current.endDate > max ? current.endDate : max;
-            }, new Date(0));
-            accessEndDate = maxAcademicEndDate;
+        const accessMap = new Map<string, Evaluation[]>();
+        for (const access of allExistingAccess) {
+          if (!accessMap.has(access.enrollmentId)) {
+            accessMap.set(access.enrollmentId, []);
           }
+          accessMap.get(access.enrollmentId)?.push(access.evaluation);
         }
 
-        const accessEntry = new EnrollmentEvaluation();
-        accessEntry.enrollmentId = enrollment.id;
-        accessEntry.evaluationId = evaluation.id;
-        accessEntry.accessStartDate = evaluation.startDate;
-        accessEntry.accessEndDate = accessEndDate;
-        accessEntry.isActive = true;
-        accessEntries.push(accessEntry);
+        const accessEntries: EnrollmentEvaluation[] = [];
+
+        for (const enrollment of enrollmentsBatch) {
+          let accessEndDate = evaluation.endDate;
+
+          if (enrollment.enrollmentTypeId !== fullType.id) {
+            const academicEvaluations = accessMap.get(enrollment.id) || [];
+
+            if (academicEvaluations.length > 0) {
+              const maxAcademicEndDate = academicEvaluations.reduce(
+                (max, current) => {
+                  return current.endDate > max ? current.endDate : max;
+                },
+                new Date(0),
+              );
+              accessEndDate = maxAcademicEndDate;
+            }
+          }
+
+          const accessEntry = new EnrollmentEvaluation();
+          accessEntry.enrollmentId = enrollment.id;
+          accessEntry.evaluationId = evaluation.id;
+          accessEntry.accessStartDate = evaluation.startDate;
+          accessEntry.accessEndDate = accessEndDate;
+          accessEntry.isActive = true;
+          accessEntries.push(accessEntry);
+        }
+
+        if (accessEntries.length > 0) {
+          await manager.save(EnrollmentEvaluation, accessEntries);
+        }
+
+        totalProcessed += enrollmentsBatch.length;
+        offset += BATCH_SIZE;
+
+        if (enrollmentsBatch.length < BATCH_SIZE) {
+          hasMore = false;
+        }
       }
-
-      await manager.save(EnrollmentEvaluation, accessEntries);
     } else {
-      const fullEnrollments = await manager.find(Enrollment, {
-        where: {
-          courseCycleId: evaluation.courseCycleId,
-          enrollmentTypeId: fullType.id,
-        },
-      });
+      while (hasMore) {
+        const fullEnrollmentsBatch = await manager.find(Enrollment, {
+          where: {
+            courseCycleId: evaluation.courseCycleId,
+            enrollmentTypeId: fullType.id,
+          },
+          skip: offset,
+          take: BATCH_SIZE,
+        });
 
-      if (fullEnrollments.length === 0) return;
+        if (fullEnrollmentsBatch.length === 0) {
+          hasMore = false;
+          break;
+        }
 
-      const accessEntries = fullEnrollments.map((enrollment) => {
-        const accessEntry = new EnrollmentEvaluation();
-        accessEntry.enrollmentId = enrollment.id;
-        accessEntry.evaluationId = evaluation.id;
-        accessEntry.accessStartDate = evaluation.startDate;
-        accessEntry.accessEndDate = evaluation.endDate;
-        accessEntry.isActive = true;
-        return accessEntry;
-      });
+        const accessEntries = fullEnrollmentsBatch.map((enrollment) => {
+          const accessEntry = new EnrollmentEvaluation();
+          accessEntry.enrollmentId = enrollment.id;
+          accessEntry.evaluationId = evaluation.id;
+          accessEntry.accessStartDate = evaluation.startDate;
+          accessEntry.accessEndDate = evaluation.endDate;
+          accessEntry.isActive = true;
+          return accessEntry;
+        });
 
-      await manager.save(EnrollmentEvaluation, accessEntries);
+        if (accessEntries.length > 0) {
+          await manager.save(EnrollmentEvaluation, accessEntries);
+        }
+
+        totalProcessed += fullEnrollmentsBatch.length;
+        offset += BATCH_SIZE;
+
+        if (fullEnrollmentsBatch.length < BATCH_SIZE) {
+          hasMore = false;
+        }
+      }
     }
+
+    this.logger.log({
+      message: 'Accesos otorgados automáticamente por subscriber',
+      evaluationId: evaluation.id,
+      totalEnrollments: totalProcessed,
+    });
   }
 }

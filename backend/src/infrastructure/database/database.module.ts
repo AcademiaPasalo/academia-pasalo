@@ -17,6 +17,13 @@ import { TypeOrmModule } from '@nestjs/typeorm';
         entities: [__dirname + '/../../**/*.entity{.ts,.js}'],
         synchronize: false,
         timezone: 'Z',
+        extra: {
+          connectionLimit: 50,
+          waitForConnections: true,
+          queueLimit: 0,
+          connectTimeout: 10000,
+          acquireTimeout: 10000,
+        },
       }),
     }),
   ],

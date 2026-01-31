@@ -4,12 +4,20 @@ import { SystemSettingRepository } from '@modules/settings/infrastructure/system
 @Injectable()
 export class SettingsService {
   private readonly logger = new Logger(SettingsService.name);
+  private readonly memoryCache: Map<string, string>;
 
   constructor(
     private readonly systemSettingRepository: SystemSettingRepository,
-  ) {}
+  ) {
+    this.memoryCache = new Map<string, string>();
+  }
 
   async getString(key: string): Promise<string> {
+    const cachedValue = this.memoryCache.get(key);
+    if (cachedValue !== undefined) {
+      return cachedValue;
+    }
+
     const row = await this.systemSettingRepository.findByKey(key);
     if (!row) {
       this.logger.error({
@@ -20,6 +28,7 @@ export class SettingsService {
       throw new InternalServerErrorException('Configuración del sistema incompleta');
     }
 
+    this.memoryCache.set(key, row.settingValue);
     return row.settingValue;
   }
 
@@ -41,10 +50,12 @@ export class SettingsService {
   }
 
   async invalidateCache(key: string): Promise<void> {
+    this.memoryCache.delete(key);
     await this.systemSettingRepository.invalidateKey(key);
   }
 
   async invalidateAllCache(): Promise<void> {
+    this.memoryCache.clear();
     await this.systemSettingRepository.invalidateAllCache();
   }
 }
