@@ -24,13 +24,13 @@ export class MaterialFoldersController {
   @Roles('STUDENT', 'ADMIN', 'PROFESSOR', 'SUPER_ADMIN')
   @ResponseMessage('Contenido raíz obtenido exitosamente')
   async getRoots(@CurrentUser() user: User, @Param('id') evaluationId: string) {
-    return await this.materialsService.getRootFolders(user.id, evaluationId);
+    return await this.materialsService.getRootFolders(user, evaluationId);
   }
 
   @Get(':id')
   @Roles('STUDENT', 'ADMIN', 'PROFESSOR', 'SUPER_ADMIN')
   @ResponseMessage('Contenido de carpeta obtenido exitosamente')
   async getContents(@CurrentUser() user: User, @Param('id') folderId: string) {
-    return await this.materialsService.getFolderContents(user.id, folderId);
+    return await this.materialsService.getFolderContents(user, folderId);
   }
 }

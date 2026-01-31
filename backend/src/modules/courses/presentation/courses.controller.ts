@@ -13,10 +13,13 @@ import {
   CourseTypeResponseDto,
   CycleLevelResponseDto,
 } from '@modules/courses/dto/course-response.dto';
+import { CourseContentResponseDto } from '@modules/courses/dto/course-content.dto';
 import { CreateCourseDto } from '@modules/courses/dto/create-course.dto';
 import { AssignCourseToCycleDto } from '@modules/courses/dto/assign-course-to-cycle.dto';
 import { Auth } from '@common/decorators/auth.decorator';
 import { Roles } from '@common/decorators/roles.decorator';
+import { CurrentUser } from '@common/decorators/current-user.decorator';
+import { User } from '@modules/users/domain/user.entity';
 import { ResponseMessage } from '@common/decorators/response-message.decorator';
 import { plainToInstance } from 'class-transformer';
 
@@ -24,6 +27,19 @@ import { plainToInstance } from 'class-transformer';
 @Auth()
 export class CoursesController {
   constructor(private readonly coursesService: CoursesService) {}
+
+  @Get('cycle/:id/content')
+  @Roles('STUDENT', 'PROFESSOR', 'ADMIN', 'SUPER_ADMIN')
+  @ResponseMessage('Contenido del curso obtenido exitosamente')
+  async getCourseContent(
+    @Param('id') courseCycleId: string,
+    @CurrentUser() user: User,
+  ) {
+    const content = await this.coursesService.getCourseContent(courseCycleId, user.id);
+    return plainToInstance(CourseContentResponseDto, content, {
+      excludeExtraneousValues: true,
+    });
+  }
 
   @Post()
   @Roles('ADMIN', 'SUPER_ADMIN')
