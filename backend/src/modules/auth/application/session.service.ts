@@ -8,6 +8,7 @@ import { AuthSettingsService } from '@modules/auth/application/auth-settings.ser
 import { GeoProvider } from '@common/interfaces/geo-provider.interface';
 import { UserSession } from '@modules/auth/domain/user-session.entity';
 import { RequestMetadata } from '@modules/auth/interfaces/request-metadata.interface';
+import { RedisCacheService } from '@infrastructure/cache/redis-cache.service';
 import {
   SessionStatusCode,
   SessionStatusService,
@@ -26,6 +27,7 @@ export class SessionService {
     private readonly sessionStatusService: SessionStatusService,
     private readonly authSettingsService: AuthSettingsService,
     private readonly geoProvider: GeoProvider,
+    private readonly cacheService: RedisCacheService,
   ) {}
 
   async createSession(
@@ -285,6 +287,7 @@ export class SessionService {
 
     for (const session of sessions) {
       await this.userSessionRepository.deactivateSession(session.id);
+      await this.cacheService.del(`cache:session:${session.id}:user`);
     }
 
     this.logger.log({

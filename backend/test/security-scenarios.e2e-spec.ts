@@ -60,6 +60,7 @@ describe('Security Scenarios (Integration)', () => {
     findByRefreshTokenHash: jest.fn(),
     findByRefreshTokenHashForUpdate: jest.fn(),
     findById: jest.fn(),
+    findByIdWithUser: jest.fn(),
     findByIdForUpdate: jest.fn(),
     update: jest.fn(),
     deactivateSession: jest.fn(),
@@ -264,7 +265,7 @@ describe('Security Scenarios (Integration)', () => {
 
       const payload = { sub: '1', email: 'h@t.com', roles: [], sessionId: '500' };
 
-      mockUserSessionRepository.findById.mockResolvedValue({
+      mockUserSessionRepository.findByIdWithUser.mockResolvedValue({
         id: '500',
         isActive: false,
         sessionStatusId: '99',

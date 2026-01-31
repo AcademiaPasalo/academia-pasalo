@@ -35,4 +35,18 @@ export class EvaluationRepository {
     const evaluation = repo.create(data);
     return await repo.save(evaluation);
   }
+
+  async findAllWithUserAccess(courseCycleId: string, userId: string): Promise<Evaluation[]> {
+    return await this.evaluationOrm.createQueryBuilder('evaluation')
+      .innerJoinAndSelect('evaluation.evaluationType', 'evaluationType')
+      .leftJoinAndSelect(
+        'evaluation.enrollmentEvaluations',
+        'access',
+        'access.enrollmentId IN (SELECT id FROM enrollment WHERE user_id = :userId AND course_cycle_id = :courseCycleId AND cancelled_at IS NULL)',
+        { userId, courseCycleId }
+      )
+      .where('evaluation.courseCycleId = :courseCycleId', { courseCycleId })
+      .orderBy('evaluation.number', 'ASC')
+      .getMany();
+  }
 }

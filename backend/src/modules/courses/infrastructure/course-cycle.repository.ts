@@ -31,4 +31,14 @@ export class CourseCycleRepository {
       relations: { academicCycle: true },
     });
   }
+
+  async findFullById(id: string): Promise<CourseCycle | null> {
+    return await this.ormRepository.findOne({
+      where: { id },
+      relations: {
+        academicCycle: true,
+        course: true,
+      },
+    });
+  }
 }
