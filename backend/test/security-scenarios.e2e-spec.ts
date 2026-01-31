@@ -15,7 +15,7 @@ import { UserSessionRepository } from '../src/modules/auth/infrastructure/user-s
 import { SecurityEventRepository } from '../src/modules/auth/infrastructure/security-event.repository';
 import { SecurityEventTypeRepository } from '../src/modules/auth/infrastructure/security-event-type.repository';
 import { SessionStatusRepository } from '../src/modules/auth/infrastructure/session-status.repository';
-import { SystemSettingRepository } from '../src/modules/auth/infrastructure/system-setting.repository';
+import { SettingsService } from '../src/modules/settings/application/settings.service';
 import { RequestMetadata } from '../src/modules/auth/interfaces/request-metadata.interface';
 import { JwtStrategy } from '../src/modules/auth/strategies/jwt.strategy';
 
@@ -115,8 +115,10 @@ describe('Security Scenarios (Integration)', () => {
         { provide: SecurityEventRepository, useValue: mockSecurityEventRepository },
         { provide: SecurityEventTypeRepository, useValue: mockSecurityEventTypeRepository },
         { provide: SessionStatusRepository, useValue: mockSessionStatusRepository },
-        { provide: SystemSettingRepository, useValue: mockSystemSettingRepository },
-        // Injection Token corregido
+        { provide: SettingsService, useValue: {
+          getPositiveInt: jest.fn().mockResolvedValue(30),
+          getString: jest.fn().mockResolvedValue('CYCLE_2024_1'),
+        } },
         { provide: GeoProvider, useValue: mockGeoProvider },
         {
           provide: RedisCacheService,

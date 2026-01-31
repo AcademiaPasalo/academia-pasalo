@@ -109,7 +109,14 @@ Obtiene el listado completo de cursos donde el alumno está inscrito, con detall
             "course": {
               "id": "101",
               "code": "FIS-1",
-              "name": "Física I"
+              "name": "Física I",
+              "courseType": {
+                "code": "CIENCIAS_BASICAS",
+                "name": "Ciencias Básicas"
+              },
+              "cycleLevel": {
+                "name": "Ciclo 1"
+              }
             },
             "academicCycle": {
               "id": "5",

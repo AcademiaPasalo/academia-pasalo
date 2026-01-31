@@ -7,6 +7,13 @@ export class MyEnrollmentsResponseDto {
       id: string;
       code: string;
       name: string;
+      courseType: {
+        code: string;
+        name: string;
+      };
+      cycleLevel: {
+        name: string;
+      };
     };
     academicCycle: {
       id: string;

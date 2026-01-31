@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { SystemSetting } from '@modules/auth/domain/system-setting.entity';
+import { SystemSetting } from '@modules/settings/domain/system-setting.entity';
 import { RedisCacheService } from '@infrastructure/cache/redis-cache.service';
 
 @Injectable()
@@ -61,8 +61,12 @@ export class SystemSettingRepository {
     return updated;
   }
 
+  async invalidateKey(settingKey: string): Promise<void> {
+    const cacheKey = `${SystemSettingRepository.CACHE_PREFIX}${settingKey}`;
+    await this.cacheService.del(cacheKey);
+  }
+
   async invalidateAllCache(): Promise<void> {
     await this.cacheService.invalidateGroup(`${SystemSettingRepository.CACHE_PREFIX}*`);
   }
 }
-
