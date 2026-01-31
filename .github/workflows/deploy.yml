@@ -34,6 +34,9 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
       - name: Log in to Docker Hub
         uses: docker/login-action@v3
         with:
@@ -45,6 +48,8 @@ jobs:
         with:
           context: ./backend
           push: true
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
           tags: |
             ${{ secrets.DOCKER_USERNAME }}/academia-pasalo-backend:latest
             ${{ secrets.DOCKER_USERNAME }}/academia-pasalo-backend:${{ github.sha }}
@@ -54,6 +59,8 @@ jobs:
         with:
           context: ./frontend
           push: true
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
           tags: |
             ${{ secrets.DOCKER_USERNAME }}/academia-pasalo-frontend:latest
             ${{ secrets.DOCKER_USERNAME }}/academia-pasalo-frontend:${{ github.sha }}
@@ -91,7 +98,7 @@ jobs:
             
             # Pull images and deploy
             docker compose -f docker-compose.prod.yml pull
-            docker compose -f docker-compose.prod.yml down
+            docker compose -f docker-compose.prod.yml down -v
             docker compose -f docker-compose.prod.yml up -d
             
             # Clean up
