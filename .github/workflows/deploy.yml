@@ -125,7 +125,7 @@ jobs:
 
             # 3) Validar compose
             if [ ! -f "$COMPOSE_FILE" ]; then
-              echo "ERROR: No existe $COMPOSE_FILE"
+              echo "ERROR: No existe - $COMPOSE_FILE"
               ls -la "$APP_DIR" "$APP_DIR/backend" || true
               exit 1
             fi
