@@ -103,6 +103,19 @@ export class ApiClient {
 
       // Manejar 401 (Token expirado o inválido)
       if (response.status === 401) {
+        // TEST DEVOPS - SE AGREGA TROZO DE CODIGO PARA AJUSTAR EL MANEJO DE TOKENS
+        const refreshToken = getRefreshToken();
+        
+        // Si no hay refresh token, limpiar y redirigir
+        if (!refreshToken) {
+          clearAuth();
+          if (typeof window !== 'undefined') {
+            window.location.href = '/plataforma';
+          }
+          const data = await response.json();
+          return data as ApiResponse<T>;
+        }
+        // FINAL TEST DEVOPS
         // Si ya estamos refrescando, esperar
         if (this.isRefreshing) {
           return new Promise((resolve, reject) => {
