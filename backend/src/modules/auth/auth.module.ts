@@ -12,6 +12,7 @@ import { SessionStatusService } from './application/session-status.service';
 import { SecurityEventService } from './application/security-event.service';
 import { AuthSettingsService } from './application/auth-settings.service';
 import { GeolocationService } from './application/geolocation.service';
+import { SessionAnomalyDetectorService } from './application/session-anomaly-detector.service';
 import { JwtStrategy } from './strategies/jwt.strategy';
 import { User } from '@modules/users/domain/user.entity';
 import { UserSession } from './domain/user-session.entity';
@@ -58,6 +59,7 @@ import { SettingsModule } from '@modules/settings/settings.module';
     SecurityEventService,
     AuthSettingsService,
     GeolocationService,
+    SessionAnomalyDetectorService,
     JwtStrategy,
     UserSessionRepository,
     SecurityEventRepository,
