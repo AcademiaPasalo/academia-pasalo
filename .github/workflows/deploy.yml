@@ -73,30 +73,54 @@ jobs:
     steps:
       - name: Deploy to EC2
         uses: appleboy/ssh-action@v1.0.3
+        env:
+          DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+          DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
+          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+          DB_NAME: ${{ secrets.DB_NAME }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+          GOOGLE_REDIRECT_URI: ${{ secrets.GOOGLE_REDIRECT_URI }}
+          MAXMIND_LICENSE_KEY: ${{ secrets.MAXMIND_LICENSE_KEY }}
         with:
           host: ${{ secrets.EC2_HOST }}
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_SSH_KEY }}
           script: |
-            set -e
+            set -euo pipefail
 
             APP_DIR="/home/ubuntu/academia-pasalo"
             COMPOSE_FILE="$APP_DIR/backend/docker-compose.prod.yml"
 
-            # 1) Obtener código (idempotente)
+            echo " Iniciando deploy en $(hostname)"
+
+            # 0) Pre-checks
+            command -v git >/dev/null
+            command -v docker >/dev/null
+            command -v docker-compose >/dev/null
+
+            # 1) Obtener código 
             if [ ! -d "$APP_DIR/.git" ]; then
-              rm -rf "$APP_DIR"
-              git clone https://github.com/${{ github.repository }}.git "$APP_DIR"
+              echo "Clonando repositorio por primera vez..."
+              mkdir -p "$APP_DIR"
+              git clone git@github.com:${{ github.repository }}.git "$APP_DIR"
             fi
 
             cd "$APP_DIR"
             git fetch origin
             git reset --hard origin/main
 
-            # 2) Limpieza segura (no tocar letsencrypt/certbot dentro del repo)
+            # 2) Limpieza segura (NO tocar runtime SSL)
             git clean -fd -e letsencrypt/ -e certbot/ || true
 
-            # 3) Validar que existe el compose
+            # 2.1) Asegurar runtime dirs (certbot + letsencrypt)
+            mkdir -p "$APP_DIR/certbot/www/.well-known/acme-challenge"
+            mkdir -p "$APP_DIR/letsencrypt"
+            chown -R ubuntu:ubuntu "$APP_DIR/certbot" || true
+            chmod -R 755 "$APP_DIR/certbot" || true
+
+            # 3) Validar compose
             if [ ! -f "$COMPOSE_FILE" ]; then
               echo "ERROR: No existe $COMPOSE_FILE"
               ls -la "$APP_DIR" "$APP_DIR/backend" || true
@@ -104,28 +128,52 @@ jobs:
             fi
 
             # 4) Login Docker Hub
-            echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
+            echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
 
             # 5) Crear .env backend
             cat > "$APP_DIR/backend/.env" << EOF
             GITHUB_REPOSITORY=${{ github.repository }}
-            DOCKER_USERNAME=${{ secrets.DOCKER_USERNAME }}
-            DB_PASSWORD=${{ secrets.DB_PASSWORD }}
-            DB_NAME=${{ secrets.DB_NAME }}
-            JWT_SECRET=${{ secrets.JWT_SECRET }}
-            GOOGLE_CLIENT_ID=${{ secrets.GOOGLE_CLIENT_ID }}
-            GOOGLE_CLIENT_SECRET=${{ secrets.GOOGLE_CLIENT_SECRET }}
-            GOOGLE_REDIRECT_URI=${{ secrets.GOOGLE_REDIRECT_URI }}
-            MAXMIND_LICENSE_KEY=${{ secrets.MAXMIND_LICENSE_KEY }}
+            DOCKER_USERNAME=$DOCKER_USERNAME
+            DB_PASSWORD=$DB_PASSWORD
+            DB_NAME=$DB_NAME
+            JWT_SECRET=$JWT_SECRET
+            GOOGLE_CLIENT_ID=$GOOGLE_CLIENT_ID
+            GOOGLE_CLIENT_SECRET=$GOOGLE_CLIENT_SECRET
+            GOOGLE_REDIRECT_URI=$GOOGLE_REDIRECT_URI
+            MAXMIND_LICENSE_KEY=$MAXMIND_LICENSE_KEY
             EOF
 
-            # 6) Deploy (compose en backend/)
+            # 6) Deploy
+            echo "⬇ Pull de imágenes"
             docker-compose -f "$COMPOSE_FILE" pull
+
+            echo "🛑 Bajando servicios (DEV: borrando volúmenes)"
             docker-compose -f "$COMPOSE_FILE" down -v
+
+            echo "🚀 Levantando servicios"
             docker-compose -f "$COMPOSE_FILE" up -d
 
-            # 7) Limpieza
+            # 7) Verificación post-deploy
+            echo "⏳ Esperando que servicios levanten..."
+            sleep 10
+
+            echo "📦 Estado de contenedores:"
+            docker ps -a
+
+            echo "🔍 Verificando contenedores clave..."
+            for c in academia-pasalo-nginx academia-pasalo-backend academia-pasalo-frontend; do
+              status="$(docker inspect -f '{{.State.Status}}' "$c")"
+              echo "$c → $status"
+              if [ "$status" != "running" ]; then
+                echo "❌ ERROR: $c no está running"
+                echo "📄 Últimos logs de $c:"
+                docker logs --tail=200 "$c" || true
+                exit 1
+              fi
+            done
+
+            # 8) Limpieza
             docker image prune -f
 
-            echo "✅ Deployment completed!"
+            echo "✅ Deployment completed successfully"
             docker ps
