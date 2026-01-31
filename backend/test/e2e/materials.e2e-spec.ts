@@ -236,9 +236,13 @@ describe('E2E: Gestión de Materiales y Seguridad', () => {
 
     it('Profesor puede solicitar eliminación', async () => {
         await request(app.getHttpServer())
-            .post(`/materials/${materialId}/request-deletion`)
+            .post('/materials/request-deletion')
             .set('Authorization', `Bearer ${professor.token}`)
-            .send({ reason: 'Ya no es válido' })
+            .send({ 
+                entityType: 'material',
+                entityId: materialId,
+                reason: 'Ya no es válido' 
+            })
             .expect(200);
         
         // Verificar en BD que se creó la solicitud

@@ -30,6 +30,8 @@ export class EnrollmentRepository {
     return await this.ormRepository.createQueryBuilder('enrollment')
       .innerJoinAndSelect('enrollment.courseCycle', 'courseCycle')
       .innerJoinAndSelect('courseCycle.course', 'course')
+      .innerJoinAndSelect('course.courseType', 'courseType')
+      .innerJoinAndSelect('course.cycleLevel', 'cycleLevel')
       .innerJoinAndSelect('courseCycle.academicCycle', 'academicCycle')
       .leftJoinAndSelect('courseCycle.professors', 'courseCycleProfessor', 'courseCycleProfessor.revokedAt IS NULL')
       .leftJoinAndSelect('courseCycleProfessor.professor', 'professor')

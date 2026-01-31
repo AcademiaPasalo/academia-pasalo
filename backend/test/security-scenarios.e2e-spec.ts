@@ -15,7 +15,7 @@ import { UserSessionRepository } from '../src/modules/auth/infrastructure/user-s
 import { SecurityEventRepository } from '../src/modules/auth/infrastructure/security-event.repository';
 import { SecurityEventTypeRepository } from '../src/modules/auth/infrastructure/security-event-type.repository';
 import { SessionStatusRepository } from '../src/modules/auth/infrastructure/session-status.repository';
-import { SystemSettingRepository } from '../src/modules/auth/infrastructure/system-setting.repository';
+import { SettingsService } from '../src/modules/settings/application/settings.service';
 import { RequestMetadata } from '../src/modules/auth/interfaces/request-metadata.interface';
 import { JwtStrategy } from '../src/modules/auth/strategies/jwt.strategy';
 
@@ -60,6 +60,7 @@ describe('Security Scenarios (Integration)', () => {
     findByRefreshTokenHash: jest.fn(),
     findByRefreshTokenHashForUpdate: jest.fn(),
     findById: jest.fn(),
+    findByIdWithUser: jest.fn(),
     findByIdForUpdate: jest.fn(),
     update: jest.fn(),
     deactivateSession: jest.fn(),
@@ -115,8 +116,10 @@ describe('Security Scenarios (Integration)', () => {
         { provide: SecurityEventRepository, useValue: mockSecurityEventRepository },
         { provide: SecurityEventTypeRepository, useValue: mockSecurityEventTypeRepository },
         { provide: SessionStatusRepository, useValue: mockSessionStatusRepository },
-        { provide: SystemSettingRepository, useValue: mockSystemSettingRepository },
-        // Injection Token corregido
+        { provide: SettingsService, useValue: {
+          getPositiveInt: jest.fn().mockResolvedValue(30),
+          getString: jest.fn().mockResolvedValue('CYCLE_2024_1'),
+        } },
         { provide: GeoProvider, useValue: mockGeoProvider },
         {
           provide: RedisCacheService,
@@ -262,7 +265,7 @@ describe('Security Scenarios (Integration)', () => {
 
       const payload = { sub: '1', email: 'h@t.com', roles: [], sessionId: '500' };
 
-      mockUserSessionRepository.findById.mockResolvedValue({
+      mockUserSessionRepository.findByIdWithUser.mockResolvedValue({
         id: '500',
         isActive: false,
         sessionStatusId: '99',

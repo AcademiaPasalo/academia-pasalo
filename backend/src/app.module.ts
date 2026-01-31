@@ -10,6 +10,7 @@ import { EvaluationsModule } from '@modules/evaluations/evaluations.module';
 import { EnrollmentsModule } from '@modules/enrollments/enrollments.module';
 import { MaterialsModule } from '@modules/materials/materials.module';
 import { FeedbackModule } from '@modules/feedback/feedback.module';
+import { SettingsModule } from '@modules/settings/settings.module';
 import { DatabaseModule } from '@infrastructure/database/database.module';
 import { RedisCacheModule } from '@infrastructure/cache/redis-cache.module';
 import { StorageModule } from '@infrastructure/storage/storage.module';
@@ -22,6 +23,7 @@ import { StorageModule } from '@infrastructure/storage/storage.module';
     DatabaseModule,
     RedisCacheModule,
     StorageModule,
+    SettingsModule,
     UsersModule,
     AuthModule,
     CyclesModule,

@@ -18,14 +18,13 @@ import { UserSession } from './domain/user-session.entity';
 import { SecurityEvent } from './domain/security-event.entity';
 import { SecurityEventType } from './domain/security-event-type.entity';
 import { SessionStatus } from './domain/session-status.entity';
-import { SystemSetting } from './domain/system-setting.entity';
 import { UserSessionRepository } from './infrastructure/user-session.repository';
 import { SecurityEventRepository } from './infrastructure/security-event.repository';
 import { SecurityEventTypeRepository } from './infrastructure/security-event-type.repository';
 import { SessionStatusRepository } from './infrastructure/session-status.repository';
-import { SystemSettingRepository } from './infrastructure/system-setting.repository';
 import { UsersModule } from '@modules/users/users.module';
 import { GeoModule } from '@infrastructure/geo/geo.module';
+import { SettingsModule } from '@modules/settings/settings.module';
 
 @Module({
   imports: [
@@ -35,7 +34,6 @@ import { GeoModule } from '@infrastructure/geo/geo.module';
       SecurityEvent,
       SecurityEventType,
       SessionStatus,
-      SystemSetting,
     ]),
     PassportModule.register({ defaultStrategy: 'jwt' }),
     JwtModule.registerAsync({
@@ -48,6 +46,7 @@ import { GeoModule } from '@infrastructure/geo/geo.module';
     }),
     UsersModule,
     GeoModule,
+    SettingsModule,
   ],
   controllers: [AuthController],
   providers: [
@@ -64,7 +63,6 @@ import { GeoModule } from '@infrastructure/geo/geo.module';
     SecurityEventRepository,
     SecurityEventTypeRepository,
     SessionStatusRepository,
-    SystemSettingRepository,
   ],
   exports: [AuthService, SessionService, AuthSettingsService, SessionStatusRepository],
 })
