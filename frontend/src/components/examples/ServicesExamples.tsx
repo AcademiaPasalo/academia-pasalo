@@ -239,7 +239,7 @@ export function CourseEvaluationsExample({ courseCycleId }: { courseCycleId: str
  */
 export function CoursePageIntegrationExample({ courseId }: { courseId: string }) {
   const { cycle } = useActiveCycle();
-  const [evaluations, setEvaluations] = React.useState([]);
+  const [evaluations, setEvaluations] = React.useState<Evaluation[]>([]);
   const [loading, setLoading] = React.useState(true);
 
   useEffect(() => {
@@ -283,6 +283,3 @@ export function CoursePageIntegrationExample({ courseId }: { courseId: string })
     </div>
   );
 }
-
-// Agregar import de React para los ejemplos que lo necesitan
-import React from 'react';
