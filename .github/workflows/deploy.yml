@@ -83,12 +83,13 @@ jobs:
           GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
           GOOGLE_REDIRECT_URI: ${{ secrets.GOOGLE_REDIRECT_URI }}
           MAXMIND_LICENSE_KEY: ${{ secrets.MAXMIND_LICENSE_KEY }}
+          CORS_ORIGINS: ${{ secrets.CORS_ORIGINS }}
         with:
           host: ${{ secrets.EC2_HOST }}
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_SSH_KEY }}
           script_stop: true
-          envs: DOCKER_USERNAME,DOCKER_PASSWORD,DB_PASSWORD,DB_NAME,JWT_SECRET,GOOGLE_CLIENT_ID,GOOGLE_CLIENT_SECRET,GOOGLE_REDIRECT_URI,MAXMIND_LICENSE_KEY
+          envs: DOCKER_USERNAME,DOCKER_PASSWORD,DB_PASSWORD,DB_NAME,JWT_SECRET,GOOGLE_CLIENT_ID,GOOGLE_CLIENT_SECRET,GOOGLE_REDIRECT_URI,MAXMIND_LICENSE_KEY,CORS_ORIGINS
           script: |
             set -euo pipefail
 
@@ -133,17 +134,19 @@ jobs:
             echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
 
             # 5) Crear .env backend
-            cat > "$APP_DIR/backend/.env" <<EOF
-            GITHUB_REPOSITORY=${{ github.repository }}
-            DOCKER_USERNAME=$DOCKER_USERNAME
-            DB_PASSWORD=$DB_PASSWORD
-            DB_NAME=$DB_NAME
-            JWT_SECRET=$JWT_SECRET
-            GOOGLE_CLIENT_ID=$GOOGLE_CLIENT_ID
-            GOOGLE_CLIENT_SECRET=$GOOGLE_CLIENT_SECRET
-            GOOGLE_REDIRECT_URI=$GOOGLE_REDIRECT_URI
-            MAXMIND_LICENSE_KEY=$MAXMIND_LICENSE_KEY
-            EOF
+            cat > "$APP_DIR/backend/.env" <<'EOF'
+GITHUB_REPOSITORY=${{ github.repository }}
+DOCKER_USERNAME=$DOCKER_USERNAME
+DB_PASSWORD=$DB_PASSWORD
+DB_NAME=$DB_NAME
+JWT_SECRET=$JWT_SECRET
+GOOGLE_CLIENT_ID=$GOOGLE_CLIENT_ID
+GOOGLE_CLIENT_SECRET=$GOOGLE_CLIENT_SECRET
+GOOGLE_REDIRECT_URI=$GOOGLE_REDIRECT_URI
+MAXMIND_LICENSE_KEY=$MAXMIND_LICENSE_KEY
+CORS_ORIGINS=$CORS_ORIGINS
+EOF
+
             # 6) Deploy
             echo "Pull de imágenes"
             docker-compose -f "$COMPOSE_FILE" pull
