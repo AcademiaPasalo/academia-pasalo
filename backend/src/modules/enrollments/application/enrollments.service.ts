@@ -120,6 +120,22 @@ export class EnrollmentsService {
         throw new InternalServerErrorException('Inconsistencia en datos del ciclo.');
       }
 
+      const now = new Date();
+      const cycleEndDate = new Date(courseCycle.academicCycle.endDate);
+
+      if (cycleEndDate < now) {
+        this.logger.warn({
+          message: 'Intento de matrícula en ciclo finalizado',
+          courseCycleId: dto.courseCycleId,
+          academicCycleCode: courseCycle.academicCycle.code,
+          cycleEndDate: cycleEndDate.toISOString(),
+          userId: dto.userId,
+        });
+        throw new BadRequestException(
+          `No se puede matricular en el ciclo ${courseCycle.academicCycle.code} porque ya ha finalizado.`,
+        );
+      }
+
       const enrollment = await this.enrollmentRepository.create({
         userId: dto.userId,
         courseCycleId: dto.courseCycleId,

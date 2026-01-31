@@ -186,6 +186,20 @@ export class SessionService {
     refreshToken: string,
   ): Promise<UserSession> {
     const refreshTokenHash = this.hashRefreshToken(refreshToken);
+
+    // Verificar blacklist
+    const isBlacklisted = await this.cacheService.get(`blacklist:refresh:${refreshTokenHash}`);
+    if (isBlacklisted) {
+      this.logger.warn({
+        level: 'warn',
+        context: SessionService.name,
+        message: 'Intento de uso de refresh token revocado',
+        userId,
+        deviceId,
+      });
+      throw new UnauthorizedException('Token revocado');
+    }
+
     const session = await this.userSessionRepository.findByRefreshTokenHash(
       refreshTokenHash,
     );
@@ -392,11 +406,8 @@ export class SessionService {
       return { metadata, locationSource: 'gps' };
     }
 
-    // 5. GeoIP Lookup (Local DB)
     const geo = this.geoProvider.resolve(metadata.ipAddress);
     
-    // 6. Security Checks
-    // A. Impossible Travel Check
     if (!geo) {
       return { metadata, locationSource: 'none' };
     }
