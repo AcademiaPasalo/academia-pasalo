@@ -81,14 +81,19 @@ jobs:
           script: |
             set -e
             
-            cd /home/ubuntu/academia-pasalo || git clone https://github.com/${{ github.repository }}.git /home/ubuntu/academia-pasalo
-            cd /home/ubuntu/academia-pasalo
-            git pull origin main
+            cd /home/ubuntu || exit 1
+
+            if [ ! -d "academia-pasalo/.git" ]; then
+              git clone https://github.com/${{ github.repository }}.git academia-pasalo
+            fi
+
+            cd academia-pasalo
+            git fetch origin
+            git reset --hard origin/main
+            git clean -fd
             
-            # Log in to Docker Hub
             echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u ${{ secrets.DOCKER_USERNAME }} --password-stdin
             
-            # Create .env file
             cd backend
             cat > .env << EOF
             GITHUB_REPOSITORY=${{ github.repository }}
@@ -102,14 +107,11 @@ jobs:
             MAXMIND_LICENSE_KEY=${{ secrets.MAXMIND_LICENSE_KEY }}
             EOF
             
-            # Pull images and deploy
             docker-compose -f docker-compose.prod.yml pull
             docker-compose -f docker-compose.prod.yml down -v
             docker-compose -f docker-compose.prod.yml up -d
             
-            # Clean up
             docker image prune -f
             
             echo "✅ Deployment completed!"
-            docker ps 
-          
+            docker ps
