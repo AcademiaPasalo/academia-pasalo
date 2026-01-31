@@ -49,11 +49,11 @@ export class AuthSettingsService {
     return await this.settingsService.getPositiveInt('GEO_IP_ANOMALY_DISTANCE_KM');
   }
 
-  invalidateCache(key: SystemSettingKey): void {
-    this.settingsService.invalidateCache(key);
+  async invalidateCache(key: SystemSettingKey): Promise<void> {
+    await this.settingsService.invalidateCache(key);
   }
 
-  invalidateAllCache(): void {
-    this.settingsService.invalidateAllCache();
+  async invalidateAllCache(): Promise<void> {
+    await this.settingsService.invalidateAllCache();
   }
 }
