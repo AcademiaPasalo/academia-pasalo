@@ -43,7 +43,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     const activeStatusId =
       await this.sessionStatusService.getIdByCode('ACTIVE');
 
-    const session = await this.userSessionRepository.findById(payload.sessionId);
+    const session = await this.userSessionRepository.findByIdWithUser(payload.sessionId);
     if (
       !session ||
       !session.isActive ||
@@ -53,13 +53,11 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       throw new UnauthorizedException('Sesión inválida o expirada');
     }
 
-    const user = await this.usersService.findOne(payload.sub);
-
-    if (!user) {
+    if (!session.user) {
       throw new UnauthorizedException('Usuario no encontrado');
     }
 
-    const userWithSession: UserWithSession = { ...user, sessionId: payload.sessionId };
+    const userWithSession: UserWithSession = { ...session.user, sessionId: payload.sessionId };
     
     await this.cacheService.set(cacheKey, userWithSession, 3600);
     

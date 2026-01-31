@@ -54,6 +54,13 @@ export class EnrollmentsService {
             id: enrollment.courseCycle.course.id,
             code: enrollment.courseCycle.course.code,
             name: enrollment.courseCycle.course.name,
+            courseType: {
+              code: enrollment.courseCycle.course.courseType.code,
+              name: enrollment.courseCycle.course.courseType.name,
+            },
+            cycleLevel: {
+              name: enrollment.courseCycle.course.cycleLevel.name,
+            },
           },
           academicCycle: {
             id: enrollment.courseCycle.academicCycle.id,

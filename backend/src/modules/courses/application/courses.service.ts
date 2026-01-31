@@ -6,16 +6,19 @@ import { CycleLevelRepository } from '@modules/courses/infrastructure/cycle-leve
 import { CourseCycleRepository } from '@modules/courses/infrastructure/course-cycle.repository';
 import { EvaluationRepository } from '@modules/evaluations/infrastructure/evaluation.repository';
 import { CyclesService } from '@modules/cycles/application/cycles.service';
+import { RedisCacheService } from '@infrastructure/cache/redis-cache.service';
 import { Course } from '@modules/courses/domain/course.entity';
 import { CourseType } from '@modules/courses/domain/course-type.entity';
 import { CycleLevel } from '@modules/courses/domain/cycle-level.entity';
 import { CourseCycle } from '@modules/courses/domain/course-cycle.entity';
 import { CreateCourseDto } from '@modules/courses/dto/create-course.dto';
 import { AssignCourseToCycleDto } from '@modules/courses/dto/assign-course-to-cycle.dto';
+import { CourseContentResponseDto, EvaluationStatusDto } from '@modules/courses/dto/course-content.dto';
 
 @Injectable()
 export class CoursesService {
   private readonly logger = new Logger(CoursesService.name);
+  private readonly CONTENT_CACHE_TTL = 600;
 
   constructor(
     private readonly dataSource: DataSource,
@@ -25,6 +28,7 @@ export class CoursesService {
     private readonly courseCycleRepository: CourseCycleRepository,
     private readonly evaluationRepository: EvaluationRepository,
     private readonly cyclesService: CyclesService,
+    private readonly cacheService: RedisCacheService,
   ) {}
 
   async findAllCourses(): Promise<Course[]> {
@@ -114,5 +118,80 @@ export class CoursesService {
 
   async findAllLevels(): Promise<CycleLevel[]> {
     return await this.cycleLevelRepository.findAll();
+  }
+
+  async getCourseContent(courseCycleId: string, userId: string): Promise<CourseContentResponseDto> {
+    const cacheKey = `cache:content:cycle:${courseCycleId}:user:${userId}`;
+    
+    let rawData = await this.cacheService.get<{
+      cycle: CourseCycle;
+      evaluations: any[]; 
+    }>(cacheKey);
+
+    if (!rawData) {
+      const cycle = await this.courseCycleRepository.findById(courseCycleId);
+      if (!cycle) {
+        throw new NotFoundException('Ciclo del curso no encontrado');
+      }
+
+      const fullCycle = await this.courseCycleRepository.findFullById(courseCycleId);
+      if (!fullCycle) throw new NotFoundException('Curso no encontrado');
+
+      const evaluations = await this.evaluationRepository.findAllWithUserAccess(courseCycleId, userId);
+
+      rawData = { cycle: fullCycle, evaluations };
+      await this.cacheService.set(cacheKey, rawData, this.CONTENT_CACHE_TTL);
+    }
+
+    const now = new Date();
+    const cycleEndDate = new Date(rawData.cycle.academicCycle.endDate);
+    const isCurrent = now >= new Date(rawData.cycle.academicCycle.startDate) && now <= cycleEndDate;
+
+    return {
+      courseCycleId: rawData.cycle.id,
+      courseName: rawData.cycle.course.name,
+      courseCode: rawData.cycle.course.code,
+      cycleCode: rawData.cycle.academicCycle.code,
+      isCurrentCycle: isCurrent,
+      evaluations: rawData.evaluations.map((ev) => {
+        const evStartDate = new Date(ev.startDate);
+        const evEndDate = new Date(ev.endDate);
+        
+        const access = (ev.enrollmentEvaluations && ev.enrollmentEvaluations.length > 0) 
+          ? ev.enrollmentEvaluations[0] 
+          : null;
+
+        const statusDto = new EvaluationStatusDto();
+        
+        if (!access || !access.isActive) {
+          statusDto.status = 'LOCKED';
+          statusDto.hasAccess = false;
+          statusDto.accessStart = null;
+          statusDto.accessEnd = null;
+        } else {
+          statusDto.hasAccess = true;
+          statusDto.accessStart = new Date(access.accessStartDate);
+          statusDto.accessEnd = new Date(access.accessEndDate);
+
+          if (now > statusDto.accessEnd) {
+            statusDto.status = 'COMPLETED';
+          } else if (now < statusDto.accessStart) {
+            statusDto.status = 'UPCOMING';
+          } else {
+            statusDto.status = 'IN_PROGRESS';
+          }
+        }
+
+        return {
+          id: ev.id,
+          name: ev.name,
+          description: null,
+          evaluationType: ev.evaluationType.name,
+          startDate: evStartDate,
+          endDate: evEndDate,
+          userStatus: statusDto,
+        };
+      }),
+    };
   }
 }

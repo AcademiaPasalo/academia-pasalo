@@ -16,6 +16,7 @@ import { MaterialFolder } from '@modules/materials/domain/material-folder.entity
 import { Material } from '@modules/materials/domain/material.entity';
 import { FileResource } from '@modules/materials/domain/file-resource.entity';
 import { FileVersion } from '@modules/materials/domain/file-version.entity';
+import { User } from '@modules/users/domain/user.entity';
 import * as fs from 'fs';
 
 @Injectable()
@@ -199,8 +200,6 @@ export class MaterialsService {
             order: { versionNumber: 'DESC' }
         });
 
-        // Si por algún motivo no hay versión (caso borde), empezamos en 1. 
-        // Si hay, sumamos +1.
         const nextVersionNumber = lastVersion ? lastVersion.versionNumber + 1 : 1;
 
         const versionEntity = manager.create(FileVersion, {
@@ -231,8 +230,8 @@ export class MaterialsService {
     return result;
   }
 
-  async getRootFolders(userId: string, evaluationId: string): Promise<MaterialFolder[]> {
-    await this.checkAccess(userId, evaluationId);
+  async getRootFolders(user: User, evaluationId: string): Promise<MaterialFolder[]> {
+    await this.checkAccess(user.id, evaluationId);
     
     const cacheKey = `cache:materials:roots:eval:${evaluationId}`;
     const cached = await this.cacheService.get<MaterialFolder[]>(cacheKey);
@@ -245,11 +244,11 @@ export class MaterialsService {
     return roots;
   }
 
-  async getFolderContents(userId: string, folderId: string): Promise<{ folders: MaterialFolder[], materials: Material[] }> {
+  async getFolderContents(user: User, folderId: string): Promise<{ folders: MaterialFolder[], materials: Material[] }> {
     const folder = await this.folderRepository.findById(folderId);
     if (!folder) throw new NotFoundException('Carpeta no encontrada');
     
-    await this.checkAccess(userId, folder.evaluationId);
+    await this.checkAccess(user.id, folder.evaluationId);
 
     const cacheKey = `cache:materials:contents:folder:${folderId}`;
     const cached = await this.cacheService.get<{ folders: MaterialFolder[], materials: Material[] }>(cacheKey);
@@ -267,14 +266,14 @@ export class MaterialsService {
     return result;
   }
 
-  async download(userId: string, materialId: string): Promise<{ stream: NodeJS.ReadableStream; fileName: string; mimeType: string }> {
+  async download(user: User, materialId: string): Promise<{ stream: NodeJS.ReadableStream; fileName: string; mimeType: string }> {
     const material = await this.materialRepository.findById(materialId);
     if (!material) throw new NotFoundException('Material no encontrado');
 
     const folder = await this.folderRepository.findById(material.materialFolderId);
     if (!folder) throw new NotFoundException('Carpeta contenedora no encontrada');
 
-    await this.checkAccess(userId, folder.evaluationId);
+    await this.checkAccess(user.id, folder.evaluationId);
 
     const resource = material.fileResource;
     if (!resource) throw new InternalServerErrorException('Integridad de datos corrupta: Material sin recurso físico');
