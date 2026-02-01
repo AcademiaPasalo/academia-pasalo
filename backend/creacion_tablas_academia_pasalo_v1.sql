@@ -76,7 +76,7 @@ CREATE TABLE enrollment_type (
     code VARCHAR(32) NOT NULL,
     name VARCHAR(100) NOT NULL,
     PRIMARY KEY (id),
-    UNIQUE KEY uq_enrollment_type_code (code)
+    CONSTRAINT uq_enrollment_type_code UNIQUE (code)
 );
 
 CREATE TABLE user (
@@ -345,7 +345,7 @@ CREATE TABLE course_testimony (
   updated_at DATETIME,
   FOREIGN KEY (user_id) REFERENCES user(id),
   FOREIGN KEY (course_cycle_id) REFERENCES course_cycle(id),
-  UNIQUE (user_id, course_cycle_id)
+  CONSTRAINT uq_course_testimony_user_course_cycle UNIQUE (user_id, course_cycle_id)
 );
 
 CREATE TABLE featured_testimony (
@@ -358,7 +358,7 @@ CREATE TABLE featured_testimony (
   updated_at DATETIME,
   FOREIGN KEY (course_cycle_id) REFERENCES course_cycle(id),
   FOREIGN KEY (course_testimony_id) REFERENCES course_testimony(id),
-  UNIQUE (course_cycle_id, course_testimony_id)
+  CONSTRAINT uq_featured_testimony_course_cycle_testimony UNIQUE (course_cycle_id, course_testimony_id)
 );
 
    CREATE TABLE class_event (
