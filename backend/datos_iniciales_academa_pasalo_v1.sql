@@ -79,22 +79,13 @@ INSERT INTO enrollment_type (code, name) VALUES
 
 
 INSERT INTO system_setting (setting_key, setting_value, description, created_at) VALUES
--- Sesiones / tokens
-('REFRESH_TOKEN_TTL_DAYS', '7', 'Tiempo de vida del refresh token (días).', NOW()),
-('SESSION_INACTIVITY_WARNING_SECONDS', '600', 'Segundos antes del cierre de sesión por inactividad para mostrar advertencia.', NOW()),
-
 -- Umbrales por IP (detección gruesa, no distrital)
 ('GEO_IP_ANOMALY_TIME_WINDOW_MINUTES', '60', 'Ventana de tiempo (min) para evaluar anomalías de ubicación basadas en IP.', NOW()),
 ('GEO_IP_ANOMALY_DISTANCE_KM', '300', 'Distancia (km) para considerar anómala la ubicación basada en IP.', NOW()),
 
 -- Umbrales por geolocalización real (GPS / navegador)
 ('GEO_GPS_ANOMALY_TIME_WINDOW_MINUTES', '30', 'Ventana de tiempo (min) para evaluar anomalías usando geolocalización real.', NOW()),
-('GEO_GPS_ANOMALY_DISTANCE_KM', '10', 'Distancia (km) para detectar cambios anómalos a nivel urbano/distrital.', NOW()),
-
-('ACCESS_TOKEN_TTL_MINUTES', '180', 'Tiempo de vida del access token en minutos (3 horas).', NOW());
-INSERT INTO system_setting (setting_key, setting_value, description, created_at) VALUES
-('SESSION_EXPIRATION_WARNING_MINUTES', '10', 'Minutos antes de que expire el token para mostrar advertencia al
-     usuario.', NOW());
+('GEO_GPS_ANOMALY_DISTANCE_KM', '10', 'Distancia (km) para detectar cambios anómalos a nivel urbano/distrital.', NOW());
      
 INSERT INTO session_status (code, name) VALUES
 ('ACTIVE', 'Sesión Activa'),

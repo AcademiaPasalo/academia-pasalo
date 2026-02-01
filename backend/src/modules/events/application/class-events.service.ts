@@ -15,15 +15,16 @@ import { UserRepository } from '@modules/users/infrastructure/user.repository';
 import { RedisCacheService } from '@infrastructure/cache/redis-cache.service';
 import { ClassEvent } from '@modules/events/domain/class-event.entity';
 import { User } from '@modules/users/domain/user.entity';
+import { technicalSettings } from '@config/technical-settings';
 
 export type ClassEventStatus = 'CANCELADA' | 'PROGRAMADA' | 'EN_CURSO' | 'FINALIZADA';
 
 @Injectable()
 export class ClassEventsService {
   private readonly logger = new Logger(ClassEventsService.name);
-  private readonly EVENT_CACHE_TTL = 1800;
-  private readonly CYCLE_ACTIVE_CACHE_TTL = 3600;
-  private readonly PROFESSOR_ASSIGNMENT_CACHE_TTL = 3600;
+  private readonly EVENT_CACHE_TTL = technicalSettings.cache.events.classEventsCacheTtlSeconds;
+  private readonly CYCLE_ACTIVE_CACHE_TTL = technicalSettings.cache.events.cycleActiveCacheTtlSeconds;
+  private readonly PROFESSOR_ASSIGNMENT_CACHE_TTL = technicalSettings.cache.events.professorAssignmentCacheTtlSeconds;
 
   private getProfessorAssignmentCacheKey(courseCycleId: string, professorUserId: string): string {
     return `cache:cc-professor:cycle:${courseCycleId}:prof:${professorUserId}`;

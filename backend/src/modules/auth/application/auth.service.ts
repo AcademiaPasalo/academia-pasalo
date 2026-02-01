@@ -16,6 +16,7 @@ import { JwtPayload } from '@modules/auth/interfaces/jwt-payload.interface';
 import { RequestMetadata } from '@modules/auth/interfaces/request-metadata.interface';
 import { RedisCacheService } from '@infrastructure/cache/redis-cache.service';
 import { createHash } from 'crypto';
+import { technicalSettings } from '@config/technical-settings';
 
 @Injectable()
 export class AuthService {
@@ -109,7 +110,7 @@ export class AuthService {
 
     // Invalidar el token antiguo (Blacklist)
     const oldTokenHash = createHash('sha256').update(refreshToken).digest('hex');
-    const ttlSeconds = 7 * 24 * 60 * 60; // 7 días
+    const ttlSeconds = technicalSettings.auth.tokens.refreshTokenBlacklistTtlSeconds;
     await this.cacheService.set(
       `blacklist:refresh:${oldTokenHash}`,
       { revokedAt: new Date().toISOString(), reason: 'TOKEN_ROTATED' },

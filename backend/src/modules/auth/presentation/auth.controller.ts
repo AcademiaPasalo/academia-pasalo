@@ -21,6 +21,7 @@ import { JwtAuthGuard } from '@common/guards/jwt-auth.guard';
 import { CurrentUser } from '@common/decorators/current-user.decorator';
 import type { UserWithSession } from '@modules/auth/strategies/jwt.strategy';
 import { RequestMetadata } from '@modules/auth/interfaces/request-metadata.interface';
+import { technicalSettings } from '@config/technical-settings';
 
 @Controller('auth')
 export class AuthController {
@@ -47,7 +48,7 @@ export class AuthController {
       {
         accessToken,
         refreshToken,
-        expiresIn: 900,
+        expiresIn: technicalSettings.auth.tokens.authResponseExpiresInSeconds,
         sessionStatus,
         concurrentSessionId,
         user: userResponse,
@@ -71,7 +72,7 @@ export class AuthController {
       {
         accessToken,
         refreshToken,
-        expiresIn: 900,
+        expiresIn: technicalSettings.auth.tokens.authResponseExpiresInSeconds,
         user: null, 
       },
       { excludeExtraneousValues: true },

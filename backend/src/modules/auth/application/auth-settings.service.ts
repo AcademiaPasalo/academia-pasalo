@@ -1,10 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { SettingsService } from '@modules/settings/application/settings.service';
+import { technicalSettings } from '@config/technical-settings';
 
 export type SystemSettingKey =
-  | 'REFRESH_TOKEN_TTL_DAYS'
-  | 'ACCESS_TOKEN_TTL_MINUTES'
-  | 'SESSION_EXPIRATION_WARNING_MINUTES'
   | 'GEO_IP_ANOMALY_TIME_WINDOW_MINUTES'
   | 'GEO_IP_ANOMALY_DISTANCE_KM'
   | 'GEO_GPS_ANOMALY_TIME_WINDOW_MINUTES'
@@ -22,15 +20,15 @@ export class AuthSettingsService {
   }
 
   async getRefreshTokenTtlDays(): Promise<number> {
-    return await this.settingsService.getPositiveInt('REFRESH_TOKEN_TTL_DAYS');
+    return technicalSettings.auth.tokens.refreshTokenTtlDays;
   }
 
   async getAccessTokenTtlMinutes(): Promise<number> {
-    return await this.settingsService.getPositiveInt('ACCESS_TOKEN_TTL_MINUTES');
+    return technicalSettings.auth.tokens.accessTokenTtlMinutes;
   }
 
   async getSessionExpirationWarningMinutes(): Promise<number> {
-    return await this.settingsService.getPositiveInt('SESSION_EXPIRATION_WARNING_MINUTES');
+    return technicalSettings.auth.tokens.sessionExpirationWarningMinutes;
   }
 
   async getGeoGpsTimeWindowMinutes(): Promise<number> {
