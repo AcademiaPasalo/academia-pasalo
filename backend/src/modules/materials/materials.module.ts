@@ -22,6 +22,7 @@ import { DeletionRequestRepository } from './infrastructure/deletion-request.rep
 import { MaterialCatalogRepository } from './infrastructure/material-catalog.repository';
 import { StorageModule } from '@infrastructure/storage/storage.module';
 import { EnrollmentsModule } from '@modules/enrollments/enrollments.module';
+import { UsersModule } from '@modules/users/users.module';
 
 @Module({
   imports: [
@@ -37,6 +38,7 @@ import { EnrollmentsModule } from '@modules/enrollments/enrollments.module';
     ]),
     StorageModule,
     EnrollmentsModule,
+    UsersModule,
   ],
   controllers: [
     MaterialsController, 

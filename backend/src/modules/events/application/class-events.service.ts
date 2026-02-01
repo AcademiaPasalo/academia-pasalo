@@ -241,22 +241,28 @@ export class ClassEventsService {
     return await this.checkUserAuthorization(userId, event.evaluationId);
   }
 
-  /**
-   * Orquestador de acceso. Separa la lógica de roles de la de matrícula.
-   */
   async checkUserAuthorization(userId: string, evaluationId: string): Promise<boolean> {
     const user = await this.userRepository.findById(userId);
     if (!user) return false;
 
-    const roleCodes = (user.roles || []).map(r => r.code);
-    const isStaff = roleCodes.some(r => ['ADMIN', 'SUPER_ADMIN', 'PROFESSOR'].includes(r));
-    
-    if (isStaff) return true;
+    const roleCodes = (user.roles || []).map((r) => r.code);
 
-    return await this.hasAccessToEvaluation(userId, evaluationId);
-  }
+    if (roleCodes.some((r) => ['ADMIN', 'SUPER_ADMIN'].includes(r))) {
+      return true;
+    }
 
-  async hasAccessToEvaluation(userId: string, evaluationId: string): Promise<boolean> {
+    if (roleCodes.includes('PROFESSOR')) {
+      const evaluation = await this.evaluationRepository.findByIdWithCycle(evaluationId);
+      if (!evaluation) return false;
+
+      const isAssigned = await this.dataSource.query(
+        'SELECT 1 FROM course_cycle_professor WHERE course_cycle_id = ? AND professor_user_id = ? LIMIT 1',
+        [evaluation.courseCycleId, userId],
+      );
+
+      return isAssigned.length > 0;
+    }
+
     return await this.enrollmentEvaluationRepository.checkAccess(userId, evaluationId);
   }
 
@@ -302,7 +308,6 @@ export class ClassEventsService {
       await this.cacheService.del(`cache:class-event:${eventId}`);
     }
 
-    // Invalidar todos los calendarios unificados para asegurar que los cambios se reflejen globalmente
     await this.cacheService.invalidateGroup('cache:my-schedule:*');
   }
 

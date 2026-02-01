@@ -45,4 +45,12 @@ export class EnrollmentRepository {
       .orderBy('enrollment.enrolledAt', 'DESC')
       .getMany();
   }
+
+  async findById(id: string): Promise<Enrollment | null> {
+    return await this.ormRepository.findOne({ where: { id } });
+  }
+
+  async update(id: string, data: Partial<Enrollment>): Promise<void> {
+    await this.ormRepository.update(id, data);
+  }
 }

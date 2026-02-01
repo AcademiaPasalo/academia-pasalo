@@ -233,4 +233,25 @@ export class EnrollmentsService {
       return enrollment;
     });
   }
+
+  async cancelEnrollment(enrollmentId: string): Promise<void> {
+    const enrollment = await this.enrollmentRepository.findById(enrollmentId);
+    if (!enrollment) {
+      throw new BadRequestException('Matrícula no encontrada.');
+    }
+
+    await this.enrollmentRepository.update(enrollmentId, {
+      cancelledAt: new Date(),
+    });
+
+    await this.cacheService.del(`cache:enrollment:user:${enrollment.userId}:dashboard`);
+    await this.cacheService.invalidateGroup(`cache:access:user:${enrollment.userId}:*`);
+
+    this.logger.log(JSON.stringify({
+      message: 'Matrícula cancelada e invalidación de caché procesada',
+      userId: enrollment.userId,
+      enrollmentId,
+      timestamp: new Date().toISOString(),
+    }));
+  }
 }
