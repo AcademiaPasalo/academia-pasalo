@@ -4,6 +4,7 @@ import { CourseRepository } from '@modules/courses/infrastructure/course.reposit
 import { CourseTypeRepository } from '@modules/courses/infrastructure/course-type.repository';
 import { CycleLevelRepository } from '@modules/courses/infrastructure/cycle-level.repository';
 import { CourseCycleRepository } from '@modules/courses/infrastructure/course-cycle.repository';
+import { CourseCycleProfessorRepository } from '@modules/courses/infrastructure/course-cycle-professor.repository';
 import { EvaluationRepository } from '@modules/evaluations/infrastructure/evaluation.repository';
 import { CyclesService } from '@modules/cycles/application/cycles.service';
 import { RedisCacheService } from '@infrastructure/cache/redis-cache.service';
@@ -26,6 +27,7 @@ type EvaluationWithAccess = Evaluation & {
 export class CoursesService {
   private readonly logger = new Logger(CoursesService.name);
   private readonly CONTENT_CACHE_TTL = 600;
+  private readonly PROFESSOR_ASSIGNMENT_CACHE_TTL = 3600;
 
   constructor(
     private readonly dataSource: DataSource,
@@ -33,10 +35,15 @@ export class CoursesService {
     private readonly courseTypeRepository: CourseTypeRepository,
     private readonly cycleLevelRepository: CycleLevelRepository,
     private readonly courseCycleRepository: CourseCycleRepository,
+    private readonly courseCycleProfessorRepository: CourseCycleProfessorRepository,
     private readonly evaluationRepository: EvaluationRepository,
     private readonly cyclesService: CyclesService,
     private readonly cacheService: RedisCacheService,
   ) {}
+
+  private getProfessorAssignmentCacheKey(courseCycleId: string, professorUserId: string): string {
+    return `cache:cc-professor:cycle:${courseCycleId}:prof:${professorUserId}`;
+  }
 
   async findAllCourses(): Promise<Course[]> {
     return await this.courseRepository.findAll();
@@ -117,6 +124,34 @@ export class CoursesService {
 
       return courseCycle;
     });
+  }
+
+  async assignProfessorToCourseCycle(courseCycleId: string, professorUserId: string): Promise<void> {
+    const cycle = await this.courseCycleRepository.findById(courseCycleId);
+    if (!cycle) {
+      throw new NotFoundException('Ciclo del curso no encontrado');
+    }
+
+    await this.dataSource.transaction(async (manager) => {
+      await this.courseCycleProfessorRepository.upsertAssign(courseCycleId, professorUserId, manager);
+    });
+
+    const cacheKey = this.getProfessorAssignmentCacheKey(courseCycleId, professorUserId);
+    await this.cacheService.del(cacheKey);
+  }
+
+  async revokeProfessorFromCourseCycle(courseCycleId: string, professorUserId: string): Promise<void> {
+    const cycle = await this.courseCycleRepository.findById(courseCycleId);
+    if (!cycle) {
+      throw new NotFoundException('Ciclo del curso no encontrado');
+    }
+
+    await this.dataSource.transaction(async (manager) => {
+      await this.courseCycleProfessorRepository.revoke(courseCycleId, professorUserId, manager);
+    });
+
+    const cacheKey = this.getProfessorAssignmentCacheKey(courseCycleId, professorUserId);
+    await this.cacheService.del(cacheKey);
   }
 
   async findAllTypes(): Promise<CourseType[]> {
