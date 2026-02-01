@@ -54,36 +54,28 @@ describe('AuthSettingsService', () => {
 
   describe('getRefreshTokenTtlDays', () => {
     it('debe retornar el TTL de refresh token en días', async () => {
-      settingsService.getPositiveInt.mockResolvedValue(7);
-
       const result = await service.getRefreshTokenTtlDays();
 
       expect(result).toBe(7);
-      expect(settingsService.getPositiveInt).toHaveBeenCalledWith('REFRESH_TOKEN_TTL_DAYS');
+      expect(settingsService.getPositiveInt).not.toHaveBeenCalled();
     });
   });
 
   describe('getAccessTokenTtlMinutes', () => {
     it('debe retornar el TTL de access token en minutos', async () => {
-      settingsService.getPositiveInt.mockResolvedValue(15);
-
       const result = await service.getAccessTokenTtlMinutes();
 
-      expect(result).toBe(15);
-      expect(settingsService.getPositiveInt).toHaveBeenCalledWith('ACCESS_TOKEN_TTL_MINUTES');
+      expect(result).toBe(180);
+      expect(settingsService.getPositiveInt).not.toHaveBeenCalled();
     });
   });
 
   describe('getSessionExpirationWarningMinutes', () => {
     it('debe retornar los minutos de advertencia de expiración', async () => {
-      settingsService.getPositiveInt.mockResolvedValue(5);
-
       const result = await service.getSessionExpirationWarningMinutes();
 
-      expect(result).toBe(5);
-      expect(settingsService.getPositiveInt).toHaveBeenCalledWith(
-        'SESSION_EXPIRATION_WARNING_MINUTES',
-      );
+      expect(result).toBe(10);
+      expect(settingsService.getPositiveInt).not.toHaveBeenCalled();
     });
   });
 
@@ -141,10 +133,10 @@ describe('AuthSettingsService', () => {
 
   describe('invalidateCache', () => {
     it('debe invalidar un setting específico', () => {
-      service.invalidateCache('ACCESS_TOKEN_TTL_MINUTES');
+      service.invalidateCache('ACTIVE_CYCLE_ID');
 
       expect(settingsService.invalidateCache).toHaveBeenCalledWith(
-        'ACCESS_TOKEN_TTL_MINUTES',
+        'ACTIVE_CYCLE_ID',
       );
     });
   });

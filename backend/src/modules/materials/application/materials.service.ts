@@ -26,11 +26,12 @@ import { FileResource } from '@modules/materials/domain/file-resource.entity';
 import { FileVersion } from '@modules/materials/domain/file-version.entity';
 import { User } from '@modules/users/domain/user.entity';
 import * as fs from 'fs';
+import { technicalSettings } from '@config/technical-settings';
 
 @Injectable()
 export class MaterialsService {
   private readonly logger = new Logger(MaterialsService.name);
-  private readonly CACHE_TTL = 300;
+  private readonly CACHE_TTL = technicalSettings.cache.materials.materialsExplorerCacheTtlSeconds;
 
   constructor(
     private readonly dataSource: DataSource,
@@ -79,17 +80,7 @@ export class MaterialsService {
   async uploadMaterial(userId: string, dto: UploadMaterialDto, file: Express.Multer.File): Promise<Material> {
     if (!file) throw new BadRequestException('Archivo requerido');
 
-    const allowedMimeTypes = [
-      'application/pdf',
-      'image/jpeg',
-      'image/png',
-      'image/gif',
-      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-      'application/vnd.openxmlformats-officedocument.presentationml.presentation',
-      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-      'text/plain',
-      'application/zip',
-    ];
+    const allowedMimeTypes: readonly string[] = technicalSettings.uploads.materials.allowedMimeTypes;
 
     if (!allowedMimeTypes.includes(file.mimetype)) {
       throw new BadRequestException(
@@ -98,8 +89,8 @@ export class MaterialsService {
     }
 
     if (file.mimetype === 'application/pdf') {
-      const pdfMagic = file.buffer.slice(0, 4).toString('hex');
-      if (pdfMagic !== '25504446') {
+      const pdfMagic = file.buffer.subarray(0, 4).toString('hex');
+      if (pdfMagic !== technicalSettings.uploads.materials.pdfMagicHeaderHex) {
         throw new BadRequestException('El archivo no es un PDF válido');
       }
     }
