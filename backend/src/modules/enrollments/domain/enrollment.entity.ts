@@ -31,7 +31,7 @@ export class Enrollment {
   @JoinColumn({ name: 'user_id' })
   user: User;
 
-  @ManyToOne(() => CourseCycle)
+  @ManyToOne(() => CourseCycle, (courseCycle) => courseCycle.enrollments)
   @JoinColumn({ name: 'course_cycle_id' })
   courseCycle: CourseCycle;
 

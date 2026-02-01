@@ -225,12 +225,11 @@ export class MaterialsService {
           finalResource = existingResource;
         }
 
-        const lastVersion = await manager.findOne(FileVersion, {
-            where: { fileResourceId: finalResource.id },
-            order: { versionNumber: 'DESC' }
+        const currentVersion = await manager.findOne(FileVersion, {
+          where: { id: freshMaterial.fileVersionId },
         });
 
-        const nextVersionNumber = lastVersion ? lastVersion.versionNumber + 1 : 1;
+        const nextVersionNumber = (currentVersion?.versionNumber || 0) + 1;
 
         const versionEntity = manager.create(FileVersion, {
           fileResourceId: finalResource.id,

@@ -3,6 +3,7 @@ import { Course } from '@modules/courses/domain/course.entity';
 import { AcademicCycle } from '@modules/cycles/domain/academic-cycle.entity';
 import { Evaluation } from '@modules/evaluations/domain/evaluation.entity';
 import { CourseCycleProfessor } from '@modules/courses/domain/course-cycle-professor.entity';
+import { Enrollment } from '@modules/enrollments/domain/enrollment.entity';
 
 @Entity('course_cycle')
 export class CourseCycle {
@@ -28,4 +29,7 @@ export class CourseCycle {
 
   @OneToMany(() => CourseCycleProfessor, (ccp) => ccp.courseCycle)
   professors: CourseCycleProfessor[];
+
+  @OneToMany(() => Enrollment, (enrollment) => enrollment.courseCycle)
+  enrollments: Enrollment[];
 }

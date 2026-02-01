@@ -76,7 +76,7 @@ CREATE TABLE enrollment_type (
     code VARCHAR(32) NOT NULL,
     name VARCHAR(100) NOT NULL,
     PRIMARY KEY (id),
-    UNIQUE KEY uq_enrollment_type_code (code)
+    CONSTRAINT uq_enrollment_type_code UNIQUE (code)
 );
 
 CREATE TABLE user (
@@ -193,7 +193,7 @@ CREATE TABLE enrollment_evaluation (
   is_active BOOLEAN NOT NULL,
   revoked_at DATETIME,
   revoked_by BIGINT,
-  UNIQUE (enrollment_id, evaluation_id),
+  CONSTRAINT uq_enrollment_evaluation_access UNIQUE (enrollment_id, evaluation_id),
   FOREIGN KEY (enrollment_id) REFERENCES enrollment(id),
   FOREIGN KEY (evaluation_id) REFERENCES evaluation(id),
   FOREIGN KEY (revoked_by) REFERENCES user(id)
@@ -345,7 +345,7 @@ CREATE TABLE course_testimony (
   updated_at DATETIME,
   FOREIGN KEY (user_id) REFERENCES user(id),
   FOREIGN KEY (course_cycle_id) REFERENCES course_cycle(id),
-  UNIQUE (user_id, course_cycle_id)
+  CONSTRAINT uq_course_testimony_user_course_cycle UNIQUE (user_id, course_cycle_id)
 );
 
 CREATE TABLE featured_testimony (
@@ -358,8 +358,38 @@ CREATE TABLE featured_testimony (
   updated_at DATETIME,
   FOREIGN KEY (course_cycle_id) REFERENCES course_cycle(id),
   FOREIGN KEY (course_testimony_id) REFERENCES course_testimony(id),
-  UNIQUE (course_cycle_id, course_testimony_id)
+  CONSTRAINT uq_featured_testimony_course_cycle_testimony UNIQUE (course_cycle_id, course_testimony_id)
 );
+
+   CREATE TABLE class_event (
+     id BIGINT PRIMARY KEY AUTO_INCREMENT,
+     evaluation_id BIGINT NOT NULL,
+     session_number INT NOT NULL,
+     title VARCHAR(255) NOT NULL,
+     topic VARCHAR(120) NOT NULL,
+     start_datetime DATETIME NOT NULL,
+     end_datetime DATETIME NOT NULL,
+     meeting_link VARCHAR(500) NOT NULL,
+     is_cancelled BOOLEAN NOT NULL DEFAULT FALSE,
+     created_by BIGINT NOT NULL,
+     created_at DATETIME NOT NULL,
+     updated_at DATETIME,
+
+     CONSTRAINT fk_class_event_evaluation FOREIGN KEY (evaluation_id) REFERENCES evaluation(id) ON DELETE CASCADE,
+     CONSTRAINT fk_class_event_creator FOREIGN KEY (created_by) REFERENCES user(id),
+     CONSTRAINT uq_evaluation_session_number UNIQUE (evaluation_id, session_number),
+     CONSTRAINT chk_datetime_order CHECK (end_datetime > start_datetime)
+ );
+
+   CREATE TABLE class_event_professor (
+     class_event_id BIGINT NOT NULL,
+     professor_user_id BIGINT NOT NULL,
+     assigned_at DATETIME NOT NULL,
+     revoked_at DATETIME,
+     PRIMARY KEY (class_event_id, professor_user_id),
+     CONSTRAINT fk_class_event_professor_event FOREIGN KEY (class_event_id) REFERENCES class_event(id) ON DELETE CASCADE,
+     CONSTRAINT fk_class_event_professor_user FOREIGN KEY (professor_user_id) REFERENCES user(id)
+   );
 
 CREATE UNIQUE INDEX idx_user_email ON user(email);
 
@@ -455,5 +485,15 @@ ON enrollment (user_id, enrollment_status_id, cancelled_at);
 
 CREATE INDEX idx_user_session_concurrent_check
 ON user_session(user_id, session_status_id, expires_at, device_id);
+
+
+CREATE INDEX idx_class_event_evaluation ON class_event(evaluation_id);
+CREATE INDEX idx_class_event_datetime ON class_event(start_datetime, end_datetime);
+CREATE INDEX idx_class_event_cancelled ON class_event(is_cancelled);
+CREATE INDEX idx_class_event_creator ON class_event(created_by);
+
+CREATE INDEX idx_class_event_professor_event ON class_event_professor(class_event_id);
+CREATE INDEX idx_class_event_professor_user ON class_event_professor(professor_user_id);
+CREATE INDEX idx_class_event_professor_active ON class_event_professor(class_event_id, revoked_at);
 
 

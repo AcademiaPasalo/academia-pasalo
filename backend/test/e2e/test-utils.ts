@@ -1,18 +1,25 @@
 import { DataSource } from 'typeorm';
 import { INestApplication } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
-import request from 'supertest';
 import { AcademicCycle } from '@modules/cycles/domain/academic-cycle.entity';
 import { Course } from '@modules/courses/domain/course.entity';
 import { CourseCycle } from '@modules/courses/domain/course-cycle.entity';
 import { Evaluation } from '@modules/evaluations/domain/evaluation.entity';
-import { User } from '@modules/users/domain/user.entity';
+import { User, PhotoSource } from '@modules/users/domain/user.entity';
+import { Role } from '@modules/users/domain/role.entity';
+import { RedisCacheService } from '@infrastructure/cache/redis-cache.service';
 
 export class TestSeeder {
   private jwtService: JwtService;
+  private cacheService: RedisCacheService;
 
   constructor(private dataSource: DataSource, private app: INestApplication) {
     this.jwtService = app.get(JwtService);
+    this.cacheService = app.get(RedisCacheService);
+  }
+
+  private sleep(ms: number) {
+    return new Promise(resolve => setTimeout(resolve, ms));
   }
 
   static generateUniqueEmail(prefix: string): string {
@@ -33,10 +40,10 @@ export class TestSeeder {
     const typeRepo = this.dataSource.getRepository('CourseType');
     const levelRepo = this.dataSource.getRepository('CycleLevel');
     
-    let type = await typeRepo.findOne({ where: {} });
+    let type = await typeRepo.findOne({ where: { code: 'REG' } });
     if (!type) type = await typeRepo.save(typeRepo.create({ code: 'REG', name: 'Regular' }));
     
-    let level = await levelRepo.findOne({ where: {} });
+    let level = await levelRepo.findOne({ where: { levelNumber: 1 } });
     if (!level) level = await levelRepo.save(levelRepo.create({ levelNumber: 1, name: 'L1' }));
 
     const repo = this.dataSource.getRepository(Course);
@@ -50,8 +57,6 @@ export class TestSeeder {
   }
 
   async linkCourseCycle(courseId: string, cycleId: string): Promise<CourseCycle> {
-    // We need an admin token for this, or simulate DB insertion directly
-    // To simplify, we'll do DB insertion directly as this is a setup step
     const repo = this.dataSource.getRepository(CourseCycle);
     const existing = await repo.findOne({ where: { courseId, academicCycleId: cycleId } });
     if (existing) return existing;
@@ -61,14 +66,12 @@ export class TestSeeder {
       academicCycleId: cycleId
     }));
 
-    // Create Banco de Enunciados manually as we skipped the service logic
     const evalRepo = this.dataSource.getRepository(Evaluation);
     const typeRepo = this.dataSource.getRepository('EvaluationType');
     
     let bankType = await typeRepo.findOne({ where: { code: 'BANCO_ENUNCIADOS' } });
     if (!bankType) bankType = await typeRepo.save(typeRepo.create({ code: 'BANCO_ENUNCIADOS', name: 'Banco' }));
 
-    // Get cycle dates
     const cycle = await this.dataSource.getRepository(AcademicCycle).findOne({ where: { id: cycleId } });
 
     if (cycle) {
@@ -81,7 +84,6 @@ export class TestSeeder {
         }));
     }
 
-    // Ensure EnrollmentTypes exist
     const typeRepoEnroll = this.dataSource.getRepository('EnrollmentType');
     const types = [
       { code: 'FULL', name: 'Curso Completo' },
@@ -94,7 +96,6 @@ export class TestSeeder {
       }
     }
 
-    // Ensure EnrollmentStatus exists
     const statusRepo = this.dataSource.getRepository('EnrollmentStatus');
     let activeStatus = await statusRepo.findOne({ where: { code: 'ACTIVE' } });
     if (!activeStatus) {
@@ -137,58 +138,57 @@ export class TestSeeder {
 
   async createAuthenticatedUser(email: string, roles: string[] = ['STUDENT']): Promise<{ user: User; token: string }> {
     const userRepo = this.dataSource.getRepository(User);
-    let user = await userRepo.findOne({ where: { email } });
+    const roleRepo = this.dataSource.getRepository(Role);
+    
+    let user = await userRepo.findOne({ where: { email }, relations: { roles: true } });
     
     if (!user) {
       user = await userRepo.save(userRepo.create({ 
-        email, firstName: 'Test', photoSource: 'none', createdAt: new Date() 
+        email, firstName: 'Test', photoSource: PhotoSource.NONE, createdAt: new Date() 
       }));
     }
 
-    // Create Session Status
-    const statusRepo = this.dataSource.getRepository('SessionStatus');
-    let activeStatus = await statusRepo.findOne({ where: { code: 'ACTIVE' } });
-    if (!activeStatus) activeStatus = await statusRepo.save(statusRepo.create({ code: 'ACTIVE', name: 'Active' }));
+    // 1. Limpieza absoluta de roles previos
+    await this.dataSource.query('DELETE FROM user_role WHERE user_id = ?', [user.id]);
 
-    // Create Session
-    const sessionRepo = this.dataSource.getRepository('UserSession');
-    const session = await sessionRepo.save(sessionRepo.create({
-      userId: user.id,
-      deviceId: 'test-device',
-      ipAddress: '127.0.0.1',
-      refreshTokenHash: 'dummy',
-      sessionStatusId: activeStatus.id,
-      isActive: true,
-      expiresAt: new Date(Date.now() + 1000 * 60 * 60), // 1 hour
-      lastActivityAt: new Date(),
-      createdAt: new Date()
-    }));
-
-    // Assign Roles in DB
-    const roleRepo = this.dataSource.getRepository('Role');
+    // 2. Asignar nuevos roles
+    const userRoles: Role[] = [];
     for (const roleCode of roles) {
       let role = await roleRepo.findOne({ where: { code: roleCode } });
       if (!role) {
         role = await roleRepo.save(roleRepo.create({ code: roleCode, name: roleCode }));
       }
-      
-      // Check if user already has this role to avoid duplicates
-      const existingUserRole = await this.dataSource.createQueryBuilder()
-        .select('ur.user_id')
-        .from('user_role', 'ur')
-        .where('ur.user_id = :userId AND ur.role_id = :roleId', { userId: user.id, roleId: role.id })
-        .getRawOne();
-
-      if (!existingUserRole) {
-        await this.dataSource.createQueryBuilder()
-          .insert()
-          .into('user_role')
-          .values({ user_id: user.id, role_id: role.id })
-          .execute();
-      }
+      userRoles.push(role);
     }
+    user.roles = userRoles;
+    await userRepo.save(user);
 
-    // Generate Token
+    // 3. Pequeño respiro para la DB
+    await this.sleep(50);
+
+    // 4. Crear Sesión
+    const statusRepo = this.dataSource.getRepository('SessionStatus');
+    let activeStatus = await statusRepo.findOne({ where: { code: 'ACTIVE' } });
+    if (!activeStatus) activeStatus = await statusRepo.save(statusRepo.create({ code: 'ACTIVE', name: 'Active' }));
+
+    const sessionRepo = this.dataSource.getRepository('UserSession');
+    const session = await sessionRepo.save(sessionRepo.create({
+      userId: user.id,
+      deviceId: 'device-' + Date.now(),
+      ipAddress: '127.0.0.1',
+      refreshTokenHash: 'hash-' + Date.now(),
+      sessionStatusId: activeStatus.id,
+      isActive: true,
+      expiresAt: new Date(Date.now() + 1000 * 60 * 60), 
+      lastActivityAt: new Date(),
+      createdAt: new Date()
+    }));
+
+    // 5. Limpieza de Caché
+    await this.cacheService.del(`cache:session:${session.id}:user`);
+    await this.cacheService.invalidateGroup(`cache:access:user:${user.id}:*`);
+
+    // 6. Token
     const payload = {
       sub: user.id,
       email: user.email,
@@ -197,6 +197,7 @@ export class TestSeeder {
     };
     
     const token = this.jwtService.sign(payload);
+    user.roles = roles.map(code => ({ code } as any));
 
     return { user, token };
   }
@@ -206,7 +207,7 @@ export class TestSeeder {
     let user = await repo.findOne({ where: { email } });
     if (!user) {
       user = await repo.save(repo.create({ 
-        email, firstName: 'Test', photoSource: 'none', createdAt: new Date() 
+        email, firstName: 'Test', photoSource: PhotoSource.NONE, createdAt: new Date() 
       }));
     }
     return user;

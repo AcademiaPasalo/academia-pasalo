@@ -33,6 +33,12 @@ INSERT INTO evaluation_type (code, name) VALUES
 ('TUTORING', 'Tutoría Especializada'),
 ('BANCO_ENUNCIADOS', 'Banco de Enunciados');
 
+INSERT INTO academic_cycle (code, start_date, end_date, created_at)
+VALUES ('2026-0', '2026-01-09', '2026-03-06', NOW());
+
+INSERT INTO system_setting (setting_key, setting_value, description, created_at)
+VALUES ('ACTIVE_CYCLE_ID', '1', 'ID del ciclo académico actual y activo en el sistema', NOW());
+
 INSERT INTO folder_status (code, name) VALUES
 ('ACTIVE', 'Activa'),
 ('HIDDEN', 'Oculta'),
@@ -104,4 +110,3 @@ VALUES
 INSERT INTO user_role (user_id, role_id) 
 VALUES 
 (LAST_INSERT_ID(), 1);
-

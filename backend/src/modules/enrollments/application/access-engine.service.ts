@@ -21,6 +21,14 @@ export class AccessEngineService {
 
     const hasAccess = await this.enrollmentEvaluationRepository.checkAccess(userId, evaluationId);
 
+    this.logger.debug({
+      message: 'Access check result',
+      userId,
+      evaluationId,
+      hasAccess,
+      timestamp: new Date().toISOString(),
+    });
+
     await this.cacheService.set(cacheKey, hasAccess, 3600);
 
     return hasAccess;

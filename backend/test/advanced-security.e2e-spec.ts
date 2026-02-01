@@ -8,6 +8,7 @@ import { SecurityEventService } from '../src/modules/auth/application/security-e
 import { SessionStatusService } from '../src/modules/auth/application/session-status.service';
 import { AuthSettingsService } from '../src/modules/auth/application/auth-settings.service';
 import { GeolocationService } from '../src/modules/auth/application/geolocation.service';
+import { SessionAnomalyDetectorService } from '../src/modules/auth/application/session-anomaly-detector.service';
 import { UsersService } from '../src/modules/users/application/users.service';
 import { UserSessionRepository } from '../src/modules/auth/infrastructure/user-session.repository';
 import { SecurityEventRepository } from '../src/modules/auth/infrastructure/security-event.repository';
@@ -20,6 +21,7 @@ import { TokenService } from '../src/modules/auth/application/token.service';
 import { GoogleProviderService } from '../src/modules/auth/application/google-provider.service';
 import { GeoProvider } from '../src/common/interfaces/geo-provider.interface';
 import { ConfigService } from '@nestjs/config';
+import { JwtStrategy } from '../src/modules/auth/strategies/jwt.strategy';
 
 describe('Advanced Security Scenarios (Offensive Testing)', () => {
   let app: INestApplication;
@@ -57,25 +59,27 @@ describe('Advanced Security Scenarios (Offensive Testing)', () => {
     findOtherActiveSession: jest.fn(),
     findLatestSessionByUserId: jest.fn(),
     findByRefreshTokenHash: jest.fn(),
+    findByRefreshTokenHashForUpdate: jest.fn(),
+    findById: jest.fn(),
+    findByIdWithUser: jest.fn().mockResolvedValue({
+      id: '100',
+      isActive: true,
+      sessionStatusId: '1',
+      expiresAt: new Date(Date.now() + 1000000),
+      user: mockUser,
+    }),
     update: jest.fn(),
     deactivateSession: jest.fn(),
-    findById: jest.fn(),
   };
 
-  const mockRedisCacheService = {
-    del: jest.fn(),
-    get: jest.fn(),
-    set: jest.fn(),
-  };
+  // ... (otros mocks)
 
-  const mockSecurityEventService = {
-    logEvent: jest.fn(),
-  };
-  
-  const mockSessionService = {
-    // Partial mock for internal logic simulation
-    validateRefreshTokenSession: jest.fn(),
-    rotateRefreshToken: jest.fn(),
+  const mockAnomalyDetector = {
+    resolveCoordinates: jest.fn().mockImplementation((meta) => Promise.resolve({
+      metadata: meta,
+      locationSource: (meta.latitude && meta.longitude) ? 'gps' : 'ip'
+    })),
+    detectLocationAnomaly: jest.fn().mockResolvedValue({ isAnomalous: false })
   };
 
   beforeEach(async () => {
@@ -85,11 +89,12 @@ describe('Advanced Security Scenarios (Offensive Testing)', () => {
       imports: [JwtModule.register({ secret: 'secret' })],
       providers: [
         AuthService,
-        SessionService, // We might mock parts of this or use real one with mocked repo
+        SessionService,
         SecurityEventService,
         SessionStatusService,
         AuthSettingsService,
         GeolocationService,
+        JwtStrategy,
         { provide: DataSource, useValue: mockDataSource },
         { provide: ConfigService, useValue: { get: () => 'secret' } },
         { provide: UsersService, useValue: mockUsersService },
@@ -97,12 +102,21 @@ describe('Advanced Security Scenarios (Offensive Testing)', () => {
         { provide: SecurityEventRepository, useValue: { create: jest.fn().mockResolvedValue({ id: '999' }) } },
         { provide: SecurityEventTypeRepository, useValue: { findByCode: jest.fn().mockResolvedValue({ id: 1 }) } },
         { provide: SessionStatusRepository, useValue: { findByCode: jest.fn((code) => Promise.resolve({ id: code === 'ACTIVE' ? '1' : '2', code })) } },
+        { provide: SessionAnomalyDetectorService, useValue: mockAnomalyDetector },
         { provide: SettingsService, useValue: {
-          getPositiveInt: jest.fn().mockResolvedValue(100), // High threshold to avoid unintended blocks
+          getPositiveInt: jest.fn().mockResolvedValue(100),
           getString: jest.fn().mockResolvedValue('CYCLE_X'),
         } },
         { provide: GeoProvider, useValue: { resolve: jest.fn() } },
-        { provide: RedisCacheService, useValue: mockRedisCacheService },
+        {
+          provide: RedisCacheService,
+          useValue: {
+            get: jest.fn().mockResolvedValue(null),
+            set: jest.fn().mockResolvedValue(undefined),
+            del: jest.fn().mockResolvedValue(undefined),
+            invalidateGroup: jest.fn().mockResolvedValue(undefined),
+          },
+        },
         {
           provide: TokenService,
           useValue: {

@@ -11,6 +11,7 @@ import * as path from 'path';
 import * as os from 'os';
 import * as fs from 'fs';
 import { User } from '@modules/users/domain/user.entity';
+import { RedisCacheService } from '@infrastructure/cache/redis-cache.service';
 
 describe('E2E: Versionado, Deduplicación e Integridad', () => {
   let app: INestApplication;
@@ -37,8 +38,9 @@ describe('E2E: Versionado, Deduplicación e Integridad', () => {
     .overrideProvider(StorageService)
     .useValue({
       calculateHash: jest.fn().mockImplementation((buffer: Buffer) => {
-          if (buffer.toString() === 'DUPLICATE_CONTENT') return 'hash_dup_123';
-          if (buffer.toString() === 'VERSION_2') return 'hash_v2_456';
+          const content = buffer.toString();
+          if (content.includes('duplicate')) return 'hash_dup_123';
+          if (content.includes('version2')) return 'hash_v2_456';
           return 'hash_' + Date.now() + Math.random();
       }),
       saveFile: jest.fn().mockImplementation(async (name, buffer) => {
@@ -58,8 +60,10 @@ describe('E2E: Versionado, Deduplicación e Integridad', () => {
 
     dataSource = app.get(DataSource);
     storageService = app.get(StorageService);
+    const cacheService = app.get(RedisCacheService);
     seeder = new TestSeeder(dataSource, app);
 
+    await cacheService.invalidateGroup('cache:*');
     await dataSource.query('SET FOREIGN_KEY_CHECKS = 0');
     await dataSource.query('DELETE FROM deletion_request');
     await dataSource.query('DELETE FROM material');
@@ -96,11 +100,11 @@ describe('E2E: Versionado, Deduplicación e Integridad', () => {
 
   describe('Caso 1: Deduplicación (Ahorro de Espacio)', () => {
     it('Subir Archivo A (Original)', async () => {
-        const buffer = Buffer.from('DUPLICATE_CONTENT');
+        const buffer = Buffer.from('%PDF-1.4 duplicate');
         const res = await request(app.getHttpServer())
             .post('/materials')
             .set('Authorization', `Bearer ${professor.token}`)
-            .attach('file', buffer, 'original.txt')
+            .attach('file', buffer, 'original.pdf')
             .field('materialFolderId', folderId)
             .field('displayName', 'Original')
             .expect(201);
@@ -111,11 +115,11 @@ describe('E2E: Versionado, Deduplicación e Integridad', () => {
     });
 
     it('Subir Archivo B (Duplicado) -> Debe reutilizar FileResource', async () => {
-        const buffer = Buffer.from('DUPLICATE_CONTENT');
+        const buffer = Buffer.from('%PDF-1.4 duplicate');
         const res = await request(app.getHttpServer())
             .post('/materials')
             .set('Authorization', `Bearer ${professor.token}`)
-            .attach('file', buffer, 'copia.txt')
+            .attach('file', buffer, 'copia.pdf')
             .field('materialFolderId', folderId)
             .field('displayName', 'Copia')
             .expect(201);
@@ -126,12 +130,12 @@ describe('E2E: Versionado, Deduplicación e Integridad', () => {
 
   describe('Caso 2: Versionado Explícito (Historial)', () => {
     it('Agregar Nueva Versión (v2) a Material Original', async () => {
-        const buffer = Buffer.from('VERSION_2');
+        const buffer = Buffer.from('%PDF-1.4 version2');
         
         const res = await request(app.getHttpServer())
             .post(`/materials/${materialId}/versions`)
             .set('Authorization', `Bearer ${professor.token}`)
-            .attach('file', buffer, 'v2.txt')
+            .attach('file', buffer, 'v2.pdf')
             .expect(201);
         
         expect(res.body.data.id).toBe(materialId);

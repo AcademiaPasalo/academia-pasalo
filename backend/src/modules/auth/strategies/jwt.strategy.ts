@@ -44,6 +44,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       await this.sessionStatusService.getIdByCode('ACTIVE');
 
     const session = await this.userSessionRepository.findByIdWithUser(payload.sessionId);
+
     if (
       !session ||
       !session.isActive ||
@@ -57,7 +58,8 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       throw new UnauthorizedException('Usuario no encontrado');
     }
 
-    const userWithSession: UserWithSession = { ...session.user, sessionId: payload.sessionId };
+    const userWithSession = session.user as UserWithSession;
+    userWithSession.sessionId = payload.sessionId;
     
     await this.cacheService.set(cacheKey, userWithSession, 3600);
     
