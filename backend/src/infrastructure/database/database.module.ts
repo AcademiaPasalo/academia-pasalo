@@ -17,6 +17,8 @@ import { TypeOrmModule } from '@nestjs/typeorm';
         entities: [__dirname + '/../../**/*.entity{.ts,.js}'],
         synchronize: false,
         timezone: 'Z',
+        retryAttempts: 10,
+        retryDelay: 5000,
         extra: {
           connectionLimit: 50,
           waitForConnections: true,
