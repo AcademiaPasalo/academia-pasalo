@@ -2,6 +2,7 @@ import {
   Controller,
   Get,
   Post,
+  Delete,
   Body,
   Param,
   HttpCode,
@@ -16,6 +17,7 @@ import {
 import { CourseContentResponseDto } from '@modules/courses/dto/course-content.dto';
 import { CreateCourseDto } from '@modules/courses/dto/create-course.dto';
 import { AssignCourseToCycleDto } from '@modules/courses/dto/assign-course-to-cycle.dto';
+import { AssignCourseCycleProfessorDto } from '@modules/courses/dto/assign-course-cycle-professor.dto';
 import { Auth } from '@common/decorators/auth.decorator';
 import { Roles } from '@common/decorators/roles.decorator';
 import { CurrentUser } from '@common/decorators/current-user.decorator';
@@ -63,6 +65,28 @@ export class CoursesController {
       message: 'Curso asignado al ciclo exitosamente',
       data: result,
     };
+  }
+
+  @Post('cycle/:id/professors')
+  @Roles('ADMIN', 'SUPER_ADMIN')
+  @HttpCode(HttpStatus.CREATED)
+  @ResponseMessage('Profesor asignado al curso/ciclo exitosamente')
+  async assignProfessorToCycle(
+    @Param('id') courseCycleId: string,
+    @Body() dto: AssignCourseCycleProfessorDto,
+  ): Promise<void> {
+    await this.coursesService.assignProfessorToCourseCycle(courseCycleId, dto.professorUserId);
+  }
+
+  @Delete('cycle/:id/professors/:professorUserId')
+  @Roles('ADMIN', 'SUPER_ADMIN')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ResponseMessage('Profesor removido del curso/ciclo exitosamente')
+  async revokeProfessorFromCycle(
+    @Param('id') courseCycleId: string,
+    @Param('professorUserId') professorUserId: string,
+  ): Promise<void> {
+    await this.coursesService.revokeProfessorFromCourseCycle(courseCycleId, professorUserId);
   }
 
   @Get()

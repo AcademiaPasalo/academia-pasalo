@@ -9,6 +9,7 @@ import { CourseRepository } from '@modules/courses/infrastructure/course.reposit
 import { CourseTypeRepository } from '@modules/courses/infrastructure/course-type.repository';
 import { CycleLevelRepository } from '@modules/courses/infrastructure/cycle-level.repository';
 import { CourseCycleRepository } from '@modules/courses/infrastructure/course-cycle.repository';
+import { CourseCycleProfessorRepository } from '@modules/courses/infrastructure/course-cycle-professor.repository';
 import { CoursesService } from '@modules/courses/application/courses.service';
 import { CoursesController } from '@modules/courses/presentation/courses.controller';
 import { AuthModule } from '@modules/auth/auth.module';
@@ -34,6 +35,7 @@ import { CyclesModule } from '@modules/cycles/cycles.module';
     CourseTypeRepository,
     CycleLevelRepository,
     CourseCycleRepository,
+    CourseCycleProfessorRepository,
     CoursesService,
   ],
   exports: [
