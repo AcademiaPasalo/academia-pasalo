@@ -2,7 +2,9 @@ import {
   Controller,
   Post,
   Get,
+  Delete,
   Body,
+  Param,
   HttpCode,
   HttpStatus,
 } from '@nestjs/common';
@@ -33,5 +35,13 @@ export class EnrollmentsController {
   @ResponseMessage('Listado de cursos obtenido exitosamente')
   async getMyCourses(@CurrentUser() user: User) {
     return await this.enrollmentsService.findMyEnrollments(user.id);
+  }
+
+  @Delete(':id')
+  @Roles('ADMIN', 'SUPER_ADMIN')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ResponseMessage('Matrícula cancelada exitosamente')
+  async cancel(@Param('id') id: string) {
+    await this.enrollmentsService.cancelEnrollment(id);
   }
 }

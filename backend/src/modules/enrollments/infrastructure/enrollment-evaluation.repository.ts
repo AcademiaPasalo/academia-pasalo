@@ -17,13 +17,14 @@ export class EnrollmentEvaluationRepository {
   }
 
   async findActiveByEnrollmentAndEvaluation(enrollmentId: string, evaluationId: string): Promise<EnrollmentEvaluation | null> {
-    return await this.ormRepository.findOne({
-      where: {
-        enrollmentId,
-        evaluationId,
-        isActive: true,
-      },
-    });
+    return await this.ormRepository
+      .createQueryBuilder('ee')
+      .innerJoin('ee.enrollment', 'enrollment')
+      .where('ee.enrollmentId = :enrollmentId', { enrollmentId })
+      .andWhere('ee.evaluationId = :evaluationId', { evaluationId })
+      .andWhere('ee.isActive = :isActive', { isActive: true })
+      .andWhere('enrollment.cancelledAt IS NULL')
+      .getOne();
   }
 
   async checkAccess(userId: string, evaluationId: string): Promise<boolean> {

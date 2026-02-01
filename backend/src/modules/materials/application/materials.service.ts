@@ -1,4 +1,11 @@
-import { Injectable, Logger, NotFoundException, InternalServerErrorException, BadRequestException, ForbiddenException } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  NotFoundException,
+  InternalServerErrorException,
+  BadRequestException,
+  ForbiddenException,
+} from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import { StorageService } from '@infrastructure/storage/storage.service';
 import { AccessEngineService } from '@modules/enrollments/application/access-engine.service';
@@ -9,6 +16,7 @@ import { FileResourceRepository } from '@modules/materials/infrastructure/file-r
 import { FileVersionRepository } from '@modules/materials/infrastructure/file-version.repository';
 import { MaterialCatalogRepository } from '@modules/materials/infrastructure/material-catalog.repository';
 import { DeletionRequestRepository } from '@modules/materials/infrastructure/deletion-request.repository';
+import { UserRepository } from '@modules/users/infrastructure/user.repository';
 import { CreateMaterialFolderDto } from '@modules/materials/dto/create-material-folder.dto';
 import { UploadMaterialDto } from '@modules/materials/dto/upload-material.dto';
 import { RequestDeletionDto } from '@modules/materials/dto/request-deletion.dto';
@@ -35,6 +43,7 @@ export class MaterialsService {
     private readonly fileVersionRepository: FileVersionRepository,
     private readonly catalogRepository: MaterialCatalogRepository,
     private readonly deletionRequestRepository: DeletionRequestRepository,
+    private readonly userRepository: UserRepository,
   ) {}
 
   async createFolder(userId: string, dto: CreateMaterialFolderDto): Promise<MaterialFolder> {
@@ -83,12 +92,6 @@ export class MaterialsService {
     ];
 
     if (!allowedMimeTypes.includes(file.mimetype)) {
-      this.logger.warn({
-        message: 'Intento de subir archivo con tipo no permitido',
-        userId,
-        mimetype: file.mimetype,
-        originalName: file.originalname,
-      });
       throw new BadRequestException(
         `Tipo de archivo no permitido. Solo se aceptan documentos educativos (PDF, imágenes, Office).`,
       );
@@ -174,7 +177,6 @@ export class MaterialsService {
         });
         const savedMaterial = await manager.save(materialEntity);
 
-        this.logSuccess('Material subido', { materialId: savedMaterial.id, userId });
         return savedMaterial;
       });
 
@@ -244,10 +246,7 @@ export class MaterialsService {
         freshMaterial.fileVersionId = savedVersion.id;
         freshMaterial.updatedAt = now;
         
-        const updatedMaterial = await manager.save(freshMaterial);
-
-        this.logSuccess('Nueva versión agregada', { materialId: updatedMaterial.id, version: nextVersionNumber, userId });
-        return updatedMaterial;
+        return await manager.save(freshMaterial);
       });
 
       await this.invalidateFolderCache(materialId);
@@ -259,7 +258,7 @@ export class MaterialsService {
   }
 
   async getRootFolders(userId: string, evaluationId: string): Promise<MaterialFolder[]> {
-    await this.checkAccess(userId, evaluationId);
+    await this.checkAuthorizedAccess(userId, evaluationId);
     
     const cacheKey = `cache:materials:roots:eval:${evaluationId}`;
     const cached = await this.cacheService.get<MaterialFolder[]>(cacheKey);
@@ -276,7 +275,7 @@ export class MaterialsService {
     const folder = await this.folderRepository.findById(folderId);
     if (!folder) throw new NotFoundException('Carpeta no encontrada');
     
-    await this.checkAccess(user.id, folder.evaluationId);
+    await this.checkAuthorizedAccess(user.id, folder.evaluationId, folder);
 
     const cacheKey = `cache:materials:contents:folder:${folderId}`;
     const cached = await this.cacheService.get<{ folders: MaterialFolder[], materials: Material[] }>(cacheKey);
@@ -301,7 +300,7 @@ export class MaterialsService {
     const folder = await this.folderRepository.findById(material.materialFolderId);
     if (!folder) throw new NotFoundException('Carpeta contenedora no encontrada');
 
-    await this.checkAccess(user.id, folder.evaluationId);
+    await this.checkAuthorizedAccess(user.id, folder.evaluationId, folder);
 
     const resource = material.fileResource;
     if (!resource) throw new InternalServerErrorException('Integridad de datos corrupta: Material sin recurso físico');
@@ -343,9 +342,33 @@ export class MaterialsService {
     });
   }
 
-  private async checkAccess(userId: string, evaluationId: string): Promise<void> {
-    const hasAccess = await this.accessEngine.hasAccess(userId, evaluationId);
-    if (!hasAccess) throw new ForbiddenException('No tienes acceso a este contenido educativo');
+  private async checkAuthorizedAccess(userId: string, evaluationId: string, folder?: MaterialFolder): Promise<void> {
+    const user = await this.userRepository.findById(userId);
+    if (!user) throw new ForbiddenException('Usuario no válido');
+
+    const roleCodes = (user.roles || []).map((r) => r.code);
+
+    if (roleCodes.some((r) => ['ADMIN', 'SUPER_ADMIN'].includes(r))) {
+      return;
+    }
+
+    if (roleCodes.includes('PROFESSOR')) {
+      const isAssigned = await this.dataSource.query(
+        `SELECT 1 FROM course_cycle_professor ccp
+         INNER JOIN evaluation e ON e.course_cycle_id = ccp.course_cycle_id
+         WHERE e.id = ? AND ccp.professor_user_id = ? LIMIT 1`,
+        [evaluationId, userId],
+      );
+      if (isAssigned.length === 0) throw new ForbiddenException('No tienes permiso para ver materiales de este curso');
+      return;
+    }
+
+    const hasEnrollment = await this.accessEngine.hasAccess(userId, evaluationId);
+    if (!hasEnrollment) throw new ForbiddenException('No tienes acceso a este contenido educativo');
+
+    if (folder?.visibleFrom && new Date() < new Date(folder.visibleFrom)) {
+      throw new ForbiddenException('Este contenido aún no está disponible');
+    }
   }
 
   private async getActiveFolderStatus() {
@@ -371,10 +394,6 @@ export class MaterialsService {
   private async rollbackFile(path: string) {
     const fileName = path.split(/[\/]/).pop();
     if (fileName) await this.storageService.deleteFile(fileName);
-  }
-
-  private logSuccess(message: string, meta: object) {
-    this.logger.log(JSON.stringify({ message, ...meta, timestamp: new Date().toISOString() }));
   }
 
   private async invalidateFolderCache(folderId: string) {
