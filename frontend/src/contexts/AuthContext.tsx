@@ -5,7 +5,6 @@
 // ============================================
 
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
 import { authService } from '@/services/auth.service';
 import { saveTokens, saveUser, getUser, clearAuth, hasStoredSession } from '@/lib/storage';
 import type { User, SessionStatus, AuthResponse } from '@/types/api';
@@ -33,8 +32,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [sessionStatus, setSessionStatus] = useState<SessionStatus | null>(null);
   const [concurrentSessionId, setConcurrentSessionId] = useState<string | null>(null);
   const [pendingRefreshToken, setPendingRefreshToken] = useState<string | null>(null);
-  
-  const router = useRouter();
 
   const isAuthenticated = !!user && sessionStatus === 'ACTIVE';
 
@@ -72,8 +69,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       // Redirigir según el estado de la sesión
       if (authData.sessionStatus === 'ACTIVE') {
-        // Login exitoso, redirigir al dashboard
-        router.push('/plataforma/inicio');
+        // Login exitoso, redirigir al dashboard con recarga
+        window.location.href = '/plataforma/inicio';
       }
       // Si hay sesión concurrente o bloqueada, el componente de login debe mostrar el modal
     } catch (error) {
@@ -82,7 +79,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } finally {
       setIsLoading(false);
     }
-  }, [processAuthResponse, router]);
+  }, [processAuthResponse]);
 
   /**
    * Resolver sesión concurrente
@@ -99,7 +96,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       // Redirigir al dashboard
       if (authData.sessionStatus === 'ACTIVE') {
-        router.push('/plataforma/inicio');
+        window.location.href = '/plataforma/inicio';
       }
     } catch (error) {
       console.error('Error al resolver sesión concurrente:', error);
@@ -107,7 +104,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } finally {
       setIsLoading(false);
     }
-  }, [pendingRefreshToken, processAuthResponse, router]);
+  }, [pendingRefreshToken, processAuthResponse]);
 
   /**
    * Re-autenticar sesión anómala
@@ -124,7 +121,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       // Redirigir al dashboard
       if (authData.sessionStatus === 'ACTIVE') {
-        router.push('/plataforma/inicio');
+        window.location.href = '/plataforma/inicio';
       }
     } catch (error) {
       console.error('Error al re-autenticar:', error);
@@ -132,28 +129,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } finally {
       setIsLoading(false);
     }
-  }, [pendingRefreshToken, processAuthResponse, router]);
+  }, [pendingRefreshToken, processAuthResponse]);
 
   /**
    * Cerrar sesión
    */
   const logout = useCallback(async () => {
     try {
+      // Intentar cerrar sesión en el backend
       await authService.logout();
     } catch (error) {
-      console.error('Error al cerrar sesión:', error);
+      console.error('Error al cerrar sesión en el backend:', error);
+      // Continuar con el logout local incluso si el backend falla
     } finally {
-      // Limpiar estado local
+      // Limpiar estado local PRIMERO
       clearAuth();
       setUser(null);
       setSessionStatus(null);
       setConcurrentSessionId(null);
       setPendingRefreshToken(null);
       
-      // Redirigir al login
-      router.push('/plataforma');
+      // Usar window.location para forzar una recarga completa y evitar problemas de caché
+      window.location.href = '/plataforma';
     }
-  }, [router]);
+  }, []);
 
   /**
    * Verifica si hay una sesión guardada al cargar la app

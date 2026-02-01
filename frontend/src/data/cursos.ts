@@ -103,21 +103,11 @@ export const cursosDetalleData: Record<string, CursoDetalle> = {
         }
       ],
       evaluaciones: [
-        {
-          id: 'e1',
-          titulo: 'Examen Parcial 1',
-          tipo: 'examen',
-          fecha: '2026-02-15',
-          calificacion: 9.0,
-          estado: 'calificado'
-        },
-        {
-          id: 'e2',
-          titulo: 'Tarea 3',
-          tipo: 'tarea',
-          fecha: '2026-02-20',
-          estado: 'pendiente'
-        }
+        { id: 'pc1', titulo: 'PC1', tipo: 'tarea', fecha: '2026-02-10', estado: 'entregado' }, // Próximamente
+        { id: 'pc2', titulo: 'PC2', tipo: 'tarea', fecha: '2026-02-17', estado: 'entregado' }, // Próximamente
+        { id: 'pc3', titulo: 'PC3', tipo: 'tarea', fecha: '2026-02-24', estado: 'pendiente' }, // En curso
+        { id: 'ex1', titulo: 'EX1', tipo: 'examen', fecha: '2026-03-03', estado: 'calificado' }, // Completado
+        { id: 'ex2', titulo: 'EX2', tipo: 'examen', fecha: '2026-03-10', estado: 'entregado' } // Próximamente
       ],
       materiales: [
         {
@@ -154,14 +144,11 @@ export const cursosDetalleData: Record<string, CursoDetalle> = {
         }
       ],
       evaluaciones: [
-        {
-          id: 'e1',
-          titulo: 'Quiz 1',
-          tipo: 'quiz',
-          fecha: '2026-02-10',
-          calificacion: 8.5,
-          estado: 'calificado'
-        }
+        { id: 'pc1', titulo: 'PC1', tipo: 'tarea', fecha: '2026-02-10', estado: 'entregado' },
+        { id: 'pc2', titulo: 'PC2', tipo: 'tarea', fecha: '2026-02-17', estado: 'entregado' },
+        { id: 'pc3', titulo: 'PC3', tipo: 'tarea', fecha: '2026-02-24', estado: 'pendiente' },
+        { id: 'ex1', titulo: 'EX1', tipo: 'examen', fecha: '2026-03-03', estado: 'calificado' },
+        { id: 'ex2', titulo: 'EX2', tipo: 'examen', fecha: '2026-03-10', estado: 'entregado' }
       ],
       materiales: [
         {
@@ -198,48 +185,11 @@ export const cursosDetalleData: Record<string, CursoDetalle> = {
         }
       ],
       evaluaciones: [
-        {
-          id: 'e1',
-          titulo: 'Laboratorio 1',
-          tipo: 'proyecto',
-          fecha: '2026-02-18',
-          estado: 'entregado'
-        },
-		{
-          id: 'e2',
-          titulo: 'Laboratorio 2',
-          tipo: 'proyecto',
-          fecha: '2026-02-18',
-          estado: 'entregado'
-        },
-		{
-          id: 'e3',
-          titulo: 'Laboratorio 3',
-          tipo: 'proyecto',
-          fecha: '2026-02-18',
-          estado: 'entregado'
-        },
-		{
-          id: 'e4',
-          titulo: 'Laboratorio 4',
-          tipo: 'proyecto',
-          fecha: '2026-02-18',
-          estado: 'entregado'
-        },
-		{
-          id: 'e5',
-          titulo: 'Laboratorio 5',
-          tipo: 'proyecto',
-          fecha: '2026-02-18',
-          estado: 'entregado'
-        },
-		{
-          id: 'e6',
-          titulo: 'Laboratorio 6',
-          tipo: 'proyecto',
-          fecha: '2026-02-18',
-          estado: 'entregado'
-        },		
+        { id: 'pc1', titulo: 'PC1', tipo: 'tarea', fecha: '2026-02-10', estado: 'entregado' },
+        { id: 'pc2', titulo: 'PC2', tipo: 'tarea', fecha: '2026-02-17', estado: 'entregado' },
+        { id: 'pc3', titulo: 'PC3', tipo: 'tarea', fecha: '2026-02-24', estado: 'pendiente' },
+        { id: 'ex1', titulo: 'EX1', tipo: 'examen', fecha: '2026-03-03', estado: 'calificado' },
+        { id: 'ex2', titulo: 'EX2', tipo: 'examen', fecha: '2026-03-10', estado: 'entregado' }
       ],
       materiales: [
         {
@@ -252,4 +202,235 @@ export const cursosDetalleData: Record<string, CursoDetalle> = {
       ]
     }
   }
+};
+
+/**
+ * Datos de ciclos anteriores por curso
+ * Estructura: { [cursoId]: { [cicloId]: { titulo, evaluaciones } } }
+ */
+export const ciclosAnterioresData: Record<string, Record<string, {
+  titulo: string;
+  periodo: string;
+  evaluaciones: Array<{
+    id: string;
+    titulo: string; // PC1, PC2, EX1, EX2
+    tipo: 'examen' | 'tarea';
+    estado: 'calificado' | 'pendiente' | 'entregado' | 'vencido';
+  }>;
+}>> = {
+  'fufis': {
+    '2025-2': {
+      titulo: 'Ciclo 2025-2',
+      periodo: '2025-2',
+      evaluaciones: [
+        { id: 'pc1', titulo: 'PC1', tipo: 'tarea', estado: 'calificado' },
+        { id: 'pc2', titulo: 'PC2', tipo: 'tarea', estado: 'calificado' },
+        { id: 'ex1', titulo: 'EX1', tipo: 'examen', estado: 'calificado' },
+        { id: 'pc3', titulo: 'PC3', tipo: 'tarea', estado: 'pendiente' },
+        { id: 'ex2', titulo: 'EX2', tipo: 'examen', estado: 'entregado' },
+        { id: 'pc4', titulo: 'PC4', tipo: 'tarea', estado: 'vencido' }
+      ]
+    },
+    '2025-1': {
+      titulo: 'Ciclo 2025-1',
+      periodo: '2025-1',
+      evaluaciones: [
+        { id: 'pc1', titulo: 'PC1', tipo: 'tarea', estado: 'calificado' },
+        { id: 'pc2', titulo: 'PC2', tipo: 'tarea', estado: 'calificado' },
+        { id: 'ex1', titulo: 'EX1', tipo: 'examen', estado: 'calificado' },
+        { id: 'pc3', titulo: 'PC3', tipo: 'tarea', estado: 'calificado' },
+        { id: 'ex2', titulo: 'EX2', tipo: 'examen', estado: 'calificado' }
+      ]
+    }
+  },
+  'fucal': {
+    '2025-2': {
+      titulo: 'Ciclo 2025-2',
+      periodo: '2025-2',
+      evaluaciones: [
+        { id: 'pc1', titulo: 'PC1', tipo: 'tarea', estado: 'calificado' },
+        { id: 'pc2', titulo: 'PC2', tipo: 'tarea', estado: 'calificado' },
+        { id: 'ex1', titulo: 'EX1', tipo: 'examen', estado: 'calificado' },
+        { id: 'pc3', titulo: 'PC3', tipo: 'tarea', estado: 'pendiente' },
+        { id: 'ex2', titulo: 'EX2', tipo: 'examen', estado: 'entregado' }
+      ]
+    }
+  },
+  'amga': {
+    '2025-2': {
+      titulo: 'Ciclo 2025-2',
+      periodo: '2025-2',
+      evaluaciones: [
+        { id: 'pc1', titulo: 'PC1', tipo: 'tarea', estado: 'calificado' },
+        { id: 'pc2', titulo: 'PC2', tipo: 'tarea', estado: 'calificado' },
+        { id: 'ex1', titulo: 'EX1', tipo: 'examen', estado: 'pendiente' },
+        { id: 'pc3', titulo: 'PC3', tipo: 'tarea', estado: 'entregado' },
+        { id: 'ex2', titulo: 'EX2', tipo: 'examen', estado: 'vencido' }
+      ]
+    }
+  }
+};
+
+/**
+ * Banco de enunciados por curso
+ * Estructura: { [cursoId]: Array<Enunciado> }
+ */
+export const bancoEnunciadosData: Record<string, Array<{
+  id: string;
+  titulo: string;
+  tipo: 'examen' | 'tarea' | 'quiz' | 'proyecto';
+  tema: string;
+  dificultad: 'basico' | 'intermedio' | 'avanzado';
+  fecha: string;
+}>> = {
+  'fufis': [
+    {
+      id: 'be1',
+      titulo: 'Cinemática - MRU y MRUV',
+      tipo: 'tarea',
+      tema: 'Movimiento Rectilíneo',
+      dificultad: 'basico',
+      fecha: '2024-03-15'
+    },
+    {
+      id: 'be2',
+      titulo: 'Dinámica - Leyes de Newton',
+      tipo: 'examen',
+      tema: 'Fuerza y Movimiento',
+      dificultad: 'intermedio',
+      fecha: '2024-04-20'
+    },
+    {
+      id: 'be3',
+      titulo: 'Trabajo y Energía',
+      tipo: 'tarea',
+      tema: 'Energía Mecánica',
+      dificultad: 'intermedio',
+      fecha: '2024-05-10'
+    },
+    {
+      id: 'be4',
+      titulo: 'Movimiento Circular',
+      tipo: 'quiz',
+      tema: 'Cinemática Circular',
+      dificultad: 'avanzado',
+      fecha: '2024-06-05'
+    },
+    {
+      id: 'be5',
+      titulo: 'Momentum y Colisiones',
+      tipo: 'examen',
+      tema: 'Conservación del Momentum',
+      dificultad: 'avanzado',
+      fecha: '2024-07-12'
+    },
+    {
+      id: 'be6',
+      titulo: 'Estática - Equilibrio',
+      tipo: 'tarea',
+      tema: 'Equilibrio de Cuerpos Rígidos',
+      dificultad: 'intermedio',
+      fecha: '2024-08-18'
+    }
+  ],
+  'fucal': [
+    {
+      id: 'be1',
+      titulo: 'Límites y Continuidad',
+      tipo: 'quiz',
+      tema: 'Límites',
+      dificultad: 'basico',
+      fecha: '2024-03-10'
+    },
+    {
+      id: 'be2',
+      titulo: 'Derivadas - Reglas Básicas',
+      tipo: 'tarea',
+      tema: 'Derivación',
+      dificultad: 'basico',
+      fecha: '2024-04-15'
+    },
+    {
+      id: 'be3',
+      titulo: 'Derivadas - Regla de la Cadena',
+      tipo: 'examen',
+      tema: 'Derivación Avanzada',
+      dificultad: 'intermedio',
+      fecha: '2024-05-05'
+    },
+    {
+      id: 'be4',
+      titulo: 'Integrales Indefinidas',
+      tipo: 'tarea',
+      tema: 'Integración',
+      dificultad: 'intermedio',
+      fecha: '2024-06-01'
+    },
+    {
+      id: 'be5',
+      titulo: 'Integrales Definidas',
+      tipo: 'examen',
+      tema: 'Integración Definida',
+      dificultad: 'avanzado',
+      fecha: '2024-07-08'
+    },
+    {
+      id: 'be6',
+      titulo: 'Aplicaciones de Integrales',
+      tipo: 'proyecto',
+      tema: 'Áreas y Volúmenes',
+      dificultad: 'avanzado',
+      fecha: '2024-08-20'
+    }
+  ],
+  'amga': [
+    {
+      id: 'be1',
+      titulo: 'Vectores en R2 y R3',
+      tipo: 'quiz',
+      tema: 'Vectores',
+      dificultad: 'basico',
+      fecha: '2024-03-12'
+    },
+    {
+      id: 'be2',
+      titulo: 'Operaciones con Matrices',
+      tipo: 'tarea',
+      tema: 'Álgebra de Matrices',
+      dificultad: 'basico',
+      fecha: '2024-04-18'
+    },
+    {
+      id: 'be3',
+      titulo: 'Determinantes',
+      tipo: 'examen',
+      tema: 'Determinantes',
+      dificultad: 'intermedio',
+      fecha: '2024-05-08'
+    },
+    {
+      id: 'be4',
+      titulo: 'Sistemas de Ecuaciones',
+      tipo: 'tarea',
+      tema: 'Sistemas Lineales',
+      dificultad: 'intermedio',
+      fecha: '2024-06-03'
+    },
+    {
+      id: 'be5',
+      titulo: 'Espacios Vectoriales',
+      tipo: 'examen',
+      tema: 'Espacios y Subespacios',
+      dificultad: 'avanzado',
+      fecha: '2024-07-10'
+    },
+    {
+      id: 'be6',
+      titulo: 'Transformaciones Lineales',
+      tipo: 'proyecto',
+      tema: 'Transformaciones',
+      dificultad: 'avanzado',
+      fecha: '2024-08-22'
+    }
+  ]
 };
