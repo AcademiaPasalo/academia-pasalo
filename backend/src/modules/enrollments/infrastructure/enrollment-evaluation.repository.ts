@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, EntityManager, LessThanOrEqual, MoreThanOrEqual, IsNull } from 'typeorm';
+import { Repository, EntityManager } from 'typeorm';
 import { EnrollmentEvaluation } from '@modules/enrollments/domain/enrollment-evaluation.entity';
 
 @Injectable()
@@ -17,33 +17,32 @@ export class EnrollmentEvaluationRepository {
   }
 
   async findActiveByEnrollmentAndEvaluation(enrollmentId: string, evaluationId: string): Promise<EnrollmentEvaluation | null> {
-    return await this.ormRepository.findOne({
-      where: {
-        enrollmentId,
-        evaluationId,
-        isActive: true,
-      },
-    });
+    return await this.ormRepository
+      .createQueryBuilder('ee')
+      .innerJoin('ee.enrollment', 'enrollment')
+      .where('ee.enrollmentId = :enrollmentId', { enrollmentId })
+      .andWhere('ee.evaluationId = :evaluationId', { evaluationId })
+      .andWhere('ee.isActive = :isActive', { isActive: true })
+      .andWhere('enrollment.cancelledAt IS NULL')
+      .getOne();
   }
 
   async checkAccess(userId: string, evaluationId: string): Promise<boolean> {
-    const now = new Date();
-    const count = await this.ormRepository.count({
-      where: {
-        evaluationId,
-        isActive: true,
-        accessStartDate: LessThanOrEqual(now),
-        accessEndDate: MoreThanOrEqual(now),
-        enrollment: {
-          userId,
-          cancelledAt: IsNull(),
-        },
-      },
-      relations: {
-        enrollment: true,
-      },
-    });
+    const result = await this.ormRepository.query(
+      `SELECT EXISTS(
+        SELECT 1 FROM enrollment_evaluation ee
+        INNER JOIN enrollment e ON e.id = ee.enrollment_id
+        WHERE ee.evaluation_id = ?
+          AND ee.is_active = 1
+          AND ee.access_start_date <= NOW()
+          AND ee.access_end_date >= NOW()
+          AND e.user_id = ?
+          AND e.cancelled_at IS NULL
+        LIMIT 1
+      ) as hasAccess`,
+      [evaluationId, userId],
+    );
 
-    return count > 0;
+    return Number(result[0]?.hasAccess) === 1;
   }
 }

@@ -52,6 +52,14 @@ export class UserSessionRepository {
     });
   }
 
+  async findByIdWithUser(id: string, manager?: EntityManager): Promise<UserSession | null> {
+    const repo = this.getRepository(manager);
+    return await repo.findOne({
+      where: { id },
+      relations: { user: { roles: true } },
+    });
+  }
+
   async findActiveById(id: string, manager?: EntityManager): Promise<UserSession | null> {
     const repo = this.getRepository(manager);
     return await repo.findOne({

@@ -11,8 +11,22 @@ async function bootstrap() {
   const httpAdapter = app.get(HttpAdapterHost);
   const reflector = app.get(Reflector);
 
+  const corsOrigins =
+  configService.get<string>('CORS_ORIGINS')
+    ?.split(',')
+    .map(o => o.trim())
+  ?? ['http://localhost:3000', 'http://127.0.0.1:3000'];
+
+
+if (corsOrigins.length === 0) {
+  throw new Error(
+    'CORS_ORIGINS no está configurado en las variables de entorno. Revise el archivo .env'
+  );
+}
+
+
   app.enableCors({
-    origin: ['http://localhost:3000', 'http://127.0.0.1:3000'],
+    origin: corsOrigins,
     methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
     credentials: true,

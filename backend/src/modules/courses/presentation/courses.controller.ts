@@ -2,6 +2,7 @@ import {
   Controller,
   Get,
   Post,
+  Delete,
   Body,
   Param,
   HttpCode,
@@ -13,10 +14,14 @@ import {
   CourseTypeResponseDto,
   CycleLevelResponseDto,
 } from '@modules/courses/dto/course-response.dto';
+import { CourseContentResponseDto } from '@modules/courses/dto/course-content.dto';
 import { CreateCourseDto } from '@modules/courses/dto/create-course.dto';
 import { AssignCourseToCycleDto } from '@modules/courses/dto/assign-course-to-cycle.dto';
+import { AssignCourseCycleProfessorDto } from '@modules/courses/dto/assign-course-cycle-professor.dto';
 import { Auth } from '@common/decorators/auth.decorator';
 import { Roles } from '@common/decorators/roles.decorator';
+import { CurrentUser } from '@common/decorators/current-user.decorator';
+import { User } from '@modules/users/domain/user.entity';
 import { ResponseMessage } from '@common/decorators/response-message.decorator';
 import { plainToInstance } from 'class-transformer';
 
@@ -24,6 +29,19 @@ import { plainToInstance } from 'class-transformer';
 @Auth()
 export class CoursesController {
   constructor(private readonly coursesService: CoursesService) {}
+
+  @Get('cycle/:id/content')
+  @Roles('STUDENT', 'PROFESSOR', 'ADMIN', 'SUPER_ADMIN')
+  @ResponseMessage('Contenido del curso obtenido exitosamente')
+  async getCourseContent(
+    @Param('id') courseCycleId: string,
+    @CurrentUser() user: User,
+  ) {
+    const content = await this.coursesService.getCourseContent(courseCycleId, user.id);
+    return plainToInstance(CourseContentResponseDto, content, {
+      excludeExtraneousValues: true,
+    });
+  }
 
   @Post()
   @Roles('ADMIN', 'SUPER_ADMIN')
@@ -47,6 +65,28 @@ export class CoursesController {
       message: 'Curso asignado al ciclo exitosamente',
       data: result,
     };
+  }
+
+  @Post('cycle/:id/professors')
+  @Roles('ADMIN', 'SUPER_ADMIN')
+  @HttpCode(HttpStatus.CREATED)
+  @ResponseMessage('Profesor asignado al curso/ciclo exitosamente')
+  async assignProfessorToCycle(
+    @Param('id') courseCycleId: string,
+    @Body() dto: AssignCourseCycleProfessorDto,
+  ): Promise<void> {
+    await this.coursesService.assignProfessorToCourseCycle(courseCycleId, dto.professorUserId);
+  }
+
+  @Delete('cycle/:id/professors/:professorUserId')
+  @Roles('ADMIN', 'SUPER_ADMIN')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ResponseMessage('Profesor removido del curso/ciclo exitosamente')
+  async revokeProfessorFromCycle(
+    @Param('id') courseCycleId: string,
+    @Param('professorUserId') professorUserId: string,
+  ): Promise<void> {
+    await this.coursesService.revokeProfessorFromCourseCycle(courseCycleId, professorUserId);
   }
 
   @Get()

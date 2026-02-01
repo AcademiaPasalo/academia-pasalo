@@ -1,0 +1,184 @@
+name: Deploy
+on:
+    workflow_dispatch:
+    push:
+      branches: [main]
+
+jobs:
+  validate-ec2-status:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v5.1.1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+      - name: Validate status
+        run: |
+          INSTANCE_ID="i-075c22a8bf3645192"
+          echo "Checking instance state..."
+          STATE=$(aws ec2 describe-instances --instance-ids "$INSTANCE_ID" --query "Reservations[0].Instances[0].State.Name" --output text)
+          echo "Current state: $STATE"
+          if [ "$STATE" = "stopped" ]; then
+            echo "EC2 Instance must be ON in order to make the DEPLOY"
+            exit 1
+          else
+            echo "EC2 Instance is running"
+          fi
+
+  build-and-push:
+    needs: validate-ec2-status
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Build and push backend image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./backend
+          push: true
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          tags: |
+            ${{ secrets.DOCKER_USERNAME }}/academia-pasalo-backend:latest
+            ${{ secrets.DOCKER_USERNAME }}/academia-pasalo-backend:${{ github.sha }}
+
+      - name: Build and push frontend image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./frontend
+          push: true
+          build-args: |
+            NEXT_PUBLIC_API_URL=/api/v1
+            NEXT_PUBLIC_GOOGLE_CLIENT_ID=${{ secrets.GOOGLE_CLIENT_ID }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          tags: |
+            ${{ secrets.DOCKER_USERNAME }}/academia-pasalo-frontend:latest
+            ${{ secrets.DOCKER_USERNAME }}/academia-pasalo-frontend:${{ github.sha }}
+  deploy:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy to EC2
+        uses: appleboy/ssh-action@v1.0.3
+        env:
+          DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+          DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
+          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+          DB_NAME: ${{ secrets.DB_NAME }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+          GOOGLE_REDIRECT_URI: ${{ secrets.GOOGLE_REDIRECT_URI }}
+          MAXMIND_LICENSE_KEY: ${{ secrets.MAXMIND_LICENSE_KEY }}
+          CORS_ORIGINS: ${{ secrets.CORS_ORIGINS }}
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script_stop: true
+          envs: DOCKER_USERNAME,DOCKER_PASSWORD,DB_PASSWORD,DB_NAME,JWT_SECRET,GOOGLE_CLIENT_ID,GOOGLE_CLIENT_SECRET,GOOGLE_REDIRECT_URI,MAXMIND_LICENSE_KEY,CORS_ORIGINS
+          script: |
+            set -euo pipefail
+
+            APP_DIR="/home/ubuntu/academia-pasalo"
+            COMPOSE_FILE="$APP_DIR/backend/docker-compose.prod.yml"
+
+            echo "Iniciando deploy en $(hostname)"
+
+            # 0) Pre-checks
+            command -v git >/dev/null
+            command -v docker >/dev/null
+            command -v docker-compose >/dev/null
+
+            # 1) Obtener código (idempotente)
+            if [ ! -d "$APP_DIR/.git" ]; then
+              echo "Clonando repositorio por primera vez..."
+              mkdir -p "$APP_DIR"
+              git clone git@github.com:${{ github.repository }}.git "$APP_DIR"
+            fi
+
+            cd "$APP_DIR"
+            git fetch origin
+            git reset --hard origin/main
+
+            # 2) Limpieza segura (NO tocar runtime SSL)
+            git clean -fd -e letsencrypt/ -e certbot/ || true
+
+            # 2.1) Asegurar runtime dirs (certbot + letsencrypt)
+            mkdir -p "$APP_DIR/certbot/www/.well-known/acme-challenge"
+            mkdir -p "$APP_DIR/letsencrypt"
+            chown -R ubuntu:ubuntu "$APP_DIR/certbot" || true
+            chmod -R 755 "$APP_DIR/certbot" || true
+
+            # 3) Validar compose
+            if [ ! -f "$COMPOSE_FILE" ]; then
+              echo "ERROR: No existe - $COMPOSE_FILE"
+              ls -la "$APP_DIR" "$APP_DIR/backend" || true
+              exit 1
+            fi
+
+            # 4) Login Docker Hub
+            echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
+
+            # 5) Crear .env backend
+            cat > "$APP_DIR/backend/.env" <<EOF
+            GITHUB_REPOSITORY=${{ github.repository }}
+            DOCKER_USERNAME=$DOCKER_USERNAME
+            DB_PASSWORD=$DB_PASSWORD
+            DB_NAME=$DB_NAME
+            JWT_SECRET=$JWT_SECRET
+            GOOGLE_CLIENT_ID=$GOOGLE_CLIENT_ID
+            GOOGLE_CLIENT_SECRET=$GOOGLE_CLIENT_SECRET
+            GOOGLE_REDIRECT_URI=$GOOGLE_REDIRECT_URI
+            MAXMIND_LICENSE_KEY=$MAXMIND_LICENSE_KEY
+            CORS_ORIGINS=$CORS_ORIGINS
+            EOF
+
+            # 6) Deploy
+            echo "Pull de imágenes"
+            docker-compose -f "$COMPOSE_FILE" pull
+
+            echo "Bajando servicios (DEV: borrando volúmenes)"
+            docker-compose -f "$COMPOSE_FILE" down -v
+
+            echo "Levantando servicios"
+            docker-compose -f "$COMPOSE_FILE" up -d
+
+            # 7) Verificación post-deploy
+            echo "Esperando que servicios levanten..."
+            sleep 10
+
+            echo "Estado de contenedores:"
+            docker ps -a
+
+            echo "Verificando contenedores clave..."
+            for c in academia-pasalo-nginx academia-pasalo-backend academia-pasalo-frontend; do
+              status="$(docker inspect -f '{{.State.Status}}' "$c")"
+              echo "$c → $status"
+              if [ "$status" != "running" ]; then
+                echo "ERROR: $c no está running"
+                echo "Últimos logs de $c:"
+                docker logs --tail=200 "$c" || true
+                exit 1
+              fi
+            done
+
+            # 8) Limpieza
+            docker image prune -f
+
+            echo "Deployment completed successfully"
+            docker ps
+

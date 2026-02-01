@@ -31,6 +31,6 @@ export class MaterialFoldersController {
   @Roles('STUDENT', 'ADMIN', 'PROFESSOR', 'SUPER_ADMIN')
   @ResponseMessage('Contenido de carpeta obtenido exitosamente')
   async getContents(@CurrentUser() user: User, @Param('id') folderId: string) {
-    return await this.materialsService.getFolderContents(user.id, folderId);
+    return await this.materialsService.getFolderContents(user, folderId);
   }
 }

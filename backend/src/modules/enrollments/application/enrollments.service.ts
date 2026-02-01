@@ -54,6 +54,13 @@ export class EnrollmentsService {
             id: enrollment.courseCycle.course.id,
             code: enrollment.courseCycle.course.code,
             name: enrollment.courseCycle.course.name,
+            courseType: {
+              code: enrollment.courseCycle.course.courseType.code,
+              name: enrollment.courseCycle.course.courseType.name,
+            },
+            cycleLevel: {
+              name: enrollment.courseCycle.course.cycleLevel.name,
+            },
           },
           academicCycle: {
             id: enrollment.courseCycle.academicCycle.id,
@@ -78,27 +85,58 @@ export class EnrollmentsService {
   }
 
   async enroll(dto: CreateEnrollmentDto): Promise<Enrollment> {
-    const existing = await this.enrollmentRepository.findActiveByUserAndCourseCycle(dto.userId, dto.courseCycleId);
-    if (existing) {
-      throw new ConflictException('El usuario ya cuenta con una matrícula activa en este curso.');
-    }
+    return await this.dataSource.transaction(async (manager) => {
+      const existing = await this.enrollmentRepository.findActiveByUserAndCourseCycle(
+        dto.userId, 
+        dto.courseCycleId, 
+        manager
+      );
 
-    const type = await this.enrollmentTypeRepository.findByCode(dto.enrollmentTypeCode);
-    if (!type) {
-      throw new BadRequestException('Tipo de matrícula no válido.');
-    }
+      if (existing) {
+        throw new ConflictException('El usuario ya cuenta con una matrícula activa en este curso.');
+      }
 
-    if (type.code === 'PARTIAL' && (!dto.evaluationIds || dto.evaluationIds.length === 0)) {
-      throw new BadRequestException('Las matrículas parciales deben especificar al menos una evaluación.');
-    }
+      const type = await this.enrollmentTypeRepository.findByCode(dto.enrollmentTypeCode, manager);
+      if (!type) {
+        throw new BadRequestException('Tipo de matrícula no válido.');
+      }
 
-    const status = await this.enrollmentStatusRepository.findByCode('ACTIVE');
-    if (!status) {
-      throw new InternalServerErrorException('Error de configuración del sistema.');
-    }
+      if (type.code === 'PARTIAL' && (!dto.evaluationIds || dto.evaluationIds.length === 0)) {
+        throw new BadRequestException('Las matrículas parciales deben especificar al menos una evaluación.');
+      }
 
-    const enrollment = await this.dataSource.transaction(async (manager) => {
-      const newEnrollment = await this.enrollmentRepository.create({
+      const status = await this.enrollmentStatusRepository.findByCode('ACTIVE', manager);
+      if (!status) {
+        throw new InternalServerErrorException('Error de configuración del sistema.');
+      }
+
+      const courseCycle = await manager.getRepository(CourseCycle).findOne({
+        where: { id: dto.courseCycleId },
+        relations: { academicCycle: true },
+        lock: { mode: 'pessimistic_read' }
+      });
+
+      if (!courseCycle || !courseCycle.academicCycle) {
+        throw new InternalServerErrorException('Inconsistencia en datos del ciclo.');
+      }
+
+      const now = new Date();
+      const cycleEndDate = new Date(courseCycle.academicCycle.endDate);
+
+      if (cycleEndDate < now) {
+        this.logger.warn({
+          message: 'Intento de matrícula en ciclo finalizado',
+          courseCycleId: dto.courseCycleId,
+          academicCycleCode: courseCycle.academicCycle.code,
+          cycleEndDate: cycleEndDate.toISOString(),
+          userId: dto.userId,
+        });
+        throw new BadRequestException(
+          `No se puede matricular en el ciclo ${courseCycle.academicCycle.code} porque ya ha finalizado.`,
+        );
+      }
+
+      const enrollment = await this.enrollmentRepository.create({
         userId: dto.userId,
         courseCycleId: dto.courseCycleId,
         enrollmentStatusId: status.id,
@@ -106,18 +144,7 @@ export class EnrollmentsService {
         enrolledAt: new Date(),
       }, manager);
 
-      let courseCycleIdsToFetch: string[] = [dto.courseCycleId];
-      let currentCycleEndDate: Date | null = null;
-
-      const courseCycle = await manager.getRepository(CourseCycle).findOne({
-        where: { id: dto.courseCycleId },
-        relations: { academicCycle: true },
-      });
-
-      if (!courseCycle || !courseCycle.academicCycle) {
-        throw new InternalServerErrorException('Inconsistencia en datos del ciclo.');
-      }
-      currentCycleEndDate = courseCycle.academicCycle.endDate;
+      const courseCycleIdsToFetch: string[] = [dto.courseCycleId];
 
       if (type.code === 'FULL' && dto.historicalCourseCycleIds && dto.historicalCourseCycleIds.length > 0) {
         const pastCycles = await manager.getRepository(CourseCycle).find({
@@ -143,7 +170,7 @@ export class EnrollmentsService {
       });
       
       if (allEvaluations.length > 0) {
-        let evaluationsToGrant: typeof allEvaluations = [];
+        let evaluationsToGrant: Evaluation[] = [];
         let bankAccessLimitDate: Date | null = null;
 
         if (type.code === 'FULL') {
@@ -158,7 +185,8 @@ export class EnrollmentsService {
           }
 
           const maxAcademicEndDate = academicEvaluations.reduce((max, current) => {
-            return current.endDate > max ? current.endDate : max;
+            const currentEndDate = new Date(current.endDate);
+            return currentEndDate > max ? currentEndDate : max;
           }, new Date(0));
 
           evaluationsToGrant = [...academicEvaluations];
@@ -170,42 +198,60 @@ export class EnrollmentsService {
         }
 
         const accessEntries = evaluationsToGrant.map(evaluation => {
-          let accessEnd = evaluation.endDate;
+          let accessEnd = new Date(evaluation.endDate);
 
           if (evaluation.evaluationType.code === 'BANCO_ENUNCIADOS' && bankAccessLimitDate) {
             accessEnd = bankAccessLimitDate;
-          } else if (type.code === 'FULL' && currentCycleEndDate) {
-            accessEnd = evaluation.endDate > currentCycleEndDate ? evaluation.endDate : currentCycleEndDate;
+          } else if (type.code === 'FULL') {
+            const cycleEnd = new Date(courseCycle.academicCycle.endDate);
+            accessEnd = accessEnd > cycleEnd ? accessEnd : cycleEnd;
           }
 
           return {
-            enrollmentId: newEnrollment.id,
+            enrollmentId: enrollment.id,
             evaluationId: evaluation.id,
-            accessStartDate: evaluation.startDate,
+            accessStartDate: new Date(evaluation.startDate),
             accessEndDate: accessEnd,
             isActive: true,
           };
         });
 
-        if (accessEntries.length > 0) {
-          await this.enrollmentEvaluationRepository.createMany(accessEntries, manager);
-        }
+        await this.enrollmentEvaluationRepository.createMany(accessEntries, manager);
       }
 
-      return newEnrollment;
+      await this.cacheService.del(`cache:enrollment:user:${dto.userId}:dashboard`);
+      await this.cacheService.invalidateGroup(`cache:access:user:${dto.userId}:*`);
+
+      this.logger.log(JSON.stringify({
+        message: 'Matrícula procesada exitosamente',
+        userId: dto.userId,
+        courseCycleId: dto.courseCycleId,
+        enrollmentId: enrollment.id,
+        timestamp: new Date().toISOString(),
+      }));
+
+      return enrollment;
+    });
+  }
+
+  async cancelEnrollment(enrollmentId: string): Promise<void> {
+    const enrollment = await this.enrollmentRepository.findById(enrollmentId);
+    if (!enrollment) {
+      throw new BadRequestException('Matrícula no encontrada.');
+    }
+
+    await this.enrollmentRepository.update(enrollmentId, {
+      cancelledAt: new Date(),
     });
 
-    await this.cacheService.del(`cache:enrollment:user:${dto.userId}:dashboard`);
-    await this.cacheService.invalidateGroup(`cache:access:user:${dto.userId}:*`);
+    await this.cacheService.del(`cache:enrollment:user:${enrollment.userId}:dashboard`);
+    await this.cacheService.invalidateGroup(`cache:access:user:${enrollment.userId}:*`);
 
-    this.logger.log({
-      message: 'Matrícula procesada exitosamente',
-      userId: dto.userId,
-      courseCycleId: dto.courseCycleId,
-      enrollmentId: enrollment.id,
+    this.logger.log(JSON.stringify({
+      message: 'Matrícula cancelada e invalidación de caché procesada',
+      userId: enrollment.userId,
+      enrollmentId,
       timestamp: new Date().toISOString(),
-    });
-
-    return enrollment;
+    }));
   }
 }

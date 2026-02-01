@@ -1,10 +1,32 @@
 services:
+  nginx:
+    image: nginx:alpine
+    container_name: academia-pasalo-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ../nginx.conf:/etc/nginx/nginx.conf:ro
+      - /home/ubuntu/academia-pasalo/letsencrypt:/etc/letsencrypt:ro
+      - /home/ubuntu/academia-pasalo/certbot/www:/var/www/certbot:ro
+    depends_on:
+      - backend
+      - frontend
+    networks:
+      - academia-network
+  certbot:
+    image: certbot/certbot:latest
+    container_name: academia-pasalo-certbot
+    volumes:
+      - /home/ubuntu/academia-pasalo/letsencrypt:/etc/letsencrypt
+      - /home/ubuntu/academia-pasalo/certbot/www:/var/www/certbot
   backend:
     image: ${DOCKER_USERNAME}/academia-pasalo-backend:latest
     container_name: academia-pasalo-backend
     restart: unless-stopped
-    ports:
-      - "3001:3001"
+    expose:
+      - "3001"
     environment:
       - DB_HOST=mysql
       - DB_PORT=3306
@@ -17,6 +39,8 @@ services:
       - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
       - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
       - GOOGLE_REDIRECT_URI=${GOOGLE_REDIRECT_URI}
+      - MAXMIND_LICENSE_KEY=${MAXMIND_LICENSE_KEY}
+      - CORS_ORIGINS=${CORS_ORIGINS}
       - API_PREFIX=api/v1
       - NODE_ENV=production
       - PORT=3001
@@ -32,11 +56,13 @@ services:
     image: ${DOCKER_USERNAME}/academia-pasalo-frontend:latest
     container_name: academia-pasalo-frontend
     restart: unless-stopped
-    ports:
-      - "3000:3000"
+    expose:
+      - "3000"
     environment:
       - NODE_ENV=production
       - PORT=3000
+      - NEXT_PUBLIC_API_URL=/api/v1
+      - NEXT_PUBLIC_GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
     depends_on:
       - backend
     networks:
@@ -46,8 +72,8 @@ services:
     image: redis:8.0-alpine
     container_name: academia-pasalo-redis
     restart: unless-stopped
-    ports:
-      - "6379:6379"
+    expose:
+      - "6379"
     command: redis-server --save 60 1 --loglevel warning --maxmemory 256mb --maxmemory-policy allkeys-lru
     volumes:
       - redis_data:/data
@@ -63,8 +89,8 @@ services:
     image: mysql:8.0
     container_name: academia-pasalo-mysql
     restart: unless-stopped
-    ports:
-      - "3306:3306"
+    expose:
+      - "3306"
     environment:
       MYSQL_ROOT_PASSWORD: ${DB_PASSWORD}
       MYSQL_DATABASE: ${DB_NAME}

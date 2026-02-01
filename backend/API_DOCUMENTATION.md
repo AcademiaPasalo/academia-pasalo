@@ -175,6 +175,53 @@ Base URL: `/api/v1/courses`
 | GET | `/levels` | ADMIN, SUPER_ADMIN | Listar niveles académicos (1er Ciclo, etc.). |
 | GET | `/:id` | ADMIN, SUPER_ADMIN | Obtener detalle de una materia. |
 | POST | `/assign-cycle` | ADMIN, SUPER_ADMIN | **Aperturar Materia en Ciclo.** Vincula una materia a un ciclo académico (ej. Física I en 2026-0). Esto crea el `CourseCycle`. |
+| POST | `/cycle/:id/professors` | ADMIN, SUPER_ADMIN | **Asignar Profesor a Materia en Ciclo.** Asigna (o reactiva) a un profesor para un `CourseCycle` específico (curso + ciclo académico). |
+| DELETE | `/cycle/:id/professors/:professorUserId` | ADMIN, SUPER_ADMIN | **Remover Profesor de Materia en Ciclo.** Revoca al profesor de un `CourseCycle` específico. |
+
+### 1. Asignar Profesor a Materia en Ciclo (CourseCycle)
+`POST /cycle/:id/professors`
+
+**Purpose:**
+- Asociar un profesor a una materia aperturada en un ciclo académico específico (`course_cycle_professor`).
+- Este permiso es el que habilita el acceso del profesor a eventos, contenido y recursos relacionados a ese `CourseCycle`.
+
+**Roles:** `ADMIN`, `SUPER_ADMIN`
+
+**Path Params:**
+- `id`: `courseCycleId` (string)
+
+**Request Body:**
+```json
+{
+  "professorUserId": "string"
+}
+```
+
+**Response:**
+- `201 Created`
+- `data`: `null`
+
+**Notas:**
+- Operación idempotente: si el profesor ya estaba asignado, se mantiene/actualiza el vínculo (y si estaba revocado, se reactiva).
+
+
+### 2. Remover Profesor de Materia en Ciclo (CourseCycle)
+`DELETE /cycle/:id/professors/:professorUserId`
+
+**Purpose:**
+- Revocar el acceso del profesor a esa materia en ese ciclo (`course_cycle_professor.revoked_at`).
+
+**Roles:** `ADMIN`, `SUPER_ADMIN`
+
+**Path Params:**
+- `id`: `courseCycleId` (string)
+- `professorUserId`: (string)
+
+**Response:**
+- `204 No Content`
+
+**Notas:**
+- Esta operación impacta directamente en las validaciones de acceso del profesor para eventos y recursos de ese `CourseCycle`.
 
 ---
 

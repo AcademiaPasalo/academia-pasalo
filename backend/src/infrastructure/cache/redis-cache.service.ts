@@ -5,7 +5,7 @@ import Redis from 'ioredis';
 @Injectable()
 export class RedisCacheService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(RedisCacheService.name);
-  private redisClient: Redis;
+  private redisClient!: Redis;
 
   constructor(private readonly configService: ConfigService) {}
 
@@ -95,31 +95,45 @@ export class RedisCacheService implements OnModuleInit, OnModuleDestroy {
   }
 
   async invalidateGroup(pattern: string): Promise<void> {
-    const stream = this.redisClient.scanStream({
-      match: pattern,
-      count: 100,
-    });
-
-    stream.on('data', async (keys: string[]) => {
-      if (keys.length > 0) {
-        await this.redisClient.del(...keys);
-      }
-    });
-
-    stream.on('end', () => {
-      this.logger.log({
-        message: 'Invalidación de grupo completada',
-        pattern,
-        timestamp: new Date().toISOString(),
+    return new Promise((resolve, reject) => {
+      const stream = this.redisClient.scanStream({
+        match: pattern,
+        count: 100,
       });
-    });
 
-    stream.on('error', (error) => {
-      this.logger.error({
-        message: 'Error durante la invalidación de grupo',
-        pattern,
-        error: error.message,
-        timestamp: new Date().toISOString(),
+      const keysToDelete: string[] = [];
+
+      stream.on('data', (keys: string[]) => {
+        if (keys.length > 0) {
+          keysToDelete.push(...keys);
+        }
+      });
+
+      stream.on('end', async () => {
+        try {
+          if (keysToDelete.length > 0) {
+            await this.redisClient.del(...keysToDelete);
+          }
+          this.logger.log({
+            message: 'Invalidación de grupo completada',
+            pattern,
+            keysDeleted: keysToDelete.length,
+            timestamp: new Date().toISOString(),
+          });
+          resolve();
+        } catch (error) {
+          reject(error);
+        }
+      });
+
+      stream.on('error', (error) => {
+        this.logger.error({
+          message: 'Error durante la invalidación de grupo',
+          pattern,
+          error: error.message,
+          timestamp: new Date().toISOString(),
+        });
+        reject(error);
       });
     });
   }

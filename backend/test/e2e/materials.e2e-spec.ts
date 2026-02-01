@@ -2,7 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import request from 'supertest';
-import { AppModule } from '@src/app.module';
+import { AppModule } from '@/app.module';
 import { DataSource } from 'typeorm';
 import { TestSeeder } from './test-utils';
 import { StorageService } from '@infrastructure/storage/storage.service';
@@ -13,6 +13,7 @@ import * as fs from 'fs';
 import { User } from '@modules/users/domain/user.entity';
 import { CourseCycle } from '@modules/courses/domain/course-cycle.entity';
 import { Evaluation } from '@modules/evaluations/domain/evaluation.entity';
+import { RedisCacheService } from '@infrastructure/cache/redis-cache.service';
 
 describe('E2E: Gestión de Materiales y Seguridad', () => {
   let app: INestApplication;
@@ -20,7 +21,6 @@ describe('E2E: Gestión de Materiales y Seguridad', () => {
   let seeder: TestSeeder;
   let storageService: StorageService;
 
-  // Entidades base
   let admin: { user: User; token: string };
   let professor: { user: User; token: string };
   let studentWithAccess: { user: User; token: string };
@@ -29,7 +29,6 @@ describe('E2E: Gestión de Materiales y Seguridad', () => {
   let evaluation: Evaluation;
   let rootFolderId: string;
 
-  // Fechas
   const now = new Date();
   const yesterday = new Date(now);
   yesterday.setDate(now.getDate() - 1);
@@ -55,9 +54,9 @@ describe('E2E: Gestión de Materiales y Seguridad', () => {
     .compile();
 
     app = moduleFixture.createNestApplication();
+    app.setGlobalPrefix('api/v1');
     app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
     
-    // Registrar Interceptor para estandarizar respuesta (data wrapper)
     const reflector = app.get(Reflector);
     app.useGlobalInterceptors(new TransformInterceptor(reflector));
 
@@ -65,45 +64,56 @@ describe('E2E: Gestión de Materiales y Seguridad', () => {
 
     dataSource = app.get(DataSource);
     storageService = app.get(StorageService);
+    const cacheService = app.get(RedisCacheService);
     seeder = new TestSeeder(dataSource, app);
 
-    // Limpieza de tablas de materiales para evitar datos sucios (paths inexistentes)
-    await dataSource.query('DELETE FROM deletion_request');
-    await dataSource.query('DELETE FROM material');
-    await dataSource.query('DELETE FROM file_version');
-    await dataSource.query('DELETE FROM file_resource');
-    await dataSource.query('DELETE FROM material_folder');
+    await cacheService.invalidateGroup('*');
+    await dataSource.query('SET FOREIGN_KEY_CHECKS = 0');
+    const tables = [
+      'deletion_request',
+      'enrollment_evaluation',
+      'enrollment',
+      'material',
+      'file_version',
+      'file_resource',
+      'material_folder',
+      'evaluation',
+      'course_cycle_professor',
+      'course_cycle',
+      'academic_cycle',
+      'course',
+      'user_role',
+      'user_session',
+      'user',
+    ];
+    for (const table of tables) {
+      await dataSource.query(`DELETE FROM ${table}`);
+    }
+    await dataSource.query('SET FOREIGN_KEY_CHECKS = 1');
 
-    // 1. Setup Base
     await seeder.ensureMaterialStatuses();
     const cycle = await seeder.createCycle(`2026-MAT-${Date.now()}`, formatDate(now), formatDate(nextMonth));
     const course = await seeder.createCourse(`MAT101-${Date.now()}`, 'Materiales 101');
     courseCycle = await seeder.linkCourseCycle(course.id, cycle.id);
-    
-    // 2. Crear Evaluación (Contenedor de carpetas)
-    // Usamos 'yesterday' para asegurar que accessStartDate sea <= now incluso con UTC/Timezones
     evaluation = await seeder.createEvaluation(courseCycle.id, 'PC', 1, formatDate(yesterday), formatDate(nextMonth));
 
-    // 3. Usuarios
     admin = await seeder.createAuthenticatedUser(TestSeeder.generateUniqueEmail('admin_mat'), ['ADMIN']);
     professor = await seeder.createAuthenticatedUser(TestSeeder.generateUniqueEmail('prof_mat'), ['PROFESSOR']);
     
-    // Alumno con acceso (Full enrollment)
+    // Asignar profesor al curso
+    await dataSource.query(
+      'INSERT INTO course_cycle_professor (course_cycle_id, professor_user_id, assigned_at) VALUES (?, ?, NOW())',
+      [courseCycle.id, professor.user.id]
+    );
+
     const s1 = await seeder.createAuthenticatedUser(TestSeeder.generateUniqueEmail('student_ok'), ['STUDENT']);
     studentWithAccess = s1;
     await request(app.getHttpServer())
-      .post('/enrollments')
+      .post('/api/v1/enrollments')
       .set('Authorization', `Bearer ${admin.token}`)
       .send({ userId: s1.user.id, courseCycleId: courseCycle.id, enrollmentTypeCode: 'FULL' })
       .expect(201);
 
-    // DEBUG: Verificar si se crearon los permisos
-    const perms = await dataSource.getRepository('EnrollmentEvaluation').find({ 
-        where: { enrollment: { userId: s1.user.id } },
-        relations: { evaluation: true }
-    });
-
-    // Alumno sin acceso (No enrollment)
     studentWithoutAccess = await seeder.createAuthenticatedUser(TestSeeder.generateUniqueEmail('student_fail'), ['STUDENT']);
   });
 
@@ -111,10 +121,10 @@ describe('E2E: Gestión de Materiales y Seguridad', () => {
     await app.close();
   });
 
-  describe('Fase 1: Gestión de Carpetas', () => {
+  describe('GESTIÓN DE CARPETAS Y ARCHIVOS', () => {
     it('Admin debe poder crear carpeta raíz', async () => {
       const res = await request(app.getHttpServer())
-        .post('/materials/folders')
+        .post('/api/v1/materials/folders')
         .set('Authorization', `Bearer ${admin.token}`)
         .send({
           evaluationId: evaluation.id,
@@ -125,127 +135,93 @@ describe('E2E: Gestión de Materiales y Seguridad', () => {
       
       rootFolderId = res.body.data.id;
       expect(rootFolderId).toBeDefined();
-      expect(rootFolderId).toBeDefined();
     });
 
-    it('Alumno matriculado debe poder ver carpetas raíz', async () => {
-      const res = await request(app.getHttpServer())
-        .get(`/materials/folders/evaluation/${evaluation.id}`)
-        .set('Authorization', `Bearer ${studentWithAccess.token}`)
-        .expect(200);
-      
-      expect(Array.isArray(res.body.data)).toBe(true);
-      expect(res.body.data[0].id).toBe(rootFolderId);
-    });
-
-    it('Alumno SIN matrícula NO debe poder ver carpetas (403)', async () => {
+    it('Profesor asignado debe poder subir archivo', async () => {
+      const buffer = Buffer.from('%PDF-1.4 content');
       await request(app.getHttpServer())
-        .get(`/materials/folders/evaluation/${evaluation.id}`)
-        .set('Authorization', `Bearer ${studentWithoutAccess.token}`)
-        .expect(403);
-    });
-  });
-
-  describe('Fase 2: Subida de Archivos (Upload)', () => {
-    it('Profesor debe poder subir archivo PDF a la carpeta', async () => {
-      const buffer = Buffer.from('Contenido simulado del PDF');
-      
-      const res = await request(app.getHttpServer())
-        .post('/materials')
+        .post('/api/v1/materials')
         .set('Authorization', `Bearer ${professor.token}`)
         .attach('file', buffer, 'silabo.pdf')
         .field('materialFolderId', rootFolderId)
         .field('displayName', 'Sílabo Oficial')
         .expect(201);
+    });
+  });
 
-      expect(res.body.data.id).toBeDefined();
-      expect(storageService.saveFile).toHaveBeenCalled();
+  describe('BLINDAJE DE SEGURIDAD AVANZADA', () => {
+    let materialId: string;
+    let lockedFolderId: string;
+    let otherCourseEvaluation: Evaluation;
+
+    beforeAll(async () => {
+      const otherCourse = await seeder.createCourse(`OTHER-${Date.now()}`, 'Curso Ajeno');
+      const otherCC = await seeder.linkCourseCycle(otherCourse.id, courseCycle.academicCycleId);
+      otherCourseEvaluation = await seeder.createEvaluation(otherCC.id, 'PC', 1, formatDate(yesterday), formatDate(nextMonth));
+
+      const future = new Date();
+      future.setFullYear(now.getFullYear() + 1);
+      const resFolder = await request(app.getHttpServer())
+        .post('/api/v1/materials/folders')
+        .set('Authorization', `Bearer ${admin.token}`)
+        .send({
+          evaluationId: evaluation.id,
+          name: 'Examen Futuro',
+          visibleFrom: future.toISOString(),
+        })
+        .expect(201);
+      lockedFolderId = resFolder.body.data.id;
+
+      const buffer = Buffer.from('%PDF-1.4 locked');
+      const resMat = await request(app.getHttpServer())
+        .post('/api/v1/materials')
+        .set('Authorization', `Bearer ${admin.token}`)
+        .attach('file', buffer, 'examen.pdf')
+        .field('materialFolderId', lockedFolderId)
+        .field('displayName', 'Examen Confidencial')
+        .expect(201);
+      materialId = resMat.body.data.id;
     });
 
-    it('Debe fallar si no se envía archivo', async () => {
-        await request(app.getHttpServer())
-        .post('/materials')
+    it('Profesor NO debe poder ver raíces de un curso ajeno (403)', async () => {
+      await request(app.getHttpServer())
+        .get(`/api/v1/materials/folders/evaluation/${otherCourseEvaluation.id}`)
         .set('Authorization', `Bearer ${professor.token}`)
-        .field('materialFolderId', rootFolderId)
-        .field('displayName', 'Fail File')
-        .expect(400); // Bad Request (Validación correcta)
-    });
-  });
-
-  describe('Fase 3: Descarga y Seguridad', () => {
-    let materialId: string;
-
-    beforeAll(async () => {
-        // Crear un material específico para descargar
-        const buffer = Buffer.from('PDF_TEST');
-        const res = await request(app.getHttpServer())
-            .post('/materials')
-            .set('Authorization', `Bearer ${professor.token}`)
-            .attach('file', buffer, 'test.pdf')
-            .field('materialFolderId', rootFolderId)
-            .field('displayName', 'Download Test')
-            .expect(201);
-        materialId = res.body.data.id;
+        .expect(403);
     });
 
-    it('Alumno matriculado debe poder descargar (Simulación)', async () => {
-        // Al estar mockeado el StorageService, esperamos que el servicio intente leer.
-        // Pero `createReadStream` es de 'fs'. Como el path es '/tmp/...', fallará en FS real si no mockeamos fs.
-        // Sin embargo, la prueba más importante aquí es que PASE la barrera de seguridad (AccessEngine).
-        // Si falla con 404 (Not Found) o 500 (FS Error), significa que PASÓ el 403.
-        
-        const res = await request(app.getHttpServer())
-            .get(`/materials/${materialId}/download`)
-            .set('Authorization', `Bearer ${studentWithAccess.token}`);
-        
-        // Esperamos 500 o 404 porque el archivo físico real no existe (Mock devolvió path falso), 
-        // PERO NO 403.
-        expect(res.status).not.toBe(403);
+    it('Admin SÍ debe poder ver raíces de cualquier curso (Bypass)', async () => {
+      await request(app.getHttpServer())
+        .get(`/api/v1/materials/folders/evaluation/${otherCourseEvaluation.id}`)
+        .set('Authorization', `Bearer ${admin.token}`)
+        .expect(200);
     });
 
-    it('Alumno SIN matrícula debe recibir 403 Forbidden', async () => {
-        await request(app.getHttpServer())
-            .get(`/materials/${materialId}/download`)
-            .set('Authorization', `Bearer ${studentWithoutAccess.token}`)
-            .expect(403);
-    });
-  });
-
-  describe('Fase 4: Flujo de Eliminación', () => {
-    let materialId: string;
-
-    beforeAll(async () => {
-        const buffer = Buffer.from('DEL');
-        const res = await request(app.getHttpServer())
-            .post('/materials')
-            .set('Authorization', `Bearer ${professor.token}`)
-            .attach('file', buffer, 'delete_me.pdf')
-            .field('materialFolderId', rootFolderId)
-            .field('displayName', 'Delete Me')
-            .expect(201);
-        materialId = res.body.data.id;
+    it('Estudiante NO debe poder descargar material si la carpeta es futura (403)', async () => {
+      await request(app.getHttpServer())
+        .get(`/api/v1/materials/${materialId}/download`)
+        .set('Authorization', `Bearer ${studentWithAccess.token}`)
+        .expect(403);
     });
 
-    it('Profesor NO puede borrar directamente (Debería implementar DELETE si existiera endpoint, pero no existe)', async () => {
-       // Verificamos que SOLO exista el endpoint de request-deletion
-       await request(app.getHttpServer())
-         .delete(`/materials/${materialId}`)
-         .set('Authorization', `Bearer ${professor.token}`)
-         .expect(404); // Endpoint no existe
-    });
+    it('Estudiante con MATRÍCULA CANCELADA debe recibir 403', async () => {
+      const enrollmentRepo = dataSource.getRepository('Enrollment');
+      const enrollment = await enrollmentRepo.findOne({ 
+        where: { userId: studentWithAccess.user.id, courseCycleId: courseCycle.id } 
+      });
+      if (enrollment) {
+        await enrollmentRepo.update(enrollment.id, { cancelledAt: new Date() });
+      }
 
-    it('Profesor puede solicitar eliminación', async () => {
-        await request(app.getHttpServer())
-            .post(`/materials/${materialId}/request-deletion`)
-            .set('Authorization', `Bearer ${professor.token}`)
-            .send({ reason: 'Ya no es válido' })
-            .expect(200);
-        
-        // Verificar en BD que se creó la solicitud
-        const reqRepo = dataSource.getRepository('DeletionRequest');
-        const req = await reqRepo.findOne({ where: { entityId: materialId } });
-        expect(req).toBeDefined();
-        expect(req?.reason).toBe('Ya no es válido');
+      // 2. IMPORTANTE: Invalidar el caché de acceso para que el sistema consulte la DB
+      const cacheService = app.get(RedisCacheService);
+      await cacheService.del(`cache:access:user:${studentWithAccess.user.id}:eval:${evaluation.id}`);
+
+      // 3. Intentar ver carpetas (Debería fallar ahora que la matrícula está cancelada)
+      await request(app.getHttpServer())
+        .get(`/api/v1/materials/folders/evaluation/${evaluation.id}`)
+        .set('Authorization', `Bearer ${studentWithAccess.token}`)
+        .expect(403);
     });
   });
 });

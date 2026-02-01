@@ -16,8 +16,13 @@ export class EnrollmentRepository {
     return await repo.save(enrollment);
   }
 
-  async findActiveByUserAndCourseCycle(userId: string, courseCycleId: string): Promise<Enrollment | null> {
-    return await this.ormRepository.findOne({
+  async findActiveByUserAndCourseCycle(
+    userId: string, 
+    courseCycleId: string, 
+    manager?: EntityManager
+  ): Promise<Enrollment | null> {
+    const repo = manager ? manager.getRepository(Enrollment) : this.ormRepository;
+    return await repo.findOne({
       where: {
         userId,
         courseCycleId,
@@ -30,6 +35,8 @@ export class EnrollmentRepository {
     return await this.ormRepository.createQueryBuilder('enrollment')
       .innerJoinAndSelect('enrollment.courseCycle', 'courseCycle')
       .innerJoinAndSelect('courseCycle.course', 'course')
+      .innerJoinAndSelect('course.courseType', 'courseType')
+      .innerJoinAndSelect('course.cycleLevel', 'cycleLevel')
       .innerJoinAndSelect('courseCycle.academicCycle', 'academicCycle')
       .leftJoinAndSelect('courseCycle.professors', 'courseCycleProfessor', 'courseCycleProfessor.revokedAt IS NULL')
       .leftJoinAndSelect('courseCycleProfessor.professor', 'professor')
@@ -37,5 +44,13 @@ export class EnrollmentRepository {
       .andWhere('enrollment.cancelledAt IS NULL')
       .orderBy('enrollment.enrolledAt', 'DESC')
       .getMany();
+  }
+
+  async findById(id: string): Promise<Enrollment | null> {
+    return await this.ormRepository.findOne({ where: { id } });
+  }
+
+  async update(id: string, data: Partial<Enrollment>): Promise<void> {
+    await this.ormRepository.update(id, data);
   }
 }

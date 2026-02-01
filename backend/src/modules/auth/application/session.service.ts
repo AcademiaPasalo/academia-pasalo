@@ -3,11 +3,10 @@ import { DataSource } from 'typeorm';
 import type { EntityManager } from 'typeorm';
 import { UserSessionRepository } from '@modules/auth/infrastructure/user-session.repository';
 import { SecurityEventService } from '@modules/auth/application/security-event.service';
-import { GeolocationService } from '@modules/auth/application/geolocation.service';
-import { AuthSettingsService } from '@modules/auth/application/auth-settings.service';
-import { GeoProvider } from '@common/interfaces/geo-provider.interface';
+import { SessionAnomalyDetectorService } from '@modules/auth/application/session-anomaly-detector.service';
 import { UserSession } from '@modules/auth/domain/user-session.entity';
 import { RequestMetadata } from '@modules/auth/interfaces/request-metadata.interface';
+import { RedisCacheService } from '@infrastructure/cache/redis-cache.service';
 import {
   SessionStatusCode,
   SessionStatusService,
@@ -22,10 +21,9 @@ export class SessionService {
     private readonly dataSource: DataSource,
     private readonly userSessionRepository: UserSessionRepository,
     private readonly securityEventService: SecurityEventService,
-    private readonly geolocationService: GeolocationService,
+    private readonly sessionAnomalyDetector: SessionAnomalyDetectorService,
     private readonly sessionStatusService: SessionStatusService,
-    private readonly authSettingsService: AuthSettingsService,
-    private readonly geoProvider: GeoProvider,
+    private readonly cacheService: RedisCacheService,
   ) {}
 
   async createSession(
@@ -39,7 +37,7 @@ export class SessionService {
     sessionStatus: SessionStatusCode;
     concurrentSessionId: string | null;
   }> {
-    const resolved = await this.resolveCoordinates(metadata);
+    const resolved = await this.sessionAnomalyDetector.resolveCoordinates(metadata);
     
     const runInTransaction = async (manager: EntityManager) => {
       const activeStatusId = await this.sessionStatusService.getIdByCode(
@@ -55,7 +53,7 @@ export class SessionService {
         manager,
       );
 
-      const anomaly = await this.detectLocationAnomaly(
+      const anomaly = await this.sessionAnomalyDetector.detectLocationAnomaly(
         userId,
         resolved.metadata,
         resolved.locationSource,
@@ -184,6 +182,19 @@ export class SessionService {
     refreshToken: string,
   ): Promise<UserSession> {
     const refreshTokenHash = this.hashRefreshToken(refreshToken);
+
+    const isBlacklisted = await this.cacheService.get(`blacklist:refresh:${refreshTokenHash}`);
+    if (isBlacklisted) {
+      this.logger.warn({
+        level: 'warn',
+        context: SessionService.name,
+        message: 'Intento de uso de refresh token revocado',
+        userId,
+        deviceId,
+      });
+      throw new UnauthorizedException('Token revocado');
+    }
+
     const session = await this.userSessionRepository.findByRefreshTokenHash(
       refreshTokenHash,
     );
@@ -285,6 +296,7 @@ export class SessionService {
 
     for (const session of sessions) {
       await this.userSessionRepository.deactivateSession(session.id);
+      await this.cacheService.del(`cache:session:${session.id}:user`);
     }
 
     this.logger.log({
@@ -294,120 +306,6 @@ export class SessionService {
       userId,
       sessionsCount: sessions.length,
     });
-  }
-
-  private async detectLocationAnomaly(
-    userId: string,
-    metadata: RequestMetadata,
-    locationSource: 'ip' | 'gps' | 'none',
-    manager?: EntityManager,
-  ): Promise<{
-    isAnomalous: boolean;
-    previousSessionId: string | null;
-    distanceKm: number | null;
-    timeDifferenceMinutes: number | null;
-  }> {
-    if (locationSource === 'none') {
-      return {
-        isAnomalous: false,
-        previousSessionId: null,
-        distanceKm: null,
-        timeDifferenceMinutes: null,
-      };
-    }
-
-    if (!metadata.latitude || !metadata.longitude) {
-      return {
-        isAnomalous: false,
-        previousSessionId: null,
-        distanceKm: null,
-        timeDifferenceMinutes: null,
-      };
-    }
-
-    const lastSession =
-      await this.userSessionRepository.findLatestSessionByUserId(userId, manager);
-
-    if (!lastSession || !lastSession.latitude || !lastSession.longitude) {
-      return {
-        isAnomalous: false,
-        previousSessionId: null,
-        distanceKm: null,
-        timeDifferenceMinutes: null,
-      };
-    }
-
-    const timeDifferenceMs =
-      new Date().getTime() - lastSession.createdAt.getTime();
-    const timeDifferenceMinutes = timeDifferenceMs / (1000 * 60);
-
-    const distanceKm = this.geolocationService.calculateDistance(
-      lastSession.latitude,
-      lastSession.longitude,
-      metadata.latitude,
-      metadata.longitude,
-    );
-
-    const timeWindowMinutes =
-      locationSource === 'gps'
-        ? await this.authSettingsService.getGeoGpsTimeWindowMinutes()
-        : await this.authSettingsService.getGeoIpTimeWindowMinutes();
-    const distanceThresholdKm =
-      locationSource === 'gps'
-        ? await this.authSettingsService.getGeoGpsDistanceKm()
-        : await this.authSettingsService.getGeoIpDistanceKm();
-
-    const isAnomalous =
-      timeDifferenceMinutes <= timeWindowMinutes &&
-      distanceKm >= distanceThresholdKm;
-
-    if (!isAnomalous) {
-      return {
-        isAnomalous: false,
-        previousSessionId: lastSession.id,
-        distanceKm,
-        timeDifferenceMinutes,
-      };
-    }
-
-    return {
-      isAnomalous: true,
-      previousSessionId: lastSession.id,
-      distanceKm,
-      timeDifferenceMinutes,
-    };
-  }
-
-  private async resolveCoordinates(metadata: RequestMetadata): Promise<{
-    metadata: RequestMetadata;
-    locationSource: 'ip' | 'gps' | 'none';
-  }> {
-    const hasLatitude = typeof metadata.latitude === 'number';
-    const hasLongitude = typeof metadata.longitude === 'number';
-
-    if (hasLatitude && hasLongitude) {
-      return { metadata, locationSource: 'gps' };
-    }
-
-    // 5. GeoIP Lookup (Local DB)
-    const geo = this.geoProvider.resolve(metadata.ipAddress);
-    
-    // 6. Security Checks
-    // A. Impossible Travel Check
-    if (!geo) {
-      return { metadata, locationSource: 'none' };
-    }
-
-    return {
-      metadata: {
-        ...metadata,
-        latitude: geo.latitude,
-        longitude: geo.longitude,
-        city: geo.city || undefined,
-        country: geo.country || undefined,
-      },
-      locationSource: 'ip',
-    };
   }
 
   private hashRefreshToken(token: string): string {

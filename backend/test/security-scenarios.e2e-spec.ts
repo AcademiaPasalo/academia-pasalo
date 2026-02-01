@@ -9,13 +9,14 @@ import { SecurityEventService } from '../src/modules/auth/application/security-e
 import { SessionStatusService } from '../src/modules/auth/application/session-status.service';
 import { AuthSettingsService } from '../src/modules/auth/application/auth-settings.service';
 import { GeolocationService } from '../src/modules/auth/application/geolocation.service';
+import { SessionAnomalyDetectorService } from '../src/modules/auth/application/session-anomaly-detector.service';
 import { GeoProvider } from '../src/common/interfaces/geo-provider.interface';
 import { UsersService } from '../src/modules/users/application/users.service';
 import { UserSessionRepository } from '../src/modules/auth/infrastructure/user-session.repository';
 import { SecurityEventRepository } from '../src/modules/auth/infrastructure/security-event.repository';
 import { SecurityEventTypeRepository } from '../src/modules/auth/infrastructure/security-event-type.repository';
 import { SessionStatusRepository } from '../src/modules/auth/infrastructure/session-status.repository';
-import { SystemSettingRepository } from '../src/modules/auth/infrastructure/system-setting.repository';
+import { SettingsService } from '../src/modules/settings/application/settings.service';
 import { RequestMetadata } from '../src/modules/auth/interfaces/request-metadata.interface';
 import { JwtStrategy } from '../src/modules/auth/strategies/jwt.strategy';
 
@@ -60,6 +61,13 @@ describe('Security Scenarios (Integration)', () => {
     findByRefreshTokenHash: jest.fn(),
     findByRefreshTokenHashForUpdate: jest.fn(),
     findById: jest.fn(),
+    findByIdWithUser: jest.fn().mockResolvedValue({
+      id: '1',
+      isActive: true,
+      sessionStatusId: '100',
+      expiresAt: new Date(Date.now() + 1000000),
+      user: mockUser,
+    }),
     findByIdForUpdate: jest.fn(),
     update: jest.fn(),
     deactivateSession: jest.fn(),
@@ -77,16 +85,16 @@ describe('Security Scenarios (Integration)', () => {
     findByCode: jest.fn((code) => Promise.resolve({ id: '100', code })),
   };
 
-  const mockSystemSettingRepository = {
-    findByKey: jest.fn((key) => {
-      const settings = {
-        REFRESH_TOKEN_TTL_DAYS: '7',
-        ACCESS_TOKEN_TTL_MINUTES: '15',
-        SESSION_EXPIRATION_WARNING_MINUTES: '5',
-        GEO_GPS_ANOMALY_TIME_WINDOW_MINUTES: '60',
-        GEO_GPS_ANOMALY_DISTANCE_KM: '500',
-      };
-      return Promise.resolve({ settingValue: settings[key] });
+  const mockAnomalyDetector = {
+    resolveCoordinates: jest.fn().mockImplementation((meta) => Promise.resolve({
+      metadata: meta,
+      locationSource: 'gps',
+    })),
+    detectLocationAnomaly: jest.fn().mockResolvedValue({
+      isAnomalous: false,
+      previousSessionId: null,
+      distanceKm: null,
+      timeDifferenceMinutes: null,
     }),
   };
 
@@ -115,16 +123,19 @@ describe('Security Scenarios (Integration)', () => {
         { provide: SecurityEventRepository, useValue: mockSecurityEventRepository },
         { provide: SecurityEventTypeRepository, useValue: mockSecurityEventTypeRepository },
         { provide: SessionStatusRepository, useValue: mockSessionStatusRepository },
-        { provide: SystemSettingRepository, useValue: mockSystemSettingRepository },
-        // Injection Token corregido
+        { provide: SessionAnomalyDetectorService, useValue: mockAnomalyDetector },
+        { provide: SettingsService, useValue: {
+          getPositiveInt: jest.fn().mockResolvedValue(30),
+          getString: jest.fn().mockResolvedValue('CYCLE_2024_1'),
+        } },
         { provide: GeoProvider, useValue: mockGeoProvider },
         {
           provide: RedisCacheService,
           useValue: {
             get: jest.fn().mockResolvedValue(null),
-            set: jest.fn().mockResolvedValue(null),
-            del: jest.fn().mockResolvedValue(null),
-            invalidateGroup: jest.fn().mockResolvedValue(null),
+            set: jest.fn().mockResolvedValue(undefined),
+            del: jest.fn().mockResolvedValue(undefined),
+            invalidateGroup: jest.fn().mockResolvedValue(undefined),
           },
         },
         {
@@ -153,13 +164,27 @@ describe('Security Scenarios (Integration)', () => {
     securityEventService = moduleFixture.get<SecurityEventService>(SecurityEventService);
     
     (authService as any).verifyCodeAndGetEmail = jest.fn().mockResolvedValue(mockUser.email);
-  });
 
-  // ... (RESTO DE PRUEBAS SE MANTIENEN IGUAL) ...
+    mockAnomalyDetector.detectLocationAnomaly.mockImplementation((userId, metadata) => {
+      if (metadata && metadata.ipAddress === '8.8.8.8') {
+        return Promise.resolve({
+          isAnomalous: true,
+          previousSessionId: '50',
+          distanceKm: 10000,
+          timeDifferenceMinutes: 5,
+        });
+      }
+      return Promise.resolve({
+        isAnomalous: false,
+        previousSessionId: null,
+        distanceKm: null,
+        timeDifferenceMinutes: null,
+      });
+    });
+  });
 
   describe('ATOMICITY & TRANSACTIONS', () => {
     it('should fail login atomically if concurrent-session audit logging fails', async () => {
-      mockUserSessionRepository.findLatestSessionByUserId.mockResolvedValue(null);
       mockUserSessionRepository.findOtherActiveSession.mockResolvedValue({
         id: '55',
         deviceId: 'device-B-existing',
@@ -197,15 +222,8 @@ describe('Security Scenarios (Integration)', () => {
 
   describe('IMPOSSIBLE TRAVEL (Anomaly Detection)', () => {
     it('should BLOCK session if user moves too fast (Madrid -> Tokyo in 5 mins)', async () => {
-      mockUserSessionRepository.findLatestSessionByUserId.mockResolvedValue({
-        id: '50',
-        createdAt: new Date(Date.now() - 5 * 60 * 1000),
-        latitude: 35.6762,
-        longitude: 139.6503,
-      });
-
       mockUserSessionRepository.create.mockResolvedValue({ id: '123' });
-      const result = await authService.loginWithGoogle('token', mockMetadata);
+      const result = await authService.loginWithGoogle('token', { ...mockMetadata, ipAddress: '8.8.8.8' });
       expect(result.sessionStatus).toBe('BLOCKED_PENDING_REAUTH');
     });
   });
@@ -254,15 +272,15 @@ describe('Security Scenarios (Integration)', () => {
     it('should REJECT access if session is BLOCKED in database', async () => {
       const strategy = new JwtStrategy(
         { get: () => 'secret' } as any,
-        mockUsersService as any,
+        {} as any,
         mockUserSessionRepository as any,
         { getIdByCode: () => Promise.resolve('1') } as any,
-        { get: jest.fn().mockResolvedValue(null), set: jest.fn() } as any, // Mock RedisCacheService
+        { get: jest.fn().mockResolvedValue(null), set: jest.fn() } as any,
       );
 
       const payload = { sub: '1', email: 'h@t.com', roles: [], sessionId: '500' };
 
-      mockUserSessionRepository.findById.mockResolvedValue({
+      mockUserSessionRepository.findByIdWithUser.mockResolvedValue({
         id: '500',
         isActive: false,
         sessionStatusId: '99',

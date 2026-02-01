@@ -1,8 +1,9 @@
-import { Controller, Post, Body, Get, Param, HttpStatus, HttpCode, UploadedFile, UseInterceptors, Res, BadRequestException } from '@nestjs/common';
+import { Controller, Post, Body, Get, Param, HttpStatus, HttpCode, UploadedFile, UseInterceptors, Res } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import type { Response } from 'express';
 import { MaterialsService } from '@modules/materials/application/materials.service';
 import { UploadMaterialDto } from '@modules/materials/dto/upload-material.dto';
+import { CreateMaterialFolderDto } from '@modules/materials/dto/create-material-folder.dto';
 import { RequestDeletionDto } from '@modules/materials/dto/request-deletion.dto';
 import { Auth } from '@common/decorators/auth.decorator';
 import { Roles } from '@common/decorators/roles.decorator';
@@ -14,6 +15,17 @@ import { ResponseMessage } from '@common/decorators/response-message.decorator';
 @Auth()
 export class MaterialsController {
   constructor(private readonly materialsService: MaterialsService) {}
+
+  @Post('folders')
+  @Roles('ADMIN', 'PROFESSOR', 'SUPER_ADMIN')
+  @HttpCode(HttpStatus.CREATED)
+  @ResponseMessage('Carpeta creada exitosamente')
+  async createFolder(
+    @CurrentUser() user: User,
+    @Body() dto: CreateMaterialFolderDto,
+  ) {
+    return await this.materialsService.createFolder(user.id, dto);
+  }
 
   @Post()
   @Roles('ADMIN', 'PROFESSOR', 'SUPER_ADMIN')
@@ -41,6 +53,26 @@ export class MaterialsController {
     return await this.materialsService.addVersion(user.id, materialId, file);
   }
 
+  @Get('folders/evaluation/:evaluationId')
+  @Roles('STUDENT', 'PROFESSOR', 'ADMIN', 'SUPER_ADMIN')
+  @ResponseMessage('Carpetas raíz obtenidas exitosamente')
+  async getRootFolders(
+    @CurrentUser() user: User,
+    @Param('evaluationId') evaluationId: string,
+  ) {
+    return await this.materialsService.getRootFolders(user.id, evaluationId);
+  }
+
+  @Get('folders/:folderId')
+  @Roles('STUDENT', 'PROFESSOR', 'ADMIN', 'SUPER_ADMIN')
+  @ResponseMessage('Contenido de carpeta obtenido exitosamente')
+  async getFolderContents(
+    @CurrentUser() user: User,
+    @Param('folderId') folderId: string,
+  ) {
+    return await this.materialsService.getFolderContents(user, folderId);
+  }
+
   @Get(':id/download')
   @Roles('STUDENT', 'ADMIN', 'PROFESSOR', 'SUPER_ADMIN')
   async download(
@@ -48,7 +80,7 @@ export class MaterialsController {
     @Param('id') materialId: string,
     @Res({ passthrough: true }) res: Response,
   ) {
-    const { stream, fileName, mimeType } = await this.materialsService.download(user.id, materialId);
+    const { stream, fileName, mimeType } = await this.materialsService.download(user, materialId);
     
     res.set({
       'Content-Type': mimeType,
@@ -56,25 +88,6 @@ export class MaterialsController {
     });
 
     return stream;
-  }
-
-  // Soporte para ruta con parametro (Legacy/Test E2E compatibility)
-  @Post(':id/request-deletion')
-  @Roles('PROFESSOR', 'ADMIN', 'SUPER_ADMIN')
-  @HttpCode(HttpStatus.OK)
-  @ResponseMessage('Solicitud de eliminación registrada')
-  async requestDeletionWithParam(
-    @CurrentUser() user: User,
-    @Param('id') materialId: string,
-    @Body() dto: any, 
-  ) {
-    // Reconstruimos el DTO completo
-    const fullDto: RequestDeletionDto = {
-        entityType: 'material', // Asumimos material por la ruta legacy
-        entityId: materialId,
-        reason: dto.reason || 'No reason provided'
-    };
-    await this.materialsService.requestDeletion(user.id, fullDto);
   }
 
   @Post('request-deletion')
