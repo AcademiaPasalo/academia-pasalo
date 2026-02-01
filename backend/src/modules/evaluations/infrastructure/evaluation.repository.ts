@@ -27,7 +27,16 @@ export class EvaluationRepository {
   }
 
   async findById(id: string): Promise<Evaluation | null> {
-    return await this.evaluationOrm.findOne({ where: { id } });
+    return await this.evaluationOrm.findOne({ 
+      where: { id },
+    });
+  }
+
+  async findByIdWithCycle(id: string): Promise<Evaluation | null> {
+    return await this.evaluationOrm.findOne({ 
+      where: { id },
+      relations: ['courseCycle', 'courseCycle.academicCycle'],
+    });
   }
 
   async create(data: Partial<Evaluation>, manager?: EntityManager): Promise<Evaluation> {
