@@ -5,15 +5,17 @@ import { useRouter } from 'next/navigation';
 import Icon from '@/components/ui/Icon';
 import CourseCard from '@/components/courses/CourseCard';
 import AgendarTutoriaModal from '@/components/modals/AgendarTutoriaModal';
+import DaySchedule from '@/components/dashboard/DaySchedule';
 import { useBreadcrumb } from '@/contexts/BreadcrumbContext';
-import { getCursos } from '@/services/cursoService';
-import { Curso } from '@/types/curso';
+import { enrollmentService } from '@/services/enrollment.service';
+import { Enrollment } from '@/types/enrollment';
 
 export default function InicioContent() {
   // Estado para controlar la vista activa
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
-  const [courses, setCourses] = useState<Curso[]>([]);
+  const [enrollments, setEnrollments] = useState<Enrollment[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const router = useRouter();
   
@@ -24,21 +26,23 @@ export default function InicioContent() {
     setBreadcrumbItems([{ icon: 'home', label: 'Inicio' }]);
   }, [setBreadcrumbItems]);
 
-  // Cargar cursos
+  // Cargar cursos matriculados
   useEffect(() => {
-    async function loadCursos() {
+    async function loadEnrollments() {
       setLoading(true);
+      setError(null);
       try {
-        const cursosData = await getCursos();
-        setCourses(cursosData);
-      } catch (error) {
-        console.error('Error al cargar cursos:', error);
+        const response = await enrollmentService.getMyCourses();
+        setEnrollments(response.data || []);
+      } catch (err) {
+        console.error('Error al cargar matrículas:', err);
+        setError('Error al cargar los cursos');
       } finally {
         setLoading(false);
       }
     }
 
-    loadCursos();
+    loadEnrollments();
   }, []);
 
   const handleAgendarTutoria = (curso: string, tema: string) => {
@@ -47,12 +51,52 @@ export default function InicioContent() {
     window.open(url, '_blank');
   };
 
+  // Obtener iniciales del profesor
+  const getProfessorInitials = (enrollment: Enrollment): string => {
+    const professors = enrollment.courseCycle.professors;
+    if (professors.length === 0) return 'XX';
+    const prof = professors[0];
+    return `${prof.firstName[0]}${prof.lastName1[0]}`.toUpperCase();
+  };
+
+  // Obtener nombre completo del profesor
+  const getProfessorName = (enrollment: Enrollment): string => {
+    const professors = enrollment.courseCycle.professors;
+    if (professors.length === 0) return 'Sin asignar';
+    const prof = professors[0];
+    return `${prof.firstName} ${prof.lastName1}`;
+  };
+
+  // Obtener color consistente para un curso
+  const getCourseColor = (courseCode: string): string => {
+    const hash = courseCode.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
+    const colors = ['#68d391', '#cd45e8', '#42a5f5', '#ffa726', '#ef5350'];
+    return colors[hash % colors.length];
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
         <div className="text-center">
           <div className="w-12 h-12 border-4 border-accent-solid border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
           <p className="text-secondary">Cargando cursos...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="text-center">
+          <Icon name="error" size={64} className="text-error-solid mb-4 mx-auto" />
+          <p className="text-lg font-semibold text-primary mb-2">{error}</p>
+          <button 
+            onClick={() => window.location.reload()}
+            className="mt-4 px-4 py-2 bg-accent-solid text-white rounded-lg hover:bg-accent-solid-hover transition-colors"
+          >
+            Reintentar
+          </button>
         </div>
       </div>
     );
@@ -112,122 +156,39 @@ export default function InicioContent() {
 
         {/* Grid de Cursos */}
         <div className={viewMode === 'grid' ? 'grid grid-cols-1 md:grid-cols-2 gap-6' : 'flex flex-col gap-6'}>
-          {courses.map((course) => (
-            <CourseCard
-              key={course.id}
-              headerColor={course.color}
-              category="CIENCIAS"
-              cycle={course.periodo || '1° CICLO'}
-              title={course.nombre}
-              teachers={[
-                { 
-                  initials: course.profesor?.split(' ').map(n => n[0]).join('').substring(0, 2) || 'XX', 
-                  name: course.profesor || 'Profesor', 
-                  avatarColor: course.color 
-                }
-              ]}
-              onViewCourse={() => router.push(`/plataforma/curso/${course.id}`)}
-              variant={viewMode}
-            />
-          ))}
+          {enrollments.length === 0 ? (
+            <div className="col-span-2 text-center py-12">
+              <Icon name="school" size={64} className="text-secondary mx-auto mb-4" />
+              <p className="text-lg font-semibold text-primary mb-2">No tienes cursos matriculados</p>
+              <p className="text-secondary">Contacta a tu coordinador para matricularte en cursos</p>
+            </div>
+          ) : (
+            enrollments.map((enrollment) => (
+              <CourseCard
+                key={enrollment.id}
+                headerColor={getCourseColor(enrollment.courseCycle.course.code)}
+                category="CIENCIAS"
+                cycle={enrollment.courseCycle.course.cycleLevel.name}
+                title={enrollment.courseCycle.course.name}
+                teachers={[
+                  { 
+                    initials: getProfessorInitials(enrollment), 
+                    name: getProfessorName(enrollment), 
+                    avatarColor: getCourseColor(enrollment.courseCycle.course.code)
+                  }
+                ]}
+                onViewCourse={() => router.push(`/plataforma/curso/${enrollment.courseCycle.id}`)}
+                variant={viewMode}
+              />
+            ))
+          )}
         </div>
       </div>
 
       {/* Columna Derecha: Agenda + CTA */}
       <div className="space-y-6">
-        {/* Agenda del Día */}
-        <div className="bg-white rounded-2xl border border-stroke-primary overflow-hidden">
-          {/* Header */}
-          <div className="p-3 border-b border-stroke-primary flex justify-between items-center">
-            <div className="flex items-center gap-1">
-              <Icon name="event" size={20} className="text-info-secondary-solid" />
-              <h2 className="text-sm font-semibold text-primary">Agenda del Día</h2>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="flex items-center gap-0.5">
-                <span className="text-xs text-primary">Mar</span>
-                <span className="text-xs text-primary">2026</span>
-              </div>
-              <div className="flex items-center">
-                <button className="p-1 rounded-lg hover:bg-secondary-hover">
-                  <Icon name="chevron_left" size={16} className="text-accent-primary" />
-                </button>
-                <button className="p-1 rounded-lg hover:bg-secondary-hover">
-                  <Icon name="chevron_right" size={16} className="text-accent-primary" />
-                </button>
-              </div>
-            </div>
-          </div>
-
-          {/* Mini Calendario */}
-          <div className="p-3 flex items-center gap-1">
-            {[
-              { day: 'DOM', date: '22', active: false },
-              { day: 'LUN', date: '23', active: false },
-              { day: 'MAR', date: '24', active: false },
-              { day: 'MIÉ', date: '25', active: true },
-              { day: 'JUE', date: '26', active: false },
-              { day: 'VIE', date: '27', active: false },
-              { day: 'SÁB', date: '28', active: false },
-            ].map((item, index) => (
-              <div
-                key={index}
-                className={`flex-1 px-2 py-1.5 rounded-xl flex flex-col items-center gap-px ${
-                  item.active ? 'bg-info-primary-solid/10' : 'bg-white'
-                }`}
-              >
-                <span className={`text-[8px] font-semibold ${item.active ? 'text-info-primary-solid' : 'text-tertiary'}`}>
-                  {item.day}
-                </span>
-                <div className={`w-5 h-5 rounded-full flex items-center justify-center ${item.active ? 'bg-info-primary-solid' : ''}`}>
-                  <span className={`text-xs font-medium ${item.active ? 'text-white' : 'text-primary'}`}>
-                    {item.date}
-                  </span>
-                </div>
-              </div>
-            ))}
-          </div>
-
-          {/* Eventos */}
-          <div className="px-3 pb-3 space-y-3">
-            {/* Evento 1 */}
-            <div className="bg-[#e6f7ed] rounded-xl border-l-4 border-[#68d391] overflow-hidden">
-              <div className="px-3 py-2.5 flex items-center gap-3">
-                <div className="flex-1 space-y-1">
-                  <div className="flex items-start gap-1">
-                    <span className="text-[10px] font-medium text-primary">2° Clase - PC1</span>
-                  </div>
-                  <div className="flex items-center">
-                    <span className="text-xs font-medium text-primary truncate">Fundamentos de Física</span>
-                  </div>
-                  <div className="flex items-center gap-0.5">
-                    <span className="text-xs text-secondary">6 - 8pm</span>
-                  </div>
-                </div>
-                <button className="px-1 py-1.5 rounded-lg hover:bg-black/5 transition-colors">
-                  <span className="text-base font-medium text-accent-primary">Unirse</span>
-                </button>
-              </div>
-            </div>
-
-            {/* Evento 2 */}
-            <div className="bg-[#fce4f2] rounded-xl border-l-4 border-[#cd45e8] overflow-hidden">
-              <div className="px-3 py-2.5 flex items-center gap-3">
-                <div className="flex-1 space-y-1">
-                  <div className="flex items-start gap-1">
-                    <span className="text-[10px] font-medium text-primary">2° Clase - PC1</span>
-                  </div>
-                  <div className="flex items-center">
-                    <span className="text-xs font-medium text-primary truncate">Fundamentos de Cálculo</span>
-                  </div>
-                  <div className="flex items-center gap-0.5">
-                    <span className="text-xs text-secondary">8 - 10pm</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
+        {/* Agenda del Día - Componente funcional */}
+        <DaySchedule />
 
         {/* CTA Tutoría */}
         <div className="relative bg-info-secondary-solid rounded-2xl p-6 flex flex-col gap-5 overflow-hidden">
