@@ -4,6 +4,8 @@ import {
   Column,
   ManyToMany,
   JoinTable,
+  ManyToOne,
+  JoinColumn,
 } from 'typeorm';
 import { Role } from './role.entity';
 
@@ -52,6 +54,13 @@ export class User {
     name: 'photo_source',
   })
   photoSource: PhotoSource;
+
+  @Column({ type: 'bigint', name: 'last_active_role_id', nullable: true })
+  lastActiveRoleId: string | null;
+
+  @ManyToOne(() => Role)
+  @JoinColumn({ name: 'last_active_role_id' })
+  lastActiveRole: Role | null;
 
   @Column({ type: 'datetime', nullable: false, name: 'created_at' })
   createdAt: Date;

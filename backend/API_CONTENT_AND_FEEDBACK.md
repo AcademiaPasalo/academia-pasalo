@@ -8,6 +8,7 @@ Esta API gestiona el núcleo de la experiencia académica: cursos, materiales ed
 ## 🏗️ Estándar de Comunicación
 *   **Base URL:** `/api/v1`
 *   **Auth:** Requiere `Authorization: Bearer <token>` (excepto en endpoints públicos).
+*   **Contexto de Rol Activo:** Todos los endpoints (ej. `/my-schedule`, `/my-courses`) responden basándose en el **perfil activo** seleccionado mediante `POST /auth/switch-profile`. Si un usuario tiene roles de `STUDENT` y `PROFESSOR`, debe cambiar de perfil explícitamente para ver el contenido correspondiente a cada rol.
 *   **Respuesta Exitosa:**
     ```json
     {
@@ -248,6 +249,15 @@ Permite navegar la jerarquía de una evaluación. Requiere matrícula en la eval
     *   `body: { file: Buffer }`
 *   **POST /materials/request-deletion:** Flujo seguro de borrado.
     *   `body: { entityType: 'material' | 'folder', entityId: string, reason: string }`
+
+### 4. Gestión Administrativa Avanzada (Moderación)
+*   **GET /admin/materials/requests/pending:** Listar solicitudes de eliminación pendientes.
+    *   **Roles:** `ADMIN`, `SUPER_ADMIN`
+*   **POST /admin/materials/requests/:id/review:** Aprobar o rechazar solicitud.
+    *   **Roles:** `ADMIN`, `SUPER_ADMIN`
+    *   `body: { action: 'APPROVE' | 'REJECT', rejectReason?: string }`
+*   **DELETE /admin/materials/:id/hard-delete:** Eliminación física permanente (irreversible).
+    *   **Roles:** `SUPER_ADMIN`
 
 ---
 
