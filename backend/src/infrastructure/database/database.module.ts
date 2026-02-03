@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { technicalSettings } from '@config/technical-settings';
 
 @Module({
   imports: [
@@ -16,14 +17,14 @@ import { TypeOrmModule } from '@nestjs/typeorm';
         database: configService.get<string>('DB_NAME'),
         entities: [__dirname + '/../../**/*.entity{.ts,.js}'],
         synchronize: false,
-        timezone: 'Z',
-        retryAttempts: 10,
-        retryDelay: 5000,
+        timezone: technicalSettings.database.typeorm.timezone,
+        retryAttempts: technicalSettings.database.typeorm.retryAttempts,
+        retryDelay: technicalSettings.database.typeorm.retryDelayMs,
         extra: {
-          connectionLimit: 50,
-          waitForConnections: true,
-          queueLimit: 0,
-          connectTimeout: 10000,
+          connectionLimit: technicalSettings.database.typeorm.pool.connectionLimit,
+          waitForConnections: technicalSettings.database.typeorm.pool.waitForConnections,
+          queueLimit: technicalSettings.database.typeorm.pool.queueLimit,
+          connectTimeout: technicalSettings.database.typeorm.pool.connectTimeoutMs,
         },
       }),
     }),

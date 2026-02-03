@@ -8,6 +8,7 @@ import { User } from '@modules/users/domain/user.entity';
 import { UserSessionRepository } from '@modules/auth/infrastructure/user-session.repository';
 import { SessionStatusService } from '@modules/auth/application/session-status.service';
 import { RedisCacheService } from '@infrastructure/cache/redis-cache.service';
+import { technicalSettings } from '@config/technical-settings';
 
 export type UserWithSession = User & { sessionId: string };
 
@@ -61,7 +62,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     const userWithSession = session.user as UserWithSession;
     userWithSession.sessionId = payload.sessionId;
     
-    await this.cacheService.set(cacheKey, userWithSession, 3600);
+    await this.cacheService.set(cacheKey, userWithSession, technicalSettings.auth.session.sessionUserCacheTtlSeconds);
     
     return userWithSession;
   }

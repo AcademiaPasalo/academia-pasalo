@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { CoursesService } from '../src/modules/courses/application/courses.service';
 import { RedisCacheService } from '../src/infrastructure/cache/redis-cache.service';
 import { CourseCycleRepository } from '../src/modules/courses/infrastructure/course-cycle.repository';
+import { CourseCycleProfessorRepository } from '../src/modules/courses/infrastructure/course-cycle-professor.repository';
 import { EvaluationRepository } from '../src/modules/evaluations/infrastructure/evaluation.repository';
 import { CourseRepository } from '../src/modules/courses/infrastructure/course.repository';
 import { CourseTypeRepository } from '../src/modules/courses/infrastructure/course-type.repository';
@@ -76,6 +77,10 @@ describe('Courses Content Logic (Integration)', () => {
             findById: jest.fn().mockResolvedValue({}),
             findFullById: jest.fn().mockResolvedValue(mockFullCycle),
           },
+        },
+        {
+          provide: CourseCycleProfessorRepository,
+          useValue: {}
         },
         {
           provide: EvaluationRepository,

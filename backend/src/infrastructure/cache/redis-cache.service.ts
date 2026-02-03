@@ -1,6 +1,7 @@
 import { Injectable, OnModuleDestroy, OnModuleInit, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import Redis from 'ioredis';
+import { technicalSettings } from '@config/technical-settings';
 
 @Injectable()
 export class RedisCacheService implements OnModuleInit, OnModuleDestroy {
@@ -10,8 +11,8 @@ export class RedisCacheService implements OnModuleInit, OnModuleDestroy {
   constructor(private readonly configService: ConfigService) {}
 
   onModuleInit() {
-    const host = this.configService.get<string>('REDIS_HOST', 'localhost');
-    const port = this.configService.get<number>('REDIS_PORT', 6379);
+    const host = this.configService.get<string>('REDIS_HOST', technicalSettings.cache.redis.defaultHost);
+    const port = this.configService.get<number>('REDIS_PORT', technicalSettings.cache.redis.defaultPort);
 
     this.redisClient = new Redis({
       host,
@@ -98,7 +99,7 @@ export class RedisCacheService implements OnModuleInit, OnModuleDestroy {
     return new Promise((resolve, reject) => {
       const stream = this.redisClient.scanStream({
         match: pattern,
-        count: 100,
+        count: technicalSettings.cache.redis.invalidateGroupScanCount,
       });
 
       const keysToDelete: string[] = [];
