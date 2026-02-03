@@ -1,6 +1,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { FaWhatsapp } from "react-icons/fa";
+import Icon from "./ui/Icon";
 
 const footerLinks = [
   { label: "Inicio", href: "#inicio" },
@@ -19,15 +20,15 @@ export default function Footer() {
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 lg:gap-20">
           {/* Brand Section */}
           <div className="flex flex-col gap-3.5 lg:gap-6">
-					<Link href="/" className="flex-shrink-0">
-						<Image
-							src="/foundations/brand-assets/imagotipo.svg"
-							alt="Pásalo logo"
-							width={120}
-							height={162}
-							className="object-contain w-[80px] h-[108px] lg:w-[120px] lg:h-[162px]"
-						/>
-					</Link>
+            <Link href="/" className="flex-shrink-0">
+              <Image
+                src="/foundations/brand-assets/imagotipo.svg"
+                alt="Pásalo logo"
+                width={120}
+                height={162}
+                className="object-contain w-[80px] h-[108px] lg:w-[120px] lg:h-[162px]"
+              />
+            </Link>
             <p className="text-sm lg:text-base text-gray-600 leading-relaxed">
               Academia especializada en nivelación y reforzamiento para
               estudiantes de la PUCP. Tu éxito es nuestra misión.
@@ -58,9 +59,9 @@ export default function Footer() {
               Contacto
             </h3>
             <div className="flex flex-col gap-3 lg:gap-4">
-                <div className="flex items-center gap-1 lg:gap-2 group">
+              <div className="flex items-center gap-1 lg:gap-2 group">
                 <FaWhatsapp className="text-[20px] lg:text-[24px] text-gray-600 group-hover:text-accent-secondary transition-colors" />
-                <a 
+                <a
                   href="https://wa.me/51903006775"
                   target="_blank"
                   rel="noopener noreferrer"
@@ -68,11 +69,9 @@ export default function Footer() {
                 >
                   +51 903 006 775
                 </a>
-                </div>
+              </div>
               <div className="flex items-center gap-1 lg:gap-2 group">
-                <span className="material-icons-round text-[20px] lg:text-[24px] text-gray-600 group-hover:text-accent-secondary transition-colors">
-                  mail
-                </span>
+                <Icon name="mail" size={24} variant="outlined" className="material-icons-round text-[20px] lg:text-[24px] text-gray-600 group-hover:text-accent-secondary transition-colors" />
                 <a
                   href="mailto:info@pasaloacademia.pe"
                   className="text-sm lg:text-base text-gray-600 group-hover:text-accent-secondary transition-colors whitespace-nowrap"

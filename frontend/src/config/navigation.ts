@@ -30,7 +30,7 @@ export const navigationConfig: Record<UserRole, SidebarNavItem[]> = {
       href: '/plataforma/calendario'
     },
     {
-      icon: 'notifications_unread',
+      icon: 'notifications',
       label: 'Notificaciones',
       href: '/plataforma/notificaciones'
     }

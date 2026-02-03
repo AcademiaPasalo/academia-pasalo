@@ -251,7 +251,7 @@ export default function InicioContent() {
             <div className="relative z-10 flex justify-end">
             <button
               onClick={() => setIsModalOpen(true)}
-              className="px-6 py-4 bg-info-secondary-solid/20 rounded-lg border border-white/20 text-base font-medium text-white hover:bg-white/5 transition-colors"
+              className="px-6 py-4 bg-magenta-violet-50 rounded-lg border border-magenta-violet-700 text-base font-medium text-magenta-violet-700 transition-colors hover:bg-magenta-violet-100"
             >
               Agendar Tutoría
             </button>
