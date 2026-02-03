@@ -70,9 +70,9 @@ export default function CursoContent({ cursoId }: CursoContentProps) {
     switch (estado) {
       case 'calificado': return 'Completado';
       case 'pendiente': return 'En curso';
-      case 'entregado': return 'Próximamente';
+      case 'entregado': return 'PrÃ³ximamente';
       case 'vencido': return 'Bloqueado';
-      default: return 'Próximamente';
+      default: return 'PrÃ³ximamente';
     }
   };
 
@@ -130,7 +130,7 @@ export default function CursoContent({ cursoId }: CursoContentProps) {
       <div className="bg-white rounded-2xl border border-stroke-primary p-12 text-center">
         <Icon name="error" size={64} className="text-error-solid mb-4 mx-auto" />
         <h1 className="text-2xl font-bold text-primary mb-2">{error || 'Curso no encontrado'}</h1>
-        <p className="text-secondary mb-6">El curso solicitado no está disponible.</p>
+        <p className="text-secondary mb-6">El curso solicitado no estÃ¡ disponible.</p>
       </div>
     );
   }
@@ -147,7 +147,7 @@ export default function CursoContent({ cursoId }: CursoContentProps) {
               <div className="text-success-primary text-xs font-medium font-['Poppins'] leading-3">CIENCIAS</div>
             </div>
             <div className="px-2.5 py-1.5 bg-gray-200 rounded-full flex justify-center items-center gap-1">
-              <div className="text-text-secondary text-xs font-medium font-['Poppins'] leading-3">1° CICLO</div>
+              <div className="text-text-secondary text-xs font-medium font-['Poppins'] leading-3">1Â° CICLO</div>
             </div>
           </div>
 
@@ -376,7 +376,7 @@ export default function CursoContent({ cursoId }: CursoContentProps) {
                                   {evaluacion.titulo}
                                 </div>
                                 <div className="self-stretch text-xs font-normal font-['Poppins'] leading-4 text-text-secondary">
-                                  {evaluacion.tipo === 'examen' ? 'Examen' : 'Práctica Calificada'}
+                                  {evaluacion.tipo === 'examen' ? 'Examen' : 'PrÃ¡ctica Calificada'}
                                 </div>
                               </div>
 
@@ -407,7 +407,7 @@ export default function CursoContent({ cursoId }: CursoContentProps) {
                   <Icon name="history" size={64} className="text-icon-tertiary" />
                   <div className="text-center">
                     <p className="text-text-primary font-semibold mb-2">No hay ciclos anteriores</p>
-                    <p className="text-text-secondary text-sm">Los ciclos anteriores aparecerán aquí una vez que finalices el ciclo actual</p>
+                    <p className="text-text-secondary text-sm">Los ciclos anteriores aparecerÃ¡n aquÃ­ una vez que finalices el ciclo actual</p>
                   </div>
                 </div>
               )}
@@ -446,7 +446,7 @@ export default function CursoContent({ cursoId }: CursoContentProps) {
 
                     const getDificultadLabel = (dificultad: string) => {
                       switch (dificultad) {
-                        case 'basico': return 'Básico';
+                        case 'basico': return 'BÃ¡sico';
                         case 'intermedio': return 'Intermedio';
                         case 'avanzado': return 'Avanzado';
                         default: return dificultad;
@@ -485,7 +485,7 @@ export default function CursoContent({ cursoId }: CursoContentProps) {
                           </div>
                           <div className="self-stretch text-xs font-normal font-['Poppins'] leading-4 text-text-secondary">
                             {enunciado.tipo === 'examen' ? 'Examen' :
-                              enunciado.tipo === 'tarea' ? 'Práctica' :
+                              enunciado.tipo === 'tarea' ? 'PrÃ¡ctica' :
                                 enunciado.tipo === 'quiz' ? 'Quiz' :
                                   enunciado.tipo === 'proyecto' ? 'Proyecto' : 'Material'}
                           </div>
@@ -515,7 +515,7 @@ export default function CursoContent({ cursoId }: CursoContentProps) {
                   <Icon name="topic" size={64} className="text-icon-tertiary" />
                   <div className="text-center">
                     <p className="text-text-primary font-semibold mb-2">No hay enunciados disponibles</p>
-                    <p className="text-text-secondary text-sm">El banco de enunciados estará disponible próximamente</p>
+                    <p className="text-text-secondary text-sm">El banco de enunciados estarÃ¡ disponible prÃ³ximamente</p>
                   </div>
                 </div>
               )}
@@ -527,7 +527,7 @@ export default function CursoContent({ cursoId }: CursoContentProps) {
   );
 }
 
-// Utilidad para obtener el subtítulo correcto de una evaluación
+// Utilidad para obtener el subtï¿½tulo correcto de una evaluaciï¿½n
 function getEvaluacionSubtitulo(evaluacion: { tipo: string; titulo: string }): string {
   if (evaluacion.tipo === 'examen') {
     if (evaluacion.titulo.startsWith('EX')) {
@@ -538,9 +538,9 @@ function getEvaluacionSubtitulo(evaluacion: { tipo: string; titulo: string }): s
   if (evaluacion.tipo === 'tarea') {
     if (evaluacion.titulo.startsWith('PC')) {
       const num = evaluacion.titulo.replace('PC', '');
-      return `Práctica Calificada ${num}`;
+      return `PrÃ¡ctica Calificada ${num}`;
     }
-    return 'Práctica Calificada';
+    return 'PrÃ¡ctica Calificada';
   }
   if (evaluacion.tipo === 'quiz') {
     return 'Quiz';

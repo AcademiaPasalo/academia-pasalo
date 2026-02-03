@@ -146,76 +146,88 @@ export default function Sidebar({
 
       {/* Navigation */}
       <nav className="p-3 flex-1 space-y-1">
-        {navItems.map((item, index) => (
-          <div key={index}>
-            {item.expandable ? (
-              <button
-                onClick={() => toggleExpand(item.label)}
-                className={`h-[43px] w-full flex items-center ${isCollapsed ? 'justify-center px-3' : 'justify-between px-2'} py-2 ${item.active
-                  ? 'bg-accent-solid text-white'
-                  : 'text-secondary hover:bg-secondary-hover'
-                  } rounded-xl font-medium transition-colors`}
-              >
-                <div className="flex items-center gap-3">
+        {navItems.map((item, index) => {
+          // Verificar si algún subitem está activo
+          const hasActiveSubItem = item.expandable && item.subItems?.some(subItem => subItem.active);
+          
+          return (
+            <div key={index}>
+              {item.expandable ? (
+                <button
+                  onClick={() => toggleExpand(item.label)}
+                  className={`h-[43px] w-full flex items-center ${isCollapsed ? 'justify-center px-3' : 'justify-between px-2'} py-2 ${
+                    // Solo aplicar bg-accent-solid si el item está activo Y NO tiene subitems activos
+                    item.active && !hasActiveSubItem
+                      ? 'bg-accent-solid text-white'
+                      : 'text-secondary hover:bg-secondary-hover'
+                    } rounded-xl font-medium transition-colors`}
+                >
+                  <div className="flex items-center gap-3">
+                    <Icon
+                      name={item.icon}
+                      size={24}
+                    />
+                    {!isCollapsed && <span>{item.label}</span>}
+                  </div>
+                  {!isCollapsed && (
+                    <Icon
+                      name="expand_more"
+                      size={20}
+                      className={`transition-transform ${expandedItems.includes(item.label) ? 'rotate-180' : ''}`}
+                    />
+                  )}
+                </button>
+              ) : (
+                <button
+                  onClick={(e) => handleNavigation(item.href, e)}
+                  className={`h-[43px] w-full flex items-center ${isCollapsed ? 'justify-center px-3' : 'gap-2 px-2'} py-2 ${item.active
+                    ? 'bg-accent-solid text-white'
+                    : 'text-secondary hover:bg-secondary-hover'
+                    } rounded-xl font-medium transition-colors`}
+                  title={isCollapsed ? item.label : undefined}
+                >
                   <Icon
                     name={item.icon}
                     size={24}
                   />
                   {!isCollapsed && <span>{item.label}</span>}
-                </div>
-                {!isCollapsed && (
-                  <Icon
-                    name="expand_more"
-                    size={20}
-                    className={`transition-transform ${expandedItems.includes(item.label) ? 'rotate-180' : ''}`}
-                  />
-                )}
-              </button>
-            ) : (
-              <button
-                onClick={(e) => handleNavigation(item.href, e)}
-                className={`h-[43px] w-full flex items-center ${isCollapsed ? 'justify-center px-3' : 'gap-2 px-2'} py-2 ${item.active
-                  ? 'bg-accent-solid text-white'
-                  : 'text-secondary hover:bg-secondary-hover'
-                  } rounded-xl font-medium transition-colors`}
-                title={isCollapsed ? item.label : undefined}
-              >
-                <Icon
-                  name={item.icon}
-                  size={24}
-                />
-                {!isCollapsed && <span>{item.label}</span>}
-              </button>
-            )}
+                </button>
+              )}
 
-            {/* Sub-items */}
-            {!isCollapsed && item.expandable && item.subItems && (
-              <div
-                className={`ml-[18px] border-l border-stroke-primary pl-2.5 overflow-hidden transition-all duration-300 ease-in-out ${
-                  expandedItems.includes(item.label)
-                    ? 'max-h-[500px] opacity-100 mt-1'
-                    : 'max-h-0 opacity-0'
-                }`}
-              >
-                <div className="space-y-1">
-                  {item.subItems.map((subItem, subIndex) => (
-                    <button
-                      key={subIndex}
-                      onClick={(e) => handleNavigation(subItem.href, e)}
-                      className={`w-full font-medium flex items-center justify-start gap-3 px-4 py-2 text-left ${
-                      subItem.active 
-                        ? 'text-accent-solid bg-accent-hover' 
-                        : 'text-secondary hover:bg-secondary-hover'
-                      } rounded-lg text-sm transition-colors`}
-                    >
-                      {subItem.label}
-                    </button>
-                  ))}
+              {/* Sub-items */}
+              {!isCollapsed && item.expandable && item.subItems && (
+                <div
+                  className={`ml-[18px] border-l border-stroke-primary pl-2.5 overflow-hidden transition-all duration-300 ease-in-out ${
+                    expandedItems.includes(item.label)
+                      ? 'max-h-[500px] opacity-100 mt-1'
+                      : 'max-h-0 opacity-0'
+                  }`}
+                >
+                  <div className="space-y-1">
+                    {item.subItems.map((subItem, subIndex) => {
+                      // Verificar si este subitem está activo comparando con pathname
+                      const isSubItemActive = pathname === subItem.href;
+                      
+                      return (
+                        <button
+                          key={subIndex}
+                          onClick={(e) => handleNavigation(subItem.href, e)}
+                          className={`w-full font-medium flex items-center justify-start gap-3 px-4 py-2 text-left ${
+                            isSubItemActive
+                              ? 'text-white bg-accent-solid' 
+                              : 'text-secondary hover:bg-secondary-hover'
+                          } rounded-lg text-sm transition-colors`}
+                        >
+                          {subItem.label}
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
-              </div>
-            )}
-          </div>
-        ))}
+              )}
+            </div>
+          );
+        })}
       </nav>
 
       {/* User Profile */}
