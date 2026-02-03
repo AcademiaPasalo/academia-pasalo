@@ -42,6 +42,9 @@ export class UserResponseDto {
   roles: RoleDto[];
 
   @Expose()
+  lastActiveRoleId: string | null;
+
+  @Expose()
   createdAt: string;
 
   @Expose()
