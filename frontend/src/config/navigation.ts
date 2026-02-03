@@ -42,43 +42,6 @@ export const navigationConfig: Record<UserRole, SidebarNavItem[]> = {
       label: 'Inicio',
       href: '/plataforma/inicio'
     },
-    {
-      icon: 'school',
-      label: 'Mis Clases',
-      href: '/plataforma/clases',
-      expandable: true,
-      subItems: [
-        { icon: 'circle', label: 'Activas', href: '/plataforma/clases/activas' },
-        { icon: 'circle', label: 'Programadas', href: '/plataforma/clases/programadas' },
-        { icon: 'circle', label: 'Historial', href: '/plataforma/clases/historial' }
-      ]
-    },
-    {
-      icon: 'groups',
-      label: 'Estudiantes',
-      href: '/plataforma/estudiantes'
-    },
-    {
-      icon: 'assignment',
-      label: 'Tareas',
-      href: '/plataforma/tareas',
-      expandable: true,
-      subItems: [
-        { icon: 'circle', label: 'Pendientes', href: '/plataforma/tareas/pendientes' },
-        { icon: 'circle', label: 'Calificadas', href: '/plataforma/tareas/calificadas' },
-        { icon: 'circle', label: 'Crear Nueva', href: '/plataforma/tareas/nueva' }
-      ]
-    },
-    {
-      icon: 'folder',
-      label: 'Materiales',
-      href: '/plataforma/materiales'
-    },
-    {
-      icon: 'analytics',
-      label: 'Reportes',
-      href: '/plataforma/reportes'
-    }
   ],
 
   ADMIN: [
@@ -87,54 +50,6 @@ export const navigationConfig: Record<UserRole, SidebarNavItem[]> = {
       label: 'Dashboard',
       href: '/plataforma/dashboard'
     },
-    {
-      icon: 'groups',
-      label: 'Usuarios',
-      href: '/plataforma/usuarios',
-      expandable: true,
-      subItems: [
-        { icon: 'circle', label: 'Estudiantes', href: '/plataforma/usuarios/estudiantes' },
-        { icon: 'circle', label: 'Docentes', href: '/plataforma/usuarios/docentes' },
-        { icon: 'circle', label: 'Administradores', href: '/plataforma/usuarios/administradores' }
-      ]
-    },
-    {
-      icon: 'school',
-      label: 'Cursos',
-      href: '/plataforma/cursos',
-      expandable: true,
-      subItems: [
-        { icon: 'circle', label: 'Ver Todos', href: '/plataforma/cursos/todos' },
-        { icon: 'circle', label: 'Crear Curso', href: '/plataforma/cursos/nuevo' },
-        { icon: 'circle', label: 'Categorías', href: '/plataforma/cursos/categorias' }
-      ]
-    },
-    {
-      icon: 'event',
-      label: 'Calendario',
-      href: '/plataforma/calendario'
-    },
-    {
-      icon: 'folder',
-      label: 'Materiales',
-      href: '/plataforma/materiales'
-    },
-    {
-      icon: 'analytics',
-      label: 'Reportes',
-      href: '/plataforma/reportes',
-      expandable: true,
-      subItems: [
-        { icon: 'circle', label: 'Estudiantes', href: '/plataforma/reportes/estudiantes' },
-        { icon: 'circle', label: 'Cursos', href: '/plataforma/reportes/cursos' },
-        { icon: 'circle', label: 'Finanzas', href: '/plataforma/reportes/finanzas' }
-      ]
-    },
-    {
-      icon: 'settings',
-      label: 'Configuración',
-      href: '/plataforma/configuracion'
-    }
   ],
 
   SUPER_ADMIN: [
@@ -143,49 +58,6 @@ export const navigationConfig: Record<UserRole, SidebarNavItem[]> = {
       label: 'Admin Panel',
       href: '/plataforma/admin'
     },
-    {
-      icon: 'groups',
-      label: 'Gestión de Usuarios',
-      href: '/plataforma/usuarios',
-      expandable: true,
-      subItems: [
-        { icon: 'circle', label: 'Todos los Usuarios', href: '/plataforma/usuarios/todos' },
-        { icon: 'circle', label: 'Roles y Permisos', href: '/plataforma/usuarios/roles' },
-        { icon: 'circle', label: 'Sesiones Activas', href: '/plataforma/usuarios/sesiones' }
-      ]
-    },
-    {
-      icon: 'domain',
-      label: 'Organizaciones',
-      href: '/plataforma/organizaciones'
-    },
-    {
-      icon: 'security',
-      label: 'Seguridad',
-      href: '/plataforma/seguridad',
-      expandable: true,
-      subItems: [
-        { icon: 'circle', label: 'Logs de Auditoría', href: '/plataforma/seguridad/logs' },
-        { icon: 'circle', label: 'Políticas', href: '/plataforma/seguridad/politicas' },
-        { icon: 'circle', label: 'Backups', href: '/plataforma/seguridad/backups' }
-      ]
-    },
-    {
-      icon: 'analytics',
-      label: 'Analytics',
-      href: '/plataforma/analytics'
-    },
-    {
-      icon: 'settings',
-      label: 'Sistema',
-      href: '/plataforma/sistema',
-      expandable: true,
-      subItems: [
-        { icon: 'circle', label: 'Configuración', href: '/plataforma/sistema/configuracion' },
-        { icon: 'circle', label: 'Integraciones', href: '/plataforma/sistema/integraciones' },
-        { icon: 'circle', label: 'Mantenimiento', href: '/plataforma/sistema/mantenimiento' }
-      ]
-    }
   ]
 };
 

@@ -115,10 +115,10 @@ export default function PlataformaPage() {
           {/* Left Section - Photo with Welcome Text */}
           <div className="hidden lg:flex lg:w-1/2 bg-deep-blue-700 relative overflow-hidden">
             {/* Decorative Ellipses */}
-            <div className="absolute w-[200px] h-[200px] rounded-full bg-magenta-violet-600 -left-[35px] bottom-[484px]" />
-            <div className="absolute w-[200px] h-[200px] rounded-full bg-magenta-violet-600 right-[46px] top-[46px]" />
-            <div className="absolute w-[100px] h-[100px] rounded-full bg-magenta-violet-600 right-[50px] -top-[50px]" />
-            <div className="absolute w-[100px] h-[100px] rounded-full bg-magenta-violet-600 -left-[50px] bottom-[375px]" />
+            <div className="absolute w-[200px] h-[200px] rounded-full bg-magenta-violet-600 -left-[35px] bottom-[-100px]" />
+            <div className="absolute w-[200px] h-[200px] rounded-full bg-magenta-violet-600 right-[-60px] top-[46px]" />
+            <div className="absolute w-[100px] h-[100px] rounded-full bg-magenta-violet-600 right-[110px] -top-[35px]" />
+            <div className="absolute w-[100px] h-[100px] rounded-full bg-magenta-violet-600 -left-[50px] bottom-[120px]" />
 
             {/* Content */}
             <div className="relative z-10 flex flex-col items-center justify-center gap-5 px-[100px] py-20 w-full">
@@ -139,7 +139,7 @@ export default function PlataformaPage() {
               </h3>
 
               {/* Description */}
-              <p className="text-white text-[18px] leading-[1.11em] text-center w-full">
+              <p className="max-w-[480px] text-white text-[18px] leading-[1.11em] text-center w-full">
                 Accede a tus clases grabadas y materiales para asegurar tu éxito en
                 la PUCP.
               </p>
