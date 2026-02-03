@@ -5,6 +5,7 @@ import { useState } from "react";
 import { usePathname } from "next/navigation";
 import Image from "next/image";
 import MobileSidebar from "./MobileSidebar";
+import Icon from '@/components/ui/Icon';
 
 const navItems = [
   { label: "Inicio", href: "/#inicio" },
@@ -15,7 +16,7 @@ const navItems = [
   { label: "Contacto", href: "/#contacto" },
 ];
 
-export default function TopBar() {
+export default function TopBar({ showBackButton = false }: { showBackButton?: boolean }) {
   const pathname = usePathname();
   const [activeSection, setActiveSection] = useState("inicio");
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -43,72 +44,98 @@ export default function TopBar() {
 
           {/* Navigation Items - Desktop */}
           <nav className="hidden lg:flex items-center gap-6">
-            {navItems.map((item) => (
+            {showBackButton ? (
+              // when showBackButton is true, only render the "Volver al Inicio" button (no Plataforma)
               <Link
-                key={item.label}
-                href={item.href}
-                onClick={() => setActiveSection(item.label.toLowerCase())}
-                className="group relative flex items-center px-2 py-1"
+                href="/"
+                className="flex items-center gap-2 px-4 py-2 rounded-lg text-deep-blue-700 hover:bg-gray-100 transition-colors"
               >
-                <span
-                  className={`text-base transition-colors ${
-                    displayActiveSection === item.label.toLowerCase()
-                      ? "text-accent-primary font-medium"
-                      : "text-tertiary hover:text-accent-secondary"
-                  }`}
-                >
-                  {item.label}
-                </span>
-                {displayActiveSection === item.label.toLowerCase() && (
-                  <div className="absolute bottom-0 left-0 right-0 h-[3px] bg-main rounded-full mx-2" />
-                )}
+                <Icon name="arrow_back" size={20} />
+                <span className="text-base font-medium">Volver al Inicio</span>
               </Link>
-            ))}
+            ) : (
+              // ...existing code...
+              <>
+                {navItems.map((item) => (
+                  <Link
+                    key={item.label}
+                    href={item.href}
+                    onClick={() => setActiveSection(item.label.toLowerCase())}
+                    className="group relative flex items-center px-2 py-1"
+                  >
+                    <span
+                      className={`text-base transition-colors ${
+                        displayActiveSection === item.label.toLowerCase()
+                          ? "text-accent-primary font-medium"
+                          : "text-tertiary hover:text-accent-secondary"
+                      }`}
+                    >
+                      {item.label}
+                    </span>
+                    {displayActiveSection === item.label.toLowerCase() && (
+                      <div className="absolute bottom-0 left-0 right-0 h-[3px] bg-main rounded-full mx-2" />
+                    )}
+                  </Link>
+                ))}
 
-            {/* Botón Plataforma */}
-            <Link
-              href="/plataforma"
-              className="flex items-center gap-2 px-6 py-4 bg-deep-blue-700 text-white rounded-lg font-medium text-base hover:bg-accent-solid-hover transition-colors"
-            >
-              <span className="material-icons-round text-xl">
-                login
-              </span>
-              Plataforma
-            </Link>
+                {/* Botón Plataforma */}
+                <Link
+                  href="/plataforma"
+                  className="flex items-center gap-2 px-6 py-4 bg-deep-blue-700 text-white rounded-lg font-medium text-base hover:bg-accent-solid-hover transition-colors"
+                >
+                  <Icon name="login" size={20} />
+                  Plataforma
+                </Link>
+              </>
+            )}
           </nav>
 
           {/* Mobile Menu */}
           <div className="lg:hidden flex items-center gap-6">
-            {/* Botón Plataforma */}
-            <Link
-              href="/plataforma"
-              className="lg:hidden flex items-center gap-2 px-6 py-4 bg-deep-blue-700 text-white rounded-lg font-medium text-base hover:bg-accent-solid-hover transition-colors"
-            >
-              <span className="material-icons-round text-xl">
-                login
-              </span>
-              Plataforma
-            </Link>
+            {showBackButton ? (
+              // Mobile with back button: only show Volver al Inicio, no burger or Plataforma
+              <Link
+                href="/"
+                className="flex items-center gap-2 px-4 py-2 rounded-lg text-deep-blue-700 hover:bg-gray-100 transition-colors"
+              >
+                <Icon name="arrow_back" size={20} />
+                <span className="text-base font-medium">Volver al Inicio</span>
+              </Link>
+            ) : (
+              // ...existing code...
+              <>
+                {/* Botón Plataforma */}
+                <Link
+                  href="/plataforma"
+                  className="lg:hidden flex items-center gap-2 px-6 py-4 bg-deep-blue-700 text-white rounded-lg font-medium text-base hover:bg-accent-solid-hover transition-colors"
+                >
+                  <Icon name="login" size={20} />
+                  Plataforma
+                </Link>
 
-            {/* Menu Sidebar */}
-            <button 
-              onClick={() => setIsMobileMenuOpen(true)}
-              className="lg:hidden text-tertiary hover:text-accent-primary transition-colors"
-              aria-label="Abrir menú"
-            >
-              <span className="material-icons-round text-4xl">menu</span>
-            </button>
+                {/* Menu Sidebar */}
+                <button 
+                  onClick={() => setIsMobileMenuOpen(true)}
+                  className="lg:hidden text-tertiary hover:text-accent-primary transition-colors"
+                  aria-label="Abrir menú"
+                >
+                  <Icon name="menu" size={28} />
+                </button>
+              </>
+            )}
           </div>
         </div>
       </div>
 
       {/* Mobile Sidebar */}
-      <MobileSidebar
-        isOpen={isMobileMenuOpen}
-        onClose={() => setIsMobileMenuOpen(false)}
-        activeSection={displayActiveSection}
-        onSectionChange={setActiveSection}
-      />
+      {!showBackButton && (
+        <MobileSidebar
+          isOpen={isMobileMenuOpen}
+          onClose={() => setIsMobileMenuOpen(false)}
+          activeSection={displayActiveSection}
+          onSectionChange={setActiveSection}
+        />
+      )}
     </header>
   );
 }
