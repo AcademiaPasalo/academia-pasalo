@@ -70,7 +70,7 @@ export default function Footer() {
                 </a>
                 </div>
               <div className="flex items-center gap-1 lg:gap-2 group">
-                <span className="material-symbols-outlined text-[20px] lg:text-[24px] text-gray-600 group-hover:text-accent-secondary transition-colors">
+                <span className="material-icons-round text-[20px] lg:text-[24px] text-gray-600 group-hover:text-accent-secondary transition-colors">
                   mail
                 </span>
                 <a

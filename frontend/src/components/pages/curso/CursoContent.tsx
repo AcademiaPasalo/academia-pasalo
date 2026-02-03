@@ -1,4 +1,4 @@
-Ôªø'use client';
+'use client';
 
 import { useEffect, useState } from 'react';
 import { useBreadcrumb } from '@/contexts/BreadcrumbContext';
@@ -70,9 +70,9 @@ export default function CursoContent({ cursoId }: CursoContentProps) {
     switch (estado) {
       case 'calificado': return 'Completado';
       case 'pendiente': return 'En curso';
-      case 'entregado': return 'Pr√≥ximamente';
+      case 'entregado': return 'PrÛximamente';
       case 'vencido': return 'Bloqueado';
-      default: return 'Pr√≥ximamente';
+      default: return 'PrÛximamente';
     }
   };
 
@@ -128,9 +128,9 @@ export default function CursoContent({ cursoId }: CursoContentProps) {
   if (error || !curso) {
     return (
       <div className="bg-white rounded-2xl border border-stroke-primary p-12 text-center">
-        <Icon name="error" size={64} variant="rounded" className="text-error-solid mb-4 mx-auto" />
+        <Icon name="error" size={64} className="text-error-solid mb-4 mx-auto" />
         <h1 className="text-2xl font-bold text-primary mb-2">{error || 'Curso no encontrado'}</h1>
-        <p className="text-secondary mb-6">El curso solicitado no est√° disponible.</p>
+        <p className="text-secondary mb-6">El curso solicitado no est· disponible.</p>
       </div>
     );
   }
@@ -147,7 +147,7 @@ export default function CursoContent({ cursoId }: CursoContentProps) {
               <div className="text-success-primary text-xs font-medium font-['Poppins'] leading-3">CIENCIAS</div>
             </div>
             <div className="px-2.5 py-1.5 bg-gray-200 rounded-full flex justify-center items-center gap-1">
-              <div className="text-text-secondary text-xs font-medium font-['Poppins'] leading-3">1¬∞ CICLO</div>
+              <div className="text-text-secondary text-xs font-medium font-['Poppins'] leading-3">1∞ CICLO</div>
             </div>
           </div>
 
@@ -181,7 +181,7 @@ export default function CursoContent({ cursoId }: CursoContentProps) {
         {/* Right: Video Player */}
         <div className="flex-1 px-5 py-14 bg-bg-tertiary rounded-lg outline outline-1 outline-offset-[-1px] outline-stroke-primary inline-flex flex-col justify-center items-center gap-6 overflow-hidden">
           <div className="p-3 bg-accent-primary rounded-full inline-flex justify-start items-center gap-2">
-            <Icon name="play_arrow" size={32} variant="rounded" filled className="text-white" />
+            <Icon name="play_arrow" size={32} className="text-white" />
 
           </div>
           <div className="self-stretch flex flex-col justify-center items-center gap-1">
@@ -212,9 +212,9 @@ export default function CursoContent({ cursoId }: CursoContentProps) {
               <Icon
                 name="event_available"
                 size={24}
-                variant="rounded"
+               
                 className={activeTab === 'vigente' ? 'text-icon-accent-primary' : 'text-icon-secondary'}
-                filled
+               
               />
               <div className={`flex-1 text-base font-medium font-['Poppins'] leading-4 ${activeTab === 'vigente' ? 'text-text-accent-primary' : 'text-text-secondary'}`}>
                 Ciclo Vigente
@@ -230,9 +230,9 @@ export default function CursoContent({ cursoId }: CursoContentProps) {
               <Icon
                 name="history"
                 size={24}
-                variant="rounded"
+               
                 className={activeTab === 'anteriores' ? 'text-icon-accent-primary' : 'text-icon-secondary'}
-                filled
+               
               />
               <div className={`flex-1 text-base font-medium font-['Poppins'] leading-4 ${activeTab === 'anteriores' ? 'text-text-accent-primary' : 'text-text-secondary'}`}>
                 Ciclos Anteriores
@@ -248,9 +248,9 @@ export default function CursoContent({ cursoId }: CursoContentProps) {
               <Icon
                 name="topic"
                 size={24}
-                variant="rounded"
+               
                 className={activeTab === 'banco' ? 'text-icon-accent-primary' : 'text-icon-secondary'}
-                filled
+               
               />
               <div className={`flex-1 text-base font-medium font-['Poppins'] leading-4 ${activeTab === 'banco' ? 'text-text-accent-primary' : 'text-text-secondary'}`}>
                 Banco de Enunciados
@@ -285,9 +285,9 @@ export default function CursoContent({ cursoId }: CursoContentProps) {
                           <Icon
                             name={getEstadoIcon(evaluacion.estado)}
                             size={24}
-                            variant="rounded"
+                           
                             className={getEstadoIconColor(evaluacion.estado)}
-                            filled
+                           
                           />
                         </div>
                         <div className="flex justify-start items-start">
@@ -320,7 +320,7 @@ export default function CursoContent({ cursoId }: CursoContentProps) {
                         <Icon
                           name="arrow_forward"
                           size={16}
-                          variant="rounded"
+                         
                           className={disabled ? 'text-icon-disabled' : 'text-icon-accent-primary'}
                         />
                       </button>
@@ -345,7 +345,7 @@ export default function CursoContent({ cursoId }: CursoContentProps) {
                   {Object.entries(ciclosAnterioresData[cursoId]).map(([cicloId, ciclo]) => (
                     <div key={cicloId} className="space-y-4">
                       <div className="flex items-center gap-2">
-                        <Icon name="calendar_today" size={20} variant="rounded" className="text-icon-secondary" />
+                        <Icon name="calendar_today" size={20} className="text-icon-secondary" />
                         <h3 className="text-lg font-semibold text-text-primary">{ciclo.titulo}</h3>
                       </div>
 
@@ -363,9 +363,9 @@ export default function CursoContent({ cursoId }: CursoContentProps) {
                                   <Icon
                                     name="inventory_2"
                                     size={24}
-                                    variant="rounded"
+                                   
                                     className="text-icon-tertiary"
-                                    filled
+                                   
                                   />
                                 </div>
                               </div>
@@ -376,7 +376,7 @@ export default function CursoContent({ cursoId }: CursoContentProps) {
                                   {evaluacion.titulo}
                                 </div>
                                 <div className="self-stretch text-xs font-normal font-['Poppins'] leading-4 text-text-secondary">
-                                  {evaluacion.tipo === 'examen' ? 'Examen' : 'Pr√°ctica Calificada'}
+                                  {evaluacion.tipo === 'examen' ? 'Examen' : 'Pr·ctica Calificada'}
                                 </div>
                               </div>
 
@@ -391,7 +391,7 @@ export default function CursoContent({ cursoId }: CursoContentProps) {
                                 <Icon
                                   name="arrow_forward"
                                   size={16}
-                                  variant="rounded"
+                                 
                                   className={disabled ? 'text-icon-disabled' : 'text-icon-accent-primary'}
                                 />
                               </button>
@@ -404,10 +404,10 @@ export default function CursoContent({ cursoId }: CursoContentProps) {
                 </div>
               ) : (
                 <div className="self-stretch p-12 bg-bg-secondary rounded-2xl border border-stroke-primary flex flex-col items-center justify-center gap-4">
-                  <Icon name="history" size={64} variant="rounded" className="text-icon-tertiary" />
+                  <Icon name="history" size={64} className="text-icon-tertiary" />
                   <div className="text-center">
                     <p className="text-text-primary font-semibold mb-2">No hay ciclos anteriores</p>
-                    <p className="text-text-secondary text-sm">Los ciclos anteriores aparecer√°n aqu√≠ una vez que finalices el ciclo actual</p>
+                    <p className="text-text-secondary text-sm">Los ciclos anteriores aparecer·n aquÌ una vez que finalices el ciclo actual</p>
                   </div>
                 </div>
               )}
@@ -446,7 +446,7 @@ export default function CursoContent({ cursoId }: CursoContentProps) {
 
                     const getDificultadLabel = (dificultad: string) => {
                       switch (dificultad) {
-                        case 'basico': return 'B√°sico';
+                        case 'basico': return 'B·sico';
                         case 'intermedio': return 'Intermedio';
                         case 'avanzado': return 'Avanzado';
                         default: return dificultad;
@@ -464,9 +464,9 @@ export default function CursoContent({ cursoId }: CursoContentProps) {
                             <Icon
                               name="description"
                               size={24}
-                              variant="rounded"
+                             
                               className="text-icon-accent-primary"
-                              filled
+                             
                             />
                           </div>
                           <div className="flex justify-start items-start">
@@ -485,7 +485,7 @@ export default function CursoContent({ cursoId }: CursoContentProps) {
                           </div>
                           <div className="self-stretch text-xs font-normal font-['Poppins'] leading-4 text-text-secondary">
                             {enunciado.tipo === 'examen' ? 'Examen' :
-                              enunciado.tipo === 'tarea' ? 'Pr√°ctica' :
+                              enunciado.tipo === 'tarea' ? 'Pr·ctica' :
                                 enunciado.tipo === 'quiz' ? 'Quiz' :
                                   enunciado.tipo === 'proyecto' ? 'Proyecto' : 'Material'}
                           </div>
@@ -502,7 +502,7 @@ export default function CursoContent({ cursoId }: CursoContentProps) {
                           <Icon
                             name="download"
                             size={16}
-                            variant="rounded"
+                           
                             className="text-icon-accent-primary"
                           />
                         </button>
@@ -512,10 +512,10 @@ export default function CursoContent({ cursoId }: CursoContentProps) {
                 </div>
               ) : (
                 <div className="self-stretch p-12 bg-bg-secondary rounded-2xl border border-stroke-primary flex flex-col items-center justify-center gap-4">
-                  <Icon name="topic" size={64} variant="rounded" className="text-icon-tertiary" />
+                  <Icon name="topic" size={64} className="text-icon-tertiary" />
                   <div className="text-center">
                     <p className="text-text-primary font-semibold mb-2">No hay enunciados disponibles</p>
-                    <p className="text-text-secondary text-sm">El banco de enunciados estar√° disponible pr√≥ximamente</p>
+                    <p className="text-text-secondary text-sm">El banco de enunciados estar· disponible prÛximamente</p>
                   </div>
                 </div>
               )}
@@ -527,7 +527,7 @@ export default function CursoContent({ cursoId }: CursoContentProps) {
   );
 }
 
-// Utilidad para obtener el subt√≠tulo correcto de una evaluaci√≥n
+// Utilidad para obtener el subtÌtulo correcto de una evaluaciÛn
 function getEvaluacionSubtitulo(evaluacion: { tipo: string; titulo: string }): string {
   if (evaluacion.tipo === 'examen') {
     if (evaluacion.titulo.startsWith('EX')) {
@@ -538,9 +538,9 @@ function getEvaluacionSubtitulo(evaluacion: { tipo: string; titulo: string }): s
   if (evaluacion.tipo === 'tarea') {
     if (evaluacion.titulo.startsWith('PC')) {
       const num = evaluacion.titulo.replace('PC', '');
-      return `Pr√°ctica Calificada ${num}`;
+      return `Pr·ctica Calificada ${num}`;
     }
-    return 'Pr√°ctica Calificada';
+    return 'Pr·ctica Calificada';
   }
   if (evaluacion.tipo === 'quiz') {
     return 'Quiz';

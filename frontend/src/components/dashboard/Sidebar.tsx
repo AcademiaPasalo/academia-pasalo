@@ -13,9 +13,6 @@ export interface SidebarNavItem {
   active?: boolean;
   expandable?: boolean;
   subItems?: SidebarNavItem[];
-  // Propiedades opcionales para personalizar el ícono
-  iconVariant?: 'outlined' | 'rounded' | 'sharp';
-  iconFilled?: boolean;
 }
 
 export interface SidebarUser {
@@ -124,13 +121,13 @@ export default function Sidebar({
       {/* Header: Logo + Role */}
       {isCollapsed ? (
         <div className="p-4 flex items-center justify-center">
-          <Icon name="school" size={36} variant="rounded" filled className="text-main" />
+          <Icon name="school" size={36} className="text-main" />
         </div>
       ) : (
         <div className="p-5 flex items-start gap-2.5">
           {/* Icon Left */}
           <div className="flex-shrink-0 flex items-center justify-center h-11 w-11 rounded-lg p-1">
-            <Icon name="school" size={36} variant="rounded" filled className="text-main" />
+            <Icon name="school" size={36} className="text-main" />
           </div>
 
           {/* Logo + Role Right */}
@@ -163,8 +160,6 @@ export default function Sidebar({
                   <Icon
                     name={item.icon}
                     size={24}
-                    variant={item.iconVariant}
-                    filled={item.iconFilled}
                   />
                   {!isCollapsed && <span>{item.label}</span>}
                 </div>
@@ -188,8 +183,6 @@ export default function Sidebar({
                 <Icon
                   name={item.icon}
                   size={24}
-                  variant={item.iconVariant}
-                  filled={item.iconFilled}
                 />
                 {!isCollapsed && <span>{item.label}</span>}
               </button>
@@ -257,7 +250,7 @@ export default function Sidebar({
               onClick={handleLogout}
               className="w-full flex items-center gap-3 px-4 py-3 text-left text-error-solid hover:bg-error-hover transition-colors"
             >
-              <Icon name="logout" size={20} variant="rounded" />
+              <Icon name="logout" size={20} />
               <span className="text-sm font-medium">Cerrar Sesión</span>
             </button>
           </div>

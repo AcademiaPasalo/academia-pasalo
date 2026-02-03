@@ -28,7 +28,7 @@ export default function TopBar() {
 
   return (
     <header className="w-full bg-white border-b border-stroke-primary sticky top-0 z-50">
-      <div className="max-w-7xl mx-auto p-4">
+      <div className="mx-auto p-4">
         <div className="flex items-center justify-between">
           {/* Logo */}
           <Link href="/" className="flex-shrink-0">
@@ -70,7 +70,7 @@ export default function TopBar() {
               href="/plataforma"
               className="flex items-center gap-2 px-6 py-4 bg-deep-blue-700 text-white rounded-lg font-medium text-base hover:bg-accent-solid-hover transition-colors"
             >
-              <span className="material-symbols-outlined text-xl">
+              <span className="material-icons-round text-xl">
                 login
               </span>
               Plataforma
@@ -84,7 +84,7 @@ export default function TopBar() {
               href="/plataforma"
               className="lg:hidden flex items-center gap-2 px-6 py-4 bg-deep-blue-700 text-white rounded-lg font-medium text-base hover:bg-accent-solid-hover transition-colors"
             >
-              <span className="material-symbols-outlined text-xl">
+              <span className="material-icons-round text-xl">
                 login
               </span>
               Plataforma
@@ -96,7 +96,7 @@ export default function TopBar() {
               className="lg:hidden text-tertiary hover:text-accent-primary transition-colors"
               aria-label="Abrir menú"
             >
-              <span className="material-symbols-outlined text-4xl">menu</span>
+              <span className="material-icons-round text-4xl">menu</span>
             </button>
           </div>
         </div>

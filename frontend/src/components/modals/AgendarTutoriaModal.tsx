@@ -50,7 +50,7 @@ export default function AgendarTutoriaModal({ isOpen, onClose, onSubmit }: Agend
         <div className="bg-info-secondary-solid p-6 flex items-start justify-between">
           <div className="flex items-center gap-3">
             <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center">
-              <Icon name="auto_awesome" size={24} variant="rounded" filled className="text-white" />
+              <Icon name="auto_awesome" size={24} className="text-white" />
             </div>
             <div>
               <h2 className="text-xl font-semibold text-white">Agendar Tutoría</h2>
@@ -61,7 +61,7 @@ export default function AgendarTutoriaModal({ isOpen, onClose, onSubmit }: Agend
             onClick={handleClose}
             className="p-1 hover:bg-white/10 rounded-lg transition-colors"
           >
-            <Icon name="close" size={24} variant="rounded" className="text-white" />
+            <Icon name="close" size={24} className="text-white" />
           </button>
         </div>
 
@@ -74,7 +74,7 @@ export default function AgendarTutoriaModal({ isOpen, onClose, onSubmit }: Agend
             </label>
             <div className="relative">
               <div className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none">
-                <Icon name="class" size={20} variant="rounded" className="text-icon-tertiary" />
+                <Icon name="class" size={20} className="text-icon-tertiary" />
               </div>
               <input
                 id="curso"
@@ -95,7 +95,7 @@ export default function AgendarTutoriaModal({ isOpen, onClose, onSubmit }: Agend
             </label>
             <div className="relative">
               <div className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none">
-                <Icon name="description" size={20} variant="rounded" className="text-icon-tertiary" />
+                <Icon name="description" size={20} className="text-icon-tertiary" />
               </div>
               <input
                 id="tema"
@@ -111,7 +111,7 @@ export default function AgendarTutoriaModal({ isOpen, onClose, onSubmit }: Agend
 
           {/* Info adicional */}
           {/*<div className="flex items-start gap-2 p-3 bg-info-secondary-solid/5 rounded-lg border border-info-secondary-solid/10">
-            <Icon name="info" size={20} variant="rounded" className="text-info-secondary-solid flex-shrink-0 mt-0.5" />
+            <Icon name="info" size={20} className="text-info-secondary-solid flex-shrink-0 mt-0.5" />
             <p className="text-xs text-secondary">
               Te redirigiremos a WhatsApp con el mensaje prellenado para que puedas agendar tu tutoría directamente.
             </p>

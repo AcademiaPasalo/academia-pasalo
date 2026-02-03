@@ -65,7 +65,7 @@ export default function InicioContent() {
         {/* Header: Mis Cursos con toggles */}
         <div className="flex justify-between items-center">
           <div className="flex items-center gap-2">
-            <Icon name="class" size={32} variant="rounded" className="text-accent-secondary" />
+            <Icon name="class" size={32} className="text-accent-secondary" />
             <h1 className="text-3xl font-semibold text-primary">Mis Cursos</h1>
           </div>
 
@@ -82,7 +82,7 @@ export default function InicioContent() {
               <Icon
                 name="grid_view"
                 size={16}
-                variant="rounded"
+               
                 className={viewMode === 'grid' ? 'text-white' : 'text-accent-primary'}
               />
               <span className={`text-sm font-medium ${viewMode === 'grid' ? 'text-white' : 'text-accent-primary'}`}>
@@ -100,7 +100,7 @@ export default function InicioContent() {
               <Icon
                 name="view_list"
                 size={16}
-                variant="rounded"
+               
                 className={viewMode === 'list' ? 'text-white' : 'text-accent-primary'}
               />
               <span className={`text-sm font-medium ${viewMode === 'list' ? 'text-white' : 'text-accent-primary'}`}>
@@ -140,7 +140,7 @@ export default function InicioContent() {
           {/* Header */}
           <div className="p-3 border-b border-stroke-primary flex justify-between items-center">
             <div className="flex items-center gap-1">
-              <Icon name="event" size={20} variant="rounded" className="text-info-secondary-solid" />
+              <Icon name="event" size={20} className="text-info-secondary-solid" />
               <h2 className="text-sm font-semibold text-primary">Agenda del Día</h2>
             </div>
             <div className="flex items-center gap-2">
@@ -150,10 +150,10 @@ export default function InicioContent() {
               </div>
               <div className="flex items-center">
                 <button className="p-1 rounded-lg hover:bg-secondary-hover">
-                  <Icon name="chevron_left" size={16} variant="rounded" className="text-accent-primary" />
+                  <Icon name="chevron_left" size={16} className="text-accent-primary" />
                 </button>
                 <button className="p-1 rounded-lg hover:bg-secondary-hover">
-                  <Icon name="chevron_right" size={16} variant="rounded" className="text-accent-primary" />
+                  <Icon name="chevron_right" size={16} className="text-accent-primary" />
                 </button>
               </div>
             </div>
@@ -233,12 +233,12 @@ export default function InicioContent() {
         <div className="relative bg-info-secondary-solid rounded-2xl p-6 flex flex-col gap-5 overflow-hidden">
           {/* Icono decorativo de fondo */}
           <div className="absolute right-0 top-24 w-40 h-40 opacity-20">
-            <Icon name="star_half" size={160} variant="rounded" className="text-white" />
+            <Icon name="star_half" size={160} className="text-white" />
           </div>
 
           {/* Contenido */}
           <div className="relative z-10">
-            <Icon name="auto_awesome" size={48} variant="rounded" filled className="text-white" />
+            <Icon name="auto_awesome" size={48} className="text-white" />
           </div>
 
           <div className="relative z-10 space-y-3">

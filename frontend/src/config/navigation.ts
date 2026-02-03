@@ -15,33 +15,24 @@ export const navigationConfig: Record<UserRole, SidebarNavItem[]> = {
     {
       icon: 'home',
       label: 'Inicio',
-      href: '/plataforma/inicio',
-      iconVariant: 'rounded',
-      iconFilled: true
+      href: '/plataforma/inicio'
     },
     {
       icon: 'class',
       label: 'Mis Cursos',
       href: '#',
       expandable: true,
-      iconVariant: 'rounded',
-      iconFilled: true,
-      // Los subItems se cargan dinámicamente desde useDynamicNavigation
       subItems: []
     },
     {
       icon: 'event',
       label: 'Calendario',
-      href: '/plataforma/calendario',
-      iconVariant: 'rounded',
-      iconFilled: true
+      href: '/plataforma/calendario'
     },
     {
       icon: 'notifications_unread',
       label: 'Notificaciones',
-      href: '/plataforma/notificaciones',
-      iconVariant: 'rounded',
-      iconFilled: false
+      href: '/plataforma/notificaciones'
     }
   ],
 
@@ -49,17 +40,13 @@ export const navigationConfig: Record<UserRole, SidebarNavItem[]> = {
     {
       icon: 'home',
       label: 'Inicio',
-      href: '/plataforma/inicio',
-      iconVariant: 'rounded',
-      iconFilled: true
+      href: '/plataforma/inicio'
     },
     {
       icon: 'school',
       label: 'Mis Clases',
       href: '/plataforma/clases',
       expandable: true,
-      iconVariant: 'rounded',
-      iconFilled: true,
       subItems: [
         { icon: 'circle', label: 'Activas', href: '/plataforma/clases/activas' },
         { icon: 'circle', label: 'Programadas', href: '/plataforma/clases/programadas' },
@@ -69,17 +56,13 @@ export const navigationConfig: Record<UserRole, SidebarNavItem[]> = {
     {
       icon: 'groups',
       label: 'Estudiantes',
-      href: '/plataforma/estudiantes',
-      iconVariant: 'rounded',
-      iconFilled: true
+      href: '/plataforma/estudiantes'
     },
     {
       icon: 'assignment',
       label: 'Tareas',
       href: '/plataforma/tareas',
       expandable: true,
-      iconVariant: 'rounded',
-      iconFilled: true,
       subItems: [
         { icon: 'circle', label: 'Pendientes', href: '/plataforma/tareas/pendientes' },
         { icon: 'circle', label: 'Calificadas', href: '/plataforma/tareas/calificadas' },
@@ -89,16 +72,12 @@ export const navigationConfig: Record<UserRole, SidebarNavItem[]> = {
     {
       icon: 'folder',
       label: 'Materiales',
-      href: '/plataforma/materiales',
-      iconVariant: 'rounded',
-      iconFilled: true
+      href: '/plataforma/materiales'
     },
     {
       icon: 'analytics',
       label: 'Reportes',
-      href: '/plataforma/reportes',
-      iconVariant: 'rounded',
-      iconFilled: true
+      href: '/plataforma/reportes'
     }
   ],
 
@@ -106,17 +85,13 @@ export const navigationConfig: Record<UserRole, SidebarNavItem[]> = {
     {
       icon: 'dashboard',
       label: 'Dashboard',
-      href: '/plataforma/dashboard',
-      iconVariant: 'rounded',
-      iconFilled: true
+      href: '/plataforma/dashboard'
     },
     {
       icon: 'groups',
       label: 'Usuarios',
       href: '/plataforma/usuarios',
       expandable: true,
-      iconVariant: 'rounded',
-      iconFilled: true,
       subItems: [
         { icon: 'circle', label: 'Estudiantes', href: '/plataforma/usuarios/estudiantes' },
         { icon: 'circle', label: 'Docentes', href: '/plataforma/usuarios/docentes' },
@@ -128,8 +103,6 @@ export const navigationConfig: Record<UserRole, SidebarNavItem[]> = {
       label: 'Cursos',
       href: '/plataforma/cursos',
       expandable: true,
-      iconVariant: 'rounded',
-      iconFilled: true,
       subItems: [
         { icon: 'circle', label: 'Ver Todos', href: '/plataforma/cursos/todos' },
         { icon: 'circle', label: 'Crear Curso', href: '/plataforma/cursos/nuevo' },
@@ -139,24 +112,18 @@ export const navigationConfig: Record<UserRole, SidebarNavItem[]> = {
     {
       icon: 'event',
       label: 'Calendario',
-      href: '/plataforma/calendario',
-      iconVariant: 'rounded',
-      iconFilled: true
+      href: '/plataforma/calendario'
     },
     {
       icon: 'folder',
       label: 'Materiales',
-      href: '/plataforma/materiales',
-      iconVariant: 'rounded',
-      iconFilled: true
+      href: '/plataforma/materiales'
     },
     {
       icon: 'analytics',
       label: 'Reportes',
       href: '/plataforma/reportes',
       expandable: true,
-      iconVariant: 'rounded',
-      iconFilled: true,
       subItems: [
         { icon: 'circle', label: 'Estudiantes', href: '/plataforma/reportes/estudiantes' },
         { icon: 'circle', label: 'Cursos', href: '/plataforma/reportes/cursos' },
@@ -166,9 +133,7 @@ export const navigationConfig: Record<UserRole, SidebarNavItem[]> = {
     {
       icon: 'settings',
       label: 'Configuración',
-      href: '/plataforma/configuracion',
-      iconVariant: 'rounded',
-      iconFilled: true
+      href: '/plataforma/configuracion'
     }
   ],
 
@@ -176,17 +141,13 @@ export const navigationConfig: Record<UserRole, SidebarNavItem[]> = {
     {
       icon: 'admin_panel_settings',
       label: 'Admin Panel',
-      href: '/plataforma/admin',
-      iconVariant: 'rounded',
-      iconFilled: true
+      href: '/plataforma/admin'
     },
     {
       icon: 'groups',
       label: 'Gestión de Usuarios',
       href: '/plataforma/usuarios',
       expandable: true,
-      iconVariant: 'rounded',
-      iconFilled: true,
       subItems: [
         { icon: 'circle', label: 'Todos los Usuarios', href: '/plataforma/usuarios/todos' },
         { icon: 'circle', label: 'Roles y Permisos', href: '/plataforma/usuarios/roles' },
@@ -196,17 +157,13 @@ export const navigationConfig: Record<UserRole, SidebarNavItem[]> = {
     {
       icon: 'domain',
       label: 'Organizaciones',
-      href: '/plataforma/organizaciones',
-      iconVariant: 'rounded',
-      iconFilled: true
+      href: '/plataforma/organizaciones'
     },
     {
       icon: 'security',
       label: 'Seguridad',
       href: '/plataforma/seguridad',
       expandable: true,
-      iconVariant: 'rounded',
-      iconFilled: true,
       subItems: [
         { icon: 'circle', label: 'Logs de Auditoría', href: '/plataforma/seguridad/logs' },
         { icon: 'circle', label: 'Políticas', href: '/plataforma/seguridad/politicas' },
@@ -216,17 +173,13 @@ export const navigationConfig: Record<UserRole, SidebarNavItem[]> = {
     {
       icon: 'analytics',
       label: 'Analytics',
-      href: '/plataforma/analytics',
-      iconVariant: 'rounded',
-      iconFilled: true
+      href: '/plataforma/analytics'
     },
     {
       icon: 'settings',
       label: 'Sistema',
       href: '/plataforma/sistema',
       expandable: true,
-      iconVariant: 'rounded',
-      iconFilled: true,
       subItems: [
         { icon: 'circle', label: 'Configuración', href: '/plataforma/sistema/configuracion' },
         { icon: 'circle', label: 'Integraciones', href: '/plataforma/sistema/integraciones' },
