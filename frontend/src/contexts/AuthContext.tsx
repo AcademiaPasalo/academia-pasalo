@@ -62,8 +62,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
    * Login con Google OAuth
    */
   const loginWithGoogle = useCallback(async (code: string) => {
+    setIsLoading(true);
     try {
-      setIsLoading(true);
       const authData = await authService.loginWithGoogle(code);
       processAuthResponse(authData);
 
@@ -71,13 +71,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (authData.sessionStatus === 'ACTIVE') {
         // Login exitoso, redirigir al dashboard con recarga
         window.location.href = '/plataforma/inicio';
+      } else {
+        // Si hay sesión concurrente o bloqueada, detener el loading
+        setIsLoading(false);
       }
       // Si hay sesión concurrente o bloqueada, el componente de login debe mostrar el modal
     } catch (error) {
       console.error('Error en login:', error);
-      throw error;
-    } finally {
+      // Limpiar el estado en caso de error para evitar redireccionamiento
+      setUser(null);
+      setSessionStatus(null);
+      setConcurrentSessionId(null);
+      setPendingRefreshToken(null);
       setIsLoading(false);
+      throw error;
     }
   }, [processAuthResponse]);
 

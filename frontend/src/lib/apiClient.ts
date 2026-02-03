@@ -106,8 +106,17 @@ export class ApiClient {
         // TEST DEVOPS - SE AGREGA TROZO DE CODIGO PARA AJUSTAR EL MANEJO DE TOKENS
         const refreshToken = getRefreshToken();
         
-        // Si no hay refresh token, limpiar y redirigir
+        // Si no hay refresh token, no hacer redirect automático si estamos en login
+        // Solo hacer redirect si ya teníamos tokens (sesión expirada)
         if (!refreshToken) {
+          // Si estamos haciendo login (/auth/google), no redirigir, solo lanzar el error
+          if (endpoint.includes('/auth/google') || endpoint.includes('/auth/sessions')) {
+            const data = await response.json();
+            const error = data as ApiError;
+            throw new Error(error.message || 'Error de autenticación');
+          }
+          
+          // Para otros endpoints, limpiar y redirigir (sesión expirada)
           clearAuth();
           if (typeof window !== 'undefined') {
             window.location.href = '/plataforma';
@@ -159,10 +168,17 @@ export class ApiClient {
       // Parsear respuesta
       const data = await response.json();
 
-      // Si es un error del backend, lanzarlo
+      // Si es un error del backend, lanzarlo con información detallada
       if (!response.ok) {
         const error = data as ApiError;
-        throw new Error(error.message || 'Error en la petición');
+        const errorMessage = error.message || 'Error en la petición';
+        
+        // Crear un error más descriptivo para usuario no registrado
+        if (response.status === 404 && endpoint.includes('/auth/google')) {
+          throw new Error('Usuario no registrado en la plataforma');
+        }
+        
+        throw new Error(errorMessage);
       }
 
       return data as ApiResponse<T>;

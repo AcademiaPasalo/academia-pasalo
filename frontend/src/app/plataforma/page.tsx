@@ -18,12 +18,12 @@ export default function PlataformaPage() {
   const [showConcurrentModal, setShowConcurrentModal] = useState(false);
   const [showReauthModal, setShowReauthModal] = useState(false);
 
-  // Redirigir si ya está autenticado
+  // Redirigir si ya está autenticado - pero NO si acabamos de tener un error
   useEffect(() => {
-    if (isAuthenticated && sessionStatus === 'ACTIVE') {
+    if (isAuthenticated && sessionStatus === 'ACTIVE' && !error && !isLoggingIn) {
       router.push('/plataforma/inicio');
     }
-  }, [isAuthenticated, sessionStatus, router]);
+  }, [isAuthenticated, sessionStatus, router, error, isLoggingIn]);
 
   // Detectar estados especiales de sesión
   useEffect(() => {
@@ -40,15 +40,57 @@ export default function PlataformaPage() {
         setIsLoggingIn(true);
         setError(null);
         await loginWithGoogle(codeResponse.code);
+        // Si llegamos aquí sin error y el login fue exitoso, 
+        // el AuthContext ya habrá hecho el redirect
       } catch (err) {
         console.error('Error en login:', err);
-        setError(err instanceof Error ? err.message : 'Error al iniciar sesión');
-      } finally {
+        // Map backend/SDK errors to friendly Spanish messages
+        let message = 'Error al iniciar sesión';
+        
+        if (err instanceof Error) {
+          const errorMsg = err.message.toLowerCase();
+          
+          // Detectar usuario no registrado
+          if (
+            errorMsg.includes('usuario no registrado') ||
+            errorMsg.includes('no registrado') ||
+            errorMsg.includes('not registered') ||
+            errorMsg.includes('user_not_registered') ||
+            errorMsg.includes('user not registered') ||
+            errorMsg.includes('not found')
+          ) {
+            message = 'Su cuenta no está registrada en la plataforma. Si crees que es un error, contacta a soporte o inscríbete.';
+          } else {
+            // Usar el mensaje original si no es el caso especial
+            message = err.message;
+          }
+        } else if (err && typeof err === 'object') {
+          // Fallback para objetos de error no estándar
+          const errorObj = err as Record<string, unknown>;
+          const response = errorObj.response as Record<string, unknown> | undefined;
+          const data = response?.data as Record<string, unknown> | undefined;
+          
+          const serverMsg = 
+            data?.message || 
+            data?.error || 
+            errorObj.message;
+
+          if (serverMsg && typeof serverMsg === 'string') {
+            message = serverMsg;
+          }
+        }
+
+        // Forzar que el estado se actualice y se mantenga
         setIsLoggingIn(false);
+        setError(message);
+        
+        // Prevenir cualquier navegación después de un error
+        return;
       }
     },
     onError: (error) => {
       console.error('Error de Google OAuth:', error);
+      setIsLoggingIn(false);
       setError('Error al conectar con Google');
     },
     flow: 'auth-code',
@@ -166,8 +208,19 @@ export default function PlataformaPage() {
 
             {/* Error Message */}
             {error && (
-              <div className="w-full p-4 bg-red-50 border border-red-200 rounded-lg">
-                <p className="text-red-600 text-sm text-center">{error}</p>
+              <div className="w-full p-4 bg-red-50 border border-red-200 rounded-lg text-center">
+                <p className="text-red-600 text-sm">{error}</p>
+                {/* Si el error indica cuenta no registrada, mostrar CTA para contacto/inscripción */}
+                {error.toLowerCase().includes('no está registrada') || error.toLowerCase().includes('no esta registrada') || error.toLowerCase().includes('no registrado') ? (
+                  <div className="mt-3">
+                    <Link
+                      href="/#contacto"
+                      className="inline-block px-4 py-2 bg-deep-blue-700 text-white rounded-lg text-sm hover:bg-deep-blue-800 transition-colors"
+                    >
+                      Contactar Soporte / Inscribirse
+                    </Link>
+                  </div>
+                ) : null}
               </div>
             )}
 
