@@ -15,7 +15,7 @@ function DashboardLayoutWrapper({ children }: { children: React.ReactNode }) {
       showBreadcrumb={true}
       showToggle={true}
     >
-      {children}
+      <div className='max-w-7xl mx-auto'>{children}</div>
     </DashboardLayout>
   );
 }
