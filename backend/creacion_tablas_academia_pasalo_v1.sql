@@ -89,8 +89,10 @@ CREATE TABLE user (
   career VARCHAR(100),
   profile_photo_url VARCHAR(500) NULL,
   photo_source ENUM('google', 'uploaded', 'none') NOT NULL DEFAULT 'none',
+  last_active_role_id BIGINT NULL,
   created_at DATETIME NOT NULL,
-  updated_at DATETIME
+  updated_at DATETIME,
+  FOREIGN KEY (last_active_role_id) REFERENCES role(id)
 );
 
 CREATE TABLE user_role (
@@ -110,12 +112,14 @@ CREATE TABLE user_session (
   longitude DECIMAL(10,7),
   refresh_token_hash VARCHAR(255) NOT NULL,
   session_status_id BIGINT NOT NULL,
+  active_role_id BIGINT NULL,
   expires_at DATETIME NOT NULL,
   is_active BOOLEAN NOT NULL,
   last_activity_at DATETIME NOT NULL,
   created_at DATETIME NOT NULL,
   FOREIGN KEY (user_id) REFERENCES user(id),
-  FOREIGN KEY (session_status_id) REFERENCES session_status(id)
+  FOREIGN KEY (session_status_id) REFERENCES session_status(id),
+  FOREIGN KEY (active_role_id) REFERENCES role(id)
 );
 
 CREATE TABLE security_event (

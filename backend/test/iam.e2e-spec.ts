@@ -177,6 +177,7 @@ describe('IAM (e2e)', () => {
       sub: userId,
       email: user.email,
       roles: user.roles.map(r => r.code),
+      activeRole: user.roles[0].code,
       sessionId,
     });
   }

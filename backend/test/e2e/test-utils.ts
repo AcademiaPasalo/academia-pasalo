@@ -193,6 +193,7 @@ export class TestSeeder {
       sub: user.id,
       email: user.email,
       roles: roles,
+      activeRole: roles[0], // Default active role
       sessionId: session.id
     };
     

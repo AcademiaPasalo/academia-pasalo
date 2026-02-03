@@ -10,7 +10,7 @@ import { SessionStatusService } from '@modules/auth/application/session-status.s
 import { RedisCacheService } from '@infrastructure/cache/redis-cache.service';
 import { technicalSettings } from '@config/technical-settings';
 
-export type UserWithSession = User & { sessionId: string };
+export type UserWithSession = User & { sessionId: string; activeRole: string };
 
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
@@ -61,6 +61,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
 
     const userWithSession = session.user as UserWithSession;
     userWithSession.sessionId = payload.sessionId;
+    userWithSession.activeRole = payload.activeRole;
     
     await this.cacheService.set(cacheKey, userWithSession, technicalSettings.auth.session.sessionUserCacheTtlSeconds);
     

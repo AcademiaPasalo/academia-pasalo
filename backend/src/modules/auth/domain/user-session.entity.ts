@@ -7,6 +7,7 @@ import {
 } from 'typeorm';
 import { User } from '@modules/users/domain/user.entity';
 import { SessionStatus } from '@modules/auth/domain/session-status.entity';
+import { Role } from '@modules/users/domain/role.entity';
 
 @Entity('user_session')
 export class UserSession {
@@ -59,6 +60,13 @@ export class UserSession {
   @ManyToOne(() => SessionStatus)
   @JoinColumn({ name: 'session_status_id' })
   sessionStatus: SessionStatus;
+
+  @Column({ type: 'bigint', name: 'active_role_id', nullable: true })
+  activeRoleId: string | null;
+
+  @ManyToOne(() => Role)
+  @JoinColumn({ name: 'active_role_id' })
+  activeRole: Role | null;
 
   @Column({ type: 'datetime', name: 'expires_at' })
   expiresAt: Date;
