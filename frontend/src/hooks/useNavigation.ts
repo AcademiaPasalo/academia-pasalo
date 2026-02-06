@@ -84,6 +84,12 @@ export function useNavigation(): NavigationData | null {
       return null;
     }
 
+    // Validar que el usuario tenga los campos requeridos
+    if (!user.firstName || !user.email) {
+      console.warn('Usuario sin firstName o email, esperando datos completos...');
+      return null;
+    }
+
     // Obtener navegación (ya con cursos cargados)
     const navItemsToUse = dynamicNavItems.length > 0 ? dynamicNavItems : getNavigationForRole(primaryRole);
 
@@ -93,8 +99,10 @@ export function useNavigation(): NavigationData | null {
     // Construir nombre completo
     const fullName = `${user.firstName} ${user.lastName1 || ''}`.trim();
 
-    // Generar iniciales
-    const initials = `${user.firstName.charAt(0)}${user.lastName1?.charAt(0) || ''}`.toUpperCase();
+    // Generar iniciales de forma segura
+    const firstInitial = user.firstName.charAt(0) || '';
+    const lastInitial = user.lastName1?.charAt(0) || '';
+    const initials = `${firstInitial}${lastInitial}`.toUpperCase();
 
     // Obtener color de avatar según rol
     const avatarColor = roleAvatarColors[primaryRole];

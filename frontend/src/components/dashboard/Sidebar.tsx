@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import Image from 'next/image';
 import { usePathname, useRouter } from 'next/navigation';
 import Icon from '@/components/ui/Icon';
+import RoleSwitcher, { getRoleFriendlyName } from '@/components/dashboard/RoleSwitcher';
 import { useAuth } from '@/contexts/AuthContext';
 
 export interface SidebarNavItem {
@@ -35,16 +36,18 @@ export default function Sidebar({
 }: SidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
-  const { logout } = useAuth();
+  const { logout, user: authUser, switchProfile } = useAuth();
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
+  const [isSwitchingRole, setIsSwitchingRole] = useState(false);
+  const [isRoleSwitcherOpen, setIsRoleSwitcherOpen] = useState(false);
   const userMenuRef = useRef<HTMLDivElement>(null);
-  
+
   // Auto-expandir items cuando un subitem está activo (inicialización)
   const getInitialExpandedItems = () => {
     const itemsToExpand: string[] = [];
     navItems.forEach(item => {
       if (item.expandable && item.subItems) {
-        const hasActiveSubItem = item.subItems.some(subItem => 
+        const hasActiveSubItem = item.subItems.some(subItem =>
           pathname === subItem.href
         );
         if (hasActiveSubItem) {
@@ -63,10 +66,10 @@ export default function Sidebar({
     setExpandedItems(prev => {
       // Solo actualizar si hay cambios
       const hasChanges = itemsToExpand.some(item => !prev.includes(item)) ||
-                         prev.some(item => !itemsToExpand.includes(item));
+        prev.some(item => !itemsToExpand.includes(item));
       return hasChanges ? itemsToExpand : prev;
     });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pathname]);
 
   // Cerrar menú de usuario cuando se hace clic fuera
@@ -114,6 +117,29 @@ export default function Sidebar({
     setIsUserMenuOpen(!isUserMenuOpen);
   };
 
+  const handleRoleChange = async (roleId: string) => {
+    try {
+      setIsSwitchingRole(true);
+      await switchProfile(roleId);
+      // La recarga de página se maneja en el contexto
+    } catch (error) {
+      console.error('Error al cambiar de rol:', error);
+      setIsSwitchingRole(false);
+
+      // Mostrar mensaje de error al usuario
+      const errorMessage = error instanceof Error ? error.message : 'Error al cambiar de rol';
+      alert(errorMessage); // Temporal, puedes reemplazar con un toast/notification component
+    }
+  };
+
+  const handleHeaderMouseDown = (e: React.MouseEvent) => {
+    // Usar mousedown para detener la propagación antes de que el document listener la capture
+    if (authUser && authUser.roles && authUser.roles.length > 1) {
+      e.stopPropagation();
+      setIsRoleSwitcherOpen(prev => !prev);
+    }
+  };
+
   return (
     <aside
       className={`${isCollapsed ? 'w-[68px]' : 'w-[240px]'} flex flex-col transition-all duration-300 border-r border-stroke-secondary bg-white h-full`}
@@ -124,22 +150,45 @@ export default function Sidebar({
           <Icon name="school" size={36} className="text-main" />
         </div>
       ) : (
-        <div className="p-5 flex items-start gap-2.5">
-          {/* Icon Left */}
-          <div className="flex-shrink-0 flex items-center justify-center h-11 w-11 rounded-lg p-1">
-            <Icon name="school" size={36} className="text-main" />
-          </div>
+        <div className="p-3 space-y-3">
+          <div onMouseDown={handleHeaderMouseDown} className="flex items-center gap-2.5 p-2 rounded-xl hover:bg-primary-hover selected:bg-primary-selected cursor-pointer">
+            {/* Icon Left */}
+            <div className="flex-shrink-0 flex items-center justify-center h-11 w-11 rounded-lg p-1">
+              <Icon name="school" size={36} className="text-main" />
+            </div>
 
-          {/* Logo + Role Right */}
-          <div className="flex-1">
-            <Image
-              src="/foundations/brand-assets/logotipo.svg"
-              alt="PÁSALO ACADEMIA"
-              width={72}
-              height={22.8}
-              className="object-contain mb-1"
-            />
-            <p className="text-secondary text-xs">Alumno</p>
+            {/* Logo + Role Right */}
+            <div className="flex-1">
+              <Image
+                src="/foundations/brand-assets/logotipo.svg"
+                alt="PÁSALO ACADEMIA"
+                width={72}
+                height={22.8}
+                className="object-contain mb-1"
+              />
+              <p className="text-secondary text-xs">
+                {authUser && authUser.roles && authUser.roles.length > 0 
+                  ? (() => {
+                      const activeRoleId = authUser.lastActiveRoleId || authUser.roles[0]?.id || authUser.roles[0]?.code || '';
+                      const activeRole = authUser.roles.find(r => (r.id || r.code) === activeRoleId);
+                      return activeRole ? getRoleFriendlyName(activeRole.code) : 'Alumno';
+                    })()
+                  : 'Alumno'
+                }
+              </p>
+            </div>
+
+            {/* Role Switcher */}
+            {authUser && authUser.roles && authUser.roles.length > 1 && (
+              <RoleSwitcher
+                roles={authUser.roles}
+                activeRoleId={authUser.lastActiveRoleId || authUser.roles[0]?.id || authUser.roles[0]?.code || ''}
+                onRoleChange={handleRoleChange}
+                isLoading={isSwitchingRole}
+                isOpen={isRoleSwitcherOpen}
+                onOpenChange={(open) => setIsRoleSwitcherOpen(open)}
+              />
+            )}
           </div>
         </div>
       )}
@@ -149,7 +198,7 @@ export default function Sidebar({
         {navItems.map((item, index) => {
           // Verificar si algún subitem está activo
           const hasActiveSubItem = item.expandable && item.subItems?.some(subItem => subItem.active);
-          
+
           return (
             <div key={index}>
               {item.expandable ? (
@@ -197,26 +246,24 @@ export default function Sidebar({
               {/* Sub-items */}
               {!isCollapsed && item.expandable && item.subItems && (
                 <div
-                  className={`ml-[18px] border-l border-stroke-primary pl-2.5 overflow-hidden transition-all duration-300 ease-in-out ${
-                    expandedItems.includes(item.label)
-                      ? 'max-h-[500px] opacity-100 mt-1'
-                      : 'max-h-0 opacity-0'
-                  }`}
+                  className={`ml-[18px] border-l border-stroke-primary pl-2.5 overflow-hidden transition-all duration-300 ease-in-out ${expandedItems.includes(item.label)
+                    ? 'max-h-[500px] opacity-100 mt-1'
+                    : 'max-h-0 opacity-0'
+                    }`}
                 >
                   <div className="space-y-1">
                     {item.subItems.map((subItem, subIndex) => {
                       // Verificar si este subitem está activo comparando con pathname
                       const isSubItemActive = pathname === subItem.href;
-                      
+
                       return (
                         <button
                           key={subIndex}
                           onClick={(e) => handleNavigation(subItem.href, e)}
-                          className={`w-full font-medium flex items-center justify-start gap-3 px-4 py-2 text-left ${
-                            isSubItemActive
-                              ? 'text-white bg-accent-solid' 
-                              : 'text-secondary hover:bg-secondary-hover'
-                          } rounded-lg text-sm transition-colors`}
+                          className={`w-full font-medium flex items-center justify-start gap-3 px-4 py-2 text-left ${isSubItemActive
+                            ? 'text-white bg-accent-solid'
+                            : 'text-secondary hover:bg-secondary-hover'
+                            } rounded-lg text-sm transition-colors`}
                         >
                           {subItem.label}
                         </button>
@@ -232,7 +279,7 @@ export default function Sidebar({
 
       {/* User Profile */}
       <div className="p-5 relative" ref={userMenuRef}>
-        <button 
+        <button
           onClick={toggleUserMenu}
           className={`w-full flex items-center ${isCollapsed ? 'justify-center' : 'gap-2'} rounded-xl transition-colors hover:bg-secondary-hover p-2`}
         >
@@ -247,10 +294,10 @@ export default function Sidebar({
             </div>
           )}
           {!isCollapsed && (
-            <Icon 
-              name="unfold_more" 
-              size={20} 
-              className={`text-tertiary transition-transform ${isUserMenuOpen ? 'rotate-180' : ''}`} 
+            <Icon
+              name="unfold_more"
+              size={20}
+              className={`text-tertiary transition-transform ${isUserMenuOpen ? 'rotate-180' : ''}`}
             />
           )}
         </button>

@@ -36,7 +36,8 @@ export default function InicioContent() {
         setEnrollments(response.data || []);
       } catch (err) {
         console.error('Error al cargar matrículas:', err);
-        setError('Error al cargar los cursos');
+        const errorMessage = err instanceof Error ? err.message : 'Error al cargar los cursos';
+        setError(errorMessage);
       } finally {
         setLoading(false);
       }

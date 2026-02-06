@@ -24,9 +24,11 @@ module.exports = {
         "bg-tertiary": "var(--bg-tertiary)",
         "bg-primary-hover": "var(--bg-primary-hover)",
         "bg-secondary-hover": "var(--bg-secondary-hover)",
+        "bg-secondary-pressed": "var(--bg-secondary-pressed)",
         "bg-tertiary-hover": "var(--bg-tertiary-hover)",
         "primary-hover": "var(--bg-primary-hover)",
         "secondary-hover": "var(--bg-secondary-hover)",
+        "secondary-pressed": "var(--bg-secondary-pressed)",
         "tertiary-hover": "var(--bg-tertiary-hover)",
         
         // Aliases de accent (texto y fondo)

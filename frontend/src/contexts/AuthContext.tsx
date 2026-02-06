@@ -7,6 +7,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { authService } from '@/services/auth.service';
 import { saveTokens, saveUser, getUser, clearAuth, hasStoredSession } from '@/lib/storage';
+import { extractActiveRoleFromToken } from '@/lib/jwtUtils';
 import type { User, SessionStatus, AuthResponse } from '@/types/api';
 
 interface AuthContextType {
@@ -18,6 +19,7 @@ interface AuthContextType {
   
   // Métodos
   loginWithGoogle: (code: string) => Promise<void>;
+  switchProfile: (roleId: string) => Promise<void>;
   resolveConcurrentSession: (decision: 'KEEP_NEW' | 'KEEP_EXISTING') => Promise<void>;
   reauthAnomalousSession: (code: string) => Promise<void>;
   logout: () => Promise<void>;
@@ -87,6 +89,63 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       throw error;
     }
   }, [processAuthResponse]);
+
+  /**
+   * Cambiar perfil activo (Switch Profile)
+   */
+  const switchProfile = useCallback(async (roleId: string) => {
+    if (!user) {
+      throw new Error('No hay usuario autenticado');
+    }
+
+    if (!roleId || roleId.trim() === '') {
+      throw new Error('El ID del rol no puede estar vacío');
+    }
+
+    try {
+      setIsLoading(true);
+      
+      // 1. Cambiar el perfil (obtiene nuevos tokens)
+      const switchResponse = await authService.switchProfile(roleId);
+      
+      // La respuesta de switch-profile NO incluye el objeto user
+      // Solo trae accessToken, refreshToken y expiresIn
+      if (!switchResponse || !switchResponse.accessToken || !switchResponse.refreshToken) {
+        throw new Error('Respuesta inválida del servidor');
+      }
+      
+      // 2. Guardar los nuevos tokens
+      saveTokens(switchResponse.accessToken, switchResponse.refreshToken);
+      
+      // 3. Extraer el rol activo desde el nuevo accessToken
+      const newActiveRoleId = extractActiveRoleFromToken(switchResponse.accessToken);
+      
+      if (!newActiveRoleId) {
+        console.error('No se pudo extraer el rol activo del token después del switch');
+        throw new Error('No se pudo extraer el rol activo del token');
+      }
+      
+      // 4. Actualizar el usuario existente con el nuevo rol activo
+      const updatedUser = {
+        ...user, // Mantener todos los datos personales
+        lastActiveRoleId: newActiveRoleId, // Solo actualizar el rol activo
+      };
+      
+      // 5. Guardar el usuario actualizado
+      saveUser(updatedUser);
+      
+      // 6. Actualizar el estado local
+      setUser(updatedUser);
+      setSessionStatus('ACTIVE');
+      
+      // 7. Recargar la página para refrescar toda la UI
+      window.location.href = '/plataforma/inicio';
+    } catch (error) {
+      console.error('Error al cambiar de perfil:', error);
+      setIsLoading(false); // Detener el loading inmediatamente en caso de error
+      throw error;
+    }
+  }, [user]);
 
   /**
    * Resolver sesión concurrente
@@ -164,12 +223,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   /**
    * Verifica si hay una sesión guardada al cargar la app
    */
-  const checkSession = useCallback(() => {
+  const checkSession = useCallback(async () => {
     if (hasStoredSession()) {
       const storedUser = getUser<User>();
-      if (storedUser) {
+      
+      if (storedUser && storedUser.firstName && storedUser.email) {
+        // Usar el usuario almacenado (el JWT no tiene datos personales)
         setUser(storedUser);
         setSessionStatus('ACTIVE');
+      } else {
+        // Si el usuario almacenado no es válido, limpiar sesión
+        console.error('Usuario almacenado inválido');
+        clearAuth();
       }
     }
     setIsLoading(false);
@@ -187,6 +252,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     sessionStatus,
     concurrentSessionId,
     loginWithGoogle,
+    switchProfile,
     resolveConcurrentSession,
     reauthAnomalousSession,
     logout,

@@ -178,6 +178,11 @@ export class ApiClient {
           throw new Error('Usuario no registrado en la plataforma');
         }
         
+        // Manejar Too Many Requests (429)
+        if (response.status === 429) {
+          throw new Error('Demasiadas solicitudes. Por favor, espera un momento e intenta de nuevo.');
+        }
+        
         throw new Error(errorMessage);
       }
 
