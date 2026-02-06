@@ -46,17 +46,34 @@ export const navigationConfig: Record<UserRole, SidebarNavItem[]> = {
 
   ADMIN: [
     {
-      icon: 'dashboard',
-      label: 'Dashboard',
-      href: '/plataforma/dashboard'
+      icon: 'home',
+      label: 'Inicio',
+      href: '/plataforma/inicio'
     },
+    {
+      icon: 'class',
+      label: 'Mis Cursos',
+      href: '#',
+      expandable: true,
+      subItems: []
+    },
+    {
+      icon: 'event',
+      label: 'Calendario',
+      href: '/plataforma/calendario'
+    },
+    {
+      icon: 'notifications',
+      label: 'Notificaciones',
+      href: '/plataforma/notificaciones'
+    }    
   ],
 
   SUPER_ADMIN: [
     {
-      icon: 'admin_panel_settings',
-      label: 'Admin Panel',
-      href: '/plataforma/admin'
+      icon: 'home',
+      label: 'Inicio',
+      href: '/plataforma/inicio'
     },
   ]
 };

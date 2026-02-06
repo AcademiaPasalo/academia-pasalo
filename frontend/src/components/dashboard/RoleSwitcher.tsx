@@ -186,7 +186,7 @@ export default function RoleSwitcher({
                     transition-all duration-150
                     ${
                       isActive
-                        ? 'bg-accent-solid shadow-sm'
+                        ? 'bg-gray-200 shadow-sm'
                         : 'bg-white hover:bg-secondary-hover active:bg-secondary-pressed'
                     } 
                     ${isLoading && !isActive ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}
@@ -196,17 +196,17 @@ export default function RoleSwitcher({
                     {/* Icon Container */}
                     <div className={`
                       p-1 rounded-md inline-flex flex-col justify-center items-center 
-                      transition-all duration-150
+                      transition-all duration-150 outline-stroke-primary
                       ${
                         isActive 
-                          ? 'outline outline-1 outline-offset-[-1px] outline-white bg-accent-solid' 
-                          : 'outline outline-1 outline-offset-[-1px] outline-stroke-primary bg-transparent'
+                          ? 'outline outline-1 outline-offset-[-1px] bg-gray-200' 
+                          : 'outline outline-1 outline-offset-[-1px] bg-transparent'
                       }
                     `}>
                       <Icon 
                         name={roleIcons[role.code]} 
                         size={16} 
-                        className={isActive ? 'text-white' : 'text-tertiary'} 
+                        className={isActive ? 'text-tertiary-pressed' : 'text-tertiary'} 
                       />
                     </div>
                     
@@ -214,7 +214,7 @@ export default function RoleSwitcher({
                     <div className={`
                       flex-1 text-left text-base font-medium leading-4 truncate 
                       transition-colors duration-150
-                      ${isActive ? 'text-white' : 'text-secondary'}
+                      ${isActive ? 'text-tertiary-pressed' : 'text-secondary'}
                     `}>
                       {friendlyName}
                     </div>
