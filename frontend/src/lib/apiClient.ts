@@ -11,6 +11,7 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/a
 export class ApiClient {
   private baseURL: string;
   private isRefreshing = false;
+  private sessionClosedEventFired = false; // Flag para evitar múltiples eventos
   private failedQueue: Array<{
     resolve: (token: string) => void;
     reject: (error: Error) => void;
@@ -127,7 +128,7 @@ export class ApiClient {
         // FINAL TEST DEVOPS
         // Si ya estamos refrescando, esperar
         if (this.isRefreshing) {
-          return new Promise((resolve, reject) => {
+          return new Promise((resolve) => {
             this.failedQueue.push({
               resolve: async (newToken: string) => {
                 // Reintentar con el nuevo token
@@ -136,7 +137,16 @@ export class ApiClient {
                 const data = await retryResponse.json();
                 resolve(data);
               },
-              reject,
+              reject: () => {
+                // NO rechazar la promesa para evitar alertas del navegador
+                // En su lugar, resolver con una respuesta vacía (el modal ya se mostró)
+                resolve({
+                  statusCode: 401,
+                  message: 'Sesión cerrada',
+                  data: null as unknown as T,
+                  timestamp: new Date().toISOString(),
+                } as ApiResponse<T>);
+              },
             });
           });
         }
@@ -156,12 +166,33 @@ export class ApiClient {
           this.processQueue(refreshError as Error, null);
           this.isRefreshing = false;
           
-          // Si falla el refresh, limpiar y redirigir al login
+          // Si falla el refresh, limpiar auth
           clearAuth();
-          if (typeof window !== 'undefined') {
-            window.location.href = '/plataforma';
+          
+          // Disparar evento personalizado UNA SOLA VEZ para mostrar modal de sesión cerrada
+          if (typeof window !== 'undefined' && !this.sessionClosedEventFired) {
+            this.sessionClosedEventFired = true;
+            
+            const event = new CustomEvent('session-closed-remotely', {
+              detail: { reason: 'Token de sesión inválido o expirado' }
+            });
+            window.dispatchEvent(event);
+            
+            // Redirigir después de 3 segundos
+            setTimeout(() => {
+              window.location.href = '/plataforma';
+            }, 3000);
           }
-          throw refreshError;
+          
+          // NO lanzar el error - esto evita que el navegador muestre alertas nativas
+          // En su lugar, retornar una respuesta especial que será ignorada por el código que hizo la petición
+          // El modal ya se mostró y el redirect está programado
+          return Promise.resolve({
+            statusCode: 401,
+            message: 'Sesión cerrada',
+            data: null as unknown as T,
+            timestamp: new Date().toISOString(),
+          } as ApiResponse<T>);
         }
       }
 

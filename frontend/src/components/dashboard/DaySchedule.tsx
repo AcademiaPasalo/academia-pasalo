@@ -261,9 +261,9 @@ export default function DaySchedule() {
                       href={event.meetingLink}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="px-3 py-1.5 rounded-lg bg-accent-solid hover:bg-accent-solid-hover transition-colors"
+                      className="px-3 py-1.5 rounded-lg hover:bg-white/70 transition-colors"
                     >
-                      <span className="text-sm font-medium text-white">Unirse</span>
+                      <span className="text-sm font-medium text-accent-primary">Unirse</span>
                     </a>
                   )}
                 </div>

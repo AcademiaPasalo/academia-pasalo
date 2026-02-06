@@ -7,6 +7,7 @@ import { getDeviceId } from '@/lib/deviceId';
 import { normalizeRoleId } from '@/lib/roleMapping';
 import type {
   AuthResponse,
+  ResolveSessionResponse,
   LoginRequest,
   ResolveConcurrentSessionRequest,
   ReauthAnomalousRequest,
@@ -33,10 +34,10 @@ export const authService = {
   async resolveConcurrentSession(
     refreshToken: string,
     decision: 'KEEP_NEW' | 'KEEP_EXISTING'
-  ): Promise<AuthResponse> {
+  ): Promise<ResolveSessionResponse> {
     const deviceId = getDeviceId();
 
-    const response = await apiClient.post<AuthResponse>(
+    const response = await apiClient.post<ResolveSessionResponse>(
       '/auth/sessions/resolve-concurrent',
       {
         refreshToken,

@@ -11,12 +11,15 @@ import Icon from "@/components/ui/Icon";
 
 export default function PlataformaPage() {
   const router = useRouter();
-  const { loginWithGoogle, isAuthenticated, isLoading, sessionStatus, concurrentSessionId } = useAuth();
+  const { loginWithGoogle, resolveConcurrentSession, isAuthenticated, isLoading, sessionStatus } = useAuth();
 
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [showConcurrentModal, setShowConcurrentModal] = useState(false);
-  const [showReauthModal, setShowReauthModal] = useState(false);
+  const [isResolvingSession, setIsResolvingSession] = useState(false);
+
+  // Determinar si mostrar modales basado en sessionStatus
+  const showConcurrentModal = sessionStatus === 'PENDING_CONCURRENT_RESOLUTION';
+  const showReauthModal = sessionStatus === 'BLOCKED_PENDING_REAUTH';
 
   // Redirigir si ya está autenticado - pero NO si acabamos de tener un error
   useEffect(() => {
@@ -24,15 +27,6 @@ export default function PlataformaPage() {
       router.push('/plataforma/inicio');
     }
   }, [isAuthenticated, sessionStatus, router, error, isLoggingIn]);
-
-  // Detectar estados especiales de sesión
-  useEffect(() => {
-    if (sessionStatus === 'PENDING_CONCURRENT_RESOLUTION') {
-      setShowConcurrentModal(true);
-    } else if (sessionStatus === 'BLOCKED_PENDING_REAUTH') {
-      setShowReauthModal(true);
-    }
-  }, [sessionStatus]);
 
   const handleGoogleLogin = useGoogleLogin({
     onSuccess: async (codeResponse) => {
@@ -236,20 +230,39 @@ export default function PlataformaPage() {
                   </p>
                   <div className="flex gap-3">
                     <button
-                      onClick={() => {
-                        // Implementar resolución
-                        setShowConcurrentModal(false);
+                      onClick={async () => {
+                        try {
+                          setIsResolvingSession(true);
+                          setError(null);
+                          // KEEP_NEW = Cerrar la otra sesión y mantener esta
+                          await resolveConcurrentSession('KEEP_NEW');
+                          // El AuthContext manejará el redirect automáticamente
+                        } catch (err) {
+                          console.error('Error al resolver sesión:', err);
+                          setIsResolvingSession(false);
+                          setError('Error al cerrar la otra sesión. Intenta nuevamente.');
+                        }
                       }}
-                      className="flex-1 px-4 py-2 bg-deep-blue-700 text-white rounded-lg hover:bg-deep-blue-800 transition-colors"
+                      disabled={isResolvingSession}
+                      className="flex-1 px-4 py-2 bg-deep-blue-700 text-white rounded-lg hover:bg-deep-blue-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                      Cerrar otra sesión
+                      {isResolvingSession ? (
+                        <>
+                          <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin inline-block mr-2"></div>
+                          Cerrando...
+                        </>
+                      ) : (
+                        'Cerrar otra sesión'
+                      )}
                     </button>
                     <button
                       onClick={() => {
-                        setShowConcurrentModal(false);
-                        setError(null);
+                        // Cancelar el login y limpiar el error
+                        setError('Inicio de sesión cancelado. Por favor, intenta nuevamente.');
+                        setIsResolvingSession(false);
                       }}
-                      className="flex-1 px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors"
+                      disabled={isResolvingSession}
+                      className="flex-1 px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       Cancelar
                     </button>
