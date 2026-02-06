@@ -6,7 +6,7 @@
 
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { authService } from '@/services/auth.service';
-import { saveTokens, saveUser, getUser, clearAuth, hasStoredSession } from '@/lib/storage';
+import { saveTokens, saveUser, getUser, clearAuth, hasStoredSession, saveLastActiveRole, getAccessToken } from '@/lib/storage';
 import { extractActiveRoleFromToken } from '@/lib/jwtUtils';
 import type { User, SessionStatus, AuthResponse } from '@/types/api';
 
@@ -45,10 +45,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     // Guardar tokens
     saveTokens(accessToken, refreshToken);
-    saveUser(userData);
+
+    // Si userData está presente (solo en login, no en refresh/switch), guardarlo
+    if (userData) {
+      // Guardar el último rol activo del usuario para futuras referencias
+      if (userData.lastActiveRoleId) {
+        saveLastActiveRole(userData.lastActiveRoleId);
+      }
+      
+      saveUser(userData);
+      setUser(userData);
+    }
 
     // Actualizar estado
-    setUser(userData);
     setSessionStatus(status);
     setConcurrentSessionId(sessionId);
 
@@ -80,6 +89,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // Si hay sesión concurrente o bloqueada, el componente de login debe mostrar el modal
     } catch (error) {
       console.error('Error en login:', error);
+      
+      // Si es el error de sesión cerrada, NO lanzarlo (el modal ya se mostró)
+      if (error instanceof Error && error.message.includes('Sesión cerrada')) {
+        console.log('🔒 Sesión cerrada detectada durante login, modal ya mostrado');
+        setIsLoading(false);
+        return;
+      }
+      
       // Limpiar el estado en caso de error para evitar redireccionamiento
       setUser(null);
       setSessionStatus(null);
@@ -134,15 +151,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // 5. Guardar el usuario actualizado
       saveUser(updatedUser);
       
-      // 6. Actualizar el estado local
+      // 6. Guardar el último rol activo para restaurar en el próximo login
+      saveLastActiveRole(newActiveRoleId);
+      
+      // 7. Actualizar el estado local
       setUser(updatedUser);
       setSessionStatus('ACTIVE');
       
-      // 7. Recargar la página para refrescar toda la UI
+      // 8. Recargar la página para refrescar toda la UI
       window.location.href = '/plataforma/inicio';
     } catch (error) {
       console.error('Error al cambiar de perfil:', error);
-      setIsLoading(false); // Detener el loading inmediatamente en caso de error
+      setIsLoading(false);
+      
+      // Si es el error de sesión cerrada, NO lanzarlo (el modal ya se mostró)
+      if (error instanceof Error && error.message.includes('Sesión cerrada')) {
+        console.log('🔒 Sesión cerrada detectada, modal ya mostrado');
+        // No hacer nada, el modal ya se mostró y el redirect está programado
+        return;
+      }
+      
+      // Para otros errores, sí lanzarlos
       throw error;
     }
   }, [user]);
@@ -157,20 +186,41 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     try {
       setIsLoading(true);
-      const authData = await authService.resolveConcurrentSession(pendingRefreshToken, decision);
-      processAuthResponse(authData);
+      const resolveData = await authService.resolveConcurrentSession(pendingRefreshToken, decision);
+      
+      console.log('🔄 Sesión concurrente resuelta:', resolveData);
+      
+      // Si no hay keptSessionId, significa que se canceló (KEEP_EXISTING en otra sesión)
+      if (!resolveData.keptSessionId) {
+        console.warn('⚠️ No se mantuvo ninguna sesión (usuario canceló)');
+        setIsLoading(false);
+        throw new Error('Sesión cancelada');
+      }
 
-      // Redirigir al dashboard
-      if (authData.sessionStatus === 'ACTIVE') {
+      // Si hay tokens nuevos, guardarlos
+      if (resolveData.accessToken && resolveData.refreshToken) {
+        saveTokens(resolveData.accessToken, resolveData.refreshToken);
+        
+        // Actualizar el estado de la sesión
+        setSessionStatus('ACTIVE');
+        setConcurrentSessionId(null);
+        setPendingRefreshToken(null);
+        
+        console.log('✅ Sesión resuelta correctamente, redirigiendo...');
+        
+        // Redirigir al dashboard (forzar recarga completa para actualizar todo el contexto)
         window.location.href = '/plataforma/inicio';
+      } else {
+        console.error('❌ No se recibieron tokens en la respuesta');
+        setIsLoading(false);
+        throw new Error('Respuesta inválida del servidor');
       }
     } catch (error) {
-      console.error('Error al resolver sesión concurrente:', error);
-      throw error;
-    } finally {
+      console.error('❌ Error al resolver sesión concurrente:', error);
       setIsLoading(false);
+      throw error;
     }
-  }, [pendingRefreshToken, processAuthResponse]);
+  }, [pendingRefreshToken]);
 
   /**
    * Re-autenticar sesión anómala
@@ -226,9 +276,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const checkSession = useCallback(async () => {
     if (hasStoredSession()) {
       const storedUser = getUser<User>();
+      const accessToken = getAccessToken();
       
-      if (storedUser && storedUser.firstName && storedUser.email) {
-        // Usar el usuario almacenado (el JWT no tiene datos personales)
+      if (storedUser && storedUser.firstName && storedUser.email && accessToken) {
+        // Extraer el rol activo actual del token
+        const currentActiveRole = extractActiveRoleFromToken(accessToken);
+        
+        console.log('🔍 Verificando sesión guardada:', {
+          storedUserLastActiveRole: storedUser.lastActiveRoleId,
+          tokenActiveRole: currentActiveRole,
+        });
+        
+        // Actualizar el lastActiveRoleId del usuario para que coincida con el token
+        // (El token es la fuente de verdad)
+        if (currentActiveRole) {
+          storedUser.lastActiveRoleId = currentActiveRole;
+          saveUser(storedUser);
+        }
+        
+        // Usar el usuario almacenado
         setUser(storedUser);
         setSessionStatus('ACTIVE');
       } else {

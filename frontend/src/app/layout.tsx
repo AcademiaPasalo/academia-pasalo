@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Poppins } from "next/font/google";
 import { GoogleOAuthProvider } from '@react-oauth/google';
 import { AuthProvider } from '@/contexts/AuthContext';
+import SessionClosedModal from '@/components/SessionClosedModal';
 import "./globals.css";
 
 const poppins = Poppins({
@@ -44,6 +45,7 @@ export default function RootLayout({
         <GoogleOAuthProvider clientId={googleClientId}>
           <AuthProvider>
             {children}
+            <SessionClosedModal />
           </AuthProvider>
         </GoogleOAuthProvider>
       </body>

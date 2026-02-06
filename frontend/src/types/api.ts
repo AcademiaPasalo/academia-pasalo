@@ -65,6 +65,13 @@ export interface AuthResponse {
   user: User;
 }
 
+export interface ResolveSessionResponse {
+  keptSessionId: string | null;
+  accessToken?: string;
+  refreshToken?: string;
+  expiresIn?: number;
+}
+
 export interface LoginRequest {
   code: string; // Google OAuth code
   deviceId: string;
