@@ -34,7 +34,7 @@ export default function TopBar({
           onClick={onNotificationClick}
           aria-label="Notificaciones"
         >
-          <Icon name="notifications" size={22} variant="rounded" className="text-secondary" />
+          <Icon name="notifications" size={22} className="text-secondary" />
           {notificationCount > 0 && (
             <div className="absolute top-1.5 right-1.5 w-2 h-2 bg-error-solid rounded-full"></div>
           )}

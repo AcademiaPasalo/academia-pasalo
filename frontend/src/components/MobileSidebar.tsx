@@ -90,7 +90,7 @@ export default function MobileSidebar({
             className="w-7 h-7 flex items-center justify-center text-white hover:opacity-80 transition-opacity"
             aria-label="Cerrar menú"
           >
-            <span className="material-symbols-outlined text-[28px] leading-none">close</span>
+            <span className="material-icons-round text-[28px] leading-none">close</span>
           </button>
         </div>
 
@@ -121,7 +121,7 @@ export default function MobileSidebar({
               href="/plataforma"
               className="flex items-center justify-center w-full gap-2 px-6 py-4 bg-white text-deep-blue-700 border border-deep-blue-700 rounded-lg font-medium text-base leading-[17px] tracking-[-0.18px] hover:bg-gray-50 transition-colors"
             >
-              <span className="material-symbols-outlined text-[20px] leading-none">
+              <span className="material-icons-round text-[20px] leading-none">
                 login
               </span>
               Plataforma

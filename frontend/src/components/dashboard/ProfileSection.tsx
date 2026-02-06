@@ -10,6 +10,7 @@ interface ProfileSectionProps {
 
 const roleLabels: Record<RoleCode, string> = {
   STUDENT: 'Alumno',
+  PROFESSOR: 'Docente',
   TEACHER: 'Docente',
   ADMIN: 'Administrador',
   SUPER_ADMIN: 'Super Admin',
@@ -17,6 +18,7 @@ const roleLabels: Record<RoleCode, string> = {
 
 const roleColors: Record<RoleCode, string> = {
   STUDENT: 'bg-blue-100 text-blue-700',
+  PROFESSOR: 'bg-green-100 text-green-700',
   TEACHER: 'bg-green-100 text-green-700',
   ADMIN: 'bg-purple-100 text-purple-700',
   SUPER_ADMIN: 'bg-red-100 text-red-700',

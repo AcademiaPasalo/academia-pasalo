@@ -74,10 +74,10 @@ export default function DashboardLayout({
   };
 
   return (
-    <div className="min-h-screen bg-bg-secondary flex">
+    <div className="h-screen bg-bg-secondary flex overflow-hidden">
       {/* Sidebar - Desktop */}
       {showSidebar && (
-        <div className="hidden lg:block">
+        <div className="hidden lg:block fixed left-0 top-0 h-screen z-40">
           <Sidebar 
             user={sidebarUser}
             navItems={navItems}
@@ -111,10 +111,10 @@ export default function DashboardLayout({
       )}
 
       {/* Main Content */}
-      <div className="flex-1 flex flex-col min-h-screen">
+      <div className={`flex-1 flex flex-col h-screen ${showSidebar ? (isCollapsed ? 'lg:ml-[72px]' : 'lg:ml-[240px]') : ''}`}>
         {/* Top Bar */}
         {showTopBar && (
-          <header className="h-14 bg-white border-b border-stroke-secondary flex items-center justify-between px-4 sticky top-0 z-30">
+          <header className="h-14 bg-white border-b border-stroke-secondary flex items-center justify-between px-4 flex-shrink-0 z-30">
             {/* Left Side */}
             <div className="flex items-center gap-4 flex-1 min-w-0">
               {/* Mobile Menu Button */}
@@ -159,7 +159,7 @@ export default function DashboardLayout({
         )}
 
         {/* Page Content */}
-        <main className="flex-1 p-12">
+        <main className="flex-1 p-12 bg-bg-secondary overflow-y-auto">
           {children}
         </main>
       </div>

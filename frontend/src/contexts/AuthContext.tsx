@@ -5,9 +5,9 @@
 // ============================================
 
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
 import { authService } from '@/services/auth.service';
 import { saveTokens, saveUser, getUser, clearAuth, hasStoredSession } from '@/lib/storage';
+import { extractActiveRoleFromToken } from '@/lib/jwtUtils';
 import type { User, SessionStatus, AuthResponse } from '@/types/api';
 
 interface AuthContextType {
@@ -19,6 +19,7 @@ interface AuthContextType {
   
   // Métodos
   loginWithGoogle: (code: string) => Promise<void>;
+  switchProfile: (roleId: string) => Promise<void>;
   resolveConcurrentSession: (decision: 'KEEP_NEW' | 'KEEP_EXISTING') => Promise<void>;
   reauthAnomalousSession: (code: string) => Promise<void>;
   logout: () => Promise<void>;
@@ -33,8 +34,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [sessionStatus, setSessionStatus] = useState<SessionStatus | null>(null);
   const [concurrentSessionId, setConcurrentSessionId] = useState<string | null>(null);
   const [pendingRefreshToken, setPendingRefreshToken] = useState<string | null>(null);
-  
-  const router = useRouter();
 
   const isAuthenticated = !!user && sessionStatus === 'ACTIVE';
 
@@ -65,24 +64,88 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
    * Login con Google OAuth
    */
   const loginWithGoogle = useCallback(async (code: string) => {
+    setIsLoading(true);
     try {
-      setIsLoading(true);
       const authData = await authService.loginWithGoogle(code);
       processAuthResponse(authData);
 
       // Redirigir según el estado de la sesión
       if (authData.sessionStatus === 'ACTIVE') {
-        // Login exitoso, redirigir al dashboard
-        router.push('/plataforma/inicio');
+        // Login exitoso, redirigir al dashboard con recarga
+        window.location.href = '/plataforma/inicio';
+      } else {
+        // Si hay sesión concurrente o bloqueada, detener el loading
+        setIsLoading(false);
       }
       // Si hay sesión concurrente o bloqueada, el componente de login debe mostrar el modal
     } catch (error) {
       console.error('Error en login:', error);
-      throw error;
-    } finally {
+      // Limpiar el estado en caso de error para evitar redireccionamiento
+      setUser(null);
+      setSessionStatus(null);
+      setConcurrentSessionId(null);
+      setPendingRefreshToken(null);
       setIsLoading(false);
+      throw error;
     }
-  }, [processAuthResponse, router]);
+  }, [processAuthResponse]);
+
+  /**
+   * Cambiar perfil activo (Switch Profile)
+   */
+  const switchProfile = useCallback(async (roleId: string) => {
+    if (!user) {
+      throw new Error('No hay usuario autenticado');
+    }
+
+    if (!roleId || roleId.trim() === '') {
+      throw new Error('El ID del rol no puede estar vacío');
+    }
+
+    try {
+      setIsLoading(true);
+      
+      // 1. Cambiar el perfil (obtiene nuevos tokens)
+      const switchResponse = await authService.switchProfile(roleId);
+      
+      // La respuesta de switch-profile NO incluye el objeto user
+      // Solo trae accessToken, refreshToken y expiresIn
+      if (!switchResponse || !switchResponse.accessToken || !switchResponse.refreshToken) {
+        throw new Error('Respuesta inválida del servidor');
+      }
+      
+      // 2. Guardar los nuevos tokens
+      saveTokens(switchResponse.accessToken, switchResponse.refreshToken);
+      
+      // 3. Extraer el rol activo desde el nuevo accessToken
+      const newActiveRoleId = extractActiveRoleFromToken(switchResponse.accessToken);
+      
+      if (!newActiveRoleId) {
+        console.error('No se pudo extraer el rol activo del token después del switch');
+        throw new Error('No se pudo extraer el rol activo del token');
+      }
+      
+      // 4. Actualizar el usuario existente con el nuevo rol activo
+      const updatedUser = {
+        ...user, // Mantener todos los datos personales
+        lastActiveRoleId: newActiveRoleId, // Solo actualizar el rol activo
+      };
+      
+      // 5. Guardar el usuario actualizado
+      saveUser(updatedUser);
+      
+      // 6. Actualizar el estado local
+      setUser(updatedUser);
+      setSessionStatus('ACTIVE');
+      
+      // 7. Recargar la página para refrescar toda la UI
+      window.location.href = '/plataforma/inicio';
+    } catch (error) {
+      console.error('Error al cambiar de perfil:', error);
+      setIsLoading(false); // Detener el loading inmediatamente en caso de error
+      throw error;
+    }
+  }, [user]);
 
   /**
    * Resolver sesión concurrente
@@ -99,7 +162,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       // Redirigir al dashboard
       if (authData.sessionStatus === 'ACTIVE') {
-        router.push('/plataforma/inicio');
+        window.location.href = '/plataforma/inicio';
       }
     } catch (error) {
       console.error('Error al resolver sesión concurrente:', error);
@@ -107,7 +170,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } finally {
       setIsLoading(false);
     }
-  }, [pendingRefreshToken, processAuthResponse, router]);
+  }, [pendingRefreshToken, processAuthResponse]);
 
   /**
    * Re-autenticar sesión anómala
@@ -124,7 +187,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       // Redirigir al dashboard
       if (authData.sessionStatus === 'ACTIVE') {
-        router.push('/plataforma/inicio');
+        window.location.href = '/plataforma/inicio';
       }
     } catch (error) {
       console.error('Error al re-autenticar:', error);
@@ -132,38 +195,46 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } finally {
       setIsLoading(false);
     }
-  }, [pendingRefreshToken, processAuthResponse, router]);
+  }, [pendingRefreshToken, processAuthResponse]);
 
   /**
    * Cerrar sesión
    */
   const logout = useCallback(async () => {
     try {
+      // Intentar cerrar sesión en el backend
       await authService.logout();
     } catch (error) {
-      console.error('Error al cerrar sesión:', error);
+      console.error('Error al cerrar sesión en el backend:', error);
+      // Continuar con el logout local incluso si el backend falla
     } finally {
-      // Limpiar estado local
+      // Limpiar estado local PRIMERO
       clearAuth();
       setUser(null);
       setSessionStatus(null);
       setConcurrentSessionId(null);
       setPendingRefreshToken(null);
       
-      // Redirigir al login
-      router.push('/plataforma');
+      // Usar window.location para forzar una recarga completa y evitar problemas de caché
+      window.location.href = '/plataforma';
     }
-  }, [router]);
+  }, []);
 
   /**
    * Verifica si hay una sesión guardada al cargar la app
    */
-  const checkSession = useCallback(() => {
+  const checkSession = useCallback(async () => {
     if (hasStoredSession()) {
       const storedUser = getUser<User>();
-      if (storedUser) {
+      
+      if (storedUser && storedUser.firstName && storedUser.email) {
+        // Usar el usuario almacenado (el JWT no tiene datos personales)
         setUser(storedUser);
         setSessionStatus('ACTIVE');
+      } else {
+        // Si el usuario almacenado no es válido, limpiar sesión
+        console.error('Usuario almacenado inválido');
+        clearAuth();
       }
     }
     setIsLoading(false);
@@ -181,6 +252,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     sessionStatus,
     concurrentSessionId,
     loginWithGoogle,
+    switchProfile,
     resolveConcurrentSession,
     reauthAnomalousSession,
     logout,
