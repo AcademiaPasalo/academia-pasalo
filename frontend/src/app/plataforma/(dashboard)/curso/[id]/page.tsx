@@ -1,5 +1,5 @@
 import { Metadata } from 'next';
-import CursoContent from '@/components/pages/curso/CursoContent';
+import RoleBasedContent from '@/components/RoleBasedContent';
 import { getCursoNombre } from '@/services/cursoService';
 
 interface CursoPageProps {
@@ -21,5 +21,10 @@ export async function generateMetadata({ params }: CursoPageProps): Promise<Meta
 
 export default async function CursoPage({ params }: CursoPageProps) {
   const { id } = await params;
-  return <CursoContent cursoId={id} />;
+  
+  return (
+    <RoleBasedContent 
+      componentProps={{ cursoId: id }}
+    />
+  );
 }
