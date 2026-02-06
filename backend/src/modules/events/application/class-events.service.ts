@@ -15,14 +15,20 @@ import { UserRepository } from '@modules/users/infrastructure/user.repository';
 import { RedisCacheService } from '@infrastructure/cache/redis-cache.service';
 import { ClassEvent } from '@modules/events/domain/class-event.entity';
 import { User } from '@modules/users/domain/user.entity';
+import { technicalSettings } from '@config/technical-settings';
 
 export type ClassEventStatus = 'CANCELADA' | 'PROGRAMADA' | 'EN_CURSO' | 'FINALIZADA';
 
 @Injectable()
 export class ClassEventsService {
   private readonly logger = new Logger(ClassEventsService.name);
-  private readonly EVENT_CACHE_TTL = 1800;
-  private readonly CYCLE_ACTIVE_CACHE_TTL = 3600;
+  private readonly EVENT_CACHE_TTL = technicalSettings.cache.events.classEventsCacheTtlSeconds;
+  private readonly CYCLE_ACTIVE_CACHE_TTL = technicalSettings.cache.events.cycleActiveCacheTtlSeconds;
+  private readonly PROFESSOR_ASSIGNMENT_CACHE_TTL = technicalSettings.cache.events.professorAssignmentCacheTtlSeconds;
+
+  private getProfessorAssignmentCacheKey(courseCycleId: string, professorUserId: string): string {
+    return `cache:cc-professor:cycle:${courseCycleId}:prof:${professorUserId}`;
+  }
 
   constructor(
     private readonly dataSource: DataSource,
@@ -228,7 +234,7 @@ export class ClassEventsService {
     return 'FINALIZADA';
   }
 
-  async canAccessMeetingLink(event: ClassEvent, userId: string): Promise<boolean> {
+  async canAccessMeetingLink(event: ClassEvent, user: User): Promise<boolean> {
     if (!event.meetingLink) {
       return false;
     }
@@ -238,7 +244,37 @@ export class ClassEventsService {
       return false;
     }
 
-    return await this.checkUserAuthorization(userId, event.evaluationId);
+    return await this.checkUserAuthorizationWithUser(user, event.evaluationId);
+  }
+
+  private async checkUserAuthorizationWithUser(user: User, evaluationId: string): Promise<boolean> {
+    const roleCodes = (user.roles || []).map((r) => r.code);
+
+    if (roleCodes.some((r) => ['ADMIN', 'SUPER_ADMIN'].includes(r))) {
+      return true;
+    }
+
+    if (roleCodes.includes('PROFESSOR')) {
+      const evaluation = await this.evaluationRepository.findByIdWithCycle(evaluationId);
+      if (!evaluation) return false;
+
+      const cacheKey = this.getProfessorAssignmentCacheKey(evaluation.courseCycleId, user.id);
+      const cached = await this.cacheService.get<boolean>(cacheKey);
+      if (cached !== null) {
+        return cached;
+      }
+
+      const isAssigned = await this.dataSource.query(
+        'SELECT 1 FROM course_cycle_professor WHERE course_cycle_id = ? AND professor_user_id = ? LIMIT 1',
+        [evaluation.courseCycleId, user.id],
+      );
+
+      const result = isAssigned.length > 0;
+      await this.cacheService.set(cacheKey, result, this.PROFESSOR_ASSIGNMENT_CACHE_TTL);
+      return result;
+    }
+
+    return await this.enrollmentEvaluationRepository.checkAccess(user.id, evaluationId);
   }
 
   async checkUserAuthorization(userId: string, evaluationId: string): Promise<boolean> {

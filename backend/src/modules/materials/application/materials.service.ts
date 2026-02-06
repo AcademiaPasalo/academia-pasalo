@@ -26,11 +26,12 @@ import { FileResource } from '@modules/materials/domain/file-resource.entity';
 import { FileVersion } from '@modules/materials/domain/file-version.entity';
 import { User } from '@modules/users/domain/user.entity';
 import * as fs from 'fs';
+import { technicalSettings } from '@config/technical-settings';
 
 @Injectable()
 export class MaterialsService {
   private readonly logger = new Logger(MaterialsService.name);
-  private readonly CACHE_TTL = 300;
+  private readonly CACHE_TTL = technicalSettings.cache.materials.materialsExplorerCacheTtlSeconds;
 
   constructor(
     private readonly dataSource: DataSource,
@@ -79,17 +80,7 @@ export class MaterialsService {
   async uploadMaterial(userId: string, dto: UploadMaterialDto, file: Express.Multer.File): Promise<Material> {
     if (!file) throw new BadRequestException('Archivo requerido');
 
-    const allowedMimeTypes = [
-      'application/pdf',
-      'image/jpeg',
-      'image/png',
-      'image/gif',
-      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-      'application/vnd.openxmlformats-officedocument.presentationml.presentation',
-      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-      'text/plain',
-      'application/zip',
-    ];
+    const allowedMimeTypes: readonly string[] = technicalSettings.uploads.materials.allowedMimeTypes;
 
     if (!allowedMimeTypes.includes(file.mimetype)) {
       throw new BadRequestException(
@@ -98,8 +89,8 @@ export class MaterialsService {
     }
 
     if (file.mimetype === 'application/pdf') {
-      const pdfMagic = file.buffer.slice(0, 4).toString('hex');
-      if (pdfMagic !== '25504446') {
+      const pdfMagic = file.buffer.subarray(0, 4).toString('hex');
+      if (pdfMagic !== technicalSettings.uploads.materials.pdfMagicHeaderHex) {
         throw new BadRequestException('El archivo no es un PDF válido');
       }
     }
@@ -121,7 +112,8 @@ export class MaterialsService {
         let finalVersion: FileVersion;
 
         if (!existingResource) {
-          const uniqueName = `${Date.now()}-${file.originalname}`;
+          const sanitizedOriginalName = file.originalname.replace(/[^a-zA-Z0-9.-]/g, '_');
+          const uniqueName = `${Date.now()}-${sanitizedOriginalName}`;
           storagePath = await this.storageService.saveFile(uniqueName, file.buffer);
           isNewFile = true;
           
@@ -210,7 +202,8 @@ export class MaterialsService {
         let finalResource: FileResource;
 
         if (!existingResource) {
-          const uniqueName = `${Date.now()}-${file.originalname}`;
+          const sanitizedOriginalName = file.originalname.replace(/[^a-zA-Z0-9.-]/g, '_');
+          const uniqueName = `${Date.now()}-${sanitizedOriginalName}`;
           storagePath = await this.storageService.saveFile(uniqueName, file.buffer);
           isNewFile = true;
           
@@ -268,7 +261,11 @@ export class MaterialsService {
     const roots = await this.folderRepository.findRootsByEvaluation(evaluationId, status.id);
 
     await this.cacheService.set(cacheKey, roots, this.CACHE_TTL);
-    return roots;
+    
+    const userEntity = await this.userRepository.findById(userId);
+    if (!userEntity) throw new ForbiddenException('Usuario no válido');
+
+    return this.applyVisibilityFilter(userEntity, roots, []).folders;
   }
 
   async getFolderContents(user: User, folderId: string): Promise<{ folders: MaterialFolder[], materials: Material[] }> {
@@ -290,7 +287,7 @@ export class MaterialsService {
     const result = { folders, materials };
     await this.cacheService.set(cacheKey, result, this.CACHE_TTL);
     
-    return result;
+    return this.applyVisibilityFilter(user, result.folders, result.materials);
   }
 
   async download(user: User, materialId: string): Promise<{ stream: NodeJS.ReadableStream; fileName: string; mimeType: string }> {
@@ -340,6 +337,31 @@ export class MaterialsService {
       createdAt: now,
       updatedAt: now,
     });
+  }
+
+  private applyVisibilityFilter(user: User, folders: MaterialFolder[], materials: Material[]) {
+    const roleCodes = (user.roles || []).map((r) => r.code);
+    const hasPrivilegedAccess = roleCodes.some((r) => ['ADMIN', 'SUPER_ADMIN', 'PROFESSOR'].includes(r));
+
+    if (hasPrivilegedAccess) {
+      return { folders, materials };
+    }
+
+    const now = new Date();
+    
+    const visibleFolders = folders.filter(f => {
+      const startOk = !f.visibleFrom || new Date(f.visibleFrom) <= now;
+      const endOk = !f.visibleUntil || new Date(f.visibleUntil) >= now;
+      return startOk && endOk;
+    });
+
+    const visibleMaterials = materials.filter(m => {
+      const startOk = !m.visibleFrom || new Date(m.visibleFrom) <= now;
+      const endOk = !m.visibleUntil || new Date(m.visibleUntil) >= now;
+      return startOk && endOk;
+    });
+
+    return { folders: visibleFolders, materials: visibleMaterials };
   }
 
   private async checkAuthorizedAccess(userId: string, evaluationId: string, folder?: MaterialFolder): Promise<void> {

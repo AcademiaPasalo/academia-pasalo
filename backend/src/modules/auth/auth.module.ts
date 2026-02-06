@@ -26,6 +26,7 @@ import { SessionStatusRepository } from './infrastructure/session-status.reposit
 import { UsersModule } from '@modules/users/users.module';
 import { GeoModule } from '@infrastructure/geo/geo.module';
 import { SettingsModule } from '@modules/settings/settings.module';
+import { technicalSettings } from '@config/technical-settings';
 
 @Module({
   imports: [
@@ -42,7 +43,7 @@ import { SettingsModule } from '@modules/settings/settings.module';
       inject: [ConfigService],
       useFactory: (configService: ConfigService) => ({
         secret: configService.get<string>('JWT_SECRET'),
-        signOptions: { expiresIn: '15m' },
+        signOptions: { expiresIn: technicalSettings.auth.tokens.jwtModuleDefaultAccessTokenExpiresIn },
       }),
     }),
     UsersModule,

@@ -59,6 +59,7 @@ export class EvaluationSubscriber implements EntitySubscriberInterface<Evaluatio
       while (hasMore) {
         const enrollmentsBatch = await manager.find(Enrollment, {
           where: { courseCycleId: evaluation.courseCycleId },
+          order: { id: 'ASC' },
           skip: offset,
           take: BATCH_SIZE,
         });
@@ -132,6 +133,7 @@ export class EvaluationSubscriber implements EntitySubscriberInterface<Evaluatio
             courseCycleId: evaluation.courseCycleId,
             enrollmentTypeId: fullType.id,
           },
+          order: { id: 'ASC' },
           skip: offset,
           take: BATCH_SIZE,
         });

@@ -61,12 +61,23 @@ describe('Security Scenarios (Integration)', () => {
     findByRefreshTokenHash: jest.fn(),
     findByRefreshTokenHashForUpdate: jest.fn(),
     findById: jest.fn(),
+    findActiveById: jest.fn().mockResolvedValue({
+      id: '1',
+      userId: mockUser.id,
+      deviceId: mockMetadata.deviceId,
+      isActive: true,
+      sessionStatusId: '100',
+      expiresAt: new Date(Date.now() + 1000000),
+      user: mockUser,
+      activeRoleId: '10',
+    }),
     findByIdWithUser: jest.fn().mockResolvedValue({
       id: '1',
       isActive: true,
       sessionStatusId: '100',
       expiresAt: new Date(Date.now() + 1000000),
       user: mockUser,
+      activeRoleId: '10',
     }),
     findByIdForUpdate: jest.fn(),
     update: jest.fn(),
@@ -278,7 +289,7 @@ describe('Security Scenarios (Integration)', () => {
         { get: jest.fn().mockResolvedValue(null), set: jest.fn() } as any,
       );
 
-      const payload = { sub: '1', email: 'h@t.com', roles: [], sessionId: '500' };
+      const payload = { sub: '1', email: 'h@t.com', roles: [], activeRole: 'STUDENT', sessionId: '500' };
 
       mockUserSessionRepository.findByIdWithUser.mockResolvedValue({
         id: '500',

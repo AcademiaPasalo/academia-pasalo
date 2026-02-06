@@ -18,6 +18,7 @@ import { DatabaseModule } from '@infrastructure/database/database.module';
 import { RedisCacheModule } from '@infrastructure/cache/redis-cache.module';
 import { StorageModule } from '@infrastructure/storage/storage.module';
 import { HealthModule } from './health/health.module';
+import { technicalSettings } from '@config/technical-settings';
 
 @Module({
   imports: [
@@ -25,8 +26,8 @@ import { HealthModule } from './health/health.module';
       isGlobal: true,
     }),
     ThrottlerModule.forRoot([{
-      ttl: 60000,
-      limit: 10,
+      ttl: technicalSettings.throttler.ttlMs,
+      limit: technicalSettings.throttler.limit,
     }]),
     DatabaseModule,
     RedisCacheModule,

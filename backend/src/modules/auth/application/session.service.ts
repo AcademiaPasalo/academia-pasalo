@@ -31,6 +31,7 @@ export class SessionService {
     metadata: RequestMetadata,
     refreshToken: string,
     expiresAt: Date,
+    activeRoleId?: string,
     externalManager?: EntityManager,
   ): Promise<{
     session: UserSession;
@@ -72,6 +73,7 @@ export class SessionService {
             longitude: resolved.metadata.longitude || null,
             refreshTokenHash,
             sessionStatusId: blockedStatusId,
+            activeRoleId: activeRoleId || null,
             expiresAt,
             lastActivityAt: new Date(),
             isActive: false,
@@ -124,6 +126,7 @@ export class SessionService {
           longitude: resolved.metadata.longitude || null,
           refreshTokenHash,
           sessionStatusId: concurrentSession ? pendingStatusId : activeStatusId,
+          activeRoleId: activeRoleId || null,
           expiresAt,
           lastActivityAt: new Date(),
           isActive: !concurrentSession,

@@ -18,6 +18,13 @@ export class RoleRepository {
     });
   }
 
+  async findById(id: string, manager?: EntityManager): Promise<Role | null> {
+    const repo = manager ? manager.getRepository(Role) : this.ormRepository;
+    return await repo.findOne({
+      where: { id },
+    });
+  }
+
   async findAll(): Promise<Role[]> {
     return await this.ormRepository.find();
   }

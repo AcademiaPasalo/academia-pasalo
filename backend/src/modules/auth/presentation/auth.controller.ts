@@ -14,6 +14,7 @@ import { GoogleLoginDto } from '@modules/auth/dto/google-login.dto';
 import { RefreshTokenDto } from '@modules/auth/dto/refresh-token.dto';
 import { ResolveConcurrentSessionDto } from '@modules/auth/dto/resolve-concurrent-session.dto';
 import { ReauthAnomalousSessionDto } from '@modules/auth/dto/reauth-anomalous-session.dto';
+import { SwitchProfileDto } from '@modules/auth/dto/switch-profile.dto';
 import { AuthResponseDto } from '@modules/auth/dto/auth-response.dto';
 import { UserResponseDto } from '@modules/users/dto/user-response.dto';
 import { ResponseMessage } from '@common/decorators/response-message.decorator';
@@ -21,6 +22,7 @@ import { JwtAuthGuard } from '@common/guards/jwt-auth.guard';
 import { CurrentUser } from '@common/decorators/current-user.decorator';
 import type { UserWithSession } from '@modules/auth/strategies/jwt.strategy';
 import { RequestMetadata } from '@modules/auth/interfaces/request-metadata.interface';
+import { technicalSettings } from '@config/technical-settings';
 
 @Controller('auth')
 export class AuthController {
@@ -47,7 +49,7 @@ export class AuthController {
       {
         accessToken,
         refreshToken,
-        expiresIn: 900,
+        expiresIn: technicalSettings.auth.tokens.authResponseExpiresInSeconds,
         sessionStatus,
         concurrentSessionId,
         user: userResponse,
@@ -71,7 +73,7 @@ export class AuthController {
       {
         accessToken,
         refreshToken,
-        expiresIn: 900,
+        expiresIn: technicalSettings.auth.tokens.authResponseExpiresInSeconds,
         user: null, 
       },
       { excludeExtraneousValues: true },
@@ -132,6 +134,36 @@ export class AuthController {
     if (user.sessionId) {
       await this.authService.logout(user.sessionId, user.id);
     }
+  }
+
+  @Post('switch-profile')
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.OK)
+  @ResponseMessage('Perfil cambiado exitosamente')
+  async switchProfile(
+    @CurrentUser() user: UserWithSession,
+    @Body() switchProfileDto: SwitchProfileDto,
+    @Req() request: express.Request,
+  ) {
+    const metadata = this.extractRequestMetadata(request, switchProfileDto.deviceId);
+
+    const { accessToken, refreshToken } = await this.authService.switchProfile(
+      user.id,
+      user.sessionId,
+      switchProfileDto.roleId,
+      metadata,
+    );
+
+    return plainToInstance(
+      AuthResponseDto,
+      {
+        accessToken,
+        refreshToken,
+        expiresIn: technicalSettings.auth.tokens.authResponseExpiresInSeconds,
+        user: null,
+      },
+      { excludeExtraneousValues: true },
+    );
   }
 
   private extractRequestMetadata(request: express.Request, deviceId: string): RequestMetadata {

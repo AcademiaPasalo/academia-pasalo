@@ -1,6 +1,7 @@
-# DOCUMENTACIÓN DE API - ACADEMIA PASALO
+# DOCUMENTACIÓN DE API - ACADEMIA PASALO (CORE & AUTH)
 
-Esta API sigue el estándar de respuestas unificadas y manejo de errores centralizado.
+Esta documentación cubre exclusivamente los módulos de **Autenticación, Seguridad y Gestión de Usuarios**.
+Para la documentación de Cursos, Materiales, Feedback y Calendario, consultar: [API_CONTENT_AND_FEEDBACK.md](./API_CONTENT_AND_FEEDBACK.md)
 
 ---
 
@@ -57,6 +58,7 @@ Base URL: `/api/v1/auth`
     "id": "1",
     "email": "alumno@academia.com",
     "roles": [ { "code": "STUDENT", "name": "Alumno" } ],
+    "lastActiveRoleId": "2",
     "firstName": "Joseph",
     ...
   }
@@ -94,7 +96,34 @@ Base URL: `/api/v1/auth`
 
 ---
 
-### 2. Resolver Sesión Concurrente
+### 2. Cambiar Perfil Activo (Switch Profile)
+`POST /switch-profile`
+*Requiere Authorization: Bearer <accessToken>*
+
+**Purpose:** Permite al usuario cambiar su contexto de operación a otro rol que posea (ej. de Estudiante a Profesor). Esta acción invalida los tokens anteriores y emite nuevos.
+
+**Request Body:**
+```json
+{
+  "roleId": "string (ID del rol al que se desea cambiar)",
+  "deviceId": "string"
+}
+```
+
+**Response:**
+`data`:
+```json
+{
+  "accessToken": "JWT (Nuevo token con el rol activo actualizado)",
+  "refreshToken": "JWT (Nuevo refresh token)",
+  "expiresIn": 10800
+}
+```
+*Nota: El frontend debe reemplazar inmediatamente los tokens almacenados y actualizar la UI.*
+
+---
+
+### 3. Resolver Sesión Concurrente
 `POST /sessions/resolve-concurrent`
 
 **Purpose:** Decide qué sesión mantener tras una detección concurrente.
@@ -110,7 +139,7 @@ Base URL: `/api/v1/auth`
 
 ---
 
-### 3. Re-autenticar Sesión Anómala
+### 4. Re-autenticar Sesión Anómala
 `POST /sessions/reauth-anomalous`
 
 **Purpose:** Desbloquear una sesión bloqueada por geolocalización.
@@ -126,7 +155,7 @@ Base URL: `/api/v1/auth`
 
 ---
 
-### 4. Renovar Token (Refresh)
+### 5. Renovar Token (Refresh)
 `POST /refresh`
 
 **Request Body:**
@@ -139,7 +168,7 @@ Base URL: `/api/v1/auth`
 
 ---
 
-### 5. Cerrar Sesión (Logout)
+### 6. Cerrar Sesión (Logout)
 `POST /logout`
 *Requiere Authorization: Bearer <accessToken>*
 
@@ -150,59 +179,168 @@ Base URL: `/api/v1/auth`
 Base URL: `/api/v1/users`
 *Todos los endpoints requieren JWT y una sesión activa en BD.*
 
-| Método | Endpoint | Roles / Permisos | Descripción |
-| :--- | :--- | :--- | :--- |
-| GET | `/` | ADMIN, SUPER_ADMIN | Listar todos los usuarios del sistema. |
-| GET | `/:id` | Propietario o ADMIN, SUPER_ADMIN | Obtener perfil (Solo propio o si eres Admin). |
-| POST | `/` | ADMIN, SUPER_ADMIN | Crear un usuario de forma manual. |
-| PATCH | `/:id` | Propietario o ADMIN, SUPER_ADMIN | Actualizar datos (Solo propio o si eres Admin). |
-| DELETE | `/:id` | ADMIN, SUPER_ADMIN | Eliminar un usuario del sistema. |
-| POST | `/:id/roles/:code` | SUPER_ADMIN | Asignar un rol específico (Operación atómica). |
-| DELETE | `/:id/roles/:code` | SUPER_ADMIN | Remover un rol específico (Operación atómica). |
+**Nota sobre "Mi Perfil":** Para obtener los datos del usuario actual, el frontend debe usar el endpoint `GET /:id` utilizando el `id` retornado en la respuesta del Login.
+
+### 1. Crear Usuario (Manual)
+*   **Endpoint:** `POST /`
+*   **Roles:** `ADMIN`, `SUPER_ADMIN`
+*   **Request Body:**
+    ```json
+    {
+      "email": "string (email válido, max 255)",
+      "firstName": "string (min 2, max 50, solo letras)",
+      "lastName1": "string (opcional, max 50)",
+      "lastName2": "string (opcional, max 50)",
+      "phone": "string (opcional, max 20)",
+      "career": "string (opcional, max 100)",
+      "profilePhotoUrl": "string (opcional, url)",
+      "photoSource": "google | uploaded | none"
+    }
+    ```
+
+### 2. Listar Usuarios
+*   **Endpoint:** `GET /`
+*   **Roles:** `ADMIN`, `SUPER_ADMIN`
+*   **Response:** Array de objetos User.
+
+### 3. Obtener Usuario por ID
+*   **Endpoint:** `GET /:id`
+*   **Roles:** `ADMIN`, `SUPER_ADMIN` o el **Propietario** de la cuenta.
+*   **Response:** Objeto User.
+
+### 4. Actualizar Usuario
+*   **Endpoint:** `PATCH /:id`
+*   **Roles:** `ADMIN`, `SUPER_ADMIN` o el **Propietario** de la cuenta.
+*   **Request Body:** Similar a `POST /` (todos los campos son opcionales).
+
+### 5. Eliminar Usuario
+*   **Endpoint:** `DELETE /:id`
+*   **Roles:** `ADMIN`, `SUPER_ADMIN`
+
+### 6. Gestión de Roles
+*   **Asignar:** `POST /:id/roles/:roleCode`
+    *   **Roles:** `SUPER_ADMIN`
+*   **Remover:** `DELETE /:id/roles/:roleCode`
+    *   **Roles:** `SUPER_ADMIN`
 
 ---
 
-## 📚 ÉPICA 3: Cursos y Ciclos (Courses)
+## 📅 ÉPICA 3: Gestión Académica Core (Cycles & Courses)
 
-Base URL: `/api/v1/courses`
-*Gestión del catálogo académico.*
+Base URL: `/api/v1/cycles` | `/api/v1/courses`
 
-| Método | Endpoint | Roles / Permisos | Descripción |
-| :--- | :--- | :--- | :--- |
-| POST | `/` | ADMIN, SUPER_ADMIN | **Crear Materia.** Registra una nueva materia en el sistema (ej. "Física I"). |
-| GET | `/` | ADMIN, SUPER_ADMIN | **Listar Materias.** Obtiene todas las materias registradas. |
-| GET | `/types` | ADMIN, SUPER_ADMIN | Listar tipos de cursos (Ciencias, Letras, Facultad). |
-| GET | `/levels` | ADMIN, SUPER_ADMIN | Listar niveles académicos (1er Ciclo, etc.). |
-| GET | `/:id` | ADMIN, SUPER_ADMIN | Obtener detalle de una materia. |
-| POST | `/assign-cycle` | ADMIN, SUPER_ADMIN | **Aperturar Materia en Ciclo.** Vincula una materia a un ciclo académico (ej. Física I en 2026-0). Esto crea el `CourseCycle`. |
+### 1. Ciclos Académicos (`/cycles`)
+*   **GET /**: Listar todos los ciclos (Admin).
+*   **GET /active**: Obtener el ciclo académico actualmente activo (Público/Auth).
+*   **GET /:id**: Obtener detalle de un ciclo (Admin).
+    *   **Response:**
+        ```json
+        {
+          "id": "string",
+          "code": "string",
+          "startDate": "Date",
+          "endDate": "Date"
+        }
+        ```
+
+### 2. Cursos (`/courses`)
+
+#### Crear Materia
+*   **Endpoint:** `POST /`
+*   **Roles:** `ADMIN`, `SUPER_ADMIN`
+*   **Request Body:**
+    ```json
+    {
+      "code": "string (max 50)",
+      "name": "string (max 100)",
+      "courseTypeId": "string (ID)",
+      "cycleLevelId": "string (ID)"
+    }
+    ```
+
+#### Listar Materias
+*   **Endpoint:** `GET /`
+*   **Roles:** `ADMIN`, `SUPER_ADMIN`
+
+#### Listar Tipos y Niveles
+*   **GET /types**: Tipos de cursos (Ciencias, Letras, etc.).
+*   **GET /levels**: Niveles (Ciclo 1, Ciclo 2, etc.).
+
+#### Aperturar Materia en Ciclo
+*   **Endpoint:** `POST /assign-cycle`
+*   **Roles:** `ADMIN`, `SUPER_ADMIN`
+*   **Request Body:**
+    ```json
+    {
+      "courseId": "string",
+      "academicCycleId": "string"
+    }
+    ```
+
+#### Gestión de Profesores en Curso/Ciclo
+*   **Asignar:** `POST /cycle/:id/professors`
+    *   **Body:** `{ "professorUserId": "string" }`
+*   **Remover:** `DELETE /cycle/:id/professors/:professorUserId`
+*   **Roles:** `ADMIN`, `SUPER_ADMIN`
 
 ---
 
 ## 📝 ÉPICA 4: Evaluaciones Académicas (Evaluations)
 
 Base URL: `/api/v1/evaluations`
-*Gestión de exámenes, PCs y estructura del curso.*
 
-| Método | Endpoint | Roles / Permisos | Descripción |
-| :--- | :--- | :--- | :--- |
-| POST | `/` | ADMIN, SUPER_ADMIN | **Crear Evaluación.** Registra una PC, Examen o Banco. <br>⚠️ **Disparador:** Al crearla, si existen alumnos matriculados FULL, se les otorga acceso automático. |
-| GET | `/course-cycle/:id` | ADMIN, SUPER_ADMIN | Listar todas las evaluaciones de un curso en un ciclo específico. |
+### 1. Crear Evaluación
+*   **Endpoint:** `POST /`
+*   **Roles:** `ADMIN`, `SUPER_ADMIN`
+*   **Request Body:**
+    ```json
+    {
+      "courseCycleId": "string",
+      "evaluationTypeId": "string",
+      "number": number,
+      "startDate": "ISO-8601 Date",
+      "endDate": "ISO-8601 Date"
+    }
+    ```
+*   **Nota:** Al crearla, si existen alumnos matriculados FULL, se les otorga acceso automático.
+
+### 2. Listar Evaluaciones de Curso/Ciclo
+*   **Endpoint:** `GET /course-cycle/:id`
+*   **Roles:** `ADMIN`, `SUPER_ADMIN`
 
 ---
 
 ## 🎓 ÉPICA 5: Matrículas (Enrollments)
 
 Base URL: `/api/v1/enrollments`
-*Proceso de inscripción y compra de accesos.*
 
-| Método | Endpoint | Roles / Permisos | Descripción |
-| :--- | :--- | :--- | :--- |
-| POST | `/` | ADMIN, SUPER_ADMIN | **Matricular Alumno.** <br>Crea la matrícula y calcula los accesos iniciales según el tipo (`FULL` o `PARTIAL`). <br> - **FULL:** Acceso a todo el ciclo actual + histórico.<br> - **PARTIAL:** Acceso solo a evaluaciones pagadas + Banco (con vigencia recortada). |
+### 1. Matricular Alumno
+*   **Endpoint:** `POST /`
+*   **Roles:** `ADMIN`, `SUPER_ADMIN`
+*   **Request Body:**
+    ```json
+    {
+      "userId": "string",
+      "courseCycleId": "string",
+      "enrollmentTypeCode": "FULL | PARTIAL",
+      "evaluationIds": ["string"] (Opcional, para PARTIAL),
+      "historicalCourseCycleIds": ["string"] (Opcional, para acceso histórico)
+    }
+    ```
+
+### 2. Cancelar Matrícula
+*   **Endpoint:** `DELETE /:id`
+*   **Roles:** `ADMIN`, `SUPER_ADMIN`
+*   **Efecto:** Revoca accesos inmediatamente.
 
 ---
 
-## 💡 Notas Técnicas Críticas para Frontend
-1. **Tipado de IDs:** El backend envía y recibe IDs como **strings** (ej. `"10"`). No convertirlos a números.
-2. **Validación de Sesión:** Si el `accessToken` es válido pero la sesión está bloqueada en la BD, recibirás un **401 Unauthorized**. El Front debe manejar esto redirigiendo a la pantalla de resolución correspondiente.
-3. **Flujo Google:** El Front debe usar `flow: 'auth-code'` al llamar a la librería de Google para obtener el `code` que el Back espera.
-4. **Seguridad Activa:** Si recibes `sessionStatus` diferente de `ACTIVE`, no permitas la navegación interna.
+## 🛠️ ÉPICA 6: Sistema (System)
+
+Base URL: `/api/v1`
+
+### 1. Health Check
+`GET /health`
+*   **Roles:** Público.
+*   **Descripción:** Verifica el estado de la API, conexión a BD y Redis.
+*   **Response:** `{ "status": "ok", "info": { ... } }`

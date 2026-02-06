@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { EnrollmentEvaluationRepository } from '@modules/enrollments/infrastructure/enrollment-evaluation.repository';
 import { RedisCacheService } from '@infrastructure/cache/redis-cache.service';
+import { technicalSettings } from '@config/technical-settings';
 
 @Injectable()
 export class AccessEngineService {
@@ -29,7 +30,7 @@ export class AccessEngineService {
       timestamp: new Date().toISOString(),
     });
 
-    await this.cacheService.set(cacheKey, hasAccess, 3600);
+    await this.cacheService.set(cacheKey, hasAccess, technicalSettings.cache.enrollments.accessCheckCacheTtlSeconds);
 
     return hasAccess;
   }
