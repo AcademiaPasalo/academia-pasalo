@@ -112,7 +112,8 @@ export class MaterialsService {
         let finalVersion: FileVersion;
 
         if (!existingResource) {
-          const uniqueName = `${Date.now()}-${file.originalname}`;
+          const sanitizedOriginalName = file.originalname.replace(/[^a-zA-Z0-9.-]/g, '_');
+          const uniqueName = `${Date.now()}-${sanitizedOriginalName}`;
           storagePath = await this.storageService.saveFile(uniqueName, file.buffer);
           isNewFile = true;
           
@@ -201,7 +202,8 @@ export class MaterialsService {
         let finalResource: FileResource;
 
         if (!existingResource) {
-          const uniqueName = `${Date.now()}-${file.originalname}`;
+          const sanitizedOriginalName = file.originalname.replace(/[^a-zA-Z0-9.-]/g, '_');
+          const uniqueName = `${Date.now()}-${sanitizedOriginalName}`;
           storagePath = await this.storageService.saveFile(uniqueName, file.buffer);
           isNewFile = true;
           
@@ -259,7 +261,11 @@ export class MaterialsService {
     const roots = await this.folderRepository.findRootsByEvaluation(evaluationId, status.id);
 
     await this.cacheService.set(cacheKey, roots, this.CACHE_TTL);
-    return roots;
+    
+    const userEntity = await this.userRepository.findById(userId);
+    if (!userEntity) throw new ForbiddenException('Usuario no válido');
+
+    return this.applyVisibilityFilter(userEntity, roots, []).folders;
   }
 
   async getFolderContents(user: User, folderId: string): Promise<{ folders: MaterialFolder[], materials: Material[] }> {
@@ -281,7 +287,7 @@ export class MaterialsService {
     const result = { folders, materials };
     await this.cacheService.set(cacheKey, result, this.CACHE_TTL);
     
-    return result;
+    return this.applyVisibilityFilter(user, result.folders, result.materials);
   }
 
   async download(user: User, materialId: string): Promise<{ stream: NodeJS.ReadableStream; fileName: string; mimeType: string }> {
@@ -331,6 +337,31 @@ export class MaterialsService {
       createdAt: now,
       updatedAt: now,
     });
+  }
+
+  private applyVisibilityFilter(user: User, folders: MaterialFolder[], materials: Material[]) {
+    const roleCodes = (user.roles || []).map((r) => r.code);
+    const hasPrivilegedAccess = roleCodes.some((r) => ['ADMIN', 'SUPER_ADMIN', 'PROFESSOR'].includes(r));
+
+    if (hasPrivilegedAccess) {
+      return { folders, materials };
+    }
+
+    const now = new Date();
+    
+    const visibleFolders = folders.filter(f => {
+      const startOk = !f.visibleFrom || new Date(f.visibleFrom) <= now;
+      const endOk = !f.visibleUntil || new Date(f.visibleUntil) >= now;
+      return startOk && endOk;
+    });
+
+    const visibleMaterials = materials.filter(m => {
+      const startOk = !m.visibleFrom || new Date(m.visibleFrom) <= now;
+      const endOk = !m.visibleUntil || new Date(m.visibleUntil) >= now;
+      return startOk && endOk;
+    });
+
+    return { folders: visibleFolders, materials: visibleMaterials };
   }
 
   private async checkAuthorizedAccess(userId: string, evaluationId: string, folder?: MaterialFolder): Promise<void> {
