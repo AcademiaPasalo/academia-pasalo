@@ -7,6 +7,24 @@ import { SidebarNavItem } from '@/components/dashboard/Sidebar';
 
 export type UserRole = 'STUDENT' | 'TEACHER' | 'ADMIN' | 'SUPER_ADMIN';
 
+// Códigos de rol que vienen del backend
+export type BackendRoleCode = 'STUDENT' | 'PROFESSOR' | 'ADMIN' | 'SUPER_ADMIN';
+
+/**
+ * Mapea códigos de rol del backend a códigos internos del frontend
+ * El backend usa PROFESSOR pero internamente usamos TEACHER para consistencia
+ */
+export function mapBackendRoleToUserRole(backendCode: string): UserRole {
+  const mapping: Record<string, UserRole> = {
+    'STUDENT': 'STUDENT',
+    'PROFESSOR': 'TEACHER', // ⚠️ Backend usa PROFESSOR, frontend usa TEACHER
+    'ADMIN': 'ADMIN',
+    'SUPER_ADMIN': 'SUPER_ADMIN'
+  };
+
+  return mapping[backendCode] || 'STUDENT';
+}
+
 /**
  * Configuración de navegación por rol
  */

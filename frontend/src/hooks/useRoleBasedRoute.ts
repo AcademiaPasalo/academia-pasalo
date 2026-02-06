@@ -8,7 +8,7 @@
 import { useEffect } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
-import { UserRole } from '@/config/navigation';
+import { UserRole, mapBackendRoleToUserRole } from '@/config/navigation';
 import {
   hasRouteAccess,
   getComponentForRoute,
@@ -35,7 +35,30 @@ export function useRoleBasedRoute(customRoute?: string): RouteGuardResult {
 
   const route = customRoute || pathname;
   const normalizedRoute = normalizeRoute(route || '');
-  const userRole = (user?.roles?.[0]?.code as UserRole) || null;
+  
+  // Obtener rol activo del usuario (basado en lastActiveRoleId o el primero por defecto)
+  const getActiveRole = (): UserRole | null => {
+    if (!user || !user.roles || user.roles.length === 0) {
+      return null;
+    }
+
+    // Si hay un lastActiveRoleId, buscar ese rol
+    if (user.lastActiveRoleId) {
+      const activeRole = user.roles.find(
+        r => (r.id || r.code) === user.lastActiveRoleId
+      );
+      if (activeRole) {
+        // Mapear código del backend a código interno
+        return mapBackendRoleToUserRole(activeRole.code);
+      }
+    }
+
+    // Si no, usar el primer rol
+    const firstRole = user.roles[0];
+    return firstRole ? mapBackendRoleToUserRole(firstRole.code) : null;
+  };
+
+  const userRole = getActiveRole();
 
   // Calcular estado de carga y acceso directamente
   const isLoading = authLoading;

@@ -12,6 +12,7 @@ import {
   setActiveNavItem,
   roleAvatarColors,
   roleLabels,
+  mapBackendRoleToUserRole,
   type UserRole 
 } from '@/config/navigation';
 import type { SidebarNavItem, SidebarUser } from '@/components/dashboard/Sidebar';
@@ -34,8 +35,29 @@ export function useNavigation(): NavigationData | null {
   const [dynamicNavItems, setDynamicNavItems] = useState<SidebarNavItem[]>([]);
   const [isLoadingCursos, setIsLoadingCursos] = useState(true);
 
-  // Obtener rol principal del usuario
-  const primaryRole = user?.roles?.[0]?.code as UserRole || 'STUDENT';
+  // Obtener rol activo del usuario (basado en lastActiveRoleId o el primero por defecto)
+  const getActiveRole = (): UserRole => {
+    if (!user || !user.roles || user.roles.length === 0) {
+      return 'STUDENT';
+    }
+
+    // Si hay un lastActiveRoleId, buscar ese rol
+    if (user.lastActiveRoleId) {
+      const activeRole = user.roles.find(
+        r => (r.id || r.code) === user.lastActiveRoleId
+      );
+      if (activeRole) {
+        // Mapear código del backend a código interno
+        return mapBackendRoleToUserRole(activeRole.code);
+      }
+    }
+
+    // Si no, usar el primer rol
+    const firstRole = user.roles[0];
+    return firstRole ? mapBackendRoleToUserRole(firstRole.code) : 'STUDENT';
+  };
+
+  const primaryRole = getActiveRole();
 
   // Cargar cursos dinámicamente
   useEffect(() => {

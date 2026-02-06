@@ -24,31 +24,8 @@ export default function InicioContent() {
           Panel de Administración
         </h1>
         <p className="text-lg text-secondary max-w-md">
-          Esta página está en desarrollo. Pronto podrás gestionar usuarios, 
-          cursos, ciclos y configuración del sistema.
+          Esta página está en desarrollo.
         </p>
-      </div>
-
-      <div className="bg-bg-tertiary rounded-xl p-6 max-w-lg">
-        <h3 className="font-semibold text-primary mb-3">Próximas Funcionalidades:</h3>
-        <ul className="space-y-2 text-secondary">
-          <li className="flex items-start gap-2">
-            <Icon name="check_circle" size={20} className="text-success-solid mt-0.5" />
-            <span>Gestión de usuarios y roles</span>
-          </li>
-          <li className="flex items-start gap-2">
-            <Icon name="check_circle" size={20} className="text-success-solid mt-0.5" />
-            <span>Administración de cursos y ciclos</span>
-          </li>
-          <li className="flex items-start gap-2">
-            <Icon name="check_circle" size={20} className="text-success-solid mt-0.5" />
-            <span>Reportes y estadísticas</span>
-          </li>
-          <li className="flex items-start gap-2">
-            <Icon name="check_circle" size={20} className="text-success-solid mt-0.5" />
-            <span>Configuración del sistema</span>
-          </li>
-        </ul>
       </div>
     </div>
   );
