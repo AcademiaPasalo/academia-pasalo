@@ -73,3 +73,19 @@ export function clearAuth(): void {
 export function hasStoredSession(): boolean {
   return !!getAccessToken() && !!getRefreshToken();
 }
+
+/**
+ * Guarda el último rol activo usado (para restaurar en el próximo login)
+ */
+export function saveLastActiveRole(roleId: string): void {
+  if (typeof window === 'undefined') return;
+  localStorage.setItem('pasalo_last_active_role', roleId);
+}
+
+/**
+ * Obtiene el último rol activo usado
+ */
+export function getLastActiveRole(): string | null {
+  if (typeof window === 'undefined') return null;
+  return localStorage.getItem('pasalo_last_active_role');
+}

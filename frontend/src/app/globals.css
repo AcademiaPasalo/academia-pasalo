@@ -327,16 +327,9 @@ body {
   color: var(--text-primary);
 }
 
-/* Material Symbols Configuration */
-/* 
- * Variantes de Material Symbols:
- * - outlined: Contorno limpio (default)
- * - rounded: Contorno con bordes redondeados
- * - sharp: Contorno con bordes angulares
- * - filled: Se usa 'outlined' con FILL=1 (relleno sólido)
- */
-.material-symbols-outlined {
-  font-family: 'Material Symbols Outlined';
+/* Material Icons Configuration */
+.material-icons-round {
+  font-family: 'Material Icons Round';
   font-weight: normal;
   font-style: normal;
   font-size: 24px;
@@ -349,11 +342,10 @@ body {
   direction: ltr;
   -webkit-font-feature-settings: 'liga';
   -webkit-font-smoothing: antialiased;
-  font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
 }
 
-.material-symbols-rounded {
-  font-family: 'Material Symbols Rounded';
+.material-icons-outlined {
+  font-family: 'Material Icons Outlined';
   font-weight: normal;
   font-style: normal;
   font-size: 24px;
@@ -366,82 +358,139 @@ body {
   direction: ltr;
   -webkit-font-feature-settings: 'liga';
   -webkit-font-smoothing: antialiased;
-  font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
-}
-
-.material-symbols-sharp {
-  font-family: 'Material Symbols Sharp';
-  font-weight: normal;
-  font-style: normal;
-  font-size: 24px;
-  line-height: 1;
-  letter-spacing: normal;
-  text-transform: none;
-  display: inline-block;
-  white-space: nowrap;
-  word-wrap: normal;
-  direction: ltr;
-  -webkit-font-feature-settings: 'liga';
-  -webkit-font-smoothing: antialiased;
-  font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
 }
 
 /* Size variations */
-.material-symbols-outlined[style*="font-size: 16px"],
-.text-\[16px\] .material-symbols-outlined { 
+.material-icons-round[style*="font-size: 16px"],
+.text-\[16px\] .material-icons-round { 
   font-size: 16px !important;
-  font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 20;
 }
 
-.material-symbols-outlined[style*="font-size: 18px"],
-.text-\[18px\] .material-symbols-outlined { 
+.material-icons-round[style*="font-size: 18px"],
+.text-\[18px\] .material-icons-round { 
   font-size: 18px !important;
-  font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 20;
 }
 
-.material-symbols-outlined[style*="font-size: 20px"],
-.text-\[20px\] .material-symbols-outlined { 
+.material-icons-round[style*="font-size: 20px"],
+.text-\[20px\] .material-icons-round { 
   font-size: 20px !important;
-  font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 20;
 }
 
-.material-symbols-outlined[style*="font-size: 22px"],
-.text-\[22px\] .material-symbols-outlined { 
+.material-icons-round[style*="font-size: 22px"],
+.text-\[22px\] .material-icons-round { 
   font-size: 22px !important;
-  font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
 }
 
-.material-symbols-outlined[style*="font-size: 24px"],
-.text-\[24px\] .material-symbols-outlined { 
+.material-icons-round[style*="font-size: 24px"],
+.text-\[24px\] .material-icons-round { 
   font-size: 24px !important;
-  font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
 }
 
-.material-symbols-outlined[style*="font-size: 26px"],
-.text-\[26px\] .material-symbols-outlined { 
+.material-icons-round[style*="font-size: 26px"],
+.text-\[26px\] .material-icons-round { 
   font-size: 26px !important;
-  font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
 }
 
-.material-symbols-outlined[style*="font-size: 32px"],
-.text-\[32px\] .material-symbols-outlined { 
+.material-icons-round[style*="font-size: 28px"],
+.text-\[28px\] .material-icons-round { 
+  font-size: 28px !important;
+}
+
+.material-icons-round[style*="font-size: 32px"],
+.text-\[32px\] .material-icons-round { 
   font-size: 32px !important;
-  font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 40;
 }
 
-.material-symbols-outlined[style*="font-size: 40px"],
-.text-\[40px\] .material-symbols-outlined { 
+.material-icons-round[style*="font-size: 40px"],
+.text-\[40px\] .material-icons-round { 
   font-size: 40px !important;
-  font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 40;
 }
 
-.material-symbols-outlined[style*="font-size: 48px"],
-.text-\[48px\] .material-symbols-outlined { 
+.material-icons-round[style*="font-size: 48px"],
+.text-\[48px\] .material-icons-round { 
   font-size: 48px !important;
-  font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 48;
+}
+
+.material-icons-outlined[style*="font-size: 16px"],
+.text-\[16px\] .material-icons-outlined { 
+  font-size: 16px !important;
+}
+
+.material-icons-outlined[style*="font-size: 18px"],
+.text-\[18px\] .material-icons-outlined { 
+  font-size: 18px !important;
+}
+
+.material-icons-outlined[style*="font-size: 20px"],
+.text-\[20px\] .material-icons-outlined { 
+  font-size: 20px !important;
+}
+
+.material-icons-outlined[style*="font-size: 22px"],
+.text-\[22px\] .material-icons-outlined { 
+  font-size: 22px !important;
+}
+
+.material-icons-outlined[style*="font-size: 24px"],
+.text-\[24px\] .material-icons-outlined { 
+  font-size: 24px !important;
+}
+
+.material-icons-outlined[style*="font-size: 26px"],
+.text-\[26px\] .material-icons-outlined { 
+  font-size: 26px !important;
+}
+
+.material-icons-outlined[style*="font-size: 28px"],
+.text-\[28px\] .material-icons-outlined { 
+  font-size: 28px !important;
+}
+
+.material-icons-outlined[style*="font-size: 32px"],
+.text-\[32px\] .material-icons-outlined { 
+  font-size: 32px !important;
+}
+
+.material-icons-outlined[style*="font-size: 40px"],
+.text-\[40px\] .material-icons-outlined { 
+  font-size: 40px !important;
+}
+
+.material-icons-outlined[style*="font-size: 48px"],
+.text-\[48px\] .material-icons-outlined { 
+  font-size: 48px !important;
 }
 
 /* Effect Styles from Kigen */
 .card-shadow {
   box-shadow: 2px 4px 4px 0px rgba(0, 0, 0, 0.05);
+}
+
+/* Animaciones para modales */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slideUp {
+  from {
+    transform: translateY(20px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.animate-fadeIn {
+  animation: fadeIn 0.3s ease-out;
+}
+
+.animate-slideUp {
+  animation: slideUp 0.3s ease-out;
 }

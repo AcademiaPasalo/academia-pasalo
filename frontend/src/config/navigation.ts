@@ -7,6 +7,24 @@ import { SidebarNavItem } from '@/components/dashboard/Sidebar';
 
 export type UserRole = 'STUDENT' | 'TEACHER' | 'ADMIN' | 'SUPER_ADMIN';
 
+// Códigos de rol que vienen del backend
+export type BackendRoleCode = 'STUDENT' | 'PROFESSOR' | 'ADMIN' | 'SUPER_ADMIN';
+
+/**
+ * Mapea códigos de rol del backend a códigos internos del frontend
+ * El backend usa PROFESSOR pero internamente usamos TEACHER para consistencia
+ */
+export function mapBackendRoleToUserRole(backendCode: string): UserRole {
+  const mapping: Record<string, UserRole> = {
+    'STUDENT': 'STUDENT',
+    'PROFESSOR': 'TEACHER', // ⚠️ Backend usa PROFESSOR, frontend usa TEACHER
+    'ADMIN': 'ADMIN',
+    'SUPER_ADMIN': 'SUPER_ADMIN'
+  };
+
+  return mapping[backendCode] || 'STUDENT';
+}
+
 /**
  * Configuración de navegación por rol
  */
@@ -15,33 +33,24 @@ export const navigationConfig: Record<UserRole, SidebarNavItem[]> = {
     {
       icon: 'home',
       label: 'Inicio',
-      href: '/plataforma/inicio',
-      iconVariant: 'rounded',
-      iconFilled: true
+      href: '/plataforma/inicio'
     },
     {
       icon: 'class',
       label: 'Mis Cursos',
       href: '#',
       expandable: true,
-      iconVariant: 'rounded',
-      iconFilled: true,
-      // Los subItems se cargan dinámicamente desde useDynamicNavigation
       subItems: []
     },
     {
       icon: 'event',
       label: 'Calendario',
-      href: '/plataforma/calendario',
-      iconVariant: 'rounded',
-      iconFilled: true
+      href: '/plataforma/calendario'
     },
     {
-      icon: 'notifications_unread',
+      icon: 'notifications',
       label: 'Notificaciones',
-      href: '/plataforma/notificaciones',
-      iconVariant: 'rounded',
-      iconFilled: false
+      href: '/plataforma/notificaciones'
     }
   ],
 
@@ -49,190 +58,41 @@ export const navigationConfig: Record<UserRole, SidebarNavItem[]> = {
     {
       icon: 'home',
       label: 'Inicio',
-      href: '/plataforma/inicio',
-      iconVariant: 'rounded',
-      iconFilled: true
+      href: '/plataforma/inicio'
     },
-    {
-      icon: 'school',
-      label: 'Mis Clases',
-      href: '/plataforma/clases',
-      expandable: true,
-      iconVariant: 'rounded',
-      iconFilled: true,
-      subItems: [
-        { icon: 'circle', label: 'Activas', href: '/plataforma/clases/activas' },
-        { icon: 'circle', label: 'Programadas', href: '/plataforma/clases/programadas' },
-        { icon: 'circle', label: 'Historial', href: '/plataforma/clases/historial' }
-      ]
-    },
-    {
-      icon: 'groups',
-      label: 'Estudiantes',
-      href: '/plataforma/estudiantes',
-      iconVariant: 'rounded',
-      iconFilled: true
-    },
-    {
-      icon: 'assignment',
-      label: 'Tareas',
-      href: '/plataforma/tareas',
-      expandable: true,
-      iconVariant: 'rounded',
-      iconFilled: true,
-      subItems: [
-        { icon: 'circle', label: 'Pendientes', href: '/plataforma/tareas/pendientes' },
-        { icon: 'circle', label: 'Calificadas', href: '/plataforma/tareas/calificadas' },
-        { icon: 'circle', label: 'Crear Nueva', href: '/plataforma/tareas/nueva' }
-      ]
-    },
-    {
-      icon: 'folder',
-      label: 'Materiales',
-      href: '/plataforma/materiales',
-      iconVariant: 'rounded',
-      iconFilled: true
-    },
-    {
-      icon: 'analytics',
-      label: 'Reportes',
-      href: '/plataforma/reportes',
-      iconVariant: 'rounded',
-      iconFilled: true
-    }
   ],
 
   ADMIN: [
     {
-      icon: 'dashboard',
-      label: 'Dashboard',
-      href: '/plataforma/dashboard',
-      iconVariant: 'rounded',
-      iconFilled: true
+      icon: 'home',
+      label: 'Inicio',
+      href: '/plataforma/inicio'
     },
     {
-      icon: 'groups',
-      label: 'Usuarios',
-      href: '/plataforma/usuarios',
+      icon: 'class',
+      label: 'Mis Cursos',
+      href: '#',
       expandable: true,
-      iconVariant: 'rounded',
-      iconFilled: true,
-      subItems: [
-        { icon: 'circle', label: 'Estudiantes', href: '/plataforma/usuarios/estudiantes' },
-        { icon: 'circle', label: 'Docentes', href: '/plataforma/usuarios/docentes' },
-        { icon: 'circle', label: 'Administradores', href: '/plataforma/usuarios/administradores' }
-      ]
-    },
-    {
-      icon: 'school',
-      label: 'Cursos',
-      href: '/plataforma/cursos',
-      expandable: true,
-      iconVariant: 'rounded',
-      iconFilled: true,
-      subItems: [
-        { icon: 'circle', label: 'Ver Todos', href: '/plataforma/cursos/todos' },
-        { icon: 'circle', label: 'Crear Curso', href: '/plataforma/cursos/nuevo' },
-        { icon: 'circle', label: 'Categorías', href: '/plataforma/cursos/categorias' }
-      ]
+      subItems: []
     },
     {
       icon: 'event',
       label: 'Calendario',
-      href: '/plataforma/calendario',
-      iconVariant: 'rounded',
-      iconFilled: true
+      href: '/plataforma/calendario'
     },
     {
-      icon: 'folder',
-      label: 'Materiales',
-      href: '/plataforma/materiales',
-      iconVariant: 'rounded',
-      iconFilled: true
-    },
-    {
-      icon: 'analytics',
-      label: 'Reportes',
-      href: '/plataforma/reportes',
-      expandable: true,
-      iconVariant: 'rounded',
-      iconFilled: true,
-      subItems: [
-        { icon: 'circle', label: 'Estudiantes', href: '/plataforma/reportes/estudiantes' },
-        { icon: 'circle', label: 'Cursos', href: '/plataforma/reportes/cursos' },
-        { icon: 'circle', label: 'Finanzas', href: '/plataforma/reportes/finanzas' }
-      ]
-    },
-    {
-      icon: 'settings',
-      label: 'Configuración',
-      href: '/plataforma/configuracion',
-      iconVariant: 'rounded',
-      iconFilled: true
-    }
+      icon: 'notifications',
+      label: 'Notificaciones',
+      href: '/plataforma/notificaciones'
+    }    
   ],
 
   SUPER_ADMIN: [
     {
-      icon: 'admin_panel_settings',
-      label: 'Admin Panel',
-      href: '/plataforma/admin',
-      iconVariant: 'rounded',
-      iconFilled: true
+      icon: 'home',
+      label: 'Inicio',
+      href: '/plataforma/inicio'
     },
-    {
-      icon: 'groups',
-      label: 'Gestión de Usuarios',
-      href: '/plataforma/usuarios',
-      expandable: true,
-      iconVariant: 'rounded',
-      iconFilled: true,
-      subItems: [
-        { icon: 'circle', label: 'Todos los Usuarios', href: '/plataforma/usuarios/todos' },
-        { icon: 'circle', label: 'Roles y Permisos', href: '/plataforma/usuarios/roles' },
-        { icon: 'circle', label: 'Sesiones Activas', href: '/plataforma/usuarios/sesiones' }
-      ]
-    },
-    {
-      icon: 'domain',
-      label: 'Organizaciones',
-      href: '/plataforma/organizaciones',
-      iconVariant: 'rounded',
-      iconFilled: true
-    },
-    {
-      icon: 'security',
-      label: 'Seguridad',
-      href: '/plataforma/seguridad',
-      expandable: true,
-      iconVariant: 'rounded',
-      iconFilled: true,
-      subItems: [
-        { icon: 'circle', label: 'Logs de Auditoría', href: '/plataforma/seguridad/logs' },
-        { icon: 'circle', label: 'Políticas', href: '/plataforma/seguridad/politicas' },
-        { icon: 'circle', label: 'Backups', href: '/plataforma/seguridad/backups' }
-      ]
-    },
-    {
-      icon: 'analytics',
-      label: 'Analytics',
-      href: '/plataforma/analytics',
-      iconVariant: 'rounded',
-      iconFilled: true
-    },
-    {
-      icon: 'settings',
-      label: 'Sistema',
-      href: '/plataforma/sistema',
-      expandable: true,
-      iconVariant: 'rounded',
-      iconFilled: true,
-      subItems: [
-        { icon: 'circle', label: 'Configuración', href: '/plataforma/sistema/configuracion' },
-        { icon: 'circle', label: 'Integraciones', href: '/plataforma/sistema/integraciones' },
-        { icon: 'circle', label: 'Mantenimiento', href: '/plataforma/sistema/mantenimiento' }
-      ]
-    }
   ]
 };
 

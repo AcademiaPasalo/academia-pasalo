@@ -3,7 +3,7 @@ export const technicalSettings = {
     // src/app.module.ts
     ttlMs: 60000, // 60s
     // src/app.module.ts
-    limit: 10,
+    limit: 1000,
   },
 
   http: {

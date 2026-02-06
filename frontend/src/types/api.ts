@@ -30,10 +30,12 @@ export type SessionStatus =
 export type RoleCode = 
   | 'STUDENT' 
   | 'TEACHER' 
+  | 'PROFESSOR' // Backend usa PROFESSOR en lugar de TEACHER
   | 'ADMIN' 
   | 'SUPER_ADMIN';
 
 export interface Role {
+  id?: string; // Opcional porque el backend no siempre lo retorna
   code: RoleCode;
   name: string;
 }
@@ -49,6 +51,7 @@ export interface User {
   profilePhotoUrl?: string;
   photoSource: 'google' | 'uploaded' | 'none';
   roles: Role[];
+  lastActiveRoleId?: string; // Opcional porque puede no venir del backend
   createdAt: string;
   updatedAt?: string;
 }
@@ -60,6 +63,13 @@ export interface AuthResponse {
   sessionStatus: SessionStatus;
   concurrentSessionId: string | null;
   user: User;
+}
+
+export interface ResolveSessionResponse {
+  keptSessionId: string | null;
+  accessToken?: string;
+  refreshToken?: string;
+  expiresIn?: number;
 }
 
 export interface LoginRequest {
