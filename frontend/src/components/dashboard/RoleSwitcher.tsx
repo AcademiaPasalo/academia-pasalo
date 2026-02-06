@@ -61,7 +61,10 @@ export default function RoleSwitcher({
 
   // Cerrar el dropdown cuando se hace clic fuera
   useEffect(() => {
+    if (!open) return;
+
     function handleClickOutside(event: MouseEvent) {
+      // Verificar si el click fue dentro del dropdown
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
         if (isControlled && typeof onOpenChange === 'function') {
           onOpenChange(false);
@@ -71,10 +74,15 @@ export default function RoleSwitcher({
       }
     }
 
-    if (open) {
+    // Usar un pequeño delay para evitar que el click inicial cierre inmediatamente el dropdown
+    const timeoutId = setTimeout(() => {
       document.addEventListener('mousedown', handleClickOutside);
-      return () => document.removeEventListener('mousedown', handleClickOutside);
-    }
+    }, 0);
+
+    return () => {
+      clearTimeout(timeoutId);
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
   }, [open, isControlled, onOpenChange]);
 
   // Si solo hay un rol, no mostrar el selector
@@ -101,10 +109,17 @@ export default function RoleSwitcher({
     }
   };
 
-  const handleRoleClick = (roleId: string) => {
+  const handleRoleClick = (roleId: string, e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
     if (roleId !== activeRoleId && !isLoading) {
-      setOpen(false);
       onRoleChange(roleId);
+      // Cerrar el dropdown después de cambiar el rol
+      // Usamos un pequeño delay para permitir que la animación se complete
+      setTimeout(() => {
+        setOpen(false);
+      }, 100);
     }
   };
 
@@ -143,8 +158,8 @@ export default function RoleSwitcher({
       {/* Dropdown */}
       {open && (
         <div 
-          className="absolute top-full mt-2 left-0 w-60 bg-white rounded-xl shadow-xl z-50" 
-          onClick={(e) => e.stopPropagation()}
+          className="absolute top-full mt-2 left-0 w-60 bg-white rounded-xl shadow-xl z-50"
+          onMouseDown={(e) => e.stopPropagation()}
         >
           {/* Header */}
           <div className="self-stretch p-3 inline-flex justify-center items-center gap-2.5">
@@ -164,7 +179,7 @@ export default function RoleSwitcher({
               return (
                 <button
                   key={role.id || `${role.code}-${index}`}
-                  onClick={(e) => { e.stopPropagation(); handleRoleClick(roleIdentifier); }}
+                  onClick={(e) => handleRoleClick(roleIdentifier, e)}
                   disabled={isActive || isLoading}
                   className={`
                     self-stretch p-2 rounded-lg inline-flex justify-start items-center gap-2 
