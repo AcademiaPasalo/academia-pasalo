@@ -33,10 +33,31 @@ export default function DaySchedule() {
       const start = format(weekStart, 'yyyy-MM-dd');
       const end = format(weekEnd, 'yyyy-MM-dd');
       
-      const response = await classEventService.getMySchedule(start, end);
-      setEvents(response.data || []);
+      const today = format(new Date(), 'yyyy-MM-dd');
+      console.log('📅 DaySchedule - Hoy es:', today);
+      console.log('📅 DaySchedule - Cargando eventos del:', start, 'al', end);
+      console.log('📅 DaySchedule - WeekStart:', weekStart);
+      console.log('📅 DaySchedule - WeekEnd:', weekEnd);
+      
+      const response = await classEventService.getMySchedule({ start, end });
+      
+      console.log('📅 DaySchedule - Response completa:', response);
+      console.log('📅 DaySchedule - Tipo:', typeof response, Array.isArray(response));
+      
+      // Manejar respuesta que puede ser array o ApiResponse
+      let eventsData: ClassEvent[] = [];
+      if (Array.isArray(response)) {
+        console.log('✅ Response es array directo');
+        eventsData = response;
+      } else if (response && 'data' in response) {
+        console.log('✅ Response es ApiResponse con data');
+        eventsData = response.data || [];
+      }
+      
+      console.log('📅 DaySchedule - Eventos recibidos:', eventsData.length, eventsData);
+      setEvents(eventsData);
     } catch (err) {
-      console.error('Error al cargar la agenda:', err);
+      console.error('❌ Error al cargar la agenda:', err);
       setError('Error al cargar los eventos');
     } finally {
       setLoading(false);
@@ -187,6 +208,17 @@ export default function DaySchedule() {
           todayEvents.map((event) => {
             const colors = getEventColor(event.courseName);
             const isNow = event.status === 'EN_CURSO';
+            
+            // Verificar si puede unirse (30 min antes del inicio hasta el fin)
+            const now = new Date();
+            const startTime = parseISO(event.startDatetime);
+            const endTime = parseISO(event.endDatetime);
+            const thirtyMinutesBefore = new Date(startTime.getTime() - 30 * 60 * 1000);
+            
+            const canJoinNow = event.canJoinMeeting && 
+                               now >= thirtyMinutesBefore && 
+                               now <= endTime &&
+                               !event.isCancelled;
 
             return (
               <div
@@ -224,7 +256,7 @@ export default function DaySchedule() {
                       </div>
                     )}
                   </div>
-                  {event.canJoinMeeting && (
+                  {canJoinNow && (
                     <a
                       href={event.meetingLink}
                       target="_blank"

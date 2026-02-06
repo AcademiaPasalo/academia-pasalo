@@ -11,6 +11,7 @@ export const enrollmentService = {
    */
   async getMyCourses(): Promise<EnrollmentResponse> {
     const response = await apiClient.get<EnrollmentResponse>('/enrollments/my-courses');
+    // axios ya desenvuelve response.data, que contiene el objeto con statusCode, message, data, timestamp
     return response.data;
   },
 };
