@@ -171,4 +171,16 @@ export class UserSessionRepository {
       .where('s.id = :id', { id })
       .getOne();
   }
+
+  async existsByUserIdAndDeviceId(
+    userId: string,
+    deviceId: string,
+    manager?: EntityManager,
+  ): Promise<boolean> {
+    const repo = this.getRepository(manager);
+    const count = await repo.count({
+      where: { userId, deviceId },
+    });
+    return count > 0;
+  }
 }

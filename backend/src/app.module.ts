@@ -6,6 +6,7 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { UsersModule } from '@modules/users/users.module';
 import { AuthModule } from '@modules/auth/auth.module';
+import { AuditModule } from '@modules/audit/audit.module';
 import { CyclesModule } from '@modules/cycles/cycles.module';
 import { CoursesModule } from '@modules/courses/courses.module';
 import { EvaluationsModule } from '@modules/evaluations/evaluations.module';
@@ -35,6 +36,7 @@ import { technicalSettings } from '@config/technical-settings';
     SettingsModule,
     UsersModule,
     AuthModule,
+    AuditModule,
     CyclesModule,
     CoursesModule,
     EvaluationsModule,

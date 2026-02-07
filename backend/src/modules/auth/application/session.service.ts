@@ -115,6 +115,12 @@ export class SessionService {
           manager,
         );
 
+      const isNewDevice = !(await this.userSessionRepository.existsByUserIdAndDeviceId(
+        userId,
+        resolved.metadata.deviceId,
+        manager,
+      ));
+
       const refreshTokenHash = this.hashRefreshToken(refreshToken);
 
       const session = await this.userSessionRepository.create(
@@ -149,6 +155,35 @@ export class SessionService {
             newSessionId: session.id,
             existingSessionId: concurrentSession.id,
             existingDeviceId: concurrentSession.deviceId,
+          },
+          manager,
+        );
+      } else {
+        if (isNewDevice) {
+          await this.securityEventService.logEvent(
+            userId,
+            'NEW_DEVICE_DETECTED',
+            {
+              ipAddress: resolved.metadata.ipAddress,
+              userAgent: resolved.metadata.userAgent,
+              deviceId: resolved.metadata.deviceId,
+              locationSource: resolved.locationSource,
+              city: resolved.metadata.city,
+              country: resolved.metadata.country,
+              sessionId: session.id,
+            },
+            manager,
+          );
+        }
+
+        await this.securityEventService.logEvent(
+          userId,
+          'LOGIN_SUCCESS',
+          {
+            ipAddress: resolved.metadata.ipAddress,
+            userAgent: resolved.metadata.userAgent,
+            deviceId: resolved.metadata.deviceId,
+            sessionId: session.id,
           },
           manager,
         );

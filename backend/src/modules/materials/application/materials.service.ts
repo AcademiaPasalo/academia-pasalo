@@ -25,6 +25,7 @@ import { Material } from '@modules/materials/domain/material.entity';
 import { FileResource } from '@modules/materials/domain/file-resource.entity';
 import { FileVersion } from '@modules/materials/domain/file-version.entity';
 import { User } from '@modules/users/domain/user.entity';
+import { AuditService } from '@modules/audit/application/audit.service';
 import * as fs from 'fs';
 import { technicalSettings } from '@config/technical-settings';
 
@@ -45,6 +46,7 @@ export class MaterialsService {
     private readonly catalogRepository: MaterialCatalogRepository,
     private readonly deletionRequestRepository: DeletionRequestRepository,
     private readonly userRepository: UserRepository,
+    private readonly auditService: AuditService,
   ) {}
 
   async createFolder(userId: string, dto: CreateMaterialFolderDto): Promise<MaterialFolder> {
@@ -169,6 +171,14 @@ export class MaterialsService {
         });
         const savedMaterial = await manager.save(materialEntity);
 
+        await this.auditService.logAction(
+          userId,
+          'FILE_UPLOAD',
+          'material',
+          savedMaterial.id,
+          manager,
+        );
+
         return savedMaterial;
       });
 
@@ -239,7 +249,17 @@ export class MaterialsService {
         freshMaterial.fileVersionId = savedVersion.id;
         freshMaterial.updatedAt = now;
         
-        return await manager.save(freshMaterial);
+        const updatedMaterial = await manager.save(freshMaterial);
+
+        await this.auditService.logAction(
+          userId,
+          'FILE_EDIT',
+          'material',
+          updatedMaterial.id,
+          manager,
+        );
+
+        return updatedMaterial;
       });
 
       await this.invalidateFolderCache(materialId);

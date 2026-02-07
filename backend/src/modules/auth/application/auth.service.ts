@@ -57,6 +57,7 @@ export class AuthService {
         email: googleEmail,
         ip: metadata.ipAddress,
       });
+      
       throw new UnauthorizedException('El correo no se encuentra registrado en el sistema. Contacte a administración.');
     }
 
@@ -109,7 +110,6 @@ export class AuthService {
 
     await this.cacheService.del(`cache:session:${session.id}:user`);
 
-    // Invalidar el token antiguo (Blacklist)
     const oldTokenHash = createHash('sha256').update(refreshToken).digest('hex');
     const ttlSeconds = technicalSettings.auth.tokens.refreshTokenBlacklistTtlSeconds;
     await this.cacheService.set(
@@ -159,19 +159,7 @@ export class AuthService {
     }
 
     return await this.dataSource.transaction(async (manager) => {
-      // Obtener sesión actual (esto valida que exista y sea del usuario)
-      // Usamos validateSession que ya tenemos disponible o el repositorio directamente si queremos evitar checks extras
-      // Dado que validateSession requiere userId y deviceId, y aqui tenemos sessionId, mejor ir al repo
-      // Pero como estamos en transaction y sessionService usa repos, necesitamos acceso al repo con manager.
-      // Sin embargo, SessionService methods don't expose simple findById with manager easily for this specific logic without adding methods.
-      // Let's rely on finding via repo directly or adding a method.
-      // For now, let's fix the immediate error. validateSession is in SessionService. 
-      // But findActiveById is NOT in SessionService, it is in UserSessionRepository.
-      
-      // Let's just proceed with the logic. The goal was to maybe get old hash.
-      // We can skip the old hash check here as discussed or implement it correctly via repo.
-      
-      // Actualizar último rol activo del usuario
+
       await manager.getRepository(User).update(userId, {
         lastActiveRoleId: roleId,
         updatedAt: new Date(),
@@ -180,7 +168,6 @@ export class AuthService {
       const { token: newRefreshToken, expiresAt: newExpiresAt } =
         await this.tokenService.generateRefreshToken(userId, metadata.deviceId);
 
-      // Actualizar rol activo de la sesión y rotar refresh token
       const session = await this.sessionService.rotateRefreshToken(
         sessionId,
         newRefreshToken,
@@ -204,6 +191,19 @@ export class AuthService {
 
       const accessToken = await this.tokenService.generateAccessToken(accessPayload);
 
+      await this.securityEventService.logEvent(
+        userId,
+        'PROFILE_SWITCH',
+        {
+          ipAddress: metadata.ipAddress,
+          userAgent: metadata.userAgent,
+          deviceId: metadata.deviceId,
+          sessionId: session.id,
+          roleCode: role.code,
+        },
+        manager,
+      );
+
       return {
         accessToken,
         refreshToken: newRefreshToken,
@@ -214,6 +214,7 @@ export class AuthService {
   async logout(sessionId: string, userId: string): Promise<void> {
     await this.sessionService.deactivateSession(sessionId);
     await this.cacheService.del(`cache:session:${sessionId}:user`);
+    await this.securityEventService.logEvent(userId, 'LOGOUT_SUCCESS', { sessionId });
   }
 
   async resolveConcurrentSession(

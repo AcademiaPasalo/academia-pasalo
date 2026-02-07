@@ -45,7 +45,7 @@ describe('Security Scenarios (Integration)', () => {
   };
 
   const mockDataSource = {
-    transaction: jest.fn((cb) => cb(mockDataSource.manager)),
+    transaction: jest.fn((cb: (manager: any) => Promise<any>): Promise<any> => cb(mockDataSource.manager)),
     manager: {},
   };
 
@@ -82,6 +82,7 @@ describe('Security Scenarios (Integration)', () => {
     findByIdForUpdate: jest.fn(),
     update: jest.fn(),
     deactivateSession: jest.fn(),
+    existsByUserIdAndDeviceId: jest.fn().mockResolvedValue(true),
   };
 
   const mockSecurityEventRepository = {
@@ -289,7 +290,7 @@ describe('Security Scenarios (Integration)', () => {
         { get: jest.fn().mockResolvedValue(null), set: jest.fn() } as any,
       );
 
-      const payload = { sub: '1', email: 'h@t.com', roles: [], activeRole: 'STUDENT', sessionId: '500' };
+      const payload = { sub: '1', email: 'h@t.com', roles: [] as string[], activeRole: 'STUDENT', sessionId: '500' };
 
       mockUserSessionRepository.findByIdWithUser.mockResolvedValue({
         id: '500',

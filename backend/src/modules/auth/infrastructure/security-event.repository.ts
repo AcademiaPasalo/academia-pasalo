@@ -39,4 +39,34 @@ export class SecurityEventRepository {
       take: limit,
     });
   }
+
+  async findAll(
+    filters: {
+      startDate?: Date;
+      endDate?: Date;
+      userId?: string;
+    },
+    limit: number,
+  ): Promise<SecurityEvent[]> {
+    const query = this.ormRepository.createQueryBuilder('e')
+      .leftJoinAndSelect('e.securityEventType', 'et')
+      .leftJoinAndSelect('e.user', 'u');
+
+    if (filters.startDate) {
+      query.andWhere('e.eventDatetime >= :startDate', { startDate: filters.startDate });
+    }
+
+    if (filters.endDate) {
+      query.andWhere('e.eventDatetime <= :endDate', { endDate: filters.endDate });
+    }
+
+    if (filters.userId) {
+      query.andWhere('e.userId = :userId', { userId: filters.userId });
+    }
+
+    return await query
+      .orderBy('e.eventDatetime', 'DESC')
+      .take(limit)
+      .getMany();
+  }
 }

@@ -70,6 +70,7 @@ describe('Advanced Security Scenarios (Offensive Testing)', () => {
     }),
     update: jest.fn(),
     deactivateSession: jest.fn(),
+    existsByUserIdAndDeviceId: jest.fn().mockResolvedValue(true),
   };
 
   // ... (otros mocks)

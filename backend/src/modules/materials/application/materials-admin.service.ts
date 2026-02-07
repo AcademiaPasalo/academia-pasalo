@@ -9,6 +9,7 @@ import { StorageService } from '@infrastructure/storage/storage.service';
 import { FileVersion } from '@modules/materials/domain/file-version.entity';
 import { FileResource } from '@modules/materials/domain/file-resource.entity';
 import { Material } from '@modules/materials/domain/material.entity';
+import { AuditService } from '@modules/audit/application/audit.service';
 
 @Injectable()
 export class MaterialsAdminService {
@@ -20,6 +21,7 @@ export class MaterialsAdminService {
     private readonly materialRepository: MaterialRepository,
     private readonly catalogRepository: MaterialCatalogRepository,
     private readonly storageService: StorageService,
+    private readonly auditService: AuditService,
   ) {}
 
   async findAllPendingRequests(): Promise<DeletionRequest[]> {
@@ -74,6 +76,14 @@ export class MaterialsAdminService {
       visibleUntil: new Date(),
       updatedAt: new Date(),
     });
+
+    await this.auditService.logAction(
+      adminId,
+      'CONTENT_DISABLE',
+      'material',
+      materialId,
+      manager,
+    );
   }
 
   private async handleRejection(requestId: string, adminId: string, manager: EntityManager) {
@@ -111,6 +121,14 @@ export class MaterialsAdminService {
       const resourceId = materialRecord.fileVersion.fileResourceId;
 
       await manager.delete(Material, materialId);
+
+      await this.auditService.logAction(
+        adminId,
+        'FILE_DELETE',
+        'material',
+        materialId,
+        manager,
+      );
 
       const materialRefs = await manager.count(Material, { where: { fileVersionId: versionId } });
 

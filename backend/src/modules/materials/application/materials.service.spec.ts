@@ -12,6 +12,7 @@ import { FileVersionRepository } from '@modules/materials/infrastructure/file-ve
 import { MaterialCatalogRepository } from '@modules/materials/infrastructure/material-catalog.repository';
 import { DeletionRequestRepository } from '@modules/materials/infrastructure/deletion-request.repository';
 import { UserRepository } from '@modules/users/infrastructure/user.repository';
+import { AuditService } from '@modules/audit/application/audit.service';
 
 const mockFolder = (id = '1', evaluationId = '100', parentId: string | null = null) => ({
   id,
@@ -39,6 +40,7 @@ describe('MaterialsService', () => {
   let accessEngine: jest.Mocked<AccessEngineService>;
   let cacheService: jest.Mocked<RedisCacheService>;
   let userRepo: jest.Mocked<UserRepository>;
+  let auditService: jest.Mocked<AuditService>;
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -92,6 +94,10 @@ describe('MaterialsService', () => {
           provide: UserRepository,
           useValue: { findById: jest.fn() },
         },
+        {
+          provide: AuditService,
+          useValue: { logAction: jest.fn() },
+        },
       ],
     }).compile();
 
@@ -106,6 +112,7 @@ describe('MaterialsService', () => {
     accessEngine = module.get(AccessEngineService);
     cacheService = module.get(RedisCacheService);
     userRepo = module.get(UserRepository);
+    auditService = module.get(AuditService);
 
     userRepo.findById.mockResolvedValue({
       id: 'user-1',
@@ -149,6 +156,7 @@ describe('MaterialsService', () => {
 
       expect(storageService.saveFile).toHaveBeenCalled();
       expect(result).toBeDefined();
+      expect(auditService.logAction).toHaveBeenCalledWith('user1', 'FILE_UPLOAD', 'material', 'saved-id', mockManager);
     });
   });
 
