@@ -1,4 +1,10 @@
-import { IsNotEmpty, IsString, IsOptional, MaxLength, IsDefined } from 'class-validator';
+import {
+  IsNotEmpty,
+  IsString,
+  IsOptional,
+  MaxLength,
+  IsDefined,
+} from 'class-validator';
 
 export class CreateFolderDto {
   @IsString()

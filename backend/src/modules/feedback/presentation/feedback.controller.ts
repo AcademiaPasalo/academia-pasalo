@@ -1,9 +1,23 @@
-import { Controller, Post, Body, Get, Param, UploadedFile, UseInterceptors, HttpStatus, HttpCode, ParseFilePipeBuilder } from '@nestjs/common';
+import {
+  Controller,
+  Post,
+  Body,
+  Get,
+  Param,
+  UploadedFile,
+  UseInterceptors,
+  HttpStatus,
+  HttpCode,
+  ParseFilePipeBuilder,
+} from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { FeedbackService } from '@modules/feedback/application/feedback.service';
 import { CreateTestimonyDto } from '@modules/feedback/dto/create-testimony.dto';
 import { FeatureTestimonyDto } from '@modules/feedback/dto/feature-testimony.dto';
-import { TestimonyResponseDto, FeaturedTestimonyResponseDto } from '@modules/feedback/dto/feedback-response.dto';
+import {
+  TestimonyResponseDto,
+  FeaturedTestimonyResponseDto,
+} from '@modules/feedback/dto/feedback-response.dto';
 import { Auth } from '@common/decorators/auth.decorator';
 import { Roles } from '@common/decorators/roles.decorator';
 import { CurrentUser } from '@common/decorators/current-user.decorator';
@@ -32,8 +46,14 @@ export class FeedbackController {
     )
     photo?: Express.Multer.File,
   ) {
-    const testimony = await this.feedbackService.createTestimony(user.id, dto, photo);
-    return plainToInstance(TestimonyResponseDto, testimony, { excludeExtraneousValues: true });
+    const testimony = await this.feedbackService.createTestimony(
+      user.id,
+      dto,
+      photo,
+    );
+    return plainToInstance(TestimonyResponseDto, testimony, {
+      excludeExtraneousValues: true,
+    });
   }
 
   @Post('admin/:id/feature')
@@ -46,15 +66,24 @@ export class FeedbackController {
     @Param('id') testimonyId: string,
     @Body() dto: FeatureTestimonyDto,
   ) {
-    const featured = await this.feedbackService.featureTestimony(user.id, testimonyId, dto);
-    return plainToInstance(FeaturedTestimonyResponseDto, featured, { excludeExtraneousValues: true });
+    const featured = await this.feedbackService.featureTestimony(
+      user.id,
+      testimonyId,
+      dto,
+    );
+    return plainToInstance(FeaturedTestimonyResponseDto, featured, {
+      excludeExtraneousValues: true,
+    });
   }
 
   @Get('public/course-cycle/:id')
   @ResponseMessage('Testimonios destacados obtenidos')
   async getPublic(@Param('id') courseCycleId: string) {
-    const testimonies = await this.feedbackService.getPublicTestimonies(courseCycleId);
-    return plainToInstance(FeaturedTestimonyResponseDto, testimonies, { excludeExtraneousValues: true });
+    const testimonies =
+      await this.feedbackService.getPublicTestimonies(courseCycleId);
+    return plainToInstance(FeaturedTestimonyResponseDto, testimonies, {
+      excludeExtraneousValues: true,
+    });
   }
 
   @Get('admin/course-cycle/:id')
@@ -62,7 +91,10 @@ export class FeedbackController {
   @Roles('ADMIN', 'SUPER_ADMIN')
   @ResponseMessage('Listado completo de testimonios')
   async getAdmin(@Param('id') courseCycleId: string) {
-    const testimonies = await this.feedbackService.getAllTestimoniesAdmin(courseCycleId);
-    return plainToInstance(TestimonyResponseDto, testimonies, { excludeExtraneousValues: true });
+    const testimonies =
+      await this.feedbackService.getAllTestimoniesAdmin(courseCycleId);
+    return plainToInstance(TestimonyResponseDto, testimonies, {
+      excludeExtraneousValues: true,
+    });
   }
 }

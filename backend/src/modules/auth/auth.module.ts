@@ -43,7 +43,10 @@ import { technicalSettings } from '@config/technical-settings';
       inject: [ConfigService],
       useFactory: (configService: ConfigService) => ({
         secret: configService.get<string>('JWT_SECRET'),
-        signOptions: { expiresIn: technicalSettings.auth.tokens.jwtModuleDefaultAccessTokenExpiresIn },
+        signOptions: {
+          expiresIn:
+            technicalSettings.auth.tokens.jwtModuleDefaultAccessTokenExpiresIn,
+        },
       }),
     }),
     UsersModule,
@@ -67,6 +70,13 @@ import { technicalSettings } from '@config/technical-settings';
     SecurityEventTypeRepository,
     SessionStatusRepository,
   ],
-  exports: [AuthService, SessionService, AuthSettingsService, SessionStatusRepository],
+  exports: [
+    AuthService,
+    SessionService,
+    AuthSettingsService,
+    SessionStatusRepository,
+    SecurityEventService,
+    SecurityEventRepository,
+  ],
 })
 export class AuthModule {}

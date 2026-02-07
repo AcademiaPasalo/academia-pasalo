@@ -38,8 +38,9 @@ export class SessionService {
     sessionStatus: SessionStatusCode;
     concurrentSessionId: string | null;
   }> {
-    const resolved = await this.sessionAnomalyDetector.resolveCoordinates(metadata);
-    
+    const resolved =
+      await this.sessionAnomalyDetector.resolveCoordinates(metadata);
+
     const runInTransaction = async (manager: EntityManager) => {
       const activeStatusId = await this.sessionStatusService.getIdByCode(
         'ACTIVE',
@@ -115,6 +116,13 @@ export class SessionService {
           manager,
         );
 
+      const isNewDevice =
+        !(await this.userSessionRepository.existsByUserIdAndDeviceId(
+          userId,
+          resolved.metadata.deviceId,
+          manager,
+        ));
+
       const refreshTokenHash = this.hashRefreshToken(refreshToken);
 
       const session = await this.userSessionRepository.create(
@@ -152,6 +160,35 @@ export class SessionService {
           },
           manager,
         );
+      } else {
+        if (isNewDevice) {
+          await this.securityEventService.logEvent(
+            userId,
+            'NEW_DEVICE_DETECTED',
+            {
+              ipAddress: resolved.metadata.ipAddress,
+              userAgent: resolved.metadata.userAgent,
+              deviceId: resolved.metadata.deviceId,
+              locationSource: resolved.locationSource,
+              city: resolved.metadata.city,
+              country: resolved.metadata.country,
+              sessionId: session.id,
+            },
+            manager,
+          );
+        }
+
+        await this.securityEventService.logEvent(
+          userId,
+          'LOGIN_SUCCESS',
+          {
+            ipAddress: resolved.metadata.ipAddress,
+            userAgent: resolved.metadata.userAgent,
+            deviceId: resolved.metadata.deviceId,
+            sessionId: session.id,
+          },
+          manager,
+        );
       }
 
       this.logger.debug({
@@ -186,7 +223,9 @@ export class SessionService {
   ): Promise<UserSession> {
     const refreshTokenHash = this.hashRefreshToken(refreshToken);
 
-    const isBlacklisted = await this.cacheService.get(`blacklist:refresh:${refreshTokenHash}`);
+    const isBlacklisted = await this.cacheService.get(
+      `blacklist:refresh:${refreshTokenHash}`,
+    );
     if (isBlacklisted) {
       this.logger.warn({
         level: 'warn',
@@ -198,9 +237,8 @@ export class SessionService {
       throw new UnauthorizedException('Token revocado');
     }
 
-    const session = await this.userSessionRepository.findByRefreshTokenHash(
-      refreshTokenHash,
-    );
+    const session =
+      await this.userSessionRepository.findByRefreshTokenHash(refreshTokenHash);
 
     if (!session) {
       throw new UnauthorizedException('Sesión inválida o expirada');
@@ -221,7 +259,8 @@ export class SessionService {
       throw new UnauthorizedException('Sesión inválida o expirada');
     }
 
-    const activeStatusId = await this.sessionStatusService.getIdByCode('ACTIVE');
+    const activeStatusId =
+      await this.sessionStatusService.getIdByCode('ACTIVE');
     if (session.sessionStatusId !== activeStatusId || !session.isActive) {
       throw new UnauthorizedException('Sesión inválida o expirada');
     }
@@ -252,7 +291,11 @@ export class SessionService {
     );
   }
 
-  async validateSession(sessionId: string, userId: string, deviceId: string): Promise<UserSession> {
+  async validateSession(
+    sessionId: string,
+    userId: string,
+    deviceId: string,
+  ): Promise<UserSession> {
     const session = await this.userSessionRepository.findActiveById(sessionId);
 
     if (!session) {
@@ -275,13 +318,20 @@ export class SessionService {
       throw new UnauthorizedException('Dispositivo no autorizado');
     }
 
-    await this.userSessionRepository.update(session.id, { lastActivityAt: new Date() });
+    await this.userSessionRepository.update(session.id, {
+      lastActivityAt: new Date(),
+    });
     return session;
   }
 
-  async deactivateSession(sessionId: string, manager?: EntityManager): Promise<void> {
-    const revokedStatusId =
-      await this.sessionStatusService.getIdByCode('REVOKED', manager);
+  async deactivateSession(
+    sessionId: string,
+    manager?: EntityManager,
+  ): Promise<void> {
+    const revokedStatusId = await this.sessionStatusService.getIdByCode(
+      'REVOKED',
+      manager,
+    );
 
     await this.userSessionRepository.update(
       sessionId,
@@ -486,7 +536,10 @@ export class SessionService {
     return await this.dataSource.transaction(runInTransaction);
   }
 
-  async activateBlockedSession(sessionId: string, manager?: EntityManager): Promise<void> {
+  async activateBlockedSession(
+    sessionId: string,
+    manager?: EntityManager,
+  ): Promise<void> {
     const activeStatusId = await this.sessionStatusService.getIdByCode(
       'ACTIVE',
       manager,

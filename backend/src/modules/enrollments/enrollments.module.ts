@@ -17,7 +17,12 @@ import { EvaluationsModule } from '@modules/evaluations/evaluations.module';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Enrollment, EnrollmentStatus, EnrollmentEvaluation, EnrollmentType]),
+    TypeOrmModule.forFeature([
+      Enrollment,
+      EnrollmentStatus,
+      EnrollmentEvaluation,
+      EnrollmentType,
+    ]),
     AuthModule,
     CoursesModule,
     EvaluationsModule,

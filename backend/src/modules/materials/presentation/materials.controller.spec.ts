@@ -27,12 +27,14 @@ describe('Materials Controllers RBAC Security', () => {
         Reflector,
       ],
     })
-    .overrideGuard(JwtAuthGuard)
-    .useValue({ canActivate: () => true })
-    .compile();
+      .overrideGuard(JwtAuthGuard)
+      .useValue({ canActivate: () => true })
+      .compile();
 
     materialsController = module.get<MaterialsController>(MaterialsController);
-    foldersController = module.get<MaterialFoldersController>(MaterialFoldersController);
+    foldersController = module.get<MaterialFoldersController>(
+      MaterialFoldersController,
+    );
   });
 
   describe('MaterialsController RBAC', () => {
@@ -45,7 +47,10 @@ describe('Materials Controllers RBAC Security', () => {
     });
 
     it('endpoint "requestDeletion" should restrict access to PROFESSOR, ADMIN, SUPER_ADMIN', () => {
-      const roles = Reflect.getMetadata('roles', materialsController.requestDeletion);
+      const roles = Reflect.getMetadata(
+        'roles',
+        materialsController.requestDeletion,
+      );
       expect(roles).toContain('PROFESSOR');
       expect(roles).not.toContain('STUDENT');
     });

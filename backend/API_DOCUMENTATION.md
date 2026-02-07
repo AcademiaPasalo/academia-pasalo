@@ -344,3 +344,57 @@ Base URL: `/api/v1`
 *   **Roles:** Público.
 *   **Descripción:** Verifica el estado de la API, conexión a BD y Redis.
 *   **Response:** `{ "status": "ok", "info": { ... } }`
+
+---
+
+## 🔍 ÉPICA 7: Auditoría y Trazabilidad (Audit)
+
+Base URL: `/api/v1/audit`
+*Requiere Authorization: Bearer <accessToken>.*
+
+### 1. Obtener Historial Unificado
+`GET /history`
+
+**Purpose:** Obtiene una vista cronológica consolidada de eventos de seguridad (logins, anomalías) y acciones de negocio (subida de archivos, gestión de usuarios).
+
+**Query Parameters:**
+*   `startDate` (ISO Date, opcional): Filtrar desde esta fecha.
+*   `endDate` (ISO Date, opcional): Filtrar hasta esta fecha.
+*   `userId` (string, opcional): Filtrar acciones de un usuario específico.
+*   `limit` (number, opcional): Máximo de registros (Default: 50, Max Backend: 100).
+
+**Response:**
+`data` (Array de objetos):
+```json
+[
+  {
+    "id": "aud-123 | sec-456",
+    "datetime": "2026-02-07T15:00:00.000Z",
+    "userId": "10",
+    "userName": "Joseph Pasalo",
+    "actionCode": "MATERIAL_UPLOAD | LOGIN_SUCCESS",
+    "actionName": "Subida de Archivo | Inicio de Sesión",
+    "source": "AUDIT | SECURITY",
+    "entityType": "material (solo en AUDIT)",
+    "entityId": "50 (solo en AUDIT)",
+    "ipAddress": "192.168.1.1",
+    "userAgent": "Mozilla/5.0... (solo en SECURITY)",
+    "metadata": { ... }
+  }
+]
+```
+
+---
+
+### 2. Exportar Historial a Excel
+`GET /export`
+
+**Purpose:** Descarga un reporte profesional en formato `.xlsx` con el historial filtrado. Soporta hasta 1000 registros por descarga.
+
+**Query Parameters:**
+*   `startDate`, `endDate`, `userId` (Mismos filtros que el historial).
+
+**Response:**
+*   **Content-Type:** `application/vnd.openxmlformats-officedocument.spreadsheetml.sheet`
+*   **Content-Disposition:** `attachment; filename=reporte-auditoria-YYYY-MM-DD.xlsx`
+*   **Body:** Stream binario del archivo Excel.

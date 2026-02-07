@@ -24,7 +24,7 @@ describe('RedisCacheService', () => {
     }).compile();
 
     service = module.get<RedisCacheService>(RedisCacheService);
-    
+
     // Access the private redisClient for mocking
     redisClientMock = new (Redis as any)();
     (service as any).redisClient = redisClientMock;
@@ -38,7 +38,7 @@ describe('RedisCacheService', () => {
     it('should delete keys and resolve promise when stream ends', async () => {
       const pattern = 'test-pattern:*';
       const keys = ['test-pattern:1', 'test-pattern:2'];
-      
+
       const streamMock = new EventEmitter();
       (streamMock as any).pause = jest.fn();
       (streamMock as any).resume = jest.fn();
@@ -59,10 +59,10 @@ describe('RedisCacheService', () => {
 
     it('should handle empty stream correctly', async () => {
       const pattern = 'empty-pattern:*';
-      
+
       const streamMock = new EventEmitter();
       redisClientMock.scanStream.mockReturnValue(streamMock);
-      
+
       const promise = service.invalidateGroup(pattern);
 
       streamMock.emit('data', []);
@@ -75,7 +75,7 @@ describe('RedisCacheService', () => {
     it('should reject if stream errors', async () => {
       const pattern = 'error-pattern:*';
       const error = new Error('Stream error');
-      
+
       const streamMock = new EventEmitter();
       redisClientMock.scanStream.mockReturnValue(streamMock);
 

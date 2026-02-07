@@ -25,22 +25,28 @@ export class MaterialFolderRepository {
     });
   }
 
-  async findRootsByEvaluation(evaluationId: string, statusId: string): Promise<MaterialFolder[]> {
+  async findRootsByEvaluation(
+    evaluationId: string,
+    statusId: string,
+  ): Promise<MaterialFolder[]> {
     return await this.ormRepository.find({
-      where: { 
-        evaluationId, 
+      where: {
+        evaluationId,
         parentFolderId: IsNull(),
-        folderStatusId: statusId 
+        folderStatusId: statusId,
       },
       order: { name: 'ASC' },
     });
   }
 
-  async findSubFolders(parentFolderId: string, statusId: string): Promise<MaterialFolder[]> {
+  async findSubFolders(
+    parentFolderId: string,
+    statusId: string,
+  ): Promise<MaterialFolder[]> {
     return await this.ormRepository.find({
-      where: { 
+      where: {
         parentFolderId,
-        folderStatusId: statusId 
+        folderStatusId: statusId,
       },
       order: { name: 'ASC' },
     });

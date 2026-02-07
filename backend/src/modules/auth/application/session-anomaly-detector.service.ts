@@ -45,7 +45,10 @@ export class SessionAnomalyDetectorService {
     }
 
     const lastSession =
-      await this.userSessionRepository.findLatestSessionByUserId(userId, manager);
+      await this.userSessionRepository.findLatestSessionByUserId(
+        userId,
+        manager,
+      );
 
     if (!lastSession || !lastSession.latitude || !lastSession.longitude) {
       return {
@@ -109,7 +112,7 @@ export class SessionAnomalyDetectorService {
     }
 
     const geo = this.geoProvider.resolve(metadata.ipAddress);
-    
+
     if (!geo) {
       return { metadata, locationSource: 'none' };
     }

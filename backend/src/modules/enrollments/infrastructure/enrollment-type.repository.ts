@@ -10,8 +10,13 @@ export class EnrollmentTypeRepository {
     private readonly ormRepository: Repository<EnrollmentType>,
   ) {}
 
-  async findByCode(code: string, manager?: EntityManager): Promise<EnrollmentType | null> {
-    const repo = manager ? manager.getRepository(EnrollmentType) : this.ormRepository;
+  async findByCode(
+    code: string,
+    manager?: EntityManager,
+  ): Promise<EnrollmentType | null> {
+    const repo = manager
+      ? manager.getRepository(EnrollmentType)
+      : this.ormRepository;
     return await repo.findOne({ where: { code } });
   }
 }

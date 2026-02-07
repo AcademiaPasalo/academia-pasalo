@@ -1,7 +1,17 @@
-import { Injectable, Logger, BadRequestException, NotFoundException, ConflictException, ForbiddenException } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  BadRequestException,
+  NotFoundException,
+  ConflictException,
+  ForbiddenException,
+} from '@nestjs/common';
 import { CreateTestimonyDto } from '@modules/feedback/dto/create-testimony.dto';
 import { FeatureTestimonyDto } from '@modules/feedback/dto/feature-testimony.dto';
-import { CourseTestimony, PhotoSource } from '@modules/feedback/domain/course-testimony.entity';
+import {
+  CourseTestimony,
+  PhotoSource,
+} from '@modules/feedback/domain/course-testimony.entity';
 import { FeaturedTestimony } from '@modules/feedback/domain/featured-testimony.entity';
 import { CourseTestimonyRepository } from '@modules/feedback/infrastructure/course-testimony.repository';
 import { FeaturedTestimonyRepository } from '@modules/feedback/infrastructure/featured-testimony.repository';
@@ -25,18 +35,28 @@ export class FeedbackService {
   ) {}
 
   async createTestimony(
-    userId: string, 
-    dto: CreateTestimonyDto, 
-    file?: Express.Multer.File
+    userId: string,
+    dto: CreateTestimonyDto,
+    file?: Express.Multer.File,
   ): Promise<CourseTestimony> {
-    const enrollment = await this.enrollmentRepo.findActiveByUserAndCourseCycle(userId, dto.courseCycleId);
+    const enrollment = await this.enrollmentRepo.findActiveByUserAndCourseCycle(
+      userId,
+      dto.courseCycleId,
+    );
     if (!enrollment) {
-      throw new ForbiddenException('No puedes opinar sobre un curso en el que no estás matriculado actualmente.');
+      throw new ForbiddenException(
+        'No puedes opinar sobre un curso en el que no estás matriculado actualmente.',
+      );
     }
 
-    const existing = await this.testimonyRepo.findByUserAndCycle(userId, dto.courseCycleId);
+    const existing = await this.testimonyRepo.findByUserAndCycle(
+      userId,
+      dto.courseCycleId,
+    );
     if (existing) {
-      throw new ConflictException('Ya has enviado un testimonio para este ciclo académico.');
+      throw new ConflictException(
+        'Ya has enviado un testimonio para este ciclo académico.',
+      );
     }
 
     let photoUrl: string | null = null;
@@ -44,7 +64,9 @@ export class FeedbackService {
 
     if (dto.photoSource === PhotoSource.UPLOADED) {
       if (!file) {
-        throw new BadRequestException('Se seleccionó Fuente: Uploaded pero no se adjuntó archivo.');
+        throw new BadRequestException(
+          'Se seleccionó Fuente: Uploaded pero no se adjuntó archivo.',
+        );
       }
       const uniqueName = `feedback-${Date.now()}-${file.originalname}`;
       photoUrl = await this.storageService.saveFile(uniqueName, file.buffer);
@@ -74,7 +96,11 @@ export class FeedbackService {
     return testimony;
   }
 
-  async featureTestimony(adminId: string, testimonyId: string, dto: FeatureTestimonyDto): Promise<FeaturedTestimony> {
+  async featureTestimony(
+    adminId: string,
+    testimonyId: string,
+    dto: FeatureTestimonyDto,
+  ): Promise<FeaturedTestimony> {
     const testimony = await this.testimonyRepo.findById(testimonyId);
     if (!testimony) {
       throw new NotFoundException('Testimonio no encontrado.');
@@ -111,9 +137,11 @@ export class FeedbackService {
     return featured;
   }
 
-  async getPublicTestimonies(courseCycleId: string): Promise<FeaturedTestimony[]> {
+  async getPublicTestimonies(
+    courseCycleId: string,
+  ): Promise<FeaturedTestimony[]> {
     const cacheKey = this.getPublicCacheKey(courseCycleId);
-    
+
     const cached = await this.cacheService.get<FeaturedTestimony[]>(cacheKey);
     if (cached) return cached;
 
@@ -124,7 +152,9 @@ export class FeedbackService {
     return items;
   }
 
-  async getAllTestimoniesAdmin(courseCycleId: string): Promise<CourseTestimony[]> {
+  async getAllTestimoniesAdmin(
+    courseCycleId: string,
+  ): Promise<CourseTestimony[]> {
     return await this.testimonyRepo.findByCycleId(courseCycleId);
   }
 

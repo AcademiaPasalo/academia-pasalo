@@ -15,7 +15,9 @@ export class FileVersionRepository {
     return await this.ormRepository.save(newVersion);
   }
 
-  async findLatestByResourceId(resourceId: string): Promise<FileVersion | null> {
+  async findLatestByResourceId(
+    resourceId: string,
+  ): Promise<FileVersion | null> {
     return await this.ormRepository.findOne({
       where: { fileResourceId: resourceId },
       order: { versionNumber: 'DESC' },

@@ -11,7 +11,10 @@ export class RoleRepository {
     private readonly ormRepository: Repository<Role>,
   ) {}
 
-  async findByCode(code: string, manager?: EntityManager): Promise<Role | null> {
+  async findByCode(
+    code: string,
+    manager?: EntityManager,
+  ): Promise<Role | null> {
     const repo = manager ? manager.getRepository(Role) : this.ormRepository;
     return await repo.findOne({
       where: { code },

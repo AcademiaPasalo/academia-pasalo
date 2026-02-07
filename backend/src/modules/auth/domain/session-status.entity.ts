@@ -11,4 +11,3 @@ export class SessionStatus {
   @Column({ type: 'varchar', length: 100, nullable: false })
   name: string;
 }
-

@@ -15,7 +15,9 @@ export class CourseCycleProfessorRepository {
     professorUserId: string,
     manager?: EntityManager,
   ): Promise<CourseCycleProfessor | null> {
-    const repo = manager ? manager.getRepository(CourseCycleProfessor) : this.ormRepository;
+    const repo = manager
+      ? manager.getRepository(CourseCycleProfessor)
+      : this.ormRepository;
     return await repo.findOne({
       where: {
         courseCycleId,
@@ -30,7 +32,9 @@ export class CourseCycleProfessorRepository {
     professorUserId: string,
     manager?: EntityManager,
   ): Promise<CourseCycleProfessor> {
-    const repo = manager ? manager.getRepository(CourseCycleProfessor) : this.ormRepository;
+    const repo = manager
+      ? manager.getRepository(CourseCycleProfessor)
+      : this.ormRepository;
 
     const existing = await repo.findOne({
       where: {
@@ -61,7 +65,9 @@ export class CourseCycleProfessorRepository {
     professorUserId: string,
     manager?: EntityManager,
   ): Promise<void> {
-    const repo = manager ? manager.getRepository(CourseCycleProfessor) : this.ormRepository;
+    const repo = manager
+      ? manager.getRepository(CourseCycleProfessor)
+      : this.ormRepository;
     await repo.update(
       {
         courseCycleId,

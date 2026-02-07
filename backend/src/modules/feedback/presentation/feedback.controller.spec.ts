@@ -23,9 +23,9 @@ describe('FeedbackController RBAC Security', () => {
         Reflector,
       ],
     })
-    .overrideGuard(JwtAuthGuard)
-    .useValue({ canActivate: () => true })
-    .compile();
+      .overrideGuard(JwtAuthGuard)
+      .useValue({ canActivate: () => true })
+      .compile();
 
     controller = module.get<FeedbackController>(FeedbackController);
   });

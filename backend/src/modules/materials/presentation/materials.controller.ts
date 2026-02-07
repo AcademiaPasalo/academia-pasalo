@@ -1,4 +1,15 @@
-import { Controller, Post, Body, Get, Param, HttpStatus, HttpCode, UploadedFile, UseInterceptors, Res } from '@nestjs/common';
+import {
+  Controller,
+  Post,
+  Body,
+  Get,
+  Param,
+  HttpStatus,
+  HttpCode,
+  UploadedFile,
+  UseInterceptors,
+  Res,
+} from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import type { Response } from 'express';
 import { MaterialsService } from '@modules/materials/application/materials.service';
@@ -80,8 +91,11 @@ export class MaterialsController {
     @Param('id') materialId: string,
     @Res({ passthrough: true }) res: Response,
   ) {
-    const { stream, fileName, mimeType } = await this.materialsService.download(user, materialId);
-    
+    const { stream, fileName, mimeType } = await this.materialsService.download(
+      user,
+      materialId,
+    );
+
     res.set({
       'Content-Type': mimeType,
       'Content-Disposition': `attachment; filename="${fileName}"`,

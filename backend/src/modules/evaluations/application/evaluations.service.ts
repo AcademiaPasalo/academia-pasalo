@@ -1,4 +1,9 @@
-import { Injectable, NotFoundException, BadRequestException, Logger } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+  Logger,
+} from '@nestjs/common';
 import { Evaluation } from '@modules/evaluations/domain/evaluation.entity';
 import { CreateEvaluationDto } from '@modules/evaluations/dto/create-evaluation.dto';
 import { EvaluationRepository } from '@modules/evaluations/infrastructure/evaluation.repository';
@@ -16,12 +21,16 @@ export class EvaluationsService {
   ) {}
 
   async create(dto: CreateEvaluationDto): Promise<Evaluation> {
-    const courseCycle = await this.courseCycleRepository.findById(dto.courseCycleId);
+    const courseCycle = await this.courseCycleRepository.findById(
+      dto.courseCycleId,
+    );
     if (!courseCycle) {
       throw new NotFoundException('La instancia de curso-ciclo no existe.');
     }
 
-    const academicCycle = await this.academicCycleRepository.findById(courseCycle.academicCycleId);
+    const academicCycle = await this.academicCycleRepository.findById(
+      courseCycle.academicCycleId,
+    );
     if (!academicCycle) {
       throw new NotFoundException('El ciclo académico vinculado no existe.');
     }
@@ -32,11 +41,15 @@ export class EvaluationsService {
     const cycleEnd = new Date(academicCycle.endDate);
 
     if (evalStart < cycleStart || evalEnd > cycleEnd) {
-      throw new BadRequestException('Las fechas de la evaluación deben estar dentro del rango del ciclo académico.');
+      throw new BadRequestException(
+        'Las fechas de la evaluación deben estar dentro del rango del ciclo académico.',
+      );
     }
 
     if (evalStart > evalEnd) {
-      throw new BadRequestException('La fecha de inicio no puede ser posterior a la fecha de fin.');
+      throw new BadRequestException(
+        'La fecha de inicio no puede ser posterior a la fecha de fin.',
+      );
     }
 
     const evaluation = await this.evaluationRepository.create({

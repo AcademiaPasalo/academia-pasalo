@@ -1,4 +1,9 @@
-import { Injectable, UnauthorizedException, Logger, InternalServerErrorException } from '@nestjs/common';
+import {
+  Injectable,
+  UnauthorizedException,
+  Logger,
+  InternalServerErrorException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { OAuth2Client } from 'google-auth-library';
 
@@ -9,11 +14,17 @@ export class GoogleProviderService {
 
   constructor(private readonly configService: ConfigService) {
     const googleClientId = this.configService.get<string>('GOOGLE_CLIENT_ID');
-    const googleClientSecret = this.configService.get<string>('GOOGLE_CLIENT_SECRET');
-    const googleRedirectUri = this.configService.get<string>('GOOGLE_REDIRECT_URI');
+    const googleClientSecret = this.configService.get<string>(
+      'GOOGLE_CLIENT_SECRET',
+    );
+    const googleRedirectUri = this.configService.get<string>(
+      'GOOGLE_REDIRECT_URI',
+    );
 
     if (!googleClientId || !googleClientSecret) {
-      throw new InternalServerErrorException('Configuración de Google OAuth incompleta');
+      throw new InternalServerErrorException(
+        'Configuración de Google OAuth incompleta',
+      );
     }
 
     this.googleClient = new OAuth2Client(
@@ -29,14 +40,16 @@ export class GoogleProviderService {
       this.googleClient.setCredentials(tokens);
 
       const ticket = await this.googleClient.verifyIdToken({
-        idToken: tokens.id_token!,
+        idToken: tokens.id_token,
         audience: this.configService.get<string>('GOOGLE_CLIENT_ID'),
       });
 
       const payload = ticket.getPayload();
 
       if (!payload || !payload.email) {
-        throw new UnauthorizedException('El token de Google no contiene un correo válido');
+        throw new UnauthorizedException(
+          'El token de Google no contiene un correo válido',
+        );
       }
 
       return payload.email;

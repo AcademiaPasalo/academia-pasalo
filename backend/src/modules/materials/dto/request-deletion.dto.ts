@@ -1,4 +1,10 @@
-import { IsNotEmpty, IsString, IsNumberString, MaxLength, IsIn } from 'class-validator';
+import {
+  IsNotEmpty,
+  IsString,
+  IsNumberString,
+  MaxLength,
+  IsIn,
+} from 'class-validator';
 
 export class RequestDeletionDto {
   @IsNotEmpty()

@@ -2,7 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtModule, JwtService } from '@nestjs/jwt';
-import { DataSource } from 'typeorm';
+import { DataSource, EntityManager } from 'typeorm';
 import { AuthService } from '../src/modules/auth/application/auth.service';
 import { SessionService } from '../src/modules/auth/application/session.service';
 import { SecurityEventService } from '../src/modules/auth/application/security-event.service';
@@ -45,8 +45,11 @@ describe('Security Scenarios (Integration)', () => {
   };
 
   const mockDataSource = {
-    transaction: jest.fn((cb) => cb(mockDataSource.manager)),
-    manager: {},
+    transaction: jest.fn(
+      (cb: (manager: EntityManager) => Promise<unknown>): Promise<unknown> =>
+        cb(mockDataSource.manager as EntityManager),
+    ),
+    manager: {} as Partial<EntityManager>,
   };
 
   const mockUsersService = {
@@ -82,6 +85,7 @@ describe('Security Scenarios (Integration)', () => {
     findByIdForUpdate: jest.fn(),
     update: jest.fn(),
     deactivateSession: jest.fn(),
+    existsByUserIdAndDeviceId: jest.fn().mockResolvedValue(true),
   };
 
   const mockSecurityEventRepository = {
@@ -93,14 +97,16 @@ describe('Security Scenarios (Integration)', () => {
   };
 
   const mockSessionStatusRepository = {
-    findByCode: jest.fn((code) => Promise.resolve({ id: '100', code })),
+    findByCode: jest.fn((code: string) => Promise.resolve({ id: '100', code })),
   };
 
   const mockAnomalyDetector = {
-    resolveCoordinates: jest.fn().mockImplementation((meta) => Promise.resolve({
-      metadata: meta,
-      locationSource: 'gps',
-    })),
+    resolveCoordinates: jest.fn().mockImplementation((meta: RequestMetadata) =>
+      Promise.resolve({
+        metadata: meta,
+        locationSource: 'gps',
+      }),
+    ),
     detectLocationAnomaly: jest.fn().mockResolvedValue({
       isAnomalous: false,
       previousSessionId: null,
@@ -109,7 +115,6 @@ describe('Security Scenarios (Integration)', () => {
     }),
   };
 
-  // Mock actualizado para usar el Puerto
   const mockGeoProvider = {
     resolve: jest.fn().mockResolvedValue(null),
   };
@@ -131,14 +136,29 @@ describe('Security Scenarios (Integration)', () => {
         { provide: ConfigService, useValue: { get: () => 'secret' } },
         { provide: UsersService, useValue: mockUsersService },
         { provide: UserSessionRepository, useValue: mockUserSessionRepository },
-        { provide: SecurityEventRepository, useValue: mockSecurityEventRepository },
-        { provide: SecurityEventTypeRepository, useValue: mockSecurityEventTypeRepository },
-        { provide: SessionStatusRepository, useValue: mockSessionStatusRepository },
-        { provide: SessionAnomalyDetectorService, useValue: mockAnomalyDetector },
-        { provide: SettingsService, useValue: {
-          getPositiveInt: jest.fn().mockResolvedValue(30),
-          getString: jest.fn().mockResolvedValue('CYCLE_2024_1'),
-        } },
+        {
+          provide: SecurityEventRepository,
+          useValue: mockSecurityEventRepository,
+        },
+        {
+          provide: SecurityEventTypeRepository,
+          useValue: mockSecurityEventTypeRepository,
+        },
+        {
+          provide: SessionStatusRepository,
+          useValue: mockSessionStatusRepository,
+        },
+        {
+          provide: SessionAnomalyDetectorService,
+          useValue: mockAnomalyDetector,
+        },
+        {
+          provide: SettingsService,
+          useValue: {
+            getPositiveInt: jest.fn().mockResolvedValue(30),
+            getString: jest.fn().mockResolvedValue('CYCLE_2024_1'),
+          },
+        },
         { provide: GeoProvider, useValue: mockGeoProvider },
         {
           provide: RedisCacheService,
@@ -152,18 +172,29 @@ describe('Security Scenarios (Integration)', () => {
         {
           provide: TokenService,
           useValue: {
-            generatePair: jest.fn().mockResolvedValue({ accessToken: 'a', refreshToken: 'b' }),
-            generateAccessToken: jest.fn().mockResolvedValue('new_access_token'),
-            generateRefreshToken: jest.fn().mockResolvedValue({ token: 'new_refresh', expiresAt: new Date() }),
+            generatePair: jest
+              .fn()
+              .mockResolvedValue({ accessToken: 'a', refreshToken: 'b' }),
+            generateAccessToken: jest
+              .fn()
+              .mockResolvedValue('new_access_token'),
+            generateRefreshToken: jest.fn().mockResolvedValue({
+              token: 'new_refresh',
+              expiresAt: new Date(),
+            }),
             verifyAccessToken: jest.fn().mockResolvedValue({ sub: '1' }),
-            verifyRefreshToken: jest.fn().mockReturnValue({ deviceId: 'device-A', sub: '1' }),
+            verifyRefreshToken: jest
+              .fn()
+              .mockReturnValue({ deviceId: 'device-A', sub: '1' }),
           },
         },
         {
           provide: GoogleProviderService,
           useValue: {
             verify: jest.fn().mockResolvedValue({ email: 'hacker@test.com' }),
-            verifyCodeAndGetEmail: jest.fn().mockResolvedValue('hacker@test.com'),
+            verifyCodeAndGetEmail: jest
+              .fn()
+              .mockResolvedValue('hacker@test.com'),
           },
         },
       ],
@@ -172,26 +203,27 @@ describe('Security Scenarios (Integration)', () => {
     app = moduleFixture.createNestApplication();
     authService = moduleFixture.get<AuthService>(AuthService);
     jwtService = moduleFixture.get<JwtService>(JwtService);
-    securityEventService = moduleFixture.get<SecurityEventService>(SecurityEventService);
-    
-    (authService as any).verifyCodeAndGetEmail = jest.fn().mockResolvedValue(mockUser.email);
+    securityEventService =
+      moduleFixture.get<SecurityEventService>(SecurityEventService);
 
-    mockAnomalyDetector.detectLocationAnomaly.mockImplementation((userId, metadata) => {
-      if (metadata && metadata.ipAddress === '8.8.8.8') {
+    mockAnomalyDetector.detectLocationAnomaly.mockImplementation(
+      (userId: string, metadata: RequestMetadata) => {
+        if (metadata && metadata.ipAddress === '8.8.8.8') {
+          return Promise.resolve({
+            isAnomalous: true,
+            previousSessionId: '50',
+            distanceKm: 10000,
+            timeDifferenceMinutes: 5,
+          });
+        }
         return Promise.resolve({
-          isAnomalous: true,
-          previousSessionId: '50',
-          distanceKm: 10000,
-          timeDifferenceMinutes: 5,
+          isAnomalous: false,
+          previousSessionId: null,
+          distanceKm: null,
+          timeDifferenceMinutes: null,
         });
-      }
-      return Promise.resolve({
-        isAnomalous: false,
-        previousSessionId: null,
-        distanceKm: null,
-        timeDifferenceMinutes: null,
-      });
-    });
+      },
+    );
   });
 
   describe('ATOMICITY & TRANSACTIONS', () => {
@@ -201,9 +233,13 @@ describe('Security Scenarios (Integration)', () => {
         deviceId: 'device-B-existing',
       });
       mockUserSessionRepository.create.mockResolvedValue({ id: '123' });
-      jest.spyOn(securityEventService, 'logEvent').mockRejectedValue(new Error('DB Error'));
+      jest
+        .spyOn(securityEventService, 'logEvent')
+        .mockRejectedValue(new Error('DB Error'));
 
-      await expect(authService.loginWithGoogle('token', mockMetadata)).rejects.toThrow('DB Error');
+      await expect(
+        authService.loginWithGoogle('token', mockMetadata),
+      ).rejects.toThrow('DB Error');
       expect(mockDataSource.transaction).toHaveBeenCalled();
       expect(mockUserSessionRepository.create).toHaveBeenCalled();
     });
@@ -215,7 +251,10 @@ describe('Security Scenarios (Integration)', () => {
         id: '55',
         deviceId: 'device-B-existing',
       });
-      mockUserSessionRepository.create.mockResolvedValue({ id: '123', sessionStatusId: '2' });
+      mockUserSessionRepository.create.mockResolvedValue({
+        id: '123',
+        sessionStatusId: '2',
+      });
 
       const result = await authService.loginWithGoogle('token', mockMetadata);
       expect(result.sessionStatus).toBe('PENDING_CONCURRENT_RESOLUTION');
@@ -224,7 +263,10 @@ describe('Security Scenarios (Integration)', () => {
 
     it('should return ACTIVE if no other session exists', async () => {
       mockUserSessionRepository.findOtherActiveSession.mockResolvedValue(null);
-      mockUserSessionRepository.create.mockResolvedValue({ id: '123', sessionStatusId: '1' });
+      mockUserSessionRepository.create.mockResolvedValue({
+        id: '123',
+        sessionStatusId: '1',
+      });
 
       const result = await authService.loginWithGoogle('token', mockMetadata);
       expect(result.sessionStatus).toBe('ACTIVE');
@@ -234,34 +276,57 @@ describe('Security Scenarios (Integration)', () => {
   describe('IMPOSSIBLE TRAVEL (Anomaly Detection)', () => {
     it('should BLOCK session if user moves too fast (Madrid -> Tokyo in 5 mins)', async () => {
       mockUserSessionRepository.create.mockResolvedValue({ id: '123' });
-      const result = await authService.loginWithGoogle('token', { ...mockMetadata, ipAddress: '8.8.8.8' });
+      const result = await authService.loginWithGoogle('token', {
+        ...mockMetadata,
+        ipAddress: '8.8.8.8',
+      });
       expect(result.sessionStatus).toBe('BLOCKED_PENDING_REAUTH');
     });
   });
 
   describe('SESSION RESOLUTION FLOWS', () => {
     it('should RESOLVE concurrent session by keeping NEW and revoking OLD', async () => {
-      const refreshToken = jwtService.sign({ sub: mockUser.id, deviceId: mockMetadata.deviceId, type: 'refresh' });
-
-      mockUserSessionRepository.findByRefreshTokenHashForUpdate.mockResolvedValue({
-        id: '200',
-        userId: mockUser.id,
+      const refreshToken = jwtService.sign({
+        sub: mockUser.id,
         deviceId: mockMetadata.deviceId,
-        sessionStatusId: '100',
+        type: 'refresh',
       });
 
-      mockUserSessionRepository.findOtherActiveSession.mockResolvedValue({ id: '100', deviceId: 'device-B' });
-      mockUserSessionRepository.findByIdForUpdate.mockResolvedValue({ id: '100' });
+      mockUserSessionRepository.findByRefreshTokenHashForUpdate.mockResolvedValue(
+        {
+          id: '200',
+          userId: mockUser.id,
+          deviceId: mockMetadata.deviceId,
+          sessionStatusId: '100',
+        },
+      );
+
+      mockUserSessionRepository.findOtherActiveSession.mockResolvedValue({
+        id: '100',
+        deviceId: 'device-B',
+      });
+      mockUserSessionRepository.findByIdForUpdate.mockResolvedValue({
+        id: '100',
+      });
       mockUserSessionRepository.update.mockResolvedValue({});
 
-      const result = await authService.resolveConcurrentSession(refreshToken, mockMetadata.deviceId, 'KEEP_NEW', mockMetadata);
+      const result = await authService.resolveConcurrentSession(
+        refreshToken,
+        mockMetadata.deviceId,
+        'KEEP_NEW',
+        mockMetadata,
+      );
 
       expect(result.keptSessionId).toBe('200');
       expect(mockUserSessionRepository.update).toHaveBeenCalled();
     });
 
     it('should RE-AUTHENTICATE anomalous session successfully', async () => {
-      const refreshToken = jwtService.sign({ sub: mockUser.id, deviceId: mockMetadata.deviceId, type: 'refresh' });
+      const refreshToken = jwtService.sign({
+        sub: mockUser.id,
+        deviceId: mockMetadata.deviceId,
+        type: 'refresh',
+      });
 
       mockUserSessionRepository.findByRefreshTokenHash.mockResolvedValue({
         id: '300',
@@ -269,10 +334,15 @@ describe('Security Scenarios (Integration)', () => {
         deviceId: mockMetadata.deviceId,
         sessionStatusId: '100',
       });
-      
+
       mockUserSessionRepository.update.mockResolvedValue({});
 
-      const result = await authService.reauthAnomalousSession('google-token', refreshToken, mockMetadata.deviceId, mockMetadata);
+      const result = await authService.reauthAnomalousSession(
+        'google-token',
+        refreshToken,
+        mockMetadata.deviceId,
+        mockMetadata,
+      );
 
       expect(result.accessToken).toBeDefined();
       expect(mockUserSessionRepository.update).toHaveBeenCalled();
@@ -282,14 +352,25 @@ describe('Security Scenarios (Integration)', () => {
   describe('JWT STRATEGY & ACCESS CONTROL', () => {
     it('should REJECT access if session is BLOCKED in database', async () => {
       const strategy = new JwtStrategy(
-        { get: () => 'secret' } as any,
-        {} as any,
-        mockUserSessionRepository as any,
-        { getIdByCode: () => Promise.resolve('1') } as any,
-        { get: jest.fn().mockResolvedValue(null), set: jest.fn() } as any,
+        { get: () => 'secret' } as unknown as ConfigService,
+        {} as unknown as TokenService,
+        mockUserSessionRepository as unknown as UserSessionRepository,
+        {
+          getIdByCode: () => Promise.resolve('1'),
+        } as unknown as SessionStatusService,
+        {
+          get: jest.fn().mockResolvedValue(null),
+          set: jest.fn(),
+        } as unknown as RedisCacheService,
       );
 
-      const payload = { sub: '1', email: 'h@t.com', roles: [], activeRole: 'STUDENT', sessionId: '500' };
+      const payload = {
+        sub: '1',
+        email: 'h@t.com',
+        roles: [] as string[],
+        activeRole: 'STUDENT',
+        sessionId: '500',
+      };
 
       mockUserSessionRepository.findByIdWithUser.mockResolvedValue({
         id: '500',
@@ -298,7 +379,9 @@ describe('Security Scenarios (Integration)', () => {
         expiresAt: new Date(Date.now() + 10000),
       });
 
-      await expect(strategy.validate(payload)).rejects.toThrow(UnauthorizedException);
+      await expect(strategy.validate(payload)).rejects.toThrow(
+        UnauthorizedException,
+      );
     });
   });
 });

@@ -1,4 +1,13 @@
-import { IsNotEmpty, IsInt, Min, Max, IsString, MaxLength, IsEnum, IsNumberString } from 'class-validator';
+import {
+  IsNotEmpty,
+  IsInt,
+  Min,
+  Max,
+  IsString,
+  MaxLength,
+  IsEnum,
+  IsNumberString,
+} from 'class-validator';
 import { PhotoSource } from '@modules/feedback/domain/course-testimony.entity';
 
 export class CreateTestimonyDto {
@@ -10,7 +19,7 @@ export class CreateTestimonyDto {
   @IsInt()
   @Min(0)
   @Max(5)
-  rating: number; 
+  rating: number;
 
   @IsNotEmpty()
   @IsString()

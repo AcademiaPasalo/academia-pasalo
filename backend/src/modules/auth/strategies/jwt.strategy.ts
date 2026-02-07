@@ -1,4 +1,8 @@
-import { Injectable, UnauthorizedException, InternalServerErrorException } from '@nestjs/common';
+import {
+  Injectable,
+  UnauthorizedException,
+  InternalServerErrorException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
@@ -44,7 +48,9 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     const activeStatusId =
       await this.sessionStatusService.getIdByCode('ACTIVE');
 
-    const session = await this.userSessionRepository.findByIdWithUser(payload.sessionId);
+    const session = await this.userSessionRepository.findByIdWithUser(
+      payload.sessionId,
+    );
 
     if (
       !session ||
@@ -62,9 +68,13 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     const userWithSession = session.user as UserWithSession;
     userWithSession.sessionId = payload.sessionId;
     userWithSession.activeRole = payload.activeRole;
-    
-    await this.cacheService.set(cacheKey, userWithSession, technicalSettings.auth.session.sessionUserCacheTtlSeconds);
-    
+
+    await this.cacheService.set(
+      cacheKey,
+      userWithSession,
+      technicalSettings.auth.session.sessionUserCacheTtlSeconds,
+    );
+
     return userWithSession;
   }
 }

@@ -20,4 +20,3 @@ export class SystemSetting {
   @Column({ type: 'datetime', name: 'updated_at', nullable: true })
   updatedAt: Date | null;
 }
-

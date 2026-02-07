@@ -1,4 +1,8 @@
-import { Injectable, Logger, InternalServerErrorException } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  InternalServerErrorException,
+} from '@nestjs/common';
 import { SecurityEventRepository } from '@modules/auth/infrastructure/security-event.repository';
 import { SecurityEventTypeRepository } from '@modules/auth/infrastructure/security-event-type.repository';
 import { SecurityEvent } from '@modules/auth/domain/security-event.entity';
@@ -19,8 +23,10 @@ export class SecurityEventService {
     context?: Record<string, unknown>,
     manager?: EntityManager,
   ): Promise<SecurityEvent | null> {
-    const eventType =
-      await this.securityEventTypeRepository.findByCode(eventCode, manager);
+    const eventType = await this.securityEventTypeRepository.findByCode(
+      eventCode,
+      manager,
+    );
 
     if (!eventType) {
       this.logger.warn({
@@ -39,14 +45,17 @@ export class SecurityEventService {
     const eventDatetime = new Date();
     const { ipAddress, userAgent, metadata } = this.normalizeContext(context);
 
-    const securityEvent = await this.securityEventRepository.create({
-      userId,
-      securityEventTypeId: eventType.id,
-      eventDatetime,
-      ipAddress,
-      userAgent,
-      metadata,
-    }, manager);
+    const securityEvent = await this.securityEventRepository.create(
+      {
+        userId,
+        securityEventTypeId: eventType.id,
+        eventDatetime,
+        ipAddress,
+        userAgent,
+        metadata,
+      },
+      manager,
+    );
 
     this.logger.log({
       level: 'info',
@@ -77,7 +86,7 @@ export class SecurityEventService {
       return { ipAddress: null, userAgent: null, metadata: null };
     }
 
-    const record = context as Record<string, unknown>;
+    const record = context;
     const ip = record.ipAddress;
     const ua = record.userAgent;
 

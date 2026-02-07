@@ -21,13 +21,17 @@ export class TokenService {
   ) {}
 
   async generateAccessToken(payload: JwtPayload): Promise<string> {
-    const ttlMinutes = await this.authSettingsService.getAccessTokenTtlMinutes();
+    const ttlMinutes =
+      await this.authSettingsService.getAccessTokenTtlMinutes();
     return this.jwtService.sign(payload, {
       expiresIn: `${ttlMinutes}m`,
     });
   }
 
-  async generateRefreshToken(userId: string, deviceId: string): Promise<{ token: string; expiresAt: Date }> {
+  async generateRefreshToken(
+    userId: string,
+    deviceId: string,
+  ): Promise<{ token: string; expiresAt: Date }> {
     const ttlDays = await this.authSettingsService.getRefreshTokenTtlDays();
     const payload: RefreshTokenPayload = {
       sub: userId,
