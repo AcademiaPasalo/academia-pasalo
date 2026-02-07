@@ -15,8 +15,10 @@ export class ClassEventProfessorRepository {
     professorUserId: string,
     manager?: EntityManager,
   ): Promise<ClassEventProfessor> {
-    const repo = manager ? manager.getRepository(ClassEventProfessor) : this.ormRepository;
-    
+    const repo = manager
+      ? manager.getRepository(ClassEventProfessor)
+      : this.ormRepository;
+
     const existing = await repo.findOne({
       where: { classEventId, professorUserId },
     });
@@ -45,14 +47,18 @@ export class ClassEventProfessorRepository {
     professorUserId: string,
     manager?: EntityManager,
   ): Promise<void> {
-    const repo = manager ? manager.getRepository(ClassEventProfessor) : this.ormRepository;
+    const repo = manager
+      ? manager.getRepository(ClassEventProfessor)
+      : this.ormRepository;
     await repo.update(
       { classEventId, professorUserId },
       { revokedAt: new Date() },
     );
   }
 
-  async findActiveProfessorsByEventId(classEventId: string): Promise<ClassEventProfessor[]> {
+  async findActiveProfessorsByEventId(
+    classEventId: string,
+  ): Promise<ClassEventProfessor[]> {
     return await this.ormRepository.find({
       where: {
         classEventId,

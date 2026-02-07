@@ -1,6 +1,10 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { DataSource } from 'typeorm';
-import { BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  NotFoundException,
+} from '@nestjs/common';
 import { MaterialsService } from '@modules/materials/application/materials.service';
 import { StorageService } from '@infrastructure/storage/storage.service';
 import { AccessEngineService } from '@modules/enrollments/application/access-engine.service';
@@ -14,19 +18,25 @@ import { DeletionRequestRepository } from '@modules/materials/infrastructure/del
 import { UserRepository } from '@modules/users/infrastructure/user.repository';
 import { AuditService } from '@modules/audit/application/audit.service';
 
-const mockFolder = (id = '1', evaluationId = '100', parentId: string | null = null) => ({
-  id,
-  evaluationId,
-  parentFolderId: parentId,
-  name: 'Test Folder',
-} as any);
+const mockFolder = (
+  id = '1',
+  evaluationId = '100',
+  parentId: string | null = null,
+) =>
+  ({
+    id,
+    evaluationId,
+    parentFolderId: parentId,
+    name: 'Test Folder',
+  }) as any;
 
-const mockFile = () => ({
-  originalname: 'test.pdf',
-  mimetype: 'application/pdf',
-  size: 1024,
-  buffer: Buffer.from('%PDF-1.4 content'),
-} as Express.Multer.File);
+const mockFile = () =>
+  ({
+    originalname: 'test.pdf',
+    mimetype: 'application/pdf',
+    size: 1024,
+    buffer: Buffer.from('%PDF-1.4 content'),
+  }) as Express.Multer.File;
 
 describe('MaterialsService', () => {
   let service: MaterialsService;
@@ -52,7 +62,11 @@ describe('MaterialsService', () => {
         },
         {
           provide: StorageService,
-          useValue: { calculateHash: jest.fn(), saveFile: jest.fn(), deleteFile: jest.fn() },
+          useValue: {
+            calculateHash: jest.fn(),
+            saveFile: jest.fn(),
+            deleteFile: jest.fn(),
+          },
         },
         {
           provide: AccessEngineService,
@@ -68,11 +82,20 @@ describe('MaterialsService', () => {
         },
         {
           provide: MaterialFolderRepository,
-          useValue: { create: jest.fn(), findById: jest.fn(), findRootsByEvaluation: jest.fn(), findSubFolders: jest.fn() },
+          useValue: {
+            create: jest.fn(),
+            findById: jest.fn(),
+            findRootsByEvaluation: jest.fn(),
+            findSubFolders: jest.fn(),
+          },
         },
         {
           provide: MaterialRepository,
-          useValue: { create: jest.fn(), findById: jest.fn(), findByFolderId: jest.fn() },
+          useValue: {
+            create: jest.fn(),
+            findById: jest.fn(),
+            findByFolderId: jest.fn(),
+          },
         },
         {
           provide: FileResourceRepository,
@@ -84,7 +107,11 @@ describe('MaterialsService', () => {
         },
         {
           provide: MaterialCatalogRepository,
-          useValue: { findFolderStatusByCode: jest.fn(), findMaterialStatusByCode: jest.fn(), findDeletionRequestStatusByCode: jest.fn() },
+          useValue: {
+            findFolderStatusByCode: jest.fn(),
+            findMaterialStatusByCode: jest.fn(),
+            findDeletionRequestStatusByCode: jest.fn(),
+          },
         },
         {
           provide: DeletionRequestRepository,
@@ -116,7 +143,7 @@ describe('MaterialsService', () => {
 
     userRepo.findById.mockResolvedValue({
       id: 'user-1',
-      roles: [{ code: 'STUDENT' }]
+      roles: [{ code: 'STUDENT' }],
     } as any);
   });
 
@@ -138,25 +165,41 @@ describe('MaterialsService', () => {
   describe('uploadMaterial', () => {
     it('should upload a new file successfully', async () => {
       const file = mockFile();
-      const mockManager = { 
-        save: jest.fn((entity) => Promise.resolve({ ...entity, id: 'saved-id' })),
+      const mockManager = {
+        save: jest.fn((entity) =>
+          Promise.resolve({ ...entity, id: 'saved-id' }),
+        ),
         create: jest.fn((entity, data) => ({ ...data, id: 'created-id' })),
         findOne: jest.fn(),
-        getRepository: jest.fn()
+        getRepository: jest.fn(),
       };
-      
-      catalogRepo.findMaterialStatusByCode.mockResolvedValue({ id: '1' } as any);
+
+      catalogRepo.findMaterialStatusByCode.mockResolvedValue({
+        id: '1',
+      } as any);
       folderRepo.findById.mockResolvedValue(mockFolder());
-      dataSource.transaction.mockImplementation(async (cb: any) => await cb(mockManager));
+      dataSource.transaction.mockImplementation(
+        async (cb: any) => await cb(mockManager),
+      );
       storageService.calculateHash.mockResolvedValue('hash123');
       resourceRepo.findByHash.mockResolvedValue(null);
       storageService.saveFile.mockResolvedValue('/path/to/file');
 
-      const result = await service.uploadMaterial('user1', { materialFolderId: '1', displayName: 'Doc' }, file);
+      const result = await service.uploadMaterial(
+        'user1',
+        { materialFolderId: '1', displayName: 'Doc' },
+        file,
+      );
 
       expect(storageService.saveFile).toHaveBeenCalled();
       expect(result).toBeDefined();
-      expect(auditService.logAction).toHaveBeenCalledWith('user1', 'FILE_UPLOAD', 'material', 'saved-id', mockManager);
+      expect(auditService.logAction).toHaveBeenCalledWith(
+        'user1',
+        'FILE_UPLOAD',
+        'material',
+        'saved-id',
+        mockManager,
+      );
     });
   });
 
@@ -174,10 +217,16 @@ describe('MaterialsService', () => {
 
   describe('requestDeletion', () => {
     it('should create deletion request for material', async () => {
-      catalogRepo.findDeletionRequestStatusByCode.mockResolvedValue({ id: '1' } as any);
+      catalogRepo.findDeletionRequestStatusByCode.mockResolvedValue({
+        id: '1',
+      } as any);
       materialRepo.findById.mockResolvedValue({ id: 'mat1' } as any);
 
-      await service.requestDeletion('user1', { entityType: 'material', entityId: 'mat1', reason: 'bad' });
+      await service.requestDeletion('user1', {
+        entityType: 'material',
+        entityId: 'mat1',
+        reason: 'bad',
+      });
 
       expect(deletionRepo.create).toHaveBeenCalled();
     });

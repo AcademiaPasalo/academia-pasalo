@@ -1,5 +1,10 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { BadRequestException, ConflictException, ForbiddenException, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  ForbiddenException,
+  NotFoundException,
+} from '@nestjs/common';
 import { FeedbackService } from '@modules/feedback/application/feedback.service';
 import { CourseTestimonyRepository } from '@modules/feedback/infrastructure/course-testimony.repository';
 import { FeaturedTestimonyRepository } from '@modules/feedback/infrastructure/featured-testimony.repository';
@@ -69,8 +74,12 @@ describe('FeedbackService', () => {
     }).compile();
 
     service = module.get<FeedbackService>(FeedbackService);
-    testimonyRepo = module.get<CourseTestimonyRepository>(CourseTestimonyRepository);
-    featuredRepo = module.get<FeaturedTestimonyRepository>(FeaturedTestimonyRepository);
+    testimonyRepo = module.get<CourseTestimonyRepository>(
+      CourseTestimonyRepository,
+    );
+    featuredRepo = module.get<FeaturedTestimonyRepository>(
+      FeaturedTestimonyRepository,
+    );
     enrollmentRepo = module.get<EnrollmentRepository>(EnrollmentRepository);
     storageService = module.get<StorageService>(StorageService);
     cacheService = module.get<RedisCacheService>(RedisCacheService);
@@ -85,38 +94,63 @@ describe('FeedbackService', () => {
     };
 
     it('should create testimony successfully if enrolled', async () => {
-      jest.spyOn(enrollmentRepo, 'findActiveByUserAndCourseCycle').mockResolvedValue({ id: '1' } as any);
+      jest
+        .spyOn(enrollmentRepo, 'findActiveByUserAndCourseCycle')
+        .mockResolvedValue({ id: '1' } as any);
       jest.spyOn(testimonyRepo, 'findByUserAndCycle').mockResolvedValue(null);
-      jest.spyOn(testimonyRepo, 'create').mockResolvedValue({ id: 'test1' } as any);
+      jest
+        .spyOn(testimonyRepo, 'create')
+        .mockResolvedValue({ id: 'test1' } as any);
 
       const result = await service.createTestimony('user1', mockDto);
 
-      expect(enrollmentRepo.findActiveByUserAndCourseCycle).toHaveBeenCalledWith('user1', '100');
+      expect(
+        enrollmentRepo.findActiveByUserAndCourseCycle,
+      ).toHaveBeenCalledWith('user1', '100');
       expect(testimonyRepo.create).toHaveBeenCalled();
       expect(result).toBeDefined();
     });
 
     it('should throw ForbiddenException if user is NOT enrolled', async () => {
-      jest.spyOn(enrollmentRepo, 'findActiveByUserAndCourseCycle').mockResolvedValue(null);
+      jest
+        .spyOn(enrollmentRepo, 'findActiveByUserAndCourseCycle')
+        .mockResolvedValue(null);
 
-      await expect(service.createTestimony('user1', mockDto)).rejects.toThrow(ForbiddenException);
+      await expect(service.createTestimony('user1', mockDto)).rejects.toThrow(
+        ForbiddenException,
+      );
     });
 
     it('should throw ConflictException if user already has a testimony for this cycle', async () => {
-      jest.spyOn(enrollmentRepo, 'findActiveByUserAndCourseCycle').mockResolvedValue({ id: '1' } as any);
-      jest.spyOn(testimonyRepo, 'findByUserAndCycle').mockResolvedValue({ id: 'existing' } as any);
+      jest
+        .spyOn(enrollmentRepo, 'findActiveByUserAndCourseCycle')
+        .mockResolvedValue({ id: '1' } as any);
+      jest
+        .spyOn(testimonyRepo, 'findByUserAndCycle')
+        .mockResolvedValue({ id: 'existing' } as any);
 
-      await expect(service.createTestimony('user1', mockDto)).rejects.toThrow(ConflictException);
+      await expect(service.createTestimony('user1', mockDto)).rejects.toThrow(
+        ConflictException,
+      );
     });
 
     it('should upload photo if source is UPLOADED', async () => {
       const uploadDto = { ...mockDto, photoSource: PhotoSource.UPLOADED };
-      const mockFile = { originalname: 'pic.jpg', buffer: Buffer.from('img') } as any;
+      const mockFile = {
+        originalname: 'pic.jpg',
+        buffer: Buffer.from('img'),
+      } as any;
 
-      jest.spyOn(enrollmentRepo, 'findActiveByUserAndCourseCycle').mockResolvedValue({ id: '1' } as any);
+      jest
+        .spyOn(enrollmentRepo, 'findActiveByUserAndCourseCycle')
+        .mockResolvedValue({ id: '1' } as any);
       jest.spyOn(testimonyRepo, 'findByUserAndCycle').mockResolvedValue(null);
-      jest.spyOn(storageService, 'saveFile').mockResolvedValue('path/to/pic.jpg');
-      jest.spyOn(testimonyRepo, 'create').mockResolvedValue({ id: 'test1', photoUrl: 'path/to/pic.jpg' } as any);
+      jest
+        .spyOn(storageService, 'saveFile')
+        .mockResolvedValue('path/to/pic.jpg');
+      jest
+        .spyOn(testimonyRepo, 'create')
+        .mockResolvedValue({ id: 'test1', photoUrl: 'path/to/pic.jpg' } as any);
 
       await service.createTestimony('user1', uploadDto, mockFile);
 
@@ -125,10 +159,14 @@ describe('FeedbackService', () => {
 
     it('should throw BadRequest if UPLOADED source but no file provided', async () => {
       const uploadDto = { ...mockDto, photoSource: PhotoSource.UPLOADED };
-      jest.spyOn(enrollmentRepo, 'findActiveByUserAndCourseCycle').mockResolvedValue({ id: '1' } as any);
+      jest
+        .spyOn(enrollmentRepo, 'findActiveByUserAndCourseCycle')
+        .mockResolvedValue({ id: '1' } as any);
       jest.spyOn(testimonyRepo, 'findByUserAndCycle').mockResolvedValue(null);
 
-      await expect(service.createTestimony('user1', uploadDto, undefined)).rejects.toThrow(BadRequestException);
+      await expect(
+        service.createTestimony('user1', uploadDto, undefined),
+      ).rejects.toThrow(BadRequestException);
     });
   });
 
@@ -136,7 +174,9 @@ describe('FeedbackService', () => {
     const featureDto = { displayOrder: 1, isActive: true };
 
     it('should create new featured record if not exists', async () => {
-      jest.spyOn(testimonyRepo, 'findById').mockResolvedValue({ id: 't1', courseCycleId: '100' } as any);
+      jest
+        .spyOn(testimonyRepo, 'findById')
+        .mockResolvedValue({ id: 't1', courseCycleId: '100' } as any);
       jest.spyOn(featuredRepo, 'findByTestimonyId').mockResolvedValue(null);
       jest.spyOn(featuredRepo, 'create').mockResolvedValue({ id: 'f1' } as any);
 
@@ -149,9 +189,13 @@ describe('FeedbackService', () => {
 
     it('should update existing featured record', async () => {
       const existing = { id: 'f1', isActive: false, displayOrder: 99 } as any;
-      jest.spyOn(testimonyRepo, 'findById').mockResolvedValue({ id: 't1', courseCycleId: '100' } as any);
+      jest
+        .spyOn(testimonyRepo, 'findById')
+        .mockResolvedValue({ id: 't1', courseCycleId: '100' } as any);
       jest.spyOn(featuredRepo, 'findByTestimonyId').mockResolvedValue(existing);
-      jest.spyOn(featuredRepo, 'save').mockResolvedValue({ ...existing, ...featureDto });
+      jest
+        .spyOn(featuredRepo, 'save')
+        .mockResolvedValue({ ...existing, ...featureDto });
 
       const result = await service.featureTestimony('admin1', 't1', featureDto);
 
@@ -164,7 +208,9 @@ describe('FeedbackService', () => {
     it('should throw NotFound if testimony does not exist', async () => {
       jest.spyOn(testimonyRepo, 'findById').mockResolvedValue(null);
 
-      await expect(service.featureTestimony('admin1', '999', featureDto)).rejects.toThrow(NotFoundException);
+      await expect(
+        service.featureTestimony('admin1', '999', featureDto),
+      ).rejects.toThrow(NotFoundException);
     });
   });
 

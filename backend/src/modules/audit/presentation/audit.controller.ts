@@ -45,7 +45,8 @@ export class AuditController {
     const filename = `reporte-auditoria-${new Date().toISOString().split('T')[0]}.xlsx`;
 
     res.set({
-      'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'Content-Type':
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
       'Content-Disposition': `attachment; filename=${filename}`,
       'Content-Length': buffer.length,
     });
@@ -53,5 +54,3 @@ export class AuditController {
     res.end(buffer);
   }
 }
-
-

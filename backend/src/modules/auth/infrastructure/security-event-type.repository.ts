@@ -11,11 +11,18 @@ export class SecurityEventTypeRepository {
     private readonly ormRepository: Repository<SecurityEventType>,
   ) {}
 
-  private getRepository(manager?: EntityManager): Repository<SecurityEventType> {
-    return manager ? manager.getRepository(SecurityEventType) : this.ormRepository;
+  private getRepository(
+    manager?: EntityManager,
+  ): Repository<SecurityEventType> {
+    return manager
+      ? manager.getRepository(SecurityEventType)
+      : this.ormRepository;
   }
 
-  async findByCode(code: string, manager?: EntityManager): Promise<SecurityEventType | null> {
+  async findByCode(
+    code: string,
+    manager?: EntityManager,
+  ): Promise<SecurityEventType | null> {
     const repo = this.getRepository(manager);
     return await repo.findOne({
       where: { code },

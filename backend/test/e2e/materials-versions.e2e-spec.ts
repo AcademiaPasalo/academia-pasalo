@@ -35,26 +35,28 @@ describe('E2E: Versionado, Deduplicación e Integridad', () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
     })
-    .overrideProvider(StorageService)
-    .useValue({
-      calculateHash: jest.fn().mockImplementation((buffer: Buffer) => {
+      .overrideProvider(StorageService)
+      .useValue({
+        calculateHash: jest.fn().mockImplementation((buffer: Buffer) => {
           const content = buffer.toString();
           if (content.includes('duplicate')) return 'hash_dup_123';
           if (content.includes('version2')) return 'hash_v2_456';
           return 'hash_' + Date.now() + Math.random();
-      }),
-      saveFile: jest.fn().mockImplementation(async (name, buffer) => {
-         const tempPath = path.join(os.tmpdir(), name);
-         await fs.promises.writeFile(tempPath, buffer);
-         return tempPath;
-      }),
-      deleteFile: jest.fn().mockResolvedValue(undefined),
-      onModuleInit: jest.fn(),
-    })
-    .compile();
+        }),
+        saveFile: jest.fn().mockImplementation(async (name, buffer) => {
+          const tempPath = path.join(os.tmpdir(), name);
+          await fs.promises.writeFile(tempPath, buffer);
+          return tempPath;
+        }),
+        deleteFile: jest.fn().mockResolvedValue(undefined),
+        onModuleInit: jest.fn(),
+      })
+      .compile();
 
     app = moduleFixture.createNestApplication();
-    app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
+    app.useGlobalPipes(
+      new ValidationPipe({ whitelist: true, transform: true }),
+    );
     app.useGlobalInterceptors(new TransformInterceptor(app.get(Reflector)));
     await app.init();
 
@@ -73,24 +75,43 @@ describe('E2E: Versionado, Deduplicación e Integridad', () => {
     await dataSource.query('SET FOREIGN_KEY_CHECKS = 1');
 
     await seeder.ensureMaterialStatuses();
-    const cycle = await seeder.createCycle(`2026-VER-${Date.now()}`, formatDate(now), formatDate(nextMonth));
-    const course = await seeder.createCourse(`VER101-${Date.now()}`, 'Versionado 101');
+    const cycle = await seeder.createCycle(
+      `2026-VER-${Date.now()}`,
+      formatDate(now),
+      formatDate(nextMonth),
+    );
+    const course = await seeder.createCourse(
+      `VER101-${Date.now()}`,
+      'Versionado 101',
+    );
     const courseCycle = await seeder.linkCourseCycle(course.id, cycle.id);
-    const evaluation = await seeder.createEvaluation(courseCycle.id, 'PC', 1, formatDate(now), formatDate(nextMonth));
+    const evaluation = await seeder.createEvaluation(
+      courseCycle.id,
+      'PC',
+      1,
+      formatDate(now),
+      formatDate(nextMonth),
+    );
 
-    professor = await seeder.createAuthenticatedUser(TestSeeder.generateUniqueEmail('prof_ver'), ['PROFESSOR']);
-    admin = await seeder.createAuthenticatedUser(TestSeeder.generateUniqueEmail('admin_ver'), ['ADMIN']);
+    professor = await seeder.createAuthenticatedUser(
+      TestSeeder.generateUniqueEmail('prof_ver'),
+      ['PROFESSOR'],
+    );
+    admin = await seeder.createAuthenticatedUser(
+      TestSeeder.generateUniqueEmail('admin_ver'),
+      ['ADMIN'],
+    );
 
     const folderRes = await request(app.getHttpServer())
-        .post('/materials/folders')
-        .set('Authorization', `Bearer ${professor.token}`)
-        .send({ 
-          evaluationId: evaluation.id, 
-          name: 'Root Versioning', 
-          visibleFrom: new Date().toISOString() 
-        })
-        .expect(201);
-    
+      .post('/materials/folders')
+      .set('Authorization', `Bearer ${professor.token}`)
+      .send({
+        evaluationId: evaluation.id,
+        name: 'Root Versioning',
+        visibleFrom: new Date().toISOString(),
+      })
+      .expect(201);
+
     folderId = folderRes.body.data.id;
   });
 
@@ -100,86 +121,93 @@ describe('E2E: Versionado, Deduplicación e Integridad', () => {
 
   describe('Caso 1: Deduplicación (Ahorro de Espacio)', () => {
     it('Subir Archivo A (Original)', async () => {
-        const buffer = Buffer.from('%PDF-1.4 duplicate');
-        const res = await request(app.getHttpServer())
-            .post('/materials')
-            .set('Authorization', `Bearer ${professor.token}`)
-            .attach('file', buffer, 'original.pdf')
-            .field('materialFolderId', folderId)
-            .field('displayName', 'Original')
-            .expect(201);
-        
-        materialId = res.body.data.id;
-        originalFileResourceId = res.body.data.fileResourceId;
-        expect(originalFileResourceId).toBeDefined();
+      const buffer = Buffer.from('%PDF-1.4 duplicate');
+      const res = await request(app.getHttpServer())
+        .post('/materials')
+        .set('Authorization', `Bearer ${professor.token}`)
+        .attach('file', buffer, 'original.pdf')
+        .field('materialFolderId', folderId)
+        .field('displayName', 'Original')
+        .expect(201);
+
+      materialId = res.body.data.id;
+      originalFileResourceId = res.body.data.fileResourceId;
+      expect(originalFileResourceId).toBeDefined();
     });
 
     it('Subir Archivo B (Duplicado) -> Debe reutilizar FileResource', async () => {
-        const buffer = Buffer.from('%PDF-1.4 duplicate');
-        const res = await request(app.getHttpServer())
-            .post('/materials')
-            .set('Authorization', `Bearer ${professor.token}`)
-            .attach('file', buffer, 'copia.pdf')
-            .field('materialFolderId', folderId)
-            .field('displayName', 'Copia')
-            .expect(201);
-        
-        expect(res.body.data.fileResourceId).toBe(originalFileResourceId);
+      const buffer = Buffer.from('%PDF-1.4 duplicate');
+      const res = await request(app.getHttpServer())
+        .post('/materials')
+        .set('Authorization', `Bearer ${professor.token}`)
+        .attach('file', buffer, 'copia.pdf')
+        .field('materialFolderId', folderId)
+        .field('displayName', 'Copia')
+        .expect(201);
+
+      expect(res.body.data.fileResourceId).toBe(originalFileResourceId);
     });
   });
 
   describe('Caso 2: Versionado Explícito (Historial)', () => {
     it('Agregar Nueva Versión (v2) a Material Original', async () => {
-        const buffer = Buffer.from('%PDF-1.4 version2');
-        
-        const res = await request(app.getHttpServer())
-            .post(`/materials/${materialId}/versions`)
-            .set('Authorization', `Bearer ${professor.token}`)
-            .attach('file', buffer, 'v2.pdf')
-            .expect(201);
-        
-        expect(res.body.data.id).toBe(materialId);
+      const buffer = Buffer.from('%PDF-1.4 version2');
 
-        const mat = await dataSource.getRepository('Material').findOne({ 
-            where: { id: materialId }, 
-            relations: { fileVersion: true }
-        });
+      const res = await request(app.getHttpServer())
+        .post(`/materials/${materialId}/versions`)
+        .set('Authorization', `Bearer ${professor.token}`)
+        .attach('file', buffer, 'v2.pdf')
+        .expect(201);
 
-        expect(mat!.fileVersion.versionNumber).toBe(2);
+      expect(res.body.data.id).toBe(materialId);
+
+      const mat = await dataSource.getRepository('Material').findOne({
+        where: { id: materialId },
+        relations: { fileVersion: true },
+      });
+
+      expect(mat.fileVersion.versionNumber).toBe(2);
     });
   });
 
   describe('Caso 3: Integridad y Limpieza (Hard Delete)', () => {
     it('Hard Delete debe borrar el material y SU versión actual', async () => {
-        const reqRepo = dataSource.getRepository('DeletionRequest');
-        const statusRepo = dataSource.getRepository('DeletionRequestStatus');
-        const pending = await statusRepo.findOne({ where: { code: 'PENDING' } });
-        
-        const req = await reqRepo.save(reqRepo.create({
-            requestedById: professor.user.id,
-            deletionRequestStatusId: pending!.id,
-            entityType: 'material',
-            entityId: materialId,
-            reason: 'Test Cleanup',
-            createdAt: new Date(),
-            updatedAt: new Date()
-        }));
+      const reqRepo = dataSource.getRepository('DeletionRequest');
+      const statusRepo = dataSource.getRepository('DeletionRequestStatus');
+      const pending = await statusRepo.findOne({ where: { code: 'PENDING' } });
 
-        await request(app.getHttpServer())
-            .post(`/admin/materials/requests/${req.id}/review`)
-            .set('Authorization', `Bearer ${admin.token}`)
-            .send({ action: 'APPROVE' })
-            .expect(200);
+      const req = await reqRepo.save(
+        reqRepo.create({
+          requestedById: professor.user.id,
+          deletionRequestStatusId: pending.id,
+          entityType: 'material',
+          entityId: materialId,
+          reason: 'Test Cleanup',
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        }),
+      );
 
-        const sa = await seeder.createAuthenticatedUser(TestSeeder.generateUniqueEmail('sa_ver'), ['SUPER_ADMIN']);
-        
-        await request(app.getHttpServer())
-            .delete(`/admin/materials/${materialId}/hard-delete`)
-            .set('Authorization', `Bearer ${sa.token}`)
-            .expect(200);
+      await request(app.getHttpServer())
+        .post(`/admin/materials/requests/${req.id}/review`)
+        .set('Authorization', `Bearer ${admin.token}`)
+        .send({ action: 'APPROVE' })
+        .expect(200);
 
-        const mat = await dataSource.getRepository('Material').findOne({ where: { id: materialId } });
-        expect(mat).toBeNull();
+      const sa = await seeder.createAuthenticatedUser(
+        TestSeeder.generateUniqueEmail('sa_ver'),
+        ['SUPER_ADMIN'],
+      );
+
+      await request(app.getHttpServer())
+        .delete(`/admin/materials/${materialId}/hard-delete`)
+        .set('Authorization', `Bearer ${sa.token}`)
+        .expect(200);
+
+      const mat = await dataSource
+        .getRepository('Material')
+        .findOne({ where: { id: materialId } });
+      expect(mat).toBeNull();
     });
   });
 });

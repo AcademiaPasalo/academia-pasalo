@@ -43,9 +43,9 @@ import { UsersModule } from '@modules/users/users.module';
     AuditModule,
   ],
   controllers: [
-    MaterialsController, 
+    MaterialsController,
     MaterialFoldersController,
-    MaterialsAdminController
+    MaterialsAdminController,
   ],
   providers: [
     MaterialsService,

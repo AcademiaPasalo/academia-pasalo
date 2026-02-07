@@ -1,4 +1,8 @@
-import { Injectable, InternalServerErrorException, Logger } from '@nestjs/common';
+import {
+  Injectable,
+  InternalServerErrorException,
+  Logger,
+} from '@nestjs/common';
 import { SystemSettingRepository } from '@modules/settings/infrastructure/system-setting.repository';
 
 @Injectable()
@@ -25,7 +29,9 @@ export class SettingsService {
         key,
         timestamp: new Date().toISOString(),
       });
-      throw new InternalServerErrorException('Configuración del sistema incompleta');
+      throw new InternalServerErrorException(
+        'Configuración del sistema incompleta',
+      );
     }
 
     this.memoryCache.set(key, row.settingValue);
@@ -43,7 +49,9 @@ export class SettingsService {
         value: rawValue,
         timestamp: new Date().toISOString(),
       });
-      throw new InternalServerErrorException('Configuración del sistema inválida');
+      throw new InternalServerErrorException(
+        'Configuración del sistema inválida',
+      );
     }
 
     return value;

@@ -13,81 +13,114 @@ export class TestSeeder {
   private jwtService: JwtService;
   private cacheService: RedisCacheService;
 
-  constructor(private dataSource: DataSource, private app: INestApplication) {
+  constructor(
+    private dataSource: DataSource,
+    private app: INestApplication,
+  ) {
     this.jwtService = app.get(JwtService);
     this.cacheService = app.get(RedisCacheService);
   }
 
   private sleep(ms: number) {
-    return new Promise(resolve => setTimeout(resolve, ms));
+    return new Promise((resolve) => setTimeout(resolve, ms));
   }
 
   static generateUniqueEmail(prefix: string): string {
     return `${prefix}_${Date.now()}_${Math.floor(Math.random() * 10000)}@test.com`;
   }
 
-  async createCycle(code: string, start: string, end: string): Promise<AcademicCycle> {
+  async createCycle(
+    code: string,
+    start: string,
+    end: string,
+  ): Promise<AcademicCycle> {
     const repo = this.dataSource.getRepository(AcademicCycle);
-    return await repo.save(repo.create({ 
-      code, 
-      startDate: start, 
-      endDate: end,
-      createdAt: new Date() 
-    }));
+    return await repo.save(
+      repo.create({
+        code,
+        startDate: start,
+        endDate: end,
+        createdAt: new Date(),
+      }),
+    );
   }
 
   async createCourse(code: string, name: string): Promise<Course> {
     const typeRepo = this.dataSource.getRepository('CourseType');
     const levelRepo = this.dataSource.getRepository('CycleLevel');
-    
+
     let type = await typeRepo.findOne({ where: { code: 'REG' } });
-    if (!type) type = await typeRepo.save(typeRepo.create({ code: 'REG', name: 'Regular' }));
-    
+    if (!type)
+      type = await typeRepo.save(
+        typeRepo.create({ code: 'REG', name: 'Regular' }),
+      );
+
     let level = await levelRepo.findOne({ where: { levelNumber: 1 } });
-    if (!level) level = await levelRepo.save(levelRepo.create({ levelNumber: 1, name: 'L1' }));
+    if (!level)
+      level = await levelRepo.save(
+        levelRepo.create({ levelNumber: 1, name: 'L1' }),
+      );
 
     const repo = this.dataSource.getRepository(Course);
-    return await repo.save(repo.create({ 
-      code, 
-      name, 
-      courseTypeId: type.id, 
-      cycleLevelId: level.id,
-      createdAt: new Date()
-    }));
+    return await repo.save(
+      repo.create({
+        code,
+        name,
+        courseTypeId: type.id,
+        cycleLevelId: level.id,
+        createdAt: new Date(),
+      }),
+    );
   }
 
-  async linkCourseCycle(courseId: string, cycleId: string): Promise<CourseCycle> {
+  async linkCourseCycle(
+    courseId: string,
+    cycleId: string,
+  ): Promise<CourseCycle> {
     const repo = this.dataSource.getRepository(CourseCycle);
-    const existing = await repo.findOne({ where: { courseId, academicCycleId: cycleId } });
+    const existing = await repo.findOne({
+      where: { courseId, academicCycleId: cycleId },
+    });
     if (existing) return existing;
 
-    const courseCycle = await repo.save(repo.create({
-      courseId,
-      academicCycleId: cycleId
-    }));
+    const courseCycle = await repo.save(
+      repo.create({
+        courseId,
+        academicCycleId: cycleId,
+      }),
+    );
 
     const evalRepo = this.dataSource.getRepository(Evaluation);
     const typeRepo = this.dataSource.getRepository('EvaluationType');
-    
-    let bankType = await typeRepo.findOne({ where: { code: 'BANCO_ENUNCIADOS' } });
-    if (!bankType) bankType = await typeRepo.save(typeRepo.create({ code: 'BANCO_ENUNCIADOS', name: 'Banco' }));
 
-    const cycle = await this.dataSource.getRepository(AcademicCycle).findOne({ where: { id: cycleId } });
+    let bankType = await typeRepo.findOne({
+      where: { code: 'BANCO_ENUNCIADOS' },
+    });
+    if (!bankType)
+      bankType = await typeRepo.save(
+        typeRepo.create({ code: 'BANCO_ENUNCIADOS', name: 'Banco' }),
+      );
+
+    const cycle = await this.dataSource
+      .getRepository(AcademicCycle)
+      .findOne({ where: { id: cycleId } });
 
     if (cycle) {
-        await evalRepo.save(evalRepo.create({
-        courseCycleId: courseCycle.id,
-        evaluationTypeId: bankType.id,
-        number: 0,
-        startDate: cycle.startDate,
-        endDate: cycle.endDate
-        }));
+      await evalRepo.save(
+        evalRepo.create({
+          courseCycleId: courseCycle.id,
+          evaluationTypeId: bankType.id,
+          number: 0,
+          startDate: cycle.startDate,
+          endDate: cycle.endDate,
+        }),
+      );
     }
 
     const typeRepoEnroll = this.dataSource.getRepository('EnrollmentType');
     const types = [
       { code: 'FULL', name: 'Curso Completo' },
-      { code: 'PARTIAL', name: 'Por Evaluación' }
+      { code: 'PARTIAL', name: 'Por Evaluación' },
     ];
     for (const t of types) {
       const exists = await typeRepoEnroll.findOne({ where: { code: t.code } });
@@ -97,9 +130,13 @@ export class TestSeeder {
     }
 
     const statusRepo = this.dataSource.getRepository('EnrollmentStatus');
-    let activeStatus = await statusRepo.findOne({ where: { code: 'ACTIVE' } });
+    const activeStatus = await statusRepo.findOne({
+      where: { code: 'ACTIVE' },
+    });
     if (!activeStatus) {
-      await statusRepo.save(statusRepo.create({ code: 'ACTIVE', name: 'Matrícula Activa' }));
+      await statusRepo.save(
+        statusRepo.create({ code: 'ACTIVE', name: 'Matrícula Activa' }),
+      );
     }
 
     return courseCycle;
@@ -110,20 +147,31 @@ export class TestSeeder {
     const msRepo = this.dataSource.getRepository('MaterialStatus');
     const drsRepo = this.dataSource.getRepository('DeletionRequestStatus');
 
-    if (!await fsRepo.findOne({ where: { code: 'ACTIVE' } })) 
+    if (!(await fsRepo.findOne({ where: { code: 'ACTIVE' } })))
       await fsRepo.save(fsRepo.create({ code: 'ACTIVE', name: 'Activa' }));
-    
-    if (!await msRepo.findOne({ where: { code: 'ACTIVE' } })) 
+
+    if (!(await msRepo.findOne({ where: { code: 'ACTIVE' } })))
       await msRepo.save(msRepo.create({ code: 'ACTIVE', name: 'Activo' }));
 
-    if (!await drsRepo.findOne({ where: { code: 'PENDING' } })) 
-      await drsRepo.save(drsRepo.create({ code: 'PENDING', name: 'Pendiente' }));
+    if (!(await drsRepo.findOne({ where: { code: 'PENDING' } })))
+      await drsRepo.save(
+        drsRepo.create({ code: 'PENDING', name: 'Pendiente' }),
+      );
   }
 
-  async createEvaluation(courseCycleId: string, typeCode: string, number: number, start: string, end: string): Promise<Evaluation> {
+  async createEvaluation(
+    courseCycleId: string,
+    typeCode: string,
+    number: number,
+    start: string,
+    end: string,
+  ): Promise<Evaluation> {
     const typeRepo = this.dataSource.getRepository('EvaluationType');
     let type = await typeRepo.findOne({ where: { code: typeCode } });
-    if (!type) type = await typeRepo.save(typeRepo.create({ code: typeCode, name: typeCode }));
+    if (!type)
+      type = await typeRepo.save(
+        typeRepo.create({ code: typeCode, name: typeCode }),
+      );
 
     const repo = this.dataSource.getRepository(Evaluation);
     const evaluation = repo.create({
@@ -131,32 +179,47 @@ export class TestSeeder {
       evaluationTypeId: type.id,
       number,
       startDate: start,
-      endDate: end
+      endDate: end,
     });
     return await repo.save(evaluation);
   }
 
-  async createAuthenticatedUser(email: string, roles: string[] = ['STUDENT']): Promise<{ user: User; token: string }> {
+  async createAuthenticatedUser(
+    email: string,
+    roles: string[] = ['STUDENT'],
+  ): Promise<{ user: User; token: string }> {
     const userRepo = this.dataSource.getRepository(User);
     const roleRepo = this.dataSource.getRepository(Role);
-    
-    let user = await userRepo.findOne({ where: { email }, relations: { roles: true } });
-    
+
+    let user = await userRepo.findOne({
+      where: { email },
+      relations: { roles: true },
+    });
+
     if (!user) {
-      user = await userRepo.save(userRepo.create({ 
-        email, firstName: 'Test', photoSource: PhotoSource.NONE, createdAt: new Date() 
-      }));
+      user = await userRepo.save(
+        userRepo.create({
+          email,
+          firstName: 'Test',
+          photoSource: PhotoSource.NONE,
+          createdAt: new Date(),
+        }),
+      );
     }
 
     // 1. Limpieza absoluta de roles previos
-    await this.dataSource.query('DELETE FROM user_role WHERE user_id = ?', [user.id]);
+    await this.dataSource.query('DELETE FROM user_role WHERE user_id = ?', [
+      user.id,
+    ]);
 
     // 2. Asignar nuevos roles
     const userRoles: Role[] = [];
     for (const roleCode of roles) {
       let role = await roleRepo.findOne({ where: { code: roleCode } });
       if (!role) {
-        role = await roleRepo.save(roleRepo.create({ code: roleCode, name: roleCode }));
+        role = await roleRepo.save(
+          roleRepo.create({ code: roleCode, name: roleCode }),
+        );
       }
       userRoles.push(role);
     }
@@ -169,20 +232,25 @@ export class TestSeeder {
     // 4. Crear Sesión
     const statusRepo = this.dataSource.getRepository('SessionStatus');
     let activeStatus = await statusRepo.findOne({ where: { code: 'ACTIVE' } });
-    if (!activeStatus) activeStatus = await statusRepo.save(statusRepo.create({ code: 'ACTIVE', name: 'Active' }));
+    if (!activeStatus)
+      activeStatus = await statusRepo.save(
+        statusRepo.create({ code: 'ACTIVE', name: 'Active' }),
+      );
 
     const sessionRepo = this.dataSource.getRepository('UserSession');
-    const session = await sessionRepo.save(sessionRepo.create({
-      userId: user.id,
-      deviceId: 'device-' + Date.now(),
-      ipAddress: '127.0.0.1',
-      refreshTokenHash: 'hash-' + Date.now(),
-      sessionStatusId: activeStatus.id,
-      isActive: true,
-      expiresAt: new Date(Date.now() + 1000 * 60 * 60), 
-      lastActivityAt: new Date(),
-      createdAt: new Date()
-    }));
+    const session = await sessionRepo.save(
+      sessionRepo.create({
+        userId: user.id,
+        deviceId: 'device-' + Date.now(),
+        ipAddress: '127.0.0.1',
+        refreshTokenHash: 'hash-' + Date.now(),
+        sessionStatusId: activeStatus.id,
+        isActive: true,
+        expiresAt: new Date(Date.now() + 1000 * 60 * 60),
+        lastActivityAt: new Date(),
+        createdAt: new Date(),
+      }),
+    );
 
     // 5. Limpieza de Caché
     await this.cacheService.del(`cache:session:${session.id}:user`);
@@ -194,11 +262,11 @@ export class TestSeeder {
       email: user.email,
       roles: roles,
       activeRole: roles[0], // Default active role
-      sessionId: session.id
+      sessionId: session.id,
     };
-    
+
     const token = this.jwtService.sign(payload);
-    user.roles = roles.map(code => ({ code } as any));
+    user.roles = roles.map((code) => ({ code }) as any);
 
     return { user, token };
   }
@@ -207,9 +275,14 @@ export class TestSeeder {
     const repo = this.dataSource.getRepository(User);
     let user = await repo.findOne({ where: { email } });
     if (!user) {
-      user = await repo.save(repo.create({ 
-        email, firstName: 'Test', photoSource: PhotoSource.NONE, createdAt: new Date() 
-      }));
+      user = await repo.save(
+        repo.create({
+          email,
+          firstName: 'Test',
+          photoSource: PhotoSource.NONE,
+          createdAt: new Date(),
+        }),
+      );
     }
     return user;
   }

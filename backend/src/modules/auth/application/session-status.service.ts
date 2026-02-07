@@ -12,9 +12,14 @@ export type SessionStatusCode =
 export class SessionStatusService {
   private readonly cache = new Map<SessionStatusCode, string>();
 
-  constructor(private readonly sessionStatusRepository: SessionStatusRepository) {}
+  constructor(
+    private readonly sessionStatusRepository: SessionStatusRepository,
+  ) {}
 
-  async getIdByCode(code: SessionStatusCode, manager?: EntityManager): Promise<string> {
+  async getIdByCode(
+    code: SessionStatusCode,
+    manager?: EntityManager,
+  ): Promise<string> {
     const cached = this.cache.get(code);
     if (cached !== undefined) {
       return cached;
@@ -31,4 +36,3 @@ export class SessionStatusService {
     return status.id;
   }
 }
-

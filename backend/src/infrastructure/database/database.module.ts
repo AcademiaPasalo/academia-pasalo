@@ -21,10 +21,13 @@ import { technicalSettings } from '@config/technical-settings';
         retryAttempts: technicalSettings.database.typeorm.retryAttempts,
         retryDelay: technicalSettings.database.typeorm.retryDelayMs,
         extra: {
-          connectionLimit: technicalSettings.database.typeorm.pool.connectionLimit,
-          waitForConnections: technicalSettings.database.typeorm.pool.waitForConnections,
+          connectionLimit:
+            technicalSettings.database.typeorm.pool.connectionLimit,
+          waitForConnections:
+            technicalSettings.database.typeorm.pool.waitForConnections,
           queueLimit: technicalSettings.database.typeorm.pool.queueLimit,
-          connectTimeout: technicalSettings.database.typeorm.pool.connectTimeoutMs,
+          connectTimeout:
+            technicalSettings.database.typeorm.pool.connectTimeoutMs,
         },
       }),
     }),

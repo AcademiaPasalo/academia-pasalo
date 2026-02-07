@@ -40,23 +40,25 @@ describe('E2E: Gestión de Materiales y Seguridad', () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
     })
-    .overrideProvider(StorageService)
-    .useValue({
-      calculateHash: jest.fn().mockResolvedValue('mock-sha256-hash'),
-      saveFile: jest.fn().mockImplementation(async (name, buffer) => {
-         const tempPath = path.join(os.tmpdir(), name);
-         await fs.promises.writeFile(tempPath, buffer);
-         return tempPath;
-      }),
-      deleteFile: jest.fn().mockResolvedValue(undefined),
-      onModuleInit: jest.fn(),
-    })
-    .compile();
+      .overrideProvider(StorageService)
+      .useValue({
+        calculateHash: jest.fn().mockResolvedValue('mock-sha256-hash'),
+        saveFile: jest.fn().mockImplementation(async (name, buffer) => {
+          const tempPath = path.join(os.tmpdir(), name);
+          await fs.promises.writeFile(tempPath, buffer);
+          return tempPath;
+        }),
+        deleteFile: jest.fn().mockResolvedValue(undefined),
+        onModuleInit: jest.fn(),
+      })
+      .compile();
 
     app = moduleFixture.createNestApplication();
     app.setGlobalPrefix('api/v1');
-    app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
-    
+    app.useGlobalPipes(
+      new ValidationPipe({ whitelist: true, transform: true }),
+    );
+
     const reflector = app.get(Reflector);
     app.useGlobalInterceptors(new TransformInterceptor(reflector));
 
@@ -92,29 +94,58 @@ describe('E2E: Gestión de Materiales y Seguridad', () => {
     await dataSource.query('SET FOREIGN_KEY_CHECKS = 1');
 
     await seeder.ensureMaterialStatuses();
-    const cycle = await seeder.createCycle(`2026-MAT-${Date.now()}`, formatDate(now), formatDate(nextMonth));
-    const course = await seeder.createCourse(`MAT101-${Date.now()}`, 'Materiales 101');
+    const cycle = await seeder.createCycle(
+      `2026-MAT-${Date.now()}`,
+      formatDate(now),
+      formatDate(nextMonth),
+    );
+    const course = await seeder.createCourse(
+      `MAT101-${Date.now()}`,
+      'Materiales 101',
+    );
     courseCycle = await seeder.linkCourseCycle(course.id, cycle.id);
-    evaluation = await seeder.createEvaluation(courseCycle.id, 'PC', 1, formatDate(yesterday), formatDate(nextMonth));
+    evaluation = await seeder.createEvaluation(
+      courseCycle.id,
+      'PC',
+      1,
+      formatDate(yesterday),
+      formatDate(nextMonth),
+    );
 
-    admin = await seeder.createAuthenticatedUser(TestSeeder.generateUniqueEmail('admin_mat'), ['ADMIN']);
-    professor = await seeder.createAuthenticatedUser(TestSeeder.generateUniqueEmail('prof_mat'), ['PROFESSOR']);
-    
+    admin = await seeder.createAuthenticatedUser(
+      TestSeeder.generateUniqueEmail('admin_mat'),
+      ['ADMIN'],
+    );
+    professor = await seeder.createAuthenticatedUser(
+      TestSeeder.generateUniqueEmail('prof_mat'),
+      ['PROFESSOR'],
+    );
+
     // Asignar profesor al curso
     await dataSource.query(
       'INSERT INTO course_cycle_professor (course_cycle_id, professor_user_id, assigned_at) VALUES (?, ?, NOW())',
-      [courseCycle.id, professor.user.id]
+      [courseCycle.id, professor.user.id],
     );
 
-    const s1 = await seeder.createAuthenticatedUser(TestSeeder.generateUniqueEmail('student_ok'), ['STUDENT']);
+    const s1 = await seeder.createAuthenticatedUser(
+      TestSeeder.generateUniqueEmail('student_ok'),
+      ['STUDENT'],
+    );
     studentWithAccess = s1;
     await request(app.getHttpServer())
       .post('/api/v1/enrollments')
       .set('Authorization', `Bearer ${admin.token}`)
-      .send({ userId: s1.user.id, courseCycleId: courseCycle.id, enrollmentTypeCode: 'FULL' })
+      .send({
+        userId: s1.user.id,
+        courseCycleId: courseCycle.id,
+        enrollmentTypeCode: 'FULL',
+      })
       .expect(201);
 
-    studentWithoutAccess = await seeder.createAuthenticatedUser(TestSeeder.generateUniqueEmail('student_fail'), ['STUDENT']);
+    studentWithoutAccess = await seeder.createAuthenticatedUser(
+      TestSeeder.generateUniqueEmail('student_fail'),
+      ['STUDENT'],
+    );
   });
 
   afterAll(async () => {
@@ -132,7 +163,7 @@ describe('E2E: Gestión de Materiales y Seguridad', () => {
           visibleFrom: new Date().toISOString(),
         })
         .expect(201);
-      
+
       rootFolderId = res.body.data.id;
       expect(rootFolderId).toBeDefined();
     });
@@ -155,9 +186,21 @@ describe('E2E: Gestión de Materiales y Seguridad', () => {
     let otherCourseEvaluation: Evaluation;
 
     beforeAll(async () => {
-      const otherCourse = await seeder.createCourse(`OTHER-${Date.now()}`, 'Curso Ajeno');
-      const otherCC = await seeder.linkCourseCycle(otherCourse.id, courseCycle.academicCycleId);
-      otherCourseEvaluation = await seeder.createEvaluation(otherCC.id, 'PC', 1, formatDate(yesterday), formatDate(nextMonth));
+      const otherCourse = await seeder.createCourse(
+        `OTHER-${Date.now()}`,
+        'Curso Ajeno',
+      );
+      const otherCC = await seeder.linkCourseCycle(
+        otherCourse.id,
+        courseCycle.academicCycleId,
+      );
+      otherCourseEvaluation = await seeder.createEvaluation(
+        otherCC.id,
+        'PC',
+        1,
+        formatDate(yesterday),
+        formatDate(nextMonth),
+      );
 
       const future = new Date();
       future.setFullYear(now.getFullYear() + 1);
@@ -206,8 +249,11 @@ describe('E2E: Gestión de Materiales y Seguridad', () => {
 
     it('Estudiante con MATRÍCULA CANCELADA debe recibir 403', async () => {
       const enrollmentRepo = dataSource.getRepository('Enrollment');
-      const enrollment = await enrollmentRepo.findOne({ 
-        where: { userId: studentWithAccess.user.id, courseCycleId: courseCycle.id } 
+      const enrollment = await enrollmentRepo.findOne({
+        where: {
+          userId: studentWithAccess.user.id,
+          courseCycleId: courseCycle.id,
+        },
       });
       if (enrollment) {
         await enrollmentRepo.update(enrollment.id, { cancelledAt: new Date() });
@@ -215,7 +261,9 @@ describe('E2E: Gestión de Materiales y Seguridad', () => {
 
       // 2. IMPORTANTE: Invalidar el caché de acceso para que el sistema consulte la DB
       const cacheService = app.get(RedisCacheService);
-      await cacheService.del(`cache:access:user:${studentWithAccess.user.id}:eval:${evaluation.id}`);
+      await cacheService.del(
+        `cache:access:user:${studentWithAccess.user.id}:eval:${evaluation.id}`,
+      );
 
       // 3. Intentar ver carpetas (Debería fallar ahora que la matrícula está cancelada)
       await request(app.getHttpServer())

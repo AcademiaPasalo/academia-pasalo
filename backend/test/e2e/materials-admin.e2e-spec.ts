@@ -30,18 +30,20 @@ describe('E2E: Administración de Materiales (Aprobaciones y Limpieza)', () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
     })
-    .overrideProvider(StorageService)
-    .useValue({
-      calculateHash: jest.fn().mockResolvedValue('hash-admin-' + Date.now()),
-      saveFile: jest.fn().mockResolvedValue('/fake/path'),
-      deleteFile: jest.fn().mockResolvedValue(undefined),
-      onModuleInit: jest.fn(),
-    })
-    .compile();
+      .overrideProvider(StorageService)
+      .useValue({
+        calculateHash: jest.fn().mockResolvedValue('hash-admin-' + Date.now()),
+        saveFile: jest.fn().mockResolvedValue('/fake/path'),
+        deleteFile: jest.fn().mockResolvedValue(undefined),
+        onModuleInit: jest.fn(),
+      })
+      .compile();
 
     app = moduleFixture.createNestApplication();
     app.setGlobalPrefix('api/v1');
-    app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
+    app.useGlobalPipes(
+      new ValidationPipe({ whitelist: true, transform: true }),
+    );
     app.useGlobalInterceptors(new TransformInterceptor(app.get(Reflector)));
     await app.init();
 
@@ -57,39 +59,65 @@ describe('E2E: Administración de Materiales (Aprobaciones y Limpieza)', () => {
     await dataSource.query('SET FOREIGN_KEY_CHECKS = 1');
 
     await seeder.ensureMaterialStatuses();
-    const cycle = await seeder.createCycle(`2026-ADM-${Date.now()}`, '2026-01-01', '2026-12-31');
-    const course = await seeder.createCourse(`ADM101-${Date.now()}`, 'Admin 101');
+    const cycle = await seeder.createCycle(
+      `2026-ADM-${Date.now()}`,
+      '2026-01-01',
+      '2026-12-31',
+    );
+    const course = await seeder.createCourse(
+      `ADM101-${Date.now()}`,
+      'Admin 101',
+    );
     const courseCycle = await seeder.linkCourseCycle(course.id, cycle.id);
-    const evaluation = await seeder.createEvaluation(courseCycle.id, 'PC', 1, '2026-01-01', '2026-12-31');
+    const evaluation = await seeder.createEvaluation(
+      courseCycle.id,
+      'PC',
+      1,
+      '2026-01-01',
+      '2026-12-31',
+    );
 
-    professor = await seeder.createAuthenticatedUser(TestSeeder.generateUniqueEmail('prof_adm'), ['PROFESSOR']);
-    admin = await seeder.createAuthenticatedUser(TestSeeder.generateUniqueEmail('admin_adm'), ['ADMIN']);
-    superAdmin = await seeder.createAuthenticatedUser(TestSeeder.generateUniqueEmail('sa_adm'), ['SUPER_ADMIN']);
+    professor = await seeder.createAuthenticatedUser(
+      TestSeeder.generateUniqueEmail('prof_adm'),
+      ['PROFESSOR'],
+    );
+    admin = await seeder.createAuthenticatedUser(
+      TestSeeder.generateUniqueEmail('admin_adm'),
+      ['ADMIN'],
+    );
+    superAdmin = await seeder.createAuthenticatedUser(
+      TestSeeder.generateUniqueEmail('sa_adm'),
+      ['SUPER_ADMIN'],
+    );
 
     const folderRes = await request(app.getHttpServer())
-        .post('/api/v1/materials/folders')
-        .set('Authorization', `Bearer ${professor.token}`)
-        .send({ evaluationId: evaluation.id, name: 'Admin Root', visibleFrom: new Date().toISOString() })
-        .expect(201);
-    
+      .post('/api/v1/materials/folders')
+      .set('Authorization', `Bearer ${professor.token}`)
+      .send({
+        evaluationId: evaluation.id,
+        name: 'Admin Root',
+        visibleFrom: new Date().toISOString(),
+      })
+      .expect(201);
+
     folderId = folderRes.body.data.id;
 
     // Crear materiales con PDF válido
     const buffer = Buffer.from('%PDF-1.4 content');
     const res1 = await request(app.getHttpServer())
-        .post('/api/v1/materials')
-        .set('Authorization', `Bearer ${professor.token}`)
-        .attach('file', buffer, 'file1.pdf')
-        .field('materialFolderId', folderId)
-        .field('displayName', 'Material 1');
+      .post('/api/v1/materials')
+      .set('Authorization', `Bearer ${professor.token}`)
+      .attach('file', buffer, 'file1.pdf')
+      .field('materialFolderId', folderId)
+      .field('displayName', 'Material 1');
     materialToDeleteId = res1.body.data.id;
 
     const res2 = await request(app.getHttpServer())
-        .post('/api/v1/materials')
-        .set('Authorization', `Bearer ${professor.token}`)
-        .attach('file', buffer, 'file2.pdf')
-        .field('materialFolderId', folderId)
-        .field('displayName', 'Material 2');
+      .post('/api/v1/materials')
+      .set('Authorization', `Bearer ${professor.token}`)
+      .attach('file', buffer, 'file2.pdf')
+      .field('materialFolderId', folderId)
+      .field('displayName', 'Material 2');
     materialToKeepId = res2.body.data.id;
   });
 
@@ -99,52 +127,62 @@ describe('E2E: Administración de Materiales (Aprobaciones y Limpieza)', () => {
 
   describe('Fase 1: Solicitud y Listado', () => {
     it('Profesor solicita eliminación de material', async () => {
-        await request(app.getHttpServer())
-            .post('/api/v1/materials/request-deletion')
-            .set('Authorization', `Bearer ${professor.token}`)
-            .send({ entityType: 'material', entityId: materialToDeleteId, reason: 'Obsoleto' })
-            .expect(200);
-        
-        const req = await dataSource.getRepository('DeletionRequest').findOne({ where: { entityId: materialToDeleteId } });
-        requestIdToDelete = req!.id;
-        expect(requestIdToDelete).toBeDefined();
+      await request(app.getHttpServer())
+        .post('/api/v1/materials/request-deletion')
+        .set('Authorization', `Bearer ${professor.token}`)
+        .send({
+          entityType: 'material',
+          entityId: materialToDeleteId,
+          reason: 'Obsoleto',
+        })
+        .expect(200);
+
+      const req = await dataSource
+        .getRepository('DeletionRequest')
+        .findOne({ where: { entityId: materialToDeleteId } });
+      requestIdToDelete = req.id;
+      expect(requestIdToDelete).toBeDefined();
     });
 
     it('Admin puede ver solicitudes pendientes', async () => {
-        const res = await request(app.getHttpServer())
-            .get('/api/v1/admin/materials/requests/pending')
-            .set('Authorization', `Bearer ${admin.token}`)
-            .expect(200);
-        
-        expect(res.body.data.some((r: any) => r.id === requestIdToDelete)).toBe(true);
+      const res = await request(app.getHttpServer())
+        .get('/api/v1/admin/materials/requests/pending')
+        .set('Authorization', `Bearer ${admin.token}`)
+        .expect(200);
+
+      expect(res.body.data.some((r: any) => r.id === requestIdToDelete)).toBe(
+        true,
+      );
     });
   });
 
   describe('Fase 2: Aprobación y Rechazo', () => {
     it('Admin APRUEBA solicitud', async () => {
-        await request(app.getHttpServer())
-            .post(`/api/v1/admin/materials/requests/${requestIdToDelete}/review`)
-            .set('Authorization', `Bearer ${admin.token}`)
-            .send({ action: 'APPROVE', adminComment: 'OK' })
-            .expect(200);
+      await request(app.getHttpServer())
+        .post(`/api/v1/admin/materials/requests/${requestIdToDelete}/review`)
+        .set('Authorization', `Bearer ${admin.token}`)
+        .send({ action: 'APPROVE', adminComment: 'OK' })
+        .expect(200);
 
-        const mat = await dataSource.getRepository('Material').findOne({ 
-            where: { id: materialToDeleteId },
-            relations: { materialStatus: true }
-        });
-        expect(mat!.materialStatus.code).toBe('ARCHIVED');
+      const mat = await dataSource.getRepository('Material').findOne({
+        where: { id: materialToDeleteId },
+        relations: { materialStatus: true },
+      });
+      expect(mat.materialStatus.code).toBe('ARCHIVED');
     });
   });
 
   describe('Fase 3: Borrado Físico', () => {
     it('SuperAdmin puede borrar material ARCHIVADO', async () => {
-        await request(app.getHttpServer())
-            .delete(`/api/v1/admin/materials/${materialToDeleteId}/hard-delete`)
-            .set('Authorization', `Bearer ${superAdmin.token}`)
-            .expect(200);
+      await request(app.getHttpServer())
+        .delete(`/api/v1/admin/materials/${materialToDeleteId}/hard-delete`)
+        .set('Authorization', `Bearer ${superAdmin.token}`)
+        .expect(200);
 
-        const mat = await dataSource.getRepository('Material').findOne({ where: { id: materialToDeleteId } });
-        expect(mat).toBeNull();
+      const mat = await dataSource
+        .getRepository('Material')
+        .findOne({ where: { id: materialToDeleteId } });
+      expect(mat).toBeNull();
     });
   });
 });

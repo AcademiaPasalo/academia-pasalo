@@ -1,14 +1,24 @@
-import { Injectable, Logger, InternalServerErrorException } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  InternalServerErrorException,
+  OnApplicationBootstrap,
+} from '@nestjs/common';
 import { Workbook } from 'exceljs';
+import { InjectQueue } from '@nestjs/bullmq';
+import { Queue } from 'bullmq';
 import { AuditLogRepository } from '@modules/audit/infrastructure/audit-log.repository';
 import { AuditActionRepository } from '@modules/audit/infrastructure/audit-action.repository';
 import { SecurityEventRepository } from '@modules/auth/infrastructure/security-event.repository';
 import { AuditLog } from '@modules/audit/domain/audit-log.entity';
 import { UnifiedAuditHistoryDto } from '@modules/audit/dto/unified-audit-history.dto';
+import { QUEUES } from '@infrastructure/queue/queue.constants';
+import { JobScheduler } from '@infrastructure/queue/queue.interfaces';
+import { technicalSettings } from '@config/technical-settings';
 import type { EntityManager } from 'typeorm';
 
 @Injectable()
-export class AuditService {
+export class AuditService implements OnApplicationBootstrap {
   private readonly logger = new Logger(AuditService.name);
   private readonly actionIdCache = new Map<string, string>();
 
@@ -16,7 +26,60 @@ export class AuditService {
     private readonly auditLogRepository: AuditLogRepository,
     private readonly auditActionRepository: AuditActionRepository,
     private readonly securityEventRepository: SecurityEventRepository,
+    @InjectQueue(QUEUES.AUDIT) private readonly auditQueue: Queue,
   ) {}
+
+  async onApplicationBootstrap() {
+    await this.setupRepeatableJobs();
+  }
+
+  private async setupRepeatableJobs() {
+    const jobName = 'cleanup-old-logs';
+    const cronPattern = technicalSettings.audit.cleanupCronPattern;
+
+    const schedulers =
+      (await this.auditQueue.getJobSchedulers()) as unknown as JobScheduler[];
+    const existingScheduler = schedulers.find((s) => s.name === jobName);
+
+    if (existingScheduler) {
+      const currentPattern =
+        existingScheduler.cron || existingScheduler.pattern;
+
+      if (currentPattern !== cronPattern) {
+        this.logger.log({
+          context: AuditService.name,
+          message:
+            'Detectado cambio en el patrón de horario. Actualizando Redis...',
+          oldPattern: currentPattern,
+          newPattern: cronPattern,
+        });
+
+        await this.auditQueue.removeJobScheduler(jobName);
+        await this.auditQueue.add(
+          jobName,
+          {},
+          {
+            repeat: { pattern: cronPattern },
+          },
+        );
+      }
+    } else {
+      await this.auditQueue.add(
+        jobName,
+        {},
+        {
+          repeat: { pattern: cronPattern },
+        },
+      );
+
+      this.logger.log({
+        context: AuditService.name,
+        message: 'Tarea repetitiva de limpieza registrada por primera vez',
+        job: jobName,
+        pattern: cronPattern,
+      });
+    }
+  }
 
   async logAction(
     userId: string,
@@ -28,30 +91,38 @@ export class AuditService {
     let actionId = this.actionIdCache.get(actionCode);
 
     if (!actionId) {
-      const action = await this.auditActionRepository.findByCode(actionCode, manager);
-      
+      const action = await this.auditActionRepository.findByCode(
+        actionCode,
+        manager,
+      );
+
       if (!action) {
-        this.logger.error(JSON.stringify({
-          level: 'error',
+        this.logger.error({
           context: AuditService.name,
-          message: 'Crítico: El código de acción de auditoría no está configurado en la BD',
+          message:
+            'Crítico: El código de acción de auditoría no está configurado en la BD',
           actionCode,
           userId,
-        }));
-        throw new InternalServerErrorException('Error de integridad: Código de auditoría no válido');
+        });
+        throw new InternalServerErrorException(
+          'Error de integridad: Código de auditoría no válido',
+        );
       }
-      
+
       actionId = action.id;
       this.actionIdCache.set(actionCode, actionId);
     }
 
-    const log = await this.auditLogRepository.create({
-      userId,
-      auditActionId: actionId,
-      eventDatetime: new Date(),
-      entityType: entityType || null,
-      entityId: entityId || null,
-    }, manager);
+    const log = await this.auditLogRepository.create(
+      {
+        userId,
+        auditActionId: actionId,
+        eventDatetime: new Date(),
+        entityType: entityType || null,
+        entityId: entityId || null,
+      },
+      manager,
+    );
 
     return log;
   }
@@ -70,8 +141,10 @@ export class AuditService {
       endDate: filters.endDate ? new Date(filters.endDate) : undefined,
       userId: filters.userId,
     };
-    
-    const safeLimit = filters.limit ? Math.min(filters.limit, maxAllowedLimit) : 50; 
+
+    const safeLimit = filters.limit
+      ? Math.min(filters.limit, maxAllowedLimit)
+      : 50;
 
     const [securityEvents, auditLogs] = await Promise.all([
       this.securityEventRepository.findAll(parsedFilters, safeLimit),
@@ -83,7 +156,9 @@ export class AuditService {
         id: `sec-${e.id}`,
         datetime: e.eventDatetime,
         userId: e.userId,
-        userName: e.user ? `${e.user.firstName} ${e.user.lastName1 || ''}`.trim() : 'Usuario',
+        userName: e.user
+          ? `${e.user.firstName} ${e.user.lastName1 || ''}`.trim()
+          : 'Usuario',
         actionCode: e.securityEventType?.code || 'UNKNOWN',
         actionName: e.securityEventType?.name || 'Evento Seguridad',
         source: 'SECURITY' as const,
@@ -95,7 +170,9 @@ export class AuditService {
         id: `aud-${l.id}`,
         datetime: l.eventDatetime,
         userId: l.userId,
-        userName: l.user ? `${l.user.firstName} ${l.user.lastName1 || ''}`.trim() : 'Usuario',
+        userName: l.user
+          ? `${l.user.firstName} ${l.user.lastName1 || ''}`.trim()
+          : 'Usuario',
         actionCode: l.auditAction?.code || 'UNKNOWN',
         actionName: l.auditAction?.name || 'Acción Sistema',
         source: 'AUDIT' as const,
@@ -118,7 +195,7 @@ export class AuditService {
       { ...filters, limit: 1000 },
       1000,
     );
-    
+
     const workbook = new Workbook();
     const worksheet = workbook.addWorksheet('Historial');
 

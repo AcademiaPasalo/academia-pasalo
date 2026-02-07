@@ -119,8 +119,8 @@ describe('Profile Switching (e2e)', () => {
         };
       }
       if (userId === singleRoleUser.id && roleId === mockRoleTeacher.id) {
-         // Should throw in service, but mocked here for success path or manual throw check
-         throw new Error('Unauthorized');
+        // Should throw in service, but mocked here for success path or manual throw check
+        throw new Error('Unauthorized');
       }
       return { accessToken: 'token', refreshToken: 'token' };
     }),
@@ -129,27 +129,27 @@ describe('Profile Switching (e2e)', () => {
 
   // Real TokenService to generate valid JWTs for the guard
   const tokenServiceMock = {
-      generateAccessToken: jest.fn(),
-      generateRefreshToken: jest.fn(),
-  }
+    generateAccessToken: jest.fn(),
+    generateRefreshToken: jest.fn(),
+  };
 
   const userSessionRepositoryMock = {
     findByIdWithUser: jest.fn(async (sessionId) => {
-        let user = multiRoleUser; 
-        if(sessionId.includes('single')) user = singleRoleUser;
+      let user = multiRoleUser;
+      if (sessionId.includes('single')) user = singleRoleUser;
 
-        let activeRoleId = user.lastActiveRoleId;
-        if(sessionId.includes('teacher')) activeRoleId = mockRoleTeacher.id;
+      let activeRoleId = user.lastActiveRoleId;
+      if (sessionId.includes('teacher')) activeRoleId = mockRoleTeacher.id;
 
-        return {
-            id: sessionId,
-            isActive: true,
-            sessionStatusId: '1',
-            activeRoleId: activeRoleId,
-            expiresAt: new Date(Date.now() + 3600000),
-            user: user
-        }
-    })
+      return {
+        id: sessionId,
+        isActive: true,
+        sessionStatusId: '1',
+        activeRoleId: activeRoleId,
+        expiresAt: new Date(Date.now() + 3600000),
+        user: user,
+      };
+    }),
   };
 
   beforeAll(async () => {
@@ -173,28 +173,34 @@ describe('Profile Switching (e2e)', () => {
         {
           provide: ConfigService,
           useValue: {
-            get: (key: string) => (key === 'JWT_SECRET' ? JWT_SECRET : undefined),
+            get: (key: string) =>
+              key === 'JWT_SECRET' ? JWT_SECRET : undefined,
           },
         },
         { provide: UsersService, useValue: usersServiceMock },
         { provide: AuthService, useValue: authServiceMock },
         { provide: DataSource, useValue: dataSourceMock },
-        { provide: UserSessionRepository, useValue: userSessionRepositoryMock }, 
-        { provide: SessionStatusService, useValue: { getIdByCode: jest.fn().mockResolvedValue('1') } },
+        { provide: UserSessionRepository, useValue: userSessionRepositoryMock },
         {
-            provide: RedisCacheService,
-            useValue: {
-              get: jest.fn().mockResolvedValue(null),
-              set: jest.fn().mockResolvedValue(undefined),
-              del: jest.fn().mockResolvedValue(undefined),
-            },
+          provide: SessionStatusService,
+          useValue: { getIdByCode: jest.fn().mockResolvedValue('1') },
+        },
+        {
+          provide: RedisCacheService,
+          useValue: {
+            get: jest.fn().mockResolvedValue(null),
+            set: jest.fn().mockResolvedValue(undefined),
+            del: jest.fn().mockResolvedValue(undefined),
+          },
         },
       ],
     }).compile();
 
     app = moduleRef.createNestApplication();
     app.setGlobalPrefix('api/v1');
-    app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
+    app.useGlobalPipes(
+      new ValidationPipe({ whitelist: true, transform: true }),
+    );
 
     const httpAdapterHost = app.get(HttpAdapterHost);
     const reflector = app.get(Reflector);
@@ -222,7 +228,7 @@ describe('Profile Switching (e2e)', () => {
   describe('POST /auth/switch-profile', () => {
     it('should successfully switch profile when user has the role', async () => {
       const token = signToken(multiRoleUser, 'STUDENT', 'session-1');
-      
+
       const response = await request(app.getHttpServer())
         .post('/api/v1/auth/switch-profile')
         .set('Authorization', `Bearer ${token}`)
@@ -247,21 +253,21 @@ describe('Profile Switching (e2e)', () => {
         .post('/api/v1/auth/switch-profile')
         .set('Authorization', `Bearer invalid-token`)
         .send({
-            roleId: mockRoleTeacher.id,
-            deviceId: 'device-123',
+          roleId: mockRoleTeacher.id,
+          deviceId: 'device-123',
         })
         .expect(401);
     });
 
-    // Note: Logic inside AuthService.switchProfile checks if user has role. 
+    // Note: Logic inside AuthService.switchProfile checks if user has role.
     // Since we mocked AuthService, we simulate the failure or trust the service unit tests.
     // However, if we want to test the flow reaching the service:
-    
+
     it('should be protected by Guard (requires valid login)', async () => {
-        await request(app.getHttpServer())
-          .post('/api/v1/auth/switch-profile')
-          .send({ roleId: '1', deviceId: '1' })
-          .expect(401);
+      await request(app.getHttpServer())
+        .post('/api/v1/auth/switch-profile')
+        .send({ roleId: '1', deviceId: '1' })
+        .expect(401);
     });
   });
 });

@@ -1,6 +1,9 @@
 import { Injectable, Logger } from '@nestjs/common';
 import * as geoip from 'geoip-lite';
-import { GeoProvider, GeoLocationResult } from '@common/interfaces/geo-provider.interface';
+import {
+  GeoProvider,
+  GeoLocationResult,
+} from '@common/interfaces/geo-provider.interface';
 
 @Injectable()
 export class GeoIpLiteService implements GeoProvider {
@@ -12,7 +15,7 @@ export class GeoIpLiteService implements GeoProvider {
       if (process.env.MOCK_GEO_ENABLED === 'true') {
         const mockLat = parseFloat(process.env.MOCK_GEO_LAT || '0');
         const mockLon = parseFloat(process.env.MOCK_GEO_LON || '0');
-        
+
         this.logger.debug(
           `Local IP detected. Using .env MOCK coordinates: [${mockLat}, ${mockLon}]`,
         );

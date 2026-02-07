@@ -11,7 +11,10 @@ export class AuditActionRepository {
     private readonly repository: Repository<AuditAction>,
   ) {}
 
-  async findByCode(code: string, manager?: EntityManager): Promise<AuditAction | null> {
+  async findByCode(
+    code: string,
+    manager?: EntityManager,
+  ): Promise<AuditAction | null> {
     const repo = manager ? manager.getRepository(AuditAction) : this.repository;
     return await repo.findOne({ where: { code } });
   }

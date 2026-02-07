@@ -1,4 +1,9 @@
-import { Injectable, Logger, OnModuleInit, InternalServerErrorException } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  OnModuleInit,
+  InternalServerErrorException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as fs from 'fs/promises';
 import * as path from 'path';
@@ -10,7 +15,10 @@ export class StorageService implements OnModuleInit {
   private readonly storageRoot: string;
 
   constructor(private readonly configService: ConfigService) {
-    this.storageRoot = this.configService.get<string>('STORAGE_PATH', path.join(process.cwd(), 'uploads'));
+    this.storageRoot = this.configService.get<string>(
+      'STORAGE_PATH',
+      path.join(process.cwd(), 'uploads'),
+    );
   }
 
   async onModuleInit() {
@@ -27,7 +35,9 @@ export class StorageService implements OnModuleInit {
         error: error instanceof Error ? error.message : 'Unknown error',
         timestamp: new Date().toISOString(),
       });
-      throw new InternalServerErrorException('Error crítico de infraestructura de almacenamiento.');
+      throw new InternalServerErrorException(
+        'Error crítico de infraestructura de almacenamiento.',
+      );
     }
   }
 
@@ -47,7 +57,9 @@ export class StorageService implements OnModuleInit {
         error: error instanceof Error ? error.message : 'Unknown error',
         timestamp: new Date().toISOString(),
       });
-      throw new InternalServerErrorException('No se pudo persistir el archivo en el servidor.');
+      throw new InternalServerErrorException(
+        'No se pudo persistir el archivo en el servidor.',
+      );
     }
   }
 

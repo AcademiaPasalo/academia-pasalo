@@ -1,5 +1,9 @@
 import { Controller, Get } from '@nestjs/common';
-import { HealthCheck, HealthCheckService, TypeOrmHealthIndicator } from '@nestjs/terminus';
+import {
+  HealthCheck,
+  HealthCheckService,
+  TypeOrmHealthIndicator,
+} from '@nestjs/terminus';
 import { RedisCacheService } from '@infrastructure/cache/redis-cache.service';
 
 @Controller('health')
@@ -22,7 +26,12 @@ export class HealthController {
           if (result !== 'ok') throw new Error('Redis check failed');
           return { redis: { status: 'up' } };
         } catch (error) {
-          return { redis: { status: 'down', error: error instanceof Error ? error.message : 'Unknown error' } };
+          return {
+            redis: {
+              status: 'down',
+              error: error instanceof Error ? error.message : 'Unknown error',
+            },
+          };
         }
       },
     ]);

@@ -35,10 +35,18 @@ export class AuthController {
     @Body() googleLoginDto: GoogleLoginDto,
     @Req() request: express.Request,
   ) {
-    const metadata = this.extractRequestMetadata(request, googleLoginDto.deviceId);
+    const metadata = this.extractRequestMetadata(
+      request,
+      googleLoginDto.deviceId,
+    );
 
-    const { accessToken, refreshToken, user, sessionStatus, concurrentSessionId } =
-      await this.authService.loginWithGoogle(googleLoginDto.code, metadata);
+    const {
+      accessToken,
+      refreshToken,
+      user,
+      sessionStatus,
+      concurrentSessionId,
+    } = await this.authService.loginWithGoogle(googleLoginDto.code, metadata);
 
     const userResponse = plainToInstance(UserResponseDto, user, {
       excludeExtraneousValues: true,
@@ -74,7 +82,7 @@ export class AuthController {
         accessToken,
         refreshToken,
         expiresIn: technicalSettings.auth.tokens.authResponseExpiresInSeconds,
-        user: null, 
+        user: null,
       },
       { excludeExtraneousValues: true },
     );
@@ -108,11 +116,11 @@ export class AuthController {
 
     const { accessToken, refreshToken, expiresIn } =
       await this.authService.reauthAnomalousSession(
-      reauthDto.code,
-      reauthDto.refreshToken,
-      reauthDto.deviceId,
-      metadata,
-    );
+        reauthDto.code,
+        reauthDto.refreshToken,
+        reauthDto.deviceId,
+        metadata,
+      );
 
     return plainToInstance(
       AuthResponseDto,
@@ -145,7 +153,10 @@ export class AuthController {
     @Body() switchProfileDto: SwitchProfileDto,
     @Req() request: express.Request,
   ) {
-    const metadata = this.extractRequestMetadata(request, switchProfileDto.deviceId);
+    const metadata = this.extractRequestMetadata(
+      request,
+      switchProfileDto.deviceId,
+    );
 
     const { accessToken, refreshToken } = await this.authService.switchProfile(
       user.id,
@@ -166,7 +177,10 @@ export class AuthController {
     );
   }
 
-  private extractRequestMetadata(request: express.Request, deviceId: string): RequestMetadata {
+  private extractRequestMetadata(
+    request: express.Request,
+    deviceId: string,
+  ): RequestMetadata {
     const ipAddress =
       (request.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() ||
       request.socket.remoteAddress ||

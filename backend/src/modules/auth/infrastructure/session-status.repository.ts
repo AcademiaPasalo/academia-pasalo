@@ -15,11 +15,13 @@ export class SessionStatusRepository {
     return manager ? manager.getRepository(SessionStatus) : this.ormRepository;
   }
 
-  async findByCode(code: string, manager?: EntityManager): Promise<SessionStatus | null> {
+  async findByCode(
+    code: string,
+    manager?: EntityManager,
+  ): Promise<SessionStatus | null> {
     const repo = this.getRepository(manager);
     return await repo.findOne({
       where: { code },
     });
   }
 }
-

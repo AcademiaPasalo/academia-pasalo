@@ -185,7 +185,7 @@ describe('SettingsService', () => {
     it('no debe afectar otros settings cacheados', async () => {
       const setting1 = mockSetting('KEY_1', 'value1');
       const setting2 = mockSetting('KEY_2', 'value2');
-      
+
       repository.findByKey
         .mockResolvedValueOnce(setting1)
         .mockResolvedValueOnce(setting2)
@@ -208,7 +208,7 @@ describe('SettingsService', () => {
       const setting1 = mockSetting('KEY_1', 'value1');
       const setting2 = mockSetting('KEY_2', 'value2');
       const setting3 = mockSetting('KEY_3', 'value3');
-      
+
       repository.findByKey
         .mockResolvedValueOnce(setting1)
         .mockResolvedValueOnce(setting2)

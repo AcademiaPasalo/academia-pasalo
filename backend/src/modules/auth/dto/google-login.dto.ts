@@ -8,6 +8,8 @@ export class GoogleLoginDto {
 
   @IsNotEmpty({ message: 'El ID del dispositivo es requerido' })
   @IsString({ message: 'El ID del dispositivo debe ser una cadena de texto' })
-  @MaxLength(255, { message: 'El ID del dispositivo excede el tamaño máximo permitido' })
+  @MaxLength(255, {
+    message: 'El ID del dispositivo excede el tamaño máximo permitido',
+  })
   deviceId: string;
 }

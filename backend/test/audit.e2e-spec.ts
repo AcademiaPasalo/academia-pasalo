@@ -22,7 +22,7 @@ describe('AuditController (e2e)', () => {
     }).compile();
 
     app = moduleFixture.createNestApplication();
-    
+
     app.setGlobalPrefix('api/v1');
     app.useGlobalPipes(
       new ValidationPipe({
@@ -43,7 +43,9 @@ describe('AuditController (e2e)', () => {
     seeder = new TestSeeder(dataSource, app);
 
     // Crear un usuario ADMIN real con sesión activa en DB
-    const auth = await seeder.createAuthenticatedUser('admin-audit@test.com', ['ADMIN']);
+    const auth = await seeder.createAuthenticatedUser('admin-audit@test.com', [
+      'ADMIN',
+    ]);
     accessToken = auth.token;
   });
 
@@ -92,8 +94,12 @@ describe('AuditController (e2e)', () => {
       })
       .expect(200);
 
-    expect(response.header['content-type']).toBe('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-    expect(response.header['content-disposition']).toContain('attachment; filename=reporte-auditoria');
+    expect(response.header['content-type']).toBe(
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    );
+    expect(response.header['content-disposition']).toContain(
+      'attachment; filename=reporte-auditoria',
+    );
     expect(Buffer.isBuffer(response.body)).toBe(true);
     expect(response.body.length).toBeGreaterThan(0);
   });

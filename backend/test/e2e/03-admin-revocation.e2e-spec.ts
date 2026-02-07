@@ -34,7 +34,9 @@ describe('E2E: Revocación Administrativa', () => {
     }).compile();
 
     app = moduleFixture.createNestApplication();
-    app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
+    app.useGlobalPipes(
+      new ValidationPipe({ whitelist: true, transform: true }),
+    );
     await app.init();
 
     dataSource = app.get(DataSource);
@@ -42,10 +44,23 @@ describe('E2E: Revocación Administrativa', () => {
     seeder = new TestSeeder(dataSource, app);
 
     const uniqueSuffix = Date.now().toString();
-    const cycle = await seeder.createCycle(`2026-REV-${uniqueSuffix}`, formatDate(now), formatDate(nextMonth));
-    const course = await seeder.createCourse(`REV101_REV_${uniqueSuffix}`, 'Revocación Test');
+    const cycle = await seeder.createCycle(
+      `2026-REV-${uniqueSuffix}`,
+      formatDate(now),
+      formatDate(nextMonth),
+    );
+    const course = await seeder.createCourse(
+      `REV101_REV_${uniqueSuffix}`,
+      'Revocación Test',
+    );
     courseCycle = await seeder.linkCourseCycle(course.id, cycle.id);
-    pc1 = await seeder.createEvaluation(courseCycle.id, 'PC', 1, formatDate(yesterday), formatDate(nextMonth));
+    pc1 = await seeder.createEvaluation(
+      courseCycle.id,
+      'PC',
+      1,
+      formatDate(yesterday),
+      formatDate(nextMonth),
+    );
 
     const adminEmail = TestSeeder.generateUniqueEmail('admin_rev');
     const userTargetEmail = TestSeeder.generateUniqueEmail('target_rev');
@@ -60,7 +75,7 @@ describe('E2E: Revocación Administrativa', () => {
         userId: userTarget.id,
         courseCycleId: courseCycle.id,
         enrollmentTypeCode: 'PARTIAL',
-        evaluationIds: [pc1.id]
+        evaluationIds: [pc1.id],
       });
 
     enrollmentId = res.body.id; // Nota: El interceptor NO está activo en este test setup
@@ -73,10 +88,12 @@ describe('E2E: Revocación Administrativa', () => {
   it('Caso 1: Revocación Manual - Admin quita acceso a PC1', async () => {
     expect(await accessEngine.hasAccess(userTarget.id, pc1.id)).toBe(true);
 
-    await dataSource.getRepository('EnrollmentEvaluation').update(
-      { enrollmentId, evaluationId: pc1.id },
-      { isActive: false, revokedAt: new Date() }
-    );
+    await dataSource
+      .getRepository('EnrollmentEvaluation')
+      .update(
+        { enrollmentId, evaluationId: pc1.id },
+        { isActive: false, revokedAt: new Date() },
+      );
 
     const cacheService = app.get(RedisCacheService);
     await cacheService.del(`cache:access:user:${userTarget.id}:eval:${pc1.id}`);

@@ -1,4 +1,10 @@
-import { Injectable, NotFoundException, ConflictException, Logger, InternalServerErrorException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  ConflictException,
+  Logger,
+  InternalServerErrorException,
+} from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import { CourseRepository } from '@modules/courses/infrastructure/course.repository';
 import { CourseTypeRepository } from '@modules/courses/infrastructure/course-type.repository';
@@ -14,7 +20,10 @@ import { CycleLevel } from '@modules/courses/domain/cycle-level.entity';
 import { CourseCycle } from '@modules/courses/domain/course-cycle.entity';
 import { CreateCourseDto } from '@modules/courses/dto/create-course.dto';
 import { AssignCourseToCycleDto } from '@modules/courses/dto/assign-course-to-cycle.dto';
-import { CourseContentResponseDto, EvaluationStatusDto } from '@modules/courses/dto/course-content.dto';
+import {
+  CourseContentResponseDto,
+  EvaluationStatusDto,
+} from '@modules/courses/dto/course-content.dto';
 import { Evaluation } from '@modules/evaluations/domain/evaluation.entity';
 import { EnrollmentEvaluation } from '@modules/enrollments/domain/enrollment-evaluation.entity';
 
@@ -41,7 +50,10 @@ export class CoursesService {
     private readonly cacheService: RedisCacheService,
   ) {}
 
-  private getProfessorAssignmentCacheKey(courseCycleId: string, professorUserId: string): string {
+  private getProfessorAssignmentCacheKey(
+    courseCycleId: string,
+    professorUserId: string,
+  ): string {
     return `cache:cc-professor:cycle:${courseCycleId}:prof:${professorUserId}`;
   }
 
@@ -57,7 +69,9 @@ export class CoursesService {
         courseId: id,
         timestamp: new Date().toISOString(),
       });
-      throw new NotFoundException('La materia solicitada no se encuentra disponible.');
+      throw new NotFoundException(
+        'La materia solicitada no se encuentra disponible.',
+      );
     }
     return course;
   }
@@ -65,9 +79,11 @@ export class CoursesService {
   async create(dto: CreateCourseDto): Promise<Course> {
     const existing = await this.courseRepository.findByCode(dto.code);
     if (existing) {
-      throw new ConflictException('Ya existe una materia registrada con ese código.');
+      throw new ConflictException(
+        'Ya existe una materia registrada con ese código.',
+      );
     }
-    
+
     const course = await this.dataSource.transaction(async (manager) => {
       const repo = manager.getRepository(Course);
       const newCourse = repo.create({
@@ -86,36 +102,54 @@ export class CoursesService {
     const course = await this.findCourseById(dto.courseId);
     const cycle = await this.cyclesService.findOne(dto.academicCycleId);
 
-    const existing = await this.courseCycleRepository.findByCourseAndCycle(dto.courseId, dto.academicCycleId);
+    const existing = await this.courseCycleRepository.findByCourseAndCycle(
+      dto.courseId,
+      dto.academicCycleId,
+    );
     if (existing) {
-      throw new ConflictException('Esta materia ya se encuentra vinculada al ciclo seleccionado.');
+      throw new ConflictException(
+        'Esta materia ya se encuentra vinculada al ciclo seleccionado.',
+      );
     }
 
     return await this.dataSource.transaction(async (manager) => {
-      const courseCycle = await this.courseCycleRepository.create({
-        courseId: course.id,
-        academicCycleId: cycle.id,
-      }, manager);
+      const courseCycle = await this.courseCycleRepository.create(
+        {
+          courseId: course.id,
+          academicCycleId: cycle.id,
+        },
+        manager,
+      );
 
-      const bancoType = await this.evaluationRepository.findTypeByCode('BANCO_ENUNCIADOS', manager);
+      const bancoType = await this.evaluationRepository.findTypeByCode(
+        'BANCO_ENUNCIADOS',
+        manager,
+      );
       if (!bancoType) {
         this.logger.error({
-          message: 'Tipo de evaluación BANCO_ENUNCIADOS no configurado en el catálogo',
+          message:
+            'Tipo de evaluación BANCO_ENUNCIADOS no configurado en el catálogo',
           timestamp: new Date().toISOString(),
         });
-        throw new InternalServerErrorException('Error de configuración del sistema: Tipo de evaluación faltante.');
+        throw new InternalServerErrorException(
+          'Error de configuración del sistema: Tipo de evaluación faltante.',
+        );
       }
 
-      await this.evaluationRepository.create({
-        courseCycleId: courseCycle.id,
-        evaluationTypeId: bancoType.id,
-        number: 0,
-        startDate: cycle.startDate,
-        endDate: cycle.endDate,
-      }, manager);
+      await this.evaluationRepository.create(
+        {
+          courseCycleId: courseCycle.id,
+          evaluationTypeId: bancoType.id,
+          number: 0,
+          startDate: cycle.startDate,
+          endDate: cycle.endDate,
+        },
+        manager,
+      );
 
       this.logger.log({
-        message: 'Materia vinculada a ciclo exitosamente con Banco de Enunciados',
+        message:
+          'Materia vinculada a ciclo exitosamente con Banco de Enunciados',
         courseId: course.id,
         cycleId: cycle.id,
         courseCycleId: courseCycle.id,
@@ -126,31 +160,51 @@ export class CoursesService {
     });
   }
 
-  async assignProfessorToCourseCycle(courseCycleId: string, professorUserId: string): Promise<void> {
+  async assignProfessorToCourseCycle(
+    courseCycleId: string,
+    professorUserId: string,
+  ): Promise<void> {
     const cycle = await this.courseCycleRepository.findById(courseCycleId);
     if (!cycle) {
       throw new NotFoundException('Ciclo del curso no encontrado');
     }
 
     await this.dataSource.transaction(async (manager) => {
-      await this.courseCycleProfessorRepository.upsertAssign(courseCycleId, professorUserId, manager);
+      await this.courseCycleProfessorRepository.upsertAssign(
+        courseCycleId,
+        professorUserId,
+        manager,
+      );
     });
 
-    const cacheKey = this.getProfessorAssignmentCacheKey(courseCycleId, professorUserId);
+    const cacheKey = this.getProfessorAssignmentCacheKey(
+      courseCycleId,
+      professorUserId,
+    );
     await this.cacheService.del(cacheKey);
   }
 
-  async revokeProfessorFromCourseCycle(courseCycleId: string, professorUserId: string): Promise<void> {
+  async revokeProfessorFromCourseCycle(
+    courseCycleId: string,
+    professorUserId: string,
+  ): Promise<void> {
     const cycle = await this.courseCycleRepository.findById(courseCycleId);
     if (!cycle) {
       throw new NotFoundException('Ciclo del curso no encontrado');
     }
 
     await this.dataSource.transaction(async (manager) => {
-      await this.courseCycleProfessorRepository.revoke(courseCycleId, professorUserId, manager);
+      await this.courseCycleProfessorRepository.revoke(
+        courseCycleId,
+        professorUserId,
+        manager,
+      );
     });
 
-    const cacheKey = this.getProfessorAssignmentCacheKey(courseCycleId, professorUserId);
+    const cacheKey = this.getProfessorAssignmentCacheKey(
+      courseCycleId,
+      professorUserId,
+    );
     await this.cacheService.del(cacheKey);
   }
 
@@ -162,12 +216,15 @@ export class CoursesService {
     return await this.cycleLevelRepository.findAll();
   }
 
-  async getCourseContent(courseCycleId: string, userId: string): Promise<CourseContentResponseDto> {
+  async getCourseContent(
+    courseCycleId: string,
+    userId: string,
+  ): Promise<CourseContentResponseDto> {
     const cacheKey = `cache:content:cycle:${courseCycleId}:user:${userId}`;
-    
+
     let rawData = await this.cacheService.get<{
       cycle: CourseCycle;
-      evaluations: EvaluationWithAccess[]; 
+      evaluations: EvaluationWithAccess[];
     }>(cacheKey);
 
     if (!rawData) {
@@ -176,18 +233,27 @@ export class CoursesService {
         throw new NotFoundException('Ciclo del curso no encontrado');
       }
 
-      const fullCycle = await this.courseCycleRepository.findFullById(courseCycleId);
+      const fullCycle =
+        await this.courseCycleRepository.findFullById(courseCycleId);
       if (!fullCycle) throw new NotFoundException('Curso no encontrado');
 
-      const evaluations = await this.evaluationRepository.findAllWithUserAccess(courseCycleId, userId);
+      const evaluations = await this.evaluationRepository.findAllWithUserAccess(
+        courseCycleId,
+        userId,
+      );
 
-      rawData = { cycle: fullCycle, evaluations: evaluations as EvaluationWithAccess[] };
+      rawData = {
+        cycle: fullCycle,
+        evaluations: evaluations as EvaluationWithAccess[],
+      };
       await this.cacheService.set(cacheKey, rawData, this.CONTENT_CACHE_TTL);
     }
 
     const now = new Date();
     const cycleEndDate = new Date(rawData.cycle.academicCycle.endDate);
-    const isCurrent = now >= new Date(rawData.cycle.academicCycle.startDate) && now <= cycleEndDate;
+    const isCurrent =
+      now >= new Date(rawData.cycle.academicCycle.startDate) &&
+      now <= cycleEndDate;
 
     return {
       courseCycleId: rawData.cycle.id,
@@ -198,13 +264,14 @@ export class CoursesService {
       evaluations: rawData.evaluations.map((ev) => {
         const evStartDate = new Date(ev.startDate);
         const evEndDate = new Date(ev.endDate);
-        
-        const access = (ev.enrollmentEvaluations && ev.enrollmentEvaluations.length > 0) 
-          ? ev.enrollmentEvaluations[0] 
-          : null;
+
+        const access =
+          ev.enrollmentEvaluations && ev.enrollmentEvaluations.length > 0
+            ? ev.enrollmentEvaluations[0]
+            : null;
 
         const statusDto = new EvaluationStatusDto();
-        
+
         if (!access || !access.isActive) {
           statusDto.status = 'LOCKED';
           statusDto.hasAccess = false;

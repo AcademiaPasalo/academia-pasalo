@@ -1,4 +1,10 @@
-import { IsEnum, IsNotEmpty, IsString, IsOptional, MaxLength } from 'class-validator';
+import {
+  IsEnum,
+  IsNotEmpty,
+  IsString,
+  IsOptional,
+  MaxLength,
+} from 'class-validator';
 
 export enum DeletionReviewAction {
   APPROVE = 'APPROVE',

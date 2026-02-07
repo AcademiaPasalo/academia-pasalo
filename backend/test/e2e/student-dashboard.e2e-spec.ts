@@ -22,7 +22,9 @@ describe('E2E: Dashboard del Alumno (My Courses)', () => {
     }).compile();
 
     app = moduleFixture.createNestApplication();
-    app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
+    app.useGlobalPipes(
+      new ValidationPipe({ whitelist: true, transform: true }),
+    );
     app.useGlobalInterceptors(new TransformInterceptor(app.get(Reflector)));
     await app.init();
 
@@ -36,38 +38,62 @@ describe('E2E: Dashboard del Alumno (My Courses)', () => {
     await dataSource.query('DELETE FROM course_cycle');
     await dataSource.query('SET FOREIGN_KEY_CHECKS = 1');
 
-    admin = await seeder.createAuthenticatedUser(TestSeeder.generateUniqueEmail('admin_db'), ['ADMIN']);
-    student = await seeder.createAuthenticatedUser(TestSeeder.generateUniqueEmail('student_db'), ['STUDENT']);
+    admin = await seeder.createAuthenticatedUser(
+      TestSeeder.generateUniqueEmail('admin_db'),
+      ['ADMIN'],
+    );
+    student = await seeder.createAuthenticatedUser(
+      TestSeeder.generateUniqueEmail('student_db'),
+      ['STUDENT'],
+    );
 
-    const cycle = await seeder.createCycle('2026-I', '2026-01-01', '2026-06-30');
-    
+    const cycle = await seeder.createCycle(
+      '2026-I',
+      '2026-01-01',
+      '2026-06-30',
+    );
+
     const course1 = await seeder.createCourse('C1', 'Curso con 2 Profes');
     const course2 = await seeder.createCourse('C2', 'Curso con 1 Profe');
 
     const cc1 = await seeder.linkCourseCycle(course1.id, cycle.id);
     const cc2 = await seeder.linkCourseCycle(course2.id, cycle.id);
 
-    const prof1 = await seeder.createAuthenticatedUser(TestSeeder.generateUniqueEmail('p1'), ['PROFESSOR']);
-    const prof2 = await seeder.createAuthenticatedUser(TestSeeder.generateUniqueEmail('p2'), ['PROFESSOR']);
+    const prof1 = await seeder.createAuthenticatedUser(
+      TestSeeder.generateUniqueEmail('p1'),
+      ['PROFESSOR'],
+    );
+    const prof2 = await seeder.createAuthenticatedUser(
+      TestSeeder.generateUniqueEmail('p2'),
+      ['PROFESSOR'],
+    );
 
     await dataSource.query(
       `INSERT INTO course_cycle_professor (course_cycle_id, professor_user_id, assigned_at) VALUES (?, ?, ?), (?, ?, ?)`,
-      [cc1.id, prof1.user.id, new Date(), cc1.id, prof2.user.id, new Date()]
+      [cc1.id, prof1.user.id, new Date(), cc1.id, prof2.user.id, new Date()],
     );
     await dataSource.query(
       `INSERT INTO course_cycle_professor (course_cycle_id, professor_user_id, assigned_at) VALUES (?, ?, ?)`,
-      [cc2.id, prof1.user.id, new Date()]
+      [cc2.id, prof1.user.id, new Date()],
     );
 
     await request(app.getHttpServer())
       .post('/enrollments')
       .set('Authorization', `Bearer ${admin.token}`)
-      .send({ userId: student.user.id, courseCycleId: cc1.id, enrollmentTypeCode: 'FULL' });
+      .send({
+        userId: student.user.id,
+        courseCycleId: cc1.id,
+        enrollmentTypeCode: 'FULL',
+      });
 
     await request(app.getHttpServer())
       .post('/enrollments')
       .set('Authorization', `Bearer ${admin.token}`)
-      .send({ userId: student.user.id, courseCycleId: cc2.id, enrollmentTypeCode: 'FULL' });
+      .send({
+        userId: student.user.id,
+        courseCycleId: cc2.id,
+        enrollmentTypeCode: 'FULL',
+      });
   });
 
   afterAll(async () => {
@@ -83,11 +109,15 @@ describe('E2E: Dashboard del Alumno (My Courses)', () => {
     const data = res.body.data;
     expect(data).toHaveLength(2);
 
-    const courseWith2Prof = data.find((e: any) => e.courseCycle.course.code === 'C1');
+    const courseWith2Prof = data.find(
+      (e: any) => e.courseCycle.course.code === 'C1',
+    );
     expect(courseWith2Prof.courseCycle.professors).toHaveLength(2);
     expect(courseWith2Prof.courseCycle.academicCycle.isCurrent).toBe(true);
 
-    const courseWith1Prof = data.find((e: any) => e.courseCycle.course.code === 'C2');
+    const courseWith1Prof = data.find(
+      (e: any) => e.courseCycle.course.code === 'C2',
+    );
     expect(courseWith1Prof.courseCycle.professors).toHaveLength(1);
   });
 });

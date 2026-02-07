@@ -39,7 +39,8 @@ export class AllExceptionsFilter implements ExceptionFilter {
         message: 'Error crítico en la aplicación',
         path: responseBody.path,
         statusCode: httpStatus,
-        errorDetails: exception instanceof Error ? exception.message : String(exception),
+        errorDetails:
+          exception instanceof Error ? exception.message : String(exception),
         stack: exception instanceof Error ? exception.stack : undefined,
         timestamp: responseBody.timestamp,
       });

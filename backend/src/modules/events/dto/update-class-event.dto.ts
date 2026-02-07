@@ -1,4 +1,12 @@
-import { IsString, IsOptional, IsInt, IsDateString, Min, MaxLength, IsUrl } from 'class-validator';
+import {
+  IsString,
+  IsOptional,
+  IsInt,
+  IsDateString,
+  Min,
+  MaxLength,
+  IsUrl,
+} from 'class-validator';
 
 export class UpdateClassEventDto {
   @IsString()

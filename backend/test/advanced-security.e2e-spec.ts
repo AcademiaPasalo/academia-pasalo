@@ -76,11 +76,13 @@ describe('Advanced Security Scenarios (Offensive Testing)', () => {
   // ... (otros mocks)
 
   const mockAnomalyDetector = {
-    resolveCoordinates: jest.fn().mockImplementation((meta) => Promise.resolve({
-      metadata: meta,
-      locationSource: (meta.latitude && meta.longitude) ? 'gps' : 'ip'
-    })),
-    detectLocationAnomaly: jest.fn().mockResolvedValue({ isAnomalous: false })
+    resolveCoordinates: jest.fn().mockImplementation((meta) =>
+      Promise.resolve({
+        metadata: meta,
+        locationSource: meta.latitude && meta.longitude ? 'gps' : 'ip',
+      }),
+    ),
+    detectLocationAnomaly: jest.fn().mockResolvedValue({ isAnomalous: false }),
   };
 
   beforeEach(async () => {
@@ -100,14 +102,33 @@ describe('Advanced Security Scenarios (Offensive Testing)', () => {
         { provide: ConfigService, useValue: { get: () => 'secret' } },
         { provide: UsersService, useValue: mockUsersService },
         { provide: UserSessionRepository, useValue: mockUserSessionRepository },
-        { provide: SecurityEventRepository, useValue: { create: jest.fn().mockResolvedValue({ id: '999' }) } },
-        { provide: SecurityEventTypeRepository, useValue: { findByCode: jest.fn().mockResolvedValue({ id: 1 }) } },
-        { provide: SessionStatusRepository, useValue: { findByCode: jest.fn((code) => Promise.resolve({ id: code === 'ACTIVE' ? '1' : '2', code })) } },
-        { provide: SessionAnomalyDetectorService, useValue: mockAnomalyDetector },
-        { provide: SettingsService, useValue: {
-          getPositiveInt: jest.fn().mockResolvedValue(100),
-          getString: jest.fn().mockResolvedValue('CYCLE_X'),
-        } },
+        {
+          provide: SecurityEventRepository,
+          useValue: { create: jest.fn().mockResolvedValue({ id: '999' }) },
+        },
+        {
+          provide: SecurityEventTypeRepository,
+          useValue: { findByCode: jest.fn().mockResolvedValue({ id: 1 }) },
+        },
+        {
+          provide: SessionStatusRepository,
+          useValue: {
+            findByCode: jest.fn((code) =>
+              Promise.resolve({ id: code === 'ACTIVE' ? '1' : '2', code }),
+            ),
+          },
+        },
+        {
+          provide: SessionAnomalyDetectorService,
+          useValue: mockAnomalyDetector,
+        },
+        {
+          provide: SettingsService,
+          useValue: {
+            getPositiveInt: jest.fn().mockResolvedValue(100),
+            getString: jest.fn().mockResolvedValue('CYCLE_X'),
+          },
+        },
         { provide: GeoProvider, useValue: { resolve: jest.fn() } },
         {
           provide: RedisCacheService,
@@ -121,17 +142,24 @@ describe('Advanced Security Scenarios (Offensive Testing)', () => {
         {
           provide: TokenService,
           useValue: {
-            generateRefreshToken: jest.fn().mockResolvedValue({ token: 'new_rt', expiresAt: new Date() }),
+            generateRefreshToken: jest
+              .fn()
+              .mockResolvedValue({ token: 'new_rt', expiresAt: new Date() }),
             generateAccessToken: jest.fn().mockResolvedValue('new_at'),
             verifyRefreshToken: jest.fn((token) => {
-                if (token === 'zombie_token') return { sub: '100', deviceId: 'device-zombie' };
-                return { sub: '100', deviceId: 'device-original' };
+              if (token === 'zombie_token')
+                return { sub: '100', deviceId: 'device-zombie' };
+              return { sub: '100', deviceId: 'device-original' };
             }),
           },
         },
         {
           provide: GoogleProviderService,
-          useValue: { verifyCodeAndGetEmail: jest.fn().mockResolvedValue('victim@test.com') },
+          useValue: {
+            verifyCodeAndGetEmail: jest
+              .fn()
+              .mockResolvedValue('victim@test.com'),
+          },
         },
       ],
     }).compile();
@@ -148,11 +176,20 @@ describe('Advanced Security Scenarios (Offensive Testing)', () => {
         id: 'session-A',
         deviceId: 'device-original',
       });
-      mockUserSessionRepository.create.mockResolvedValue({ id: 'session-B', sessionStatusId: '2' }); // 2 = PENDING
+      mockUserSessionRepository.create.mockResolvedValue({
+        id: 'session-B',
+        sessionStatusId: '2',
+      }); // 2 = PENDING
 
       // Action: Login attempt from Device B (Roommate/Attacker) with SAME metadata
-      const attackMetadata = { ...mockMetadataBase, deviceId: 'device-roommate' };
-      const result = await authService.loginWithGoogle('auth-code', attackMetadata);
+      const attackMetadata = {
+        ...mockMetadataBase,
+        deviceId: 'device-roommate',
+      };
+      const result = await authService.loginWithGoogle(
+        'auth-code',
+        attackMetadata,
+      );
 
       // Assert: Must prompt for resolution, NOT block as anomalous travel
       expect(result.sessionStatus).toBe('PENDING_CONCURRENT_RESOLUTION');
@@ -163,21 +200,24 @@ describe('Advanced Security Scenarios (Offensive Testing)', () => {
 
   describe('Scenario 2: The Zombie Token Attack', () => {
     it('should REJECT refresh attempt with a token from a revoked session', async () => {
-        // Setup: A session that was valid but revoked in DB (e.g. by concurrency resolution)
-        const zombieRefreshToken = 'zombie_token';
-        
-        // Mock Session Service logic manually since we are testing AuthService flow interacting with it
-        // Or better, mock the `SessionService.validateRefreshTokenSession` to fail
-        // Since AuthService calls SessionService, let's look at how AuthService is built.
-        // It injects SessionService. We are using the REAL SessionService in this test module (unless overridden).
-        // Real SessionService calls UserSessionRepository.findByRefreshTokenHash.
-        
-        // Simulate DB returning NO session for this token (or is_active = false)
-        mockUserSessionRepository.findByRefreshTokenHash = jest.fn().mockResolvedValue(null); 
-        
-        // Assert
-        await expect(authService.refreshAccessToken(zombieRefreshToken, 'device-zombie'))
-            .rejects.toThrow(UnauthorizedException);
+      // Setup: A session that was valid but revoked in DB (e.g. by concurrency resolution)
+      const zombieRefreshToken = 'zombie_token';
+
+      // Mock Session Service logic manually since we are testing AuthService flow interacting with it
+      // Or better, mock the `SessionService.validateRefreshTokenSession` to fail
+      // Since AuthService calls SessionService, let's look at how AuthService is built.
+      // It injects SessionService. We are using the REAL SessionService in this test module (unless overridden).
+      // Real SessionService calls UserSessionRepository.findByRefreshTokenHash.
+
+      // Simulate DB returning NO session for this token (or is_active = false)
+      mockUserSessionRepository.findByRefreshTokenHash = jest
+        .fn()
+        .mockResolvedValue(null);
+
+      // Assert
+      await expect(
+        authService.refreshAccessToken(zombieRefreshToken, 'device-zombie'),
+      ).rejects.toThrow(UnauthorizedException);
     });
   });
 
@@ -187,16 +227,26 @@ describe('Advanced Security Scenarios (Offensive Testing)', () => {
       mockUserSessionRepository.findOtherActiveSession.mockResolvedValue(null);
       // Setup: Previous session was close (simulated by finding latest session)
       mockUserSessionRepository.findLatestSessionByUserId.mockResolvedValue({
-         id: 'prev-session',
-         ipAddress: '200.200.200.1', // Same IP
-         createdAt: new Date(),
+        id: 'prev-session',
+        ipAddress: '200.200.200.1', // Same IP
+        createdAt: new Date(),
       });
-      
-      mockUserSessionRepository.create.mockResolvedValue({ id: 'new-session', sessionStatusId: '1' });
+
+      mockUserSessionRepository.create.mockResolvedValue({
+        id: 'new-session',
+        sessionStatusId: '1',
+      });
 
       // Action: Login with NULL coordinates
-      const ghostMetadata = { ...mockMetadataBase, latitude: null, longitude: null };
-      const result = await authService.loginWithGoogle('auth-code', ghostMetadata);
+      const ghostMetadata = {
+        ...mockMetadataBase,
+        latitude: null,
+        longitude: null,
+      };
+      const result = await authService.loginWithGoogle(
+        'auth-code',
+        ghostMetadata,
+      );
 
       // Assert: Should proceed to ACTIVE (not crashed, not blocked)
       expect(result.sessionStatus).toBe('ACTIVE');

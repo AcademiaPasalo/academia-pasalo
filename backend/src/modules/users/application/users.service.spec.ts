@@ -1,16 +1,16 @@
-import { ConflictException } from "@nestjs/common";
-import { Test } from "@nestjs/testing";
-import type { EntityManager } from "typeorm";
-import { DataSource } from "typeorm";
+import { ConflictException } from '@nestjs/common';
+import { Test } from '@nestjs/testing';
+import type { EntityManager } from 'typeorm';
+import { DataSource } from 'typeorm';
 
-import { UsersService } from "@modules/users/application/users.service";
-import { UserRepository } from "@modules/users/infrastructure/user.repository";
-import { RoleRepository } from "@modules/users/infrastructure/role.repository";
-import { PhotoSource } from "@modules/users/domain/user.entity";
-import type { DatabaseError } from "@common/interfaces/database-error.interface";
-import { MySqlErrorCode } from "@common/interfaces/database-error.interface";
+import { UsersService } from '@modules/users/application/users.service';
+import { UserRepository } from '@modules/users/infrastructure/user.repository';
+import { RoleRepository } from '@modules/users/infrastructure/role.repository';
+import { PhotoSource } from '@modules/users/domain/user.entity';
+import type { DatabaseError } from '@common/interfaces/database-error.interface';
+import { MySqlErrorCode } from '@common/interfaces/database-error.interface';
 
-describe("UsersService", () => {
+describe('UsersService', () => {
   let usersService: UsersService;
 
   const dataSourceMock = {
@@ -49,11 +49,11 @@ describe("UsersService", () => {
     usersService = moduleRef.get(UsersService);
   });
 
-  it("assignRole: duplicate entry -> ConflictException", async () => {
+  it('assignRole: duplicate entry -> ConflictException', async () => {
     const user = {
-      id: "1",
-      email: "a@test.com",
-      firstName: "A",
+      id: '1',
+      email: 'a@test.com',
+      firstName: 'A',
       lastName1: null,
       lastName2: null,
       phone: null,
@@ -67,9 +67,9 @@ describe("UsersService", () => {
 
     userRepositoryMock.findById.mockResolvedValue(user);
     roleRepositoryMock.findByCode.mockResolvedValue({
-      id: "2",
-      code: "ADMIN",
-      name: "Admin",
+      id: '2',
+      code: 'ADMIN',
+      name: 'Admin',
     });
 
     const error: DatabaseError = {
@@ -77,9 +77,8 @@ describe("UsersService", () => {
     };
     userRepositoryMock.save.mockRejectedValue(error);
 
-    await expect(usersService.assignRole("1", "ADMIN")).rejects.toBeInstanceOf(
+    await expect(usersService.assignRole('1', 'ADMIN')).rejects.toBeInstanceOf(
       ConflictException,
     );
   });
 });
-

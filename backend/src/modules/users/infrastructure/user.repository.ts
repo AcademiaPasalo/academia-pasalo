@@ -41,7 +41,10 @@ export class UserRepository {
     });
   }
 
-  async findByEmail(email: string, manager?: EntityManager): Promise<User | null> {
+  async findByEmail(
+    email: string,
+    manager?: EntityManager,
+  ): Promise<User | null> {
     const repo = this.getRepository(manager);
     return await repo.findOne({
       where: { email },

@@ -11,9 +11,7 @@ export type SystemSettingKey =
 
 @Injectable()
 export class AuthSettingsService {
-  constructor(
-    private readonly settingsService: SettingsService,
-  ) {}
+  constructor(private readonly settingsService: SettingsService) {}
 
   async getActiveCycleId(): Promise<string> {
     return await this.settingsService.getString('ACTIVE_CYCLE_ID');
@@ -32,19 +30,27 @@ export class AuthSettingsService {
   }
 
   async getGeoGpsTimeWindowMinutes(): Promise<number> {
-    return await this.settingsService.getPositiveInt('GEO_GPS_ANOMALY_TIME_WINDOW_MINUTES');
+    return await this.settingsService.getPositiveInt(
+      'GEO_GPS_ANOMALY_TIME_WINDOW_MINUTES',
+    );
   }
 
   async getGeoGpsDistanceKm(): Promise<number> {
-    return await this.settingsService.getPositiveInt('GEO_GPS_ANOMALY_DISTANCE_KM');
+    return await this.settingsService.getPositiveInt(
+      'GEO_GPS_ANOMALY_DISTANCE_KM',
+    );
   }
 
   async getGeoIpTimeWindowMinutes(): Promise<number> {
-    return await this.settingsService.getPositiveInt('GEO_IP_ANOMALY_TIME_WINDOW_MINUTES');
+    return await this.settingsService.getPositiveInt(
+      'GEO_IP_ANOMALY_TIME_WINDOW_MINUTES',
+    );
   }
 
   async getGeoIpDistanceKm(): Promise<number> {
-    return await this.settingsService.getPositiveInt('GEO_IP_ANOMALY_DISTANCE_KM');
+    return await this.settingsService.getPositiveInt(
+      'GEO_IP_ANOMALY_DISTANCE_KM',
+    );
   }
 
   async invalidateCache(key: SystemSettingKey): Promise<void> {

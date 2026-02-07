@@ -1,5 +1,10 @@
 import { Logger } from '@nestjs/common';
-import { EntitySubscriberInterface, EventSubscriber, InsertEvent, DataSource } from 'typeorm';
+import {
+  EntitySubscriberInterface,
+  EventSubscriber,
+  InsertEvent,
+  DataSource,
+} from 'typeorm';
 import { Evaluation } from '@modules/evaluations/domain/evaluation.entity';
 import { Enrollment } from '@modules/enrollments/domain/enrollment.entity';
 import { EnrollmentEvaluation } from '@modules/enrollments/domain/enrollment-evaluation.entity';
@@ -31,7 +36,8 @@ export class EvaluationSubscriber implements EntitySubscriberInterface<Evaluatio
 
     if (!evaluationType) {
       this.logger.warn({
-        message: 'Tipo de evaluación no encontrado, omitiendo lógica del subscriber',
+        message:
+          'Tipo de evaluación no encontrado, omitiendo lógica del subscriber',
         evaluationTypeId: evaluation.evaluationTypeId,
         evaluationId: evaluation.id,
       });
@@ -44,7 +50,8 @@ export class EvaluationSubscriber implements EntitySubscriberInterface<Evaluatio
 
     if (!fullType) {
       this.logger.warn({
-        message: 'Tipo de matrícula FULL no encontrado, omitiendo lógica del subscriber',
+        message:
+          'Tipo de matrícula FULL no encontrado, omitiendo lógica del subscriber',
         evaluationId: evaluation.id,
       });
       return;

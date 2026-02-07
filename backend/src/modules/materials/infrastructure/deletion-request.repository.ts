@@ -28,9 +28,9 @@ export class DeletionRequestRepository {
   async findByStatusId(statusId: string): Promise<DeletionRequest[]> {
     return await this.ormRepository.find({
       where: { deletionRequestStatusId: statusId },
-      relations: { 
+      relations: {
         requestedBy: true,
-        deletionRequestStatus: true 
+        deletionRequestStatus: true,
       },
       order: { createdAt: 'ASC' },
     });

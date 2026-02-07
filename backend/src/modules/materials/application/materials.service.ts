@@ -32,7 +32,8 @@ import { technicalSettings } from '@config/technical-settings';
 @Injectable()
 export class MaterialsService {
   private readonly logger = new Logger(MaterialsService.name);
-  private readonly CACHE_TTL = technicalSettings.cache.materials.materialsExplorerCacheTtlSeconds;
+  private readonly CACHE_TTL =
+    technicalSettings.cache.materials.materialsExplorerCacheTtlSeconds;
 
   constructor(
     private readonly dataSource: DataSource,
@@ -49,12 +50,18 @@ export class MaterialsService {
     private readonly auditService: AuditService,
   ) {}
 
-  async createFolder(userId: string, dto: CreateMaterialFolderDto): Promise<MaterialFolder> {
+  async createFolder(
+    userId: string,
+    dto: CreateMaterialFolderDto,
+  ): Promise<MaterialFolder> {
     const activeStatus = await this.getActiveFolderStatus();
     const now = new Date();
 
     if (dto.parentFolderId) {
-      const parent = await this.validateParentFolder(dto.parentFolderId, dto.evaluationId);
+      const parent = await this.validateParentFolder(
+        dto.parentFolderId,
+        dto.evaluationId,
+      );
       if (!parent) throw new NotFoundException('Carpeta padre no encontrada');
     }
 
@@ -79,10 +86,15 @@ export class MaterialsService {
     return folder;
   }
 
-  async uploadMaterial(userId: string, dto: UploadMaterialDto, file: Express.Multer.File): Promise<Material> {
+  async uploadMaterial(
+    userId: string,
+    dto: UploadMaterialDto,
+    file: Express.Multer.File,
+  ): Promise<Material> {
     if (!file) throw new BadRequestException('Archivo requerido');
 
-    const allowedMimeTypes: readonly string[] = technicalSettings.uploads.materials.allowedMimeTypes;
+    const allowedMimeTypes: readonly string[] =
+      technicalSettings.uploads.materials.allowedMimeTypes;
 
     if (!allowedMimeTypes.includes(file.mimetype)) {
       throw new BadRequestException(
@@ -108,17 +120,24 @@ export class MaterialsService {
     try {
       const result = await this.dataSource.transaction(async (manager) => {
         const hash = await this.storageService.calculateHash(file.buffer);
-        const existingResource = await this.fileResourceRepository.findByHash(hash);
-        
+        const existingResource =
+          await this.fileResourceRepository.findByHash(hash);
+
         let finalResource: FileResource;
         let finalVersion: FileVersion;
 
         if (!existingResource) {
-          const sanitizedOriginalName = file.originalname.replace(/[^a-zA-Z0-9.-]/g, '_');
+          const sanitizedOriginalName = file.originalname.replace(
+            /[^a-zA-Z0-9.-]/g,
+            '_',
+          );
           const uniqueName = `${Date.now()}-${sanitizedOriginalName}`;
-          storagePath = await this.storageService.saveFile(uniqueName, file.buffer);
+          storagePath = await this.storageService.saveFile(
+            uniqueName,
+            file.buffer,
+          );
           isNewFile = true;
-          
+
           const resourceEntity = manager.create(FileResource, {
             checksumHash: hash,
             originalName: file.originalname,
@@ -139,10 +158,10 @@ export class MaterialsService {
           finalVersion = await manager.save(versionEntity);
         } else {
           finalResource = existingResource;
-          const version1 = await manager.findOne(FileVersion, { 
-            where: { fileResourceId: finalResource.id, versionNumber: 1 } 
+          const version1 = await manager.findOne(FileVersion, {
+            where: { fileResourceId: finalResource.id, versionNumber: 1 },
           });
-          
+
           if (!version1) {
             const versionEntity = manager.create(FileVersion, {
               fileResourceId: finalResource.id,
@@ -190,7 +209,11 @@ export class MaterialsService {
     }
   }
 
-  async addVersion(userId: string, materialId: string, file: Express.Multer.File): Promise<Material> {
+  async addVersion(
+    userId: string,
+    materialId: string,
+    file: Express.Multer.File,
+  ): Promise<Material> {
     if (!file) throw new BadRequestException('Archivo requerido');
 
     const now = new Date();
@@ -199,24 +222,32 @@ export class MaterialsService {
 
     try {
       const result = await this.dataSource.transaction(async (manager) => {
-        const freshMaterial = await manager.findOne(Material, { 
-            where: { id: materialId },
-            lock: { mode: 'pessimistic_write' }
+        const freshMaterial = await manager.findOne(Material, {
+          where: { id: materialId },
+          lock: { mode: 'pessimistic_write' },
         });
-        
-        if (!freshMaterial) throw new NotFoundException('Material no encontrado');
+
+        if (!freshMaterial)
+          throw new NotFoundException('Material no encontrado');
 
         const hash = await this.storageService.calculateHash(file.buffer);
-        const existingResource = await this.fileResourceRepository.findByHash(hash);
-        
+        const existingResource =
+          await this.fileResourceRepository.findByHash(hash);
+
         let finalResource: FileResource;
 
         if (!existingResource) {
-          const sanitizedOriginalName = file.originalname.replace(/[^a-zA-Z0-9.-]/g, '_');
+          const sanitizedOriginalName = file.originalname.replace(
+            /[^a-zA-Z0-9.-]/g,
+            '_',
+          );
           const uniqueName = `${Date.now()}-${sanitizedOriginalName}`;
-          storagePath = await this.storageService.saveFile(uniqueName, file.buffer);
+          storagePath = await this.storageService.saveFile(
+            uniqueName,
+            file.buffer,
+          );
           isNewFile = true;
-          
+
           const resourceEntity = manager.create(FileResource, {
             checksumHash: hash,
             originalName: file.originalname,
@@ -248,7 +279,7 @@ export class MaterialsService {
         freshMaterial.fileResourceId = finalResource.id;
         freshMaterial.fileVersionId = savedVersion.id;
         freshMaterial.updatedAt = now;
-        
+
         const updatedMaterial = await manager.save(freshMaterial);
 
         await this.auditService.logAction(
@@ -270,73 +301,105 @@ export class MaterialsService {
     }
   }
 
-  async getRootFolders(userId: string, evaluationId: string): Promise<MaterialFolder[]> {
+  async getRootFolders(
+    userId: string,
+    evaluationId: string,
+  ): Promise<MaterialFolder[]> {
     await this.checkAuthorizedAccess(userId, evaluationId);
-    
+
     const cacheKey = `cache:materials:roots:eval:${evaluationId}`;
     const cached = await this.cacheService.get<MaterialFolder[]>(cacheKey);
     if (cached) return cached;
 
     const status = await this.getActiveFolderStatus();
-    const roots = await this.folderRepository.findRootsByEvaluation(evaluationId, status.id);
+    const roots = await this.folderRepository.findRootsByEvaluation(
+      evaluationId,
+      status.id,
+    );
 
     await this.cacheService.set(cacheKey, roots, this.CACHE_TTL);
-    
+
     const userEntity = await this.userRepository.findById(userId);
     if (!userEntity) throw new ForbiddenException('Usuario no válido');
 
     return this.applyVisibilityFilter(userEntity, roots, []).folders;
   }
 
-  async getFolderContents(user: User, folderId: string): Promise<{ folders: MaterialFolder[], materials: Material[] }> {
+  async getFolderContents(
+    user: User,
+    folderId: string,
+  ): Promise<{ folders: MaterialFolder[]; materials: Material[] }> {
     const folder = await this.folderRepository.findById(folderId);
     if (!folder) throw new NotFoundException('Carpeta no encontrada');
-    
+
     await this.checkAuthorizedAccess(user.id, folder.evaluationId, folder);
 
     const cacheKey = `cache:materials:contents:folder:${folderId}`;
-    const cached = await this.cacheService.get<{ folders: MaterialFolder[], materials: Material[] }>(cacheKey);
+    const cached = await this.cacheService.get<{
+      folders: MaterialFolder[];
+      materials: Material[];
+    }>(cacheKey);
     if (cached) return cached;
 
     const status = await this.getActiveFolderStatus();
     const [folders, materials] = await Promise.all([
       this.folderRepository.findSubFolders(folderId, status.id),
-      this.materialRepository.findByFolderId(folderId) 
+      this.materialRepository.findByFolderId(folderId),
     ]);
 
     const result = { folders, materials };
     await this.cacheService.set(cacheKey, result, this.CACHE_TTL);
-    
+
     return this.applyVisibilityFilter(user, result.folders, result.materials);
   }
 
-  async download(user: User, materialId: string): Promise<{ stream: NodeJS.ReadableStream; fileName: string; mimeType: string }> {
+  async download(
+    user: User,
+    materialId: string,
+  ): Promise<{
+    stream: NodeJS.ReadableStream;
+    fileName: string;
+    mimeType: string;
+  }> {
     const material = await this.materialRepository.findById(materialId);
     if (!material) throw new NotFoundException('Material no encontrado');
 
-    const folder = await this.folderRepository.findById(material.materialFolderId);
-    if (!folder) throw new NotFoundException('Carpeta contenedora no encontrada');
+    const folder = await this.folderRepository.findById(
+      material.materialFolderId,
+    );
+    if (!folder)
+      throw new NotFoundException('Carpeta contenedora no encontrada');
 
     await this.checkAuthorizedAccess(user.id, folder.evaluationId, folder);
 
     const resource = material.fileResource;
-    if (!resource) throw new InternalServerErrorException('Integridad de datos corrupta: Material sin recurso físico');
+    if (!resource)
+      throw new InternalServerErrorException(
+        'Integridad de datos corrupta: Material sin recurso físico',
+      );
 
     if (!fs.existsSync(resource.storageUrl)) {
-        throw new NotFoundException('El archivo físico no existe en el servidor');
+      throw new NotFoundException('El archivo físico no existe en el servidor');
     }
 
     const stream = fs.createReadStream(resource.storageUrl);
     return {
-        stream,
-        fileName: material.displayName || resource.originalName,
-        mimeType: resource.mimeType,
+      stream,
+      fileName: material.displayName || resource.originalName,
+      mimeType: resource.mimeType,
     };
   }
 
-  async requestDeletion(userId: string, dto: RequestDeletionDto): Promise<void> {
-    const pendingStatus = await this.catalogRepository.findDeletionRequestStatusByCode('PENDING');
-    if (!pendingStatus) throw new InternalServerErrorException('Error configuración: Status PENDING');
+  async requestDeletion(
+    userId: string,
+    dto: RequestDeletionDto,
+  ): Promise<void> {
+    const pendingStatus =
+      await this.catalogRepository.findDeletionRequestStatusByCode('PENDING');
+    if (!pendingStatus)
+      throw new InternalServerErrorException(
+        'Error configuración: Status PENDING',
+      );
 
     if (dto.entityType === 'material') {
       const exists = await this.materialRepository.findById(dto.entityId);
@@ -359,23 +422,29 @@ export class MaterialsService {
     });
   }
 
-  private applyVisibilityFilter(user: User, folders: MaterialFolder[], materials: Material[]) {
+  private applyVisibilityFilter(
+    user: User,
+    folders: MaterialFolder[],
+    materials: Material[],
+  ) {
     const roleCodes = (user.roles || []).map((r) => r.code);
-    const hasPrivilegedAccess = roleCodes.some((r) => ['ADMIN', 'SUPER_ADMIN', 'PROFESSOR'].includes(r));
+    const hasPrivilegedAccess = roleCodes.some((r) =>
+      ['ADMIN', 'SUPER_ADMIN', 'PROFESSOR'].includes(r),
+    );
 
     if (hasPrivilegedAccess) {
       return { folders, materials };
     }
 
     const now = new Date();
-    
-    const visibleFolders = folders.filter(f => {
+
+    const visibleFolders = folders.filter((f) => {
       const startOk = !f.visibleFrom || new Date(f.visibleFrom) <= now;
       const endOk = !f.visibleUntil || new Date(f.visibleUntil) >= now;
       return startOk && endOk;
     });
 
-    const visibleMaterials = materials.filter(m => {
+    const visibleMaterials = materials.filter((m) => {
       const startOk = !m.visibleFrom || new Date(m.visibleFrom) <= now;
       const endOk = !m.visibleUntil || new Date(m.visibleUntil) >= now;
       return startOk && endOk;
@@ -384,7 +453,11 @@ export class MaterialsService {
     return { folders: visibleFolders, materials: visibleMaterials };
   }
 
-  private async checkAuthorizedAccess(userId: string, evaluationId: string, folder?: MaterialFolder): Promise<void> {
+  private async checkAuthorizedAccess(
+    userId: string,
+    evaluationId: string,
+    folder?: MaterialFolder,
+  ): Promise<void> {
     const user = await this.userRepository.findById(userId);
     if (!user) throw new ForbiddenException('Usuario no válido');
 
@@ -401,12 +474,21 @@ export class MaterialsService {
          WHERE e.id = ? AND ccp.professor_user_id = ? LIMIT 1`,
         [evaluationId, userId],
       );
-      if (isAssigned.length === 0) throw new ForbiddenException('No tienes permiso para ver materiales de este curso');
+      if (isAssigned.length === 0)
+        throw new ForbiddenException(
+          'No tienes permiso para ver materiales de este curso',
+        );
       return;
     }
 
-    const hasEnrollment = await this.accessEngine.hasAccess(userId, evaluationId);
-    if (!hasEnrollment) throw new ForbiddenException('No tienes acceso a este contenido educativo');
+    const hasEnrollment = await this.accessEngine.hasAccess(
+      userId,
+      evaluationId,
+    );
+    if (!hasEnrollment)
+      throw new ForbiddenException(
+        'No tienes acceso a este contenido educativo',
+      );
 
     if (folder?.visibleFrom && new Date() < new Date(folder.visibleFrom)) {
       throw new ForbiddenException('Este contenido aún no está disponible');
@@ -414,21 +496,31 @@ export class MaterialsService {
   }
 
   private async getActiveFolderStatus() {
-    const status = await this.catalogRepository.findFolderStatusByCode('ACTIVE');
-    if (!status) throw new InternalServerErrorException('Error configuración: Folder Status ACTIVE');
+    const status =
+      await this.catalogRepository.findFolderStatusByCode('ACTIVE');
+    if (!status)
+      throw new InternalServerErrorException(
+        'Error configuración: Folder Status ACTIVE',
+      );
     return status;
   }
 
   private async getActiveMaterialStatus() {
-    const status = await this.catalogRepository.findMaterialStatusByCode('ACTIVE');
-    if (!status) throw new InternalServerErrorException('Error configuración: Material Status ACTIVE');
+    const status =
+      await this.catalogRepository.findMaterialStatusByCode('ACTIVE');
+    if (!status)
+      throw new InternalServerErrorException(
+        'Error configuración: Material Status ACTIVE',
+      );
     return status;
   }
 
   private async validateParentFolder(parentId: string, evaluationId: string) {
     const parent = await this.folderRepository.findById(parentId);
     if (parent && parent.evaluationId !== evaluationId) {
-      throw new BadRequestException('Inconsistencia: La carpeta padre no pertenece a la misma evaluación');
+      throw new BadRequestException(
+        'Inconsistencia: La carpeta padre no pertenece a la misma evaluación',
+      );
     }
     return parent;
   }

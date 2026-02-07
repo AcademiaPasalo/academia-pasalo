@@ -1,4 +1,10 @@
-import { Injectable, ConflictException, Logger, InternalServerErrorException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  ConflictException,
+  Logger,
+  InternalServerErrorException,
+  BadRequestException,
+} from '@nestjs/common';
 import { DataSource, In, LessThan } from 'typeorm';
 import { EnrollmentRepository } from '@modules/enrollments/infrastructure/enrollment.repository';
 import { EnrollmentStatusRepository } from '@modules/enrollments/infrastructure/enrollment-status.repository';
@@ -27,19 +33,23 @@ export class EnrollmentsService {
 
   async findMyEnrollments(userId: string): Promise<MyEnrollmentsResponseDto[]> {
     const cacheKey = `cache:enrollment:user:${userId}:dashboard`;
-    
-    const cachedData = await this.cacheService.get<MyEnrollmentsResponseDto[]>(cacheKey);
+
+    const cachedData =
+      await this.cacheService.get<MyEnrollmentsResponseDto[]>(cacheKey);
     if (cachedData) return cachedData;
 
-    const enrollments = await this.enrollmentRepository.findMyEnrollments(userId);
-    
+    const enrollments =
+      await this.enrollmentRepository.findMyEnrollments(userId);
+
     const now = new Date();
     now.setHours(0, 0, 0, 0);
 
     const result = enrollments.map((enrollment) => {
-      const startDate = new Date(enrollment.courseCycle.academicCycle.startDate);
+      const startDate = new Date(
+        enrollment.courseCycle.academicCycle.startDate,
+      );
       startDate.setHours(0, 0, 0, 0);
-      
+
       const endDate = new Date(enrollment.courseCycle.academicCycle.endDate);
       endDate.setHours(0, 0, 0, 0);
 
@@ -69,7 +79,7 @@ export class EnrollmentsService {
             endDate: enrollment.courseCycle.academicCycle.endDate,
             isCurrent,
           },
-          professors: (enrollment.courseCycle.professors || []).map(p => ({
+          professors: (enrollment.courseCycle.professors || []).map((p) => ({
             id: p.professor.id,
             firstName: p.professor.firstName,
             lastName1: p.professor.lastName1 || '',
@@ -86,38 +96,56 @@ export class EnrollmentsService {
 
   async enroll(dto: CreateEnrollmentDto): Promise<Enrollment> {
     return await this.dataSource.transaction(async (manager) => {
-      const existing = await this.enrollmentRepository.findActiveByUserAndCourseCycle(
-        dto.userId, 
-        dto.courseCycleId, 
-        manager
-      );
+      const existing =
+        await this.enrollmentRepository.findActiveByUserAndCourseCycle(
+          dto.userId,
+          dto.courseCycleId,
+          manager,
+        );
 
       if (existing) {
-        throw new ConflictException('El usuario ya cuenta con una matrícula activa en este curso.');
+        throw new ConflictException(
+          'El usuario ya cuenta con una matrícula activa en este curso.',
+        );
       }
 
-      const type = await this.enrollmentTypeRepository.findByCode(dto.enrollmentTypeCode, manager);
+      const type = await this.enrollmentTypeRepository.findByCode(
+        dto.enrollmentTypeCode,
+        manager,
+      );
       if (!type) {
         throw new BadRequestException('Tipo de matrícula no válido.');
       }
 
-      if (type.code === 'PARTIAL' && (!dto.evaluationIds || dto.evaluationIds.length === 0)) {
-        throw new BadRequestException('Las matrículas parciales deben especificar al menos una evaluación.');
+      if (
+        type.code === 'PARTIAL' &&
+        (!dto.evaluationIds || dto.evaluationIds.length === 0)
+      ) {
+        throw new BadRequestException(
+          'Las matrículas parciales deben especificar al menos una evaluación.',
+        );
       }
 
-      const status = await this.enrollmentStatusRepository.findByCode('ACTIVE', manager);
+      const status = await this.enrollmentStatusRepository.findByCode(
+        'ACTIVE',
+        manager,
+      );
       if (!status) {
-        throw new InternalServerErrorException('Error de configuración del sistema.');
+        throw new InternalServerErrorException(
+          'Error de configuración del sistema.',
+        );
       }
 
       const courseCycle = await manager.getRepository(CourseCycle).findOne({
         where: { id: dto.courseCycleId },
         relations: { academicCycle: true },
-        lock: { mode: 'pessimistic_read' }
+        lock: { mode: 'pessimistic_read' },
       });
 
       if (!courseCycle || !courseCycle.academicCycle) {
-        throw new InternalServerErrorException('Inconsistencia en datos del ciclo.');
+        throw new InternalServerErrorException(
+          'Inconsistencia en datos del ciclo.',
+        );
       }
 
       const now = new Date();
@@ -136,17 +164,24 @@ export class EnrollmentsService {
         );
       }
 
-      const enrollment = await this.enrollmentRepository.create({
-        userId: dto.userId,
-        courseCycleId: dto.courseCycleId,
-        enrollmentStatusId: status.id,
-        enrollmentTypeId: type.id,
-        enrolledAt: new Date(),
-      }, manager);
+      const enrollment = await this.enrollmentRepository.create(
+        {
+          userId: dto.userId,
+          courseCycleId: dto.courseCycleId,
+          enrollmentStatusId: status.id,
+          enrollmentTypeId: type.id,
+          enrolledAt: new Date(),
+        },
+        manager,
+      );
 
       const courseCycleIdsToFetch: string[] = [dto.courseCycleId];
 
-      if (type.code === 'FULL' && dto.historicalCourseCycleIds && dto.historicalCourseCycleIds.length > 0) {
+      if (
+        type.code === 'FULL' &&
+        dto.historicalCourseCycleIds &&
+        dto.historicalCourseCycleIds.length > 0
+      ) {
         const pastCycles = await manager.getRepository(CourseCycle).find({
           where: {
             id: In(dto.historicalCourseCycleIds),
@@ -158,7 +193,9 @@ export class EnrollmentsService {
         });
 
         if (pastCycles.length !== dto.historicalCourseCycleIds.length) {
-          throw new BadRequestException('Uno o más ciclos históricos no son válidos o no pertenecen al curso.');
+          throw new BadRequestException(
+            'Uno o más ciclos históricos no son válidos o no pertenecen al curso.',
+          );
         }
 
         courseCycleIdsToFetch.push(...pastCycles.map((pc) => pc.id));
@@ -168,7 +205,7 @@ export class EnrollmentsService {
         where: { courseCycleId: In(courseCycleIdsToFetch) },
         relations: { evaluationType: true },
       });
-      
+
       if (allEvaluations.length > 0) {
         let evaluationsToGrant: Evaluation[] = [];
         let bankAccessLimitDate: Date | null = null;
@@ -177,30 +214,42 @@ export class EnrollmentsService {
           evaluationsToGrant = allEvaluations;
         } else {
           const requestedIds = dto.evaluationIds || [];
-          const academicEvaluations = allEvaluations.filter(e => requestedIds.includes(e.id));
-          const bankEvaluation = allEvaluations.find(e => e.evaluationType.code === 'BANCO_ENUNCIADOS');
+          const academicEvaluations = allEvaluations.filter((e) =>
+            requestedIds.includes(e.id),
+          );
+          const bankEvaluation = allEvaluations.find(
+            (e) => e.evaluationType.code === 'BANCO_ENUNCIADOS',
+          );
 
           if (academicEvaluations.length === 0) {
-            throw new BadRequestException('Las evaluaciones solicitadas no son válidas para este ciclo.');
+            throw new BadRequestException(
+              'Las evaluaciones solicitadas no son válidas para este ciclo.',
+            );
           }
 
-          const maxAcademicEndDate = academicEvaluations.reduce((max, current) => {
-            const currentEndDate = new Date(current.endDate);
-            return currentEndDate > max ? currentEndDate : max;
-          }, new Date(0));
+          const maxAcademicEndDate = academicEvaluations.reduce(
+            (max, current) => {
+              const currentEndDate = new Date(current.endDate);
+              return currentEndDate > max ? currentEndDate : max;
+            },
+            new Date(0),
+          );
 
           evaluationsToGrant = [...academicEvaluations];
-          
+
           if (bankEvaluation) {
             evaluationsToGrant.push(bankEvaluation);
             bankAccessLimitDate = maxAcademicEndDate;
           }
         }
 
-        const accessEntries = evaluationsToGrant.map(evaluation => {
+        const accessEntries = evaluationsToGrant.map((evaluation) => {
           let accessEnd = new Date(evaluation.endDate);
 
-          if (evaluation.evaluationType.code === 'BANCO_ENUNCIADOS' && bankAccessLimitDate) {
+          if (
+            evaluation.evaluationType.code === 'BANCO_ENUNCIADOS' &&
+            bankAccessLimitDate
+          ) {
             accessEnd = bankAccessLimitDate;
           } else if (type.code === 'FULL') {
             const cycleEnd = new Date(courseCycle.academicCycle.endDate);
@@ -216,19 +265,28 @@ export class EnrollmentsService {
           };
         });
 
-        await this.enrollmentEvaluationRepository.createMany(accessEntries, manager);
+        await this.enrollmentEvaluationRepository.createMany(
+          accessEntries,
+          manager,
+        );
       }
 
-      await this.cacheService.del(`cache:enrollment:user:${dto.userId}:dashboard`);
-      await this.cacheService.invalidateGroup(`cache:access:user:${dto.userId}:*`);
+      await this.cacheService.del(
+        `cache:enrollment:user:${dto.userId}:dashboard`,
+      );
+      await this.cacheService.invalidateGroup(
+        `cache:access:user:${dto.userId}:*`,
+      );
 
-      this.logger.log(JSON.stringify({
-        message: 'Matrícula procesada exitosamente',
-        userId: dto.userId,
-        courseCycleId: dto.courseCycleId,
-        enrollmentId: enrollment.id,
-        timestamp: new Date().toISOString(),
-      }));
+      this.logger.log(
+        JSON.stringify({
+          message: 'Matrícula procesada exitosamente',
+          userId: dto.userId,
+          courseCycleId: dto.courseCycleId,
+          enrollmentId: enrollment.id,
+          timestamp: new Date().toISOString(),
+        }),
+      );
 
       return enrollment;
     });
@@ -244,14 +302,20 @@ export class EnrollmentsService {
       cancelledAt: new Date(),
     });
 
-    await this.cacheService.del(`cache:enrollment:user:${enrollment.userId}:dashboard`);
-    await this.cacheService.invalidateGroup(`cache:access:user:${enrollment.userId}:*`);
+    await this.cacheService.del(
+      `cache:enrollment:user:${enrollment.userId}:dashboard`,
+    );
+    await this.cacheService.invalidateGroup(
+      `cache:access:user:${enrollment.userId}:*`,
+    );
 
-    this.logger.log(JSON.stringify({
-      message: 'Matrícula cancelada e invalidación de caché procesada',
-      userId: enrollment.userId,
-      enrollmentId,
-      timestamp: new Date().toISOString(),
-    }));
+    this.logger.log(
+      JSON.stringify({
+        message: 'Matrícula cancelada e invalidación de caché procesada',
+        userId: enrollment.userId,
+        enrollmentId,
+        timestamp: new Date().toISOString(),
+      }),
+    );
   }
 }

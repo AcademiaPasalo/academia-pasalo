@@ -133,8 +133,12 @@ describe('ClassEventsService', () => {
 
   describe('createEvent', () => {
     it('debe crear un evento exitosamente', async () => {
-      evaluationRepository.findByIdWithCycle.mockResolvedValue(mockEvaluation as any);
-      classEventRepository.findByEvaluationAndSessionNumber.mockResolvedValue(null);
+      evaluationRepository.findByIdWithCycle.mockResolvedValue(
+        mockEvaluation as any,
+      );
+      classEventRepository.findByEvaluationAndSessionNumber.mockResolvedValue(
+        null,
+      );
       classEventRepository.create.mockResolvedValue(mockEvent as any);
 
       await service.createEvent(
@@ -155,7 +159,9 @@ describe('ClassEventsService', () => {
   describe('getEventsByEvaluation', () => {
     it('debe retornar eventos si el usuario es STAFF (Bypass)', async () => {
       userRepository.findById.mockResolvedValue(mockAdmin as any);
-      classEventRepository.findByEvaluationId.mockResolvedValue([mockEvent] as any);
+      classEventRepository.findByEvaluationId.mockResolvedValue([
+        mockEvent,
+      ] as any);
 
       const result = await service.getEventsByEvaluation('eval-1', 'admin-1');
 
@@ -165,7 +171,9 @@ describe('ClassEventsService', () => {
     it('debe retornar eventos si el ALUMNO está matriculado', async () => {
       userRepository.findById.mockResolvedValue(mockStudent as any);
       enrollmentEvaluationRepository.checkAccess.mockResolvedValue(true);
-      classEventRepository.findByEvaluationId.mockResolvedValue([mockEvent] as any);
+      classEventRepository.findByEvaluationId.mockResolvedValue([
+        mockEvent,
+      ] as any);
 
       const result = await service.getEventsByEvaluation('eval-1', 'student-1');
 
@@ -193,7 +201,9 @@ describe('ClassEventsService', () => {
 
     it('debe conceder acceso a PROFESORES asignados', async () => {
       userRepository.findById.mockResolvedValue(mockProfessor as any);
-      evaluationRepository.findByIdWithCycle.mockResolvedValue(mockEvaluation as any);
+      evaluationRepository.findByIdWithCycle.mockResolvedValue(
+        mockEvaluation as any,
+      );
       dataSource.query.mockResolvedValue([{ 1: 1 }]); // Simular que está asignado
 
       const result = await service.checkUserAuthorization('prof-1', 'eval-1');
@@ -202,7 +212,9 @@ describe('ClassEventsService', () => {
 
     it('debe denegar acceso a PROFESORES NO asignados', async () => {
       userRepository.findById.mockResolvedValue(mockProfessor as any);
-      evaluationRepository.findByIdWithCycle.mockResolvedValue(mockEvaluation as any);
+      evaluationRepository.findByIdWithCycle.mockResolvedValue(
+        mockEvaluation as any,
+      );
       dataSource.query.mockResolvedValue([]); // Simular que NO está asignado
 
       const result = await service.checkUserAuthorization('prof-1', 'eval-1');
@@ -219,7 +231,10 @@ describe('ClassEventsService', () => {
         endDatetime: new Date(now + 2 * 60 * 60 * 1000),
       } as any;
 
-      const result = await service.canAccessMeetingLink(event, mockAdmin as any);
+      const result = await service.canAccessMeetingLink(
+        event,
+        mockAdmin as any,
+      );
 
       expect(result).toBe(true);
       expect(userRepository.findById).not.toHaveBeenCalled();
@@ -228,7 +243,10 @@ describe('ClassEventsService', () => {
     it('debe denegar si el evento no tiene meetingLink sin consultar repositorios', async () => {
       const event = { ...mockEvent, meetingLink: null } as any;
 
-      const result = await service.canAccessMeetingLink(event, mockAdmin as any);
+      const result = await service.canAccessMeetingLink(
+        event,
+        mockAdmin as any,
+      );
 
       expect(result).toBe(false);
       expect(userRepository.findById).not.toHaveBeenCalled();
@@ -246,11 +264,17 @@ describe('ClassEventsService', () => {
       } as any;
       enrollmentEvaluationRepository.checkAccess.mockResolvedValue(true);
 
-      const result = await service.canAccessMeetingLink(event, mockStudent as any);
+      const result = await service.canAccessMeetingLink(
+        event,
+        mockStudent as any,
+      );
 
       expect(result).toBe(true);
       expect(userRepository.findById).not.toHaveBeenCalled();
-      expect(enrollmentEvaluationRepository.checkAccess).toHaveBeenCalledWith('student-1', 'eval-1');
+      expect(enrollmentEvaluationRepository.checkAccess).toHaveBeenCalledWith(
+        'student-1',
+        'eval-1',
+      );
     });
 
     it('como PROFESSOR debe consultar la evaluación y la asignación (sin consultar userRepository.findById)', async () => {
@@ -260,14 +284,21 @@ describe('ClassEventsService', () => {
         startDatetime: new Date(now + 60 * 60 * 1000),
         endDatetime: new Date(now + 2 * 60 * 60 * 1000),
       } as any;
-      evaluationRepository.findByIdWithCycle.mockResolvedValue(mockEvaluation as any);
+      evaluationRepository.findByIdWithCycle.mockResolvedValue(
+        mockEvaluation as any,
+      );
       dataSource.query.mockResolvedValue([{ 1: 1 }]);
 
-      const result = await service.canAccessMeetingLink(event, mockProfessor as any);
+      const result = await service.canAccessMeetingLink(
+        event,
+        mockProfessor as any,
+      );
 
       expect(result).toBe(true);
       expect(userRepository.findById).not.toHaveBeenCalled();
-      expect(evaluationRepository.findByIdWithCycle).toHaveBeenCalledWith('eval-1');
+      expect(evaluationRepository.findByIdWithCycle).toHaveBeenCalledWith(
+        'eval-1',
+      );
       expect(dataSource.query).toHaveBeenCalled();
       expect(cacheService.set).toHaveBeenCalled();
     });

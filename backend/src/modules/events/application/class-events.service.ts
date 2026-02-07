@@ -17,16 +17,26 @@ import { ClassEvent } from '@modules/events/domain/class-event.entity';
 import { User } from '@modules/users/domain/user.entity';
 import { technicalSettings } from '@config/technical-settings';
 
-export type ClassEventStatus = 'CANCELADA' | 'PROGRAMADA' | 'EN_CURSO' | 'FINALIZADA';
+export type ClassEventStatus =
+  | 'CANCELADA'
+  | 'PROGRAMADA'
+  | 'EN_CURSO'
+  | 'FINALIZADA';
 
 @Injectable()
 export class ClassEventsService {
   private readonly logger = new Logger(ClassEventsService.name);
-  private readonly EVENT_CACHE_TTL = technicalSettings.cache.events.classEventsCacheTtlSeconds;
-  private readonly CYCLE_ACTIVE_CACHE_TTL = technicalSettings.cache.events.cycleActiveCacheTtlSeconds;
-  private readonly PROFESSOR_ASSIGNMENT_CACHE_TTL = technicalSettings.cache.events.professorAssignmentCacheTtlSeconds;
+  private readonly EVENT_CACHE_TTL =
+    technicalSettings.cache.events.classEventsCacheTtlSeconds;
+  private readonly CYCLE_ACTIVE_CACHE_TTL =
+    technicalSettings.cache.events.cycleActiveCacheTtlSeconds;
+  private readonly PROFESSOR_ASSIGNMENT_CACHE_TTL =
+    technicalSettings.cache.events.professorAssignmentCacheTtlSeconds;
 
-  private getProfessorAssignmentCacheKey(courseCycleId: string, professorUserId: string): string {
+  private getProfessorAssignmentCacheKey(
+    courseCycleId: string,
+    professorUserId: string,
+  ): string {
     return `cache:cc-professor:cycle:${courseCycleId}:prof:${professorUserId}`;
   }
 
@@ -50,22 +60,31 @@ export class ClassEventsService {
     meetingLink: string,
     creatorUser: User,
   ): Promise<ClassEvent> {
-    const evaluation = await this.evaluationRepository.findByIdWithCycle(evaluationId);
+    const evaluation =
+      await this.evaluationRepository.findByIdWithCycle(evaluationId);
     if (!evaluation) {
       throw new NotFoundException('Evaluación no encontrada');
     }
 
-    await this.validateEventDates(startDatetime, endDatetime, evaluation.startDate, evaluation.endDate);
+    await this.validateEventDates(
+      startDatetime,
+      endDatetime,
+      evaluation.startDate,
+      evaluation.endDate,
+    );
 
     return await this.dataSource.transaction(async (manager) => {
-      const existingSession = await this.classEventRepository.findByEvaluationAndSessionNumber(
-        evaluationId,
-        sessionNumber,
-        manager,
-      );
+      const existingSession =
+        await this.classEventRepository.findByEvaluationAndSessionNumber(
+          evaluationId,
+          sessionNumber,
+          manager,
+        );
 
       if (existingSession) {
-        throw new ConflictException(`Ya existe la sesión ${sessionNumber} para esta evaluación`);
+        throw new ConflictException(
+          `Ya existe la sesión ${sessionNumber} para esta evaluación`,
+        );
       }
 
       const classEvent = await this.classEventRepository.create(
@@ -97,8 +116,14 @@ export class ClassEventsService {
     });
   }
 
-  async getEventsByEvaluation(evaluationId: string, userId: string): Promise<ClassEvent[]> {
-    const isAuthorized = await this.checkUserAuthorization(userId, evaluationId);
+  async getEventsByEvaluation(
+    evaluationId: string,
+    userId: string,
+  ): Promise<ClassEvent[]> {
+    const isAuthorized = await this.checkUserAuthorization(
+      userId,
+      evaluationId,
+    );
     if (!isAuthorized) {
       throw new ForbiddenException('No tienes acceso a esta evaluación');
     }
@@ -109,8 +134,9 @@ export class ClassEventsService {
       return cached;
     }
 
-    const events = await this.classEventRepository.findByEvaluationId(evaluationId);
-    
+    const events =
+      await this.classEventRepository.findByEvaluationId(evaluationId);
+
     await this.cacheService.set(cacheKey, events, this.EVENT_CACHE_TTL);
 
     return events;
@@ -118,12 +144,15 @@ export class ClassEventsService {
 
   async getEventDetail(eventId: string, userId: string): Promise<ClassEvent> {
     const event = await this.classEventRepository.findById(eventId);
-    
+
     if (!event) {
       throw new NotFoundException('Evento de clase no encontrado');
     }
 
-    const isAuthorized = await this.checkUserAuthorization(userId, event.evaluationId);
+    const isAuthorized = await this.checkUserAuthorization(
+      userId,
+      event.evaluationId,
+    );
     if (!isAuthorized) {
       throw new ForbiddenException('No tienes acceso a este evento');
     }
@@ -157,10 +186,17 @@ export class ClassEventsService {
     if (startDatetime || endDatetime) {
       const finalStart = startDatetime || event.startDatetime;
       const finalEnd = endDatetime || event.endDatetime;
-      
-      const evaluation = await this.evaluationRepository.findByIdWithCycle(event.evaluationId);
+
+      const evaluation = await this.evaluationRepository.findByIdWithCycle(
+        event.evaluationId,
+      );
       if (evaluation) {
-        await this.validateEventDates(finalStart, finalEnd, evaluation.startDate, evaluation.endDate);
+        await this.validateEventDates(
+          finalStart,
+          finalEnd,
+          evaluation.startDate,
+          evaluation.endDate,
+        );
       }
     }
 
@@ -188,33 +224,51 @@ export class ClassEventsService {
     await this.invalidateEventCache(event.evaluationId, eventId);
   }
 
-  async assignProfessor(eventId: string, professorUserId: string): Promise<void> {
+  async assignProfessor(
+    eventId: string,
+    professorUserId: string,
+  ): Promise<void> {
     const event = await this.classEventRepository.findByIdSimple(eventId);
     if (!event) {
       throw new NotFoundException('Evento de clase no encontrado');
     }
 
-    await this.classEventProfessorRepository.assignProfessor(eventId, professorUserId);
+    await this.classEventProfessorRepository.assignProfessor(
+      eventId,
+      professorUserId,
+    );
 
     await this.invalidateEventCache(event.evaluationId, eventId);
   }
 
-  async removeProfessor(eventId: string, professorUserId: string): Promise<void> {
+  async removeProfessor(
+    eventId: string,
+    professorUserId: string,
+  ): Promise<void> {
     const event = await this.classEventRepository.findByIdSimple(eventId);
     if (!event) {
       throw new NotFoundException('Evento de clase no encontrado');
     }
 
     if (event.createdBy === professorUserId) {
-      throw new BadRequestException('No se puede remover al creador del evento');
+      throw new BadRequestException(
+        'No se puede remover al creador del evento',
+      );
     }
 
-    const isAssigned = await this.classEventProfessorRepository.isProfessorAssigned(eventId, professorUserId);
+    const isAssigned =
+      await this.classEventProfessorRepository.isProfessorAssigned(
+        eventId,
+        professorUserId,
+      );
     if (!isAssigned) {
       throw new NotFoundException('El profesor no está asignado a este evento');
     }
 
-    await this.classEventProfessorRepository.revokeProfessor(eventId, professorUserId);
+    await this.classEventProfessorRepository.revokeProfessor(
+      eventId,
+      professorUserId,
+    );
 
     await this.invalidateEventCache(event.evaluationId, eventId);
   }
@@ -247,7 +301,10 @@ export class ClassEventsService {
     return await this.checkUserAuthorizationWithUser(user, event.evaluationId);
   }
 
-  private async checkUserAuthorizationWithUser(user: User, evaluationId: string): Promise<boolean> {
+  private async checkUserAuthorizationWithUser(
+    user: User,
+    evaluationId: string,
+  ): Promise<boolean> {
     const roleCodes = (user.roles || []).map((r) => r.code);
 
     if (roleCodes.some((r) => ['ADMIN', 'SUPER_ADMIN'].includes(r))) {
@@ -255,10 +312,14 @@ export class ClassEventsService {
     }
 
     if (roleCodes.includes('PROFESSOR')) {
-      const evaluation = await this.evaluationRepository.findByIdWithCycle(evaluationId);
+      const evaluation =
+        await this.evaluationRepository.findByIdWithCycle(evaluationId);
       if (!evaluation) return false;
 
-      const cacheKey = this.getProfessorAssignmentCacheKey(evaluation.courseCycleId, user.id);
+      const cacheKey = this.getProfessorAssignmentCacheKey(
+        evaluation.courseCycleId,
+        user.id,
+      );
       const cached = await this.cacheService.get<boolean>(cacheKey);
       if (cached !== null) {
         return cached;
@@ -270,14 +331,24 @@ export class ClassEventsService {
       );
 
       const result = isAssigned.length > 0;
-      await this.cacheService.set(cacheKey, result, this.PROFESSOR_ASSIGNMENT_CACHE_TTL);
+      await this.cacheService.set(
+        cacheKey,
+        result,
+        this.PROFESSOR_ASSIGNMENT_CACHE_TTL,
+      );
       return result;
     }
 
-    return await this.enrollmentEvaluationRepository.checkAccess(user.id, evaluationId);
+    return await this.enrollmentEvaluationRepository.checkAccess(
+      user.id,
+      evaluationId,
+    );
   }
 
-  async checkUserAuthorization(userId: string, evaluationId: string): Promise<boolean> {
+  async checkUserAuthorization(
+    userId: string,
+    evaluationId: string,
+  ): Promise<boolean> {
     const user = await this.userRepository.findById(userId);
     if (!user) return false;
 
@@ -288,7 +359,8 @@ export class ClassEventsService {
     }
 
     if (roleCodes.includes('PROFESSOR')) {
-      const evaluation = await this.evaluationRepository.findByIdWithCycle(evaluationId);
+      const evaluation =
+        await this.evaluationRepository.findByIdWithCycle(evaluationId);
       if (!evaluation) return false;
 
       const isAssigned = await this.dataSource.query(
@@ -299,17 +371,28 @@ export class ClassEventsService {
       return isAssigned.length > 0;
     }
 
-    return await this.enrollmentEvaluationRepository.checkAccess(userId, evaluationId);
+    return await this.enrollmentEvaluationRepository.checkAccess(
+      userId,
+      evaluationId,
+    );
   }
 
-  async getMySchedule(userId: string, start: Date, end: Date): Promise<ClassEvent[]> {
+  async getMySchedule(
+    userId: string,
+    start: Date,
+    end: Date,
+  ): Promise<ClassEvent[]> {
     const cacheKey = `cache:my-schedule:user:${userId}:from:${start.toISOString().split('T')[0]}:to:${end.toISOString().split('T')[0]}`;
-    
+
     const cached = await this.cacheService.get<ClassEvent[]>(cacheKey);
     if (cached) return cached;
 
-    const events = await this.classEventRepository.findByUserAndRange(userId, start, end);
-    
+    const events = await this.classEventRepository.findByUserAndRange(
+      userId,
+      start,
+      end,
+    );
+
     await this.cacheService.set(cacheKey, events, this.EVENT_CACHE_TTL);
     return events;
   }
@@ -321,7 +404,8 @@ export class ClassEventsService {
       return cached;
     }
 
-    const evaluation = await this.evaluationRepository.findByIdWithCycle(evaluationId);
+    const evaluation =
+      await this.evaluationRepository.findByIdWithCycle(evaluationId);
     if (!evaluation) {
       return false;
     }
@@ -331,15 +415,24 @@ export class ClassEventsService {
     const cycleEnd = new Date(evaluation.courseCycle.academicCycle.endDate);
 
     const isActive = now >= cycleStart && now <= cycleEnd;
-    
-    await this.cacheService.set(cacheKey, isActive, this.CYCLE_ACTIVE_CACHE_TTL);
+
+    await this.cacheService.set(
+      cacheKey,
+      isActive,
+      this.CYCLE_ACTIVE_CACHE_TTL,
+    );
 
     return isActive;
   }
 
-  private async invalidateEventCache(evaluationId: string, eventId?: string): Promise<void> {
-    await this.cacheService.del(`cache:class-events:evaluation:${evaluationId}`);
-    
+  private async invalidateEventCache(
+    evaluationId: string,
+    eventId?: string,
+  ): Promise<void> {
+    await this.cacheService.del(
+      `cache:class-events:evaluation:${evaluationId}`,
+    );
+
     if (eventId) {
       await this.cacheService.del(`cache:class-event:${eventId}`);
     }
@@ -347,12 +440,17 @@ export class ClassEventsService {
     await this.cacheService.invalidateGroup('cache:my-schedule:*');
   }
 
-  private async validateEventOwnership(creatorId: string, user: User): Promise<void> {
+  private async validateEventOwnership(
+    creatorId: string,
+    user: User,
+  ): Promise<void> {
     const roles = (user.roles || []).map((r) => r.code);
     const isAdmin = roles.includes('ADMIN') || roles.includes('SUPER_ADMIN');
 
     if (!isAdmin && creatorId !== user.id) {
-      throw new ForbiddenException('Solo el creador o un administrador puede realizar esta acción');
+      throw new ForbiddenException(
+        'Solo el creador o un administrador puede realizar esta acción',
+      );
     }
   }
 
@@ -363,15 +461,21 @@ export class ClassEventsService {
     evaluationEnd: Date,
   ): Promise<void> {
     if (endDatetime <= startDatetime) {
-      throw new BadRequestException('La fecha de fin debe ser posterior a la fecha de inicio');
+      throw new BadRequestException(
+        'La fecha de fin debe ser posterior a la fecha de inicio',
+      );
     }
 
     if (startDatetime < evaluationStart || startDatetime > evaluationEnd) {
-      throw new BadRequestException('La fecha de inicio debe estar dentro del rango de la evaluación');
+      throw new BadRequestException(
+        'La fecha de inicio debe estar dentro del rango de la evaluación',
+      );
     }
 
     if (endDatetime < evaluationStart || endDatetime > evaluationEnd) {
-      throw new BadRequestException('La fecha de fin debe estar dentro del rango de la evaluación');
+      throw new BadRequestException(
+        'La fecha de fin debe estar dentro del rango de la evaluación',
+      );
     }
   }
 }

@@ -140,7 +140,10 @@ describe('IAM (e2e)', () => {
         { provide: UsersService, useValue: usersServiceMock },
         { provide: AuthService, useValue: authServiceMock },
         { provide: UserSessionRepository, useValue: userSessionRepositoryMock },
-        { provide: SessionStatusService, useValue: { getIdByCode: jest.fn().mockResolvedValue('1') } },
+        {
+          provide: SessionStatusService,
+          useValue: { getIdByCode: jest.fn().mockResolvedValue('1') },
+        },
         { provide: DataSource, useValue: {} },
         {
           provide: RedisCacheService,
@@ -156,7 +159,9 @@ describe('IAM (e2e)', () => {
 
     app = moduleRef.createNestApplication();
     app.setGlobalPrefix('api/v1');
-    app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
+    app.useGlobalPipes(
+      new ValidationPipe({ whitelist: true, transform: true }),
+    );
 
     const httpAdapterHost = app.get(HttpAdapterHost);
     const reflector = app.get(Reflector);
@@ -176,7 +181,7 @@ describe('IAM (e2e)', () => {
     return jwtService.sign({
       sub: userId,
       email: user.email,
-      roles: user.roles.map(r => r.code),
+      roles: user.roles.map((r) => r.code),
       activeRole: user.roles[0].code,
       sessionId,
     });

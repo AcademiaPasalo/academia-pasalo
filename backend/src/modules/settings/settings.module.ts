@@ -6,14 +6,8 @@ import { SettingsService } from '@modules/settings/application/settings.service'
 import { RedisCacheModule } from '@infrastructure/cache/redis-cache.module';
 
 @Module({
-  imports: [
-    TypeOrmModule.forFeature([SystemSetting]),
-    RedisCacheModule,
-  ],
-  providers: [
-    SystemSettingRepository,
-    SettingsService,
-  ],
+  imports: [TypeOrmModule.forFeature([SystemSetting]), RedisCacheModule],
+  providers: [SystemSettingRepository, SettingsService],
   exports: [SystemSettingRepository, SettingsService],
 })
 export class SettingsModule {}
