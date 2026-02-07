@@ -101,12 +101,13 @@ export class AuditCleanupProcessor extends WorkerHost {
           });
         });
     } catch (error) {
+      const isError = error instanceof Error;
       this.logger.error({
         context: AuditCleanupProcessor.name,
         job: jobName,
         message: 'Error crítico durante la limpieza de logs de auditoría',
-        error: error.message,
-        stack: error.stack,
+        error: isError ? error.message : 'Unknown error',
+        stack: isError ? error.stack : undefined,
       });
       throw error;
     }

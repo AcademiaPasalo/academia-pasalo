@@ -12,8 +12,19 @@ import { GoogleProviderService } from '@modules/auth/application/google-provider
 import { TokenService } from '@modules/auth/application/token.service';
 import { RequestMetadata } from '@modules/auth/interfaces/request-metadata.interface';
 import { UsersService } from '@modules/users/application/users.service';
-import { PhotoSource } from '@modules/users/domain/user.entity';
+import { PhotoSource, User } from '@modules/users/domain/user.entity';
 import { RedisCacheService } from '@infrastructure/cache/redis-cache.service';
+import { UserSession } from '@modules/auth/domain/user-session.entity';
+
+interface TokenPayload {
+  sub: string;
+  email?: string;
+  roles?: string[];
+  sessionId?: string;
+  deviceId?: string;
+  type?: string;
+  iat?: number;
+}
 
 describe('AuthService', () => {
   let authService: AuthService;
@@ -96,14 +107,13 @@ describe('AuthService', () => {
   };
 
   const dataSourceMock = {
-    transaction: jest.fn((cb: any) => cb({})),
+    transaction: jest.fn((cb: (manager: unknown) => Promise<unknown>) =>
+      cb({}),
+    ),
   };
-
-  let verifyIdTokenMock: jest.Mock;
 
   beforeEach(async () => {
     jest.clearAllMocks();
-    verifyIdTokenMock = jest.fn();
 
     tokenServiceMock = {
       generateAccessToken: jest.fn(),
@@ -143,9 +153,11 @@ describe('AuthService', () => {
       }
     });
 
-    tokenServiceMock.generateAccessToken.mockImplementation((payload: any) => {
-      return Promise.resolve(jwtService.sign(payload));
-    });
+    tokenServiceMock.generateAccessToken.mockImplementation(
+      (payload: TokenPayload) => {
+        return Promise.resolve(jwtService.sign(payload));
+      },
+    );
 
     tokenServiceMock.generateRefreshToken.mockImplementation(
       (userId: string, deviceId: string) => {
@@ -153,7 +165,7 @@ describe('AuthService', () => {
           sub: userId,
           deviceId,
           type: 'refresh',
-          iat: Date.now(), // Force unique token
+          iat: Date.now(),
         });
         return Promise.resolve({
           token,
@@ -268,7 +280,6 @@ describe('AuthService', () => {
     expect(typeof result.accessToken).toBe('string');
     expect(sessionServiceMock.rotateRefreshToken).toHaveBeenCalledTimes(1);
 
-    // Verify blacklist and cache invalidation
     expect(redisCacheServiceMock.del).toHaveBeenCalledWith(
       'cache:session:123:user',
     );
@@ -335,7 +346,7 @@ describe('AuthService', () => {
       userId: baseUser.id,
       deviceId: metadata.deviceId,
       sessionStatusId: '9',
-    };
+    } as unknown as UserSession;
 
     sessionServiceMock.findSessionByRefreshToken.mockResolvedValue(
       blockedSession,

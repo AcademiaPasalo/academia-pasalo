@@ -8,6 +8,22 @@ import { TestSeeder } from './test-utils';
 import { TransformInterceptor } from '@common/interceptors/transform.interceptor';
 import { User } from '@modules/users/domain/user.entity';
 
+interface EnrollmentDashboardItem {
+  courseCycle: {
+    course: {
+      code: string;
+    };
+    professors: unknown[];
+    academicCycle: {
+      isCurrent: boolean;
+    };
+  };
+}
+
+interface DashboardResponse {
+  data: EnrollmentDashboardItem[];
+}
+
 describe('E2E: Dashboard del Alumno (My Courses)', () => {
   let app: INestApplication;
   let dataSource: DataSource;
@@ -97,7 +113,7 @@ describe('E2E: Dashboard del Alumno (My Courses)', () => {
   });
 
   afterAll(async () => {
-    await app.close();
+    if (app) await app.close();
   });
 
   it('Debe retornar los cursos matriculados con sus respectivos profesores', async () => {
@@ -106,18 +122,22 @@ describe('E2E: Dashboard del Alumno (My Courses)', () => {
       .set('Authorization', `Bearer ${student.token}`)
       .expect(200);
 
-    const data = res.body.data;
+    const body = res.body as DashboardResponse;
+    const data = body.data;
     expect(data).toHaveLength(2);
 
     const courseWith2Prof = data.find(
-      (e: any) => e.courseCycle.course.code === 'C1',
+      (e) => e.courseCycle.course.code === 'C1',
     );
+    if (!courseWith2Prof) throw new Error('Course C1 not found');
+
     expect(courseWith2Prof.courseCycle.professors).toHaveLength(2);
     expect(courseWith2Prof.courseCycle.academicCycle.isCurrent).toBe(true);
 
     const courseWith1Prof = data.find(
-      (e: any) => e.courseCycle.course.code === 'C2',
+      (e) => e.courseCycle.course.code === 'C2',
     );
+    if (!courseWith1Prof) throw new Error('Course C2 not found');
     expect(courseWith1Prof.courseCycle.professors).toHaveLength(1);
   });
 });

@@ -1,11 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { DataSource } from 'typeorm';
-import {
-  NotFoundException,
-  ConflictException,
-  BadRequestException,
-  ForbiddenException,
-} from '@nestjs/common';
+import { DataSource, EntityManager } from 'typeorm';
 import { ClassEventsService } from '@modules/events/application/class-events.service';
 import { ClassEventRepository } from '@modules/events/infrastructure/class-event.repository';
 import { ClassEventProfessorRepository } from '@modules/events/infrastructure/class-event-professor.repository';
@@ -13,11 +7,13 @@ import { EvaluationRepository } from '@modules/evaluations/infrastructure/evalua
 import { EnrollmentEvaluationRepository } from '@modules/enrollments/infrastructure/enrollment-evaluation.repository';
 import { UserRepository } from '@modules/users/infrastructure/user.repository';
 import { RedisCacheService } from '@infrastructure/cache/redis-cache.service';
+import { User } from '@modules/users/domain/user.entity';
+import { ClassEvent } from '@modules/events/domain/class-event.entity';
+import { Evaluation } from '@modules/evaluations/domain/evaluation.entity';
 
 describe('ClassEventsService', () => {
   let service: ClassEventsService;
   let classEventRepository: jest.Mocked<ClassEventRepository>;
-  let classEventProfessorRepository: jest.Mocked<ClassEventProfessorRepository>;
   let evaluationRepository: jest.Mocked<EvaluationRepository>;
   let enrollmentEvaluationRepository: jest.Mocked<EnrollmentEvaluationRepository>;
   let userRepository: jest.Mocked<UserRepository>;
@@ -27,17 +23,17 @@ describe('ClassEventsService', () => {
   const mockAdmin = {
     id: 'admin-1',
     roles: [{ code: 'ADMIN' }],
-  };
+  } as User;
 
   const mockProfessor = {
     id: 'prof-1',
     roles: [{ code: 'PROFESSOR' }],
-  };
+  } as User;
 
   const mockStudent = {
     id: 'student-1',
     roles: [{ code: 'STUDENT' }],
-  };
+  } as User;
 
   const mockEvent = {
     id: 'event-1',
@@ -50,14 +46,14 @@ describe('ClassEventsService', () => {
     meetingLink: 'http://link.com',
     isCancelled: false,
     createdBy: 'prof-1',
-  };
+  } as ClassEvent;
 
   const mockEvaluation = {
     id: 'eval-1',
     courseCycleId: 'cycle-1',
     startDate: new Date('2026-01-01T00:00:00Z'),
     endDate: new Date('2026-12-31T23:59:59Z'),
-  };
+  } as Evaluation;
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -66,7 +62,9 @@ describe('ClassEventsService', () => {
         {
           provide: DataSource,
           useValue: {
-            transaction: jest.fn((cb) => cb({ getRepository: jest.fn() })),
+            transaction: jest.fn((cb: (manager: unknown) => Promise<unknown>) =>
+              cb({ getRepository: jest.fn() }),
+            ),
             query: jest.fn().mockResolvedValue([{ 1: 1 }]),
           },
         },
@@ -123,7 +121,6 @@ describe('ClassEventsService', () => {
 
     service = module.get<ClassEventsService>(ClassEventsService);
     classEventRepository = module.get(ClassEventRepository);
-    classEventProfessorRepository = module.get(ClassEventProfessorRepository);
     evaluationRepository = module.get(EvaluationRepository);
     enrollmentEvaluationRepository = module.get(EnrollmentEvaluationRepository);
     userRepository = module.get(UserRepository);
@@ -133,13 +130,11 @@ describe('ClassEventsService', () => {
 
   describe('createEvent', () => {
     it('debe crear un evento exitosamente', async () => {
-      evaluationRepository.findByIdWithCycle.mockResolvedValue(
-        mockEvaluation as any,
-      );
+      evaluationRepository.findByIdWithCycle.mockResolvedValue(mockEvaluation);
       classEventRepository.findByEvaluationAndSessionNumber.mockResolvedValue(
         null,
       );
-      classEventRepository.create.mockResolvedValue(mockEvent as any);
+      classEventRepository.create.mockResolvedValue(mockEvent);
 
       await service.createEvent(
         'eval-1',
@@ -149,7 +144,7 @@ describe('ClassEventsService', () => {
         new Date('2026-02-01T08:00:00Z'),
         new Date('2026-02-01T10:00:00Z'),
         'link',
-        mockProfessor as any,
+        mockProfessor,
       );
 
       expect(classEventRepository.create).toHaveBeenCalled();
@@ -158,10 +153,8 @@ describe('ClassEventsService', () => {
 
   describe('getEventsByEvaluation', () => {
     it('debe retornar eventos si el usuario es STAFF (Bypass)', async () => {
-      userRepository.findById.mockResolvedValue(mockAdmin as any);
-      classEventRepository.findByEvaluationId.mockResolvedValue([
-        mockEvent,
-      ] as any);
+      userRepository.findById.mockResolvedValue(mockAdmin);
+      classEventRepository.findByEvaluationId.mockResolvedValue([mockEvent]);
 
       const result = await service.getEventsByEvaluation('eval-1', 'admin-1');
 
@@ -169,11 +162,9 @@ describe('ClassEventsService', () => {
     });
 
     it('debe retornar eventos si el ALUMNO está matriculado', async () => {
-      userRepository.findById.mockResolvedValue(mockStudent as any);
+      userRepository.findById.mockResolvedValue(mockStudent);
       enrollmentEvaluationRepository.checkAccess.mockResolvedValue(true);
-      classEventRepository.findByEvaluationId.mockResolvedValue([
-        mockEvent,
-      ] as any);
+      classEventRepository.findByEvaluationId.mockResolvedValue([mockEvent]);
 
       const result = await service.getEventsByEvaluation('eval-1', 'student-1');
 
@@ -183,8 +174,8 @@ describe('ClassEventsService', () => {
 
   describe('getEventDetail', () => {
     it('debe retornar detalle si el STAFF tiene acceso', async () => {
-      classEventRepository.findById.mockResolvedValue(mockEvent as any);
-      userRepository.findById.mockResolvedValue(mockAdmin as any);
+      classEventRepository.findById.mockResolvedValue(mockEvent);
+      userRepository.findById.mockResolvedValue(mockAdmin);
 
       const result = await service.getEventDetail('event-1', 'admin-1');
 
@@ -194,28 +185,24 @@ describe('ClassEventsService', () => {
 
   describe('checkUserAuthorization', () => {
     it('debe conceder acceso a ADMINS (Bypass Total)', async () => {
-      userRepository.findById.mockResolvedValue(mockAdmin as any);
+      userRepository.findById.mockResolvedValue(mockAdmin);
       const result = await service.checkUserAuthorization('admin-1', 'eval-1');
       expect(result).toBe(true);
     });
 
     it('debe conceder acceso a PROFESORES asignados', async () => {
-      userRepository.findById.mockResolvedValue(mockProfessor as any);
-      evaluationRepository.findByIdWithCycle.mockResolvedValue(
-        mockEvaluation as any,
-      );
-      dataSource.query.mockResolvedValue([{ 1: 1 }]); // Simular que está asignado
+      userRepository.findById.mockResolvedValue(mockProfessor);
+      evaluationRepository.findByIdWithCycle.mockResolvedValue(mockEvaluation);
+      dataSource.query.mockResolvedValue([{ 1: 1 }]);
 
       const result = await service.checkUserAuthorization('prof-1', 'eval-1');
       expect(result).toBe(true);
     });
 
     it('debe denegar acceso a PROFESORES NO asignados', async () => {
-      userRepository.findById.mockResolvedValue(mockProfessor as any);
-      evaluationRepository.findByIdWithCycle.mockResolvedValue(
-        mockEvaluation as any,
-      );
-      dataSource.query.mockResolvedValue([]); // Simular que NO está asignado
+      userRepository.findById.mockResolvedValue(mockProfessor);
+      evaluationRepository.findByIdWithCycle.mockResolvedValue(mockEvaluation);
+      dataSource.query.mockResolvedValue([]);
 
       const result = await service.checkUserAuthorization('prof-1', 'eval-1');
       expect(result).toBe(false);
@@ -229,24 +216,21 @@ describe('ClassEventsService', () => {
         ...mockEvent,
         startDatetime: new Date(now + 60 * 60 * 1000),
         endDatetime: new Date(now + 2 * 60 * 60 * 1000),
-      } as any;
+      } as ClassEvent;
 
-      const result = await service.canAccessMeetingLink(
-        event,
-        mockAdmin as any,
-      );
+      const result = await service.canAccessMeetingLink(event, mockAdmin);
 
       expect(result).toBe(true);
       expect(userRepository.findById).not.toHaveBeenCalled();
     });
 
     it('debe denegar si el evento no tiene meetingLink sin consultar repositorios', async () => {
-      const event = { ...mockEvent, meetingLink: null } as any;
+      const event = {
+        ...mockEvent,
+        meetingLink: null,
+      } as unknown as ClassEvent;
 
-      const result = await service.canAccessMeetingLink(
-        event,
-        mockAdmin as any,
-      );
+      const result = await service.canAccessMeetingLink(event, mockAdmin);
 
       expect(result).toBe(false);
       expect(userRepository.findById).not.toHaveBeenCalled();
@@ -261,13 +245,10 @@ describe('ClassEventsService', () => {
         ...mockEvent,
         startDatetime: new Date(now + 60 * 60 * 1000),
         endDatetime: new Date(now + 2 * 60 * 60 * 1000),
-      } as any;
+      } as ClassEvent;
       enrollmentEvaluationRepository.checkAccess.mockResolvedValue(true);
 
-      const result = await service.canAccessMeetingLink(
-        event,
-        mockStudent as any,
-      );
+      const result = await service.canAccessMeetingLink(event, mockStudent);
 
       expect(result).toBe(true);
       expect(userRepository.findById).not.toHaveBeenCalled();
@@ -283,16 +264,11 @@ describe('ClassEventsService', () => {
         ...mockEvent,
         startDatetime: new Date(now + 60 * 60 * 1000),
         endDatetime: new Date(now + 2 * 60 * 60 * 1000),
-      } as any;
-      evaluationRepository.findByIdWithCycle.mockResolvedValue(
-        mockEvaluation as any,
-      );
+      } as ClassEvent;
+      evaluationRepository.findByIdWithCycle.mockResolvedValue(mockEvaluation);
       dataSource.query.mockResolvedValue([{ 1: 1 }]);
 
-      const result = await service.canAccessMeetingLink(
-        event,
-        mockProfessor as any,
-      );
+      const result = await service.canAccessMeetingLink(event, mockProfessor);
 
       expect(result).toBe(true);
       expect(userRepository.findById).not.toHaveBeenCalled();

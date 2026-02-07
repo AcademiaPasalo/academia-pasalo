@@ -1,7 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication, UnauthorizedException } from '@nestjs/common';
-import { JwtModule, JwtService } from '@nestjs/jwt';
-import { DataSource } from 'typeorm';
+import { JwtModule } from '@nestjs/jwt';
+import { DataSource, EntityManager } from 'typeorm';
 import { AuthService } from '../src/modules/auth/application/auth.service';
 import { SessionService } from '../src/modules/auth/application/session.service';
 import { SecurityEventService } from '../src/modules/auth/application/security-event.service';
@@ -24,11 +24,8 @@ import { ConfigService } from '@nestjs/config';
 import { JwtStrategy } from '../src/modules/auth/strategies/jwt.strategy';
 
 describe('Advanced Security Scenarios (Offensive Testing)', () => {
-  let app: INestApplication;
   let authService: AuthService;
-  let jwtService: JwtService;
 
-  // Mock Data
   const mockUser = {
     id: '100',
     email: 'victim@test.com',
@@ -43,10 +40,11 @@ describe('Advanced Security Scenarios (Offensive Testing)', () => {
     longitude: 10.0,
   };
 
-  // Mocks
   const mockDataSource = {
-    transaction: jest.fn((cb) => cb(mockDataSource.manager)),
-    manager: {},
+    transaction: jest.fn((cb: (manager: EntityManager) => Promise<unknown>) =>
+      cb(mockDataSource.manager as EntityManager),
+    ),
+    manager: {} as Partial<EntityManager>,
   };
 
   const mockUsersService = {
@@ -73,10 +71,8 @@ describe('Advanced Security Scenarios (Offensive Testing)', () => {
     existsByUserIdAndDeviceId: jest.fn().mockResolvedValue(true),
   };
 
-  // ... (otros mocks)
-
   const mockAnomalyDetector = {
-    resolveCoordinates: jest.fn().mockImplementation((meta) =>
+    resolveCoordinates: jest.fn().mockImplementation((meta: RequestMetadata) =>
       Promise.resolve({
         metadata: meta,
         locationSource: meta.latitude && meta.longitude ? 'gps' : 'ip',
@@ -113,7 +109,7 @@ describe('Advanced Security Scenarios (Offensive Testing)', () => {
         {
           provide: SessionStatusRepository,
           useValue: {
-            findByCode: jest.fn((code) =>
+            findByCode: jest.fn((code: string) =>
               Promise.resolve({ id: code === 'ACTIVE' ? '1' : '2', code }),
             ),
           },
@@ -146,7 +142,7 @@ describe('Advanced Security Scenarios (Offensive Testing)', () => {
               .fn()
               .mockResolvedValue({ token: 'new_rt', expiresAt: new Date() }),
             generateAccessToken: jest.fn().mockResolvedValue('new_at'),
-            verifyRefreshToken: jest.fn((token) => {
+            verifyRefreshToken: jest.fn((token: string) => {
               if (token === 'zombie_token')
                 return { sub: '100', deviceId: 'device-zombie' };
               return { sub: '100', deviceId: 'device-original' };
@@ -164,14 +160,11 @@ describe('Advanced Security Scenarios (Offensive Testing)', () => {
       ],
     }).compile();
 
-    app = moduleFixture.createNestApplication();
     authService = moduleFixture.get<AuthService>(AuthService);
-    jwtService = moduleFixture.get<JwtService>(JwtService);
   });
 
   describe('Scenario 1: The Roommate Attack (Same IP, Different Device)', () => {
     it('should DETECT CONCURRENCY even if IP and Location are identical', async () => {
-      // Setup: Existing active session on Device A
       mockUserSessionRepository.findOtherActiveSession.mockResolvedValue({
         id: 'session-A',
         deviceId: 'device-original',
@@ -179,10 +172,9 @@ describe('Advanced Security Scenarios (Offensive Testing)', () => {
       mockUserSessionRepository.create.mockResolvedValue({
         id: 'session-B',
         sessionStatusId: '2',
-      }); // 2 = PENDING
+      });
 
-      // Action: Login attempt from Device B (Roommate/Attacker) with SAME metadata
-      const attackMetadata = {
+      const attackMetadata: RequestMetadata = {
         ...mockMetadataBase,
         deviceId: 'device-roommate',
       };
@@ -191,30 +183,19 @@ describe('Advanced Security Scenarios (Offensive Testing)', () => {
         attackMetadata,
       );
 
-      // Assert: Must prompt for resolution, NOT block as anomalous travel
       expect(result.sessionStatus).toBe('PENDING_CONCURRENT_RESOLUTION');
       expect(result.concurrentSessionId).toBe('session-A');
-      // Ensure we didn't trigger anomaly logic implies we didn't get BLOCKED status
     });
   });
 
   describe('Scenario 2: The Zombie Token Attack', () => {
     it('should REJECT refresh attempt with a token from a revoked session', async () => {
-      // Setup: A session that was valid but revoked in DB (e.g. by concurrency resolution)
       const zombieRefreshToken = 'zombie_token';
 
-      // Mock Session Service logic manually since we are testing AuthService flow interacting with it
-      // Or better, mock the `SessionService.validateRefreshTokenSession` to fail
-      // Since AuthService calls SessionService, let's look at how AuthService is built.
-      // It injects SessionService. We are using the REAL SessionService in this test module (unless overridden).
-      // Real SessionService calls UserSessionRepository.findByRefreshTokenHash.
-
-      // Simulate DB returning NO session for this token (or is_active = false)
       mockUserSessionRepository.findByRefreshTokenHash = jest
         .fn()
         .mockResolvedValue(null);
 
-      // Assert
       await expect(
         authService.refreshAccessToken(zombieRefreshToken, 'device-zombie'),
       ).rejects.toThrow(UnauthorizedException);
@@ -223,12 +204,10 @@ describe('Advanced Security Scenarios (Offensive Testing)', () => {
 
   describe('Scenario 3: Ghost Location (Null GPS)', () => {
     it('should FALLBACK to IP-based check and allow login if IP is safe', async () => {
-      // Setup: No other active session
       mockUserSessionRepository.findOtherActiveSession.mockResolvedValue(null);
-      // Setup: Previous session was close (simulated by finding latest session)
       mockUserSessionRepository.findLatestSessionByUserId.mockResolvedValue({
         id: 'prev-session',
-        ipAddress: '200.200.200.1', // Same IP
+        ipAddress: '200.200.200.1',
         createdAt: new Date(),
       });
 
@@ -237,8 +216,7 @@ describe('Advanced Security Scenarios (Offensive Testing)', () => {
         sessionStatusId: '1',
       });
 
-      // Action: Login with NULL coordinates
-      const ghostMetadata = {
+      const ghostMetadata: RequestMetadata = {
         ...mockMetadataBase,
         latitude: null,
         longitude: null,
@@ -248,7 +226,6 @@ describe('Advanced Security Scenarios (Offensive Testing)', () => {
         ghostMetadata,
       );
 
-      // Assert: Should proceed to ACTIVE (not crashed, not blocked)
       expect(result.sessionStatus).toBe('ACTIVE');
     });
   });

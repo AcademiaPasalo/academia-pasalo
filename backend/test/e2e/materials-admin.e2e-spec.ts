@@ -9,6 +9,16 @@ import { StorageService } from '@infrastructure/storage/storage.service';
 import { TransformInterceptor } from '@common/interceptors/transform.interceptor';
 import { User } from '@modules/users/domain/user.entity';
 import { RedisCacheService } from '@infrastructure/cache/redis-cache.service';
+import { DeletionRequest } from '@modules/materials/domain/deletion-request.entity';
+import { Material } from '@modules/materials/domain/material.entity';
+
+interface DeletionRequestResponse {
+  id: string;
+}
+
+interface GenericDataResponse<T> {
+  data: T;
+}
 
 describe('E2E: Administración de Materiales (Aprobaciones y Limpieza)', () => {
   let app: INestApplication;
@@ -21,10 +31,7 @@ describe('E2E: Administración de Materiales (Aprobaciones y Limpieza)', () => {
 
   let folderId: string;
   let materialToDeleteId: string;
-  let materialToKeepId: string;
   let requestIdToDelete: string;
-
-  const formatDate = (d: Date) => d.toISOString().split('T')[0];
 
   beforeAll(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
@@ -100,9 +107,9 @@ describe('E2E: Administración de Materiales (Aprobaciones y Limpieza)', () => {
       })
       .expect(201);
 
-    folderId = folderRes.body.data.id;
+    const folderBody = folderRes.body as GenericDataResponse<{ id: string }>;
+    folderId = folderBody.data.id;
 
-    // Crear materiales con PDF válido
     const buffer = Buffer.from('%PDF-1.4 content');
     const res1 = await request(app.getHttpServer())
       .post('/api/v1/materials')
@@ -110,19 +117,20 @@ describe('E2E: Administración de Materiales (Aprobaciones y Limpieza)', () => {
       .attach('file', buffer, 'file1.pdf')
       .field('materialFolderId', folderId)
       .field('displayName', 'Material 1');
-    materialToDeleteId = res1.body.data.id;
 
-    const res2 = await request(app.getHttpServer())
+    const mat1Body = res1.body as GenericDataResponse<{ id: string }>;
+    materialToDeleteId = mat1Body.data.id;
+
+    await request(app.getHttpServer())
       .post('/api/v1/materials')
       .set('Authorization', `Bearer ${professor.token}`)
       .attach('file', buffer, 'file2.pdf')
       .field('materialFolderId', folderId)
       .field('displayName', 'Material 2');
-    materialToKeepId = res2.body.data.id;
   });
 
   afterAll(async () => {
-    await app.close();
+    if (app) await app.close();
   });
 
   describe('Fase 1: Solicitud y Listado', () => {
@@ -138,8 +146,8 @@ describe('E2E: Administración de Materiales (Aprobaciones y Limpieza)', () => {
         .expect(200);
 
       const req = await dataSource
-        .getRepository('DeletionRequest')
-        .findOne({ where: { entityId: materialToDeleteId } });
+        .getRepository(DeletionRequest)
+        .findOneOrFail({ where: { entityId: materialToDeleteId } });
       requestIdToDelete = req.id;
       expect(requestIdToDelete).toBeDefined();
     });
@@ -150,9 +158,8 @@ describe('E2E: Administración de Materiales (Aprobaciones y Limpieza)', () => {
         .set('Authorization', `Bearer ${admin.token}`)
         .expect(200);
 
-      expect(res.body.data.some((r: any) => r.id === requestIdToDelete)).toBe(
-        true,
-      );
+      const body = res.body as GenericDataResponse<DeletionRequestResponse[]>;
+      expect(body.data.some((r) => r.id === requestIdToDelete)).toBe(true);
     });
   });
 
@@ -164,7 +171,7 @@ describe('E2E: Administración de Materiales (Aprobaciones y Limpieza)', () => {
         .send({ action: 'APPROVE', adminComment: 'OK' })
         .expect(200);
 
-      const mat = await dataSource.getRepository('Material').findOne({
+      const mat = await dataSource.getRepository(Material).findOneOrFail({
         where: { id: materialToDeleteId },
         relations: { materialStatus: true },
       });
@@ -180,7 +187,7 @@ describe('E2E: Administración de Materiales (Aprobaciones y Limpieza)', () => {
         .expect(200);
 
       const mat = await dataSource
-        .getRepository('Material')
+        .getRepository(Material)
         .findOne({ where: { id: materialToDeleteId } });
       expect(mat).toBeNull();
     });

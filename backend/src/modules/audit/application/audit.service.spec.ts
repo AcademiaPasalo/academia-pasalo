@@ -1,5 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getQueueToken } from '@nestjs/bullmq';
+import { Queue } from 'bullmq';
 import { AuditService } from './audit.service';
 import { AuditLogRepository } from '@modules/audit/infrastructure/audit-log.repository';
 import { AuditActionRepository } from '@modules/audit/infrastructure/audit-action.repository';
@@ -13,7 +14,7 @@ describe('AuditService', () => {
   let auditLogRepository: Partial<AuditLogRepository>;
   let auditActionRepository: Partial<AuditActionRepository>;
   let securityEventRepository: Partial<SecurityEventRepository>;
-  let auditQueue: any;
+  let auditQueue: Partial<Queue>;
 
   const mockAuditAction = {
     id: '1',

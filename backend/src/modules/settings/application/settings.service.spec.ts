@@ -176,7 +176,7 @@ describe('SettingsService', () => {
       await service.getString('KEY_1');
       expect(repository.findByKey).toHaveBeenCalledTimes(1);
 
-      service.invalidateCache('KEY_1');
+      await service.invalidateCache('KEY_1');
 
       await service.getString('KEY_1');
       expect(repository.findByKey).toHaveBeenCalledTimes(2);
@@ -194,7 +194,7 @@ describe('SettingsService', () => {
       await service.getString('KEY_1');
       await service.getString('KEY_2');
 
-      service.invalidateCache('KEY_1');
+      await service.invalidateCache('KEY_1');
 
       await service.getString('KEY_1');
       await service.getString('KEY_2');
@@ -222,7 +222,7 @@ describe('SettingsService', () => {
       await service.getString('KEY_3');
       expect(repository.findByKey).toHaveBeenCalledTimes(3);
 
-      service.invalidateAllCache();
+      await service.invalidateAllCache();
 
       await service.getString('KEY_1');
       await service.getString('KEY_2');

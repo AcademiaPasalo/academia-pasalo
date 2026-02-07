@@ -66,7 +66,7 @@ export class ClassEventsService {
       throw new NotFoundException('Evaluación no encontrada');
     }
 
-    await this.validateEventDates(
+    this.validateEventDates(
       startDatetime,
       endDatetime,
       evaluation.startDate,
@@ -174,7 +174,7 @@ export class ClassEventsService {
       throw new NotFoundException('Evento de clase no encontrado');
     }
 
-    await this.validateEventOwnership(event.createdBy, user);
+    this.validateEventOwnership(event.createdBy, user);
 
     const updateData: Partial<ClassEvent> = {};
     if (title !== undefined) updateData.title = title;
@@ -191,7 +191,7 @@ export class ClassEventsService {
         event.evaluationId,
       );
       if (evaluation) {
-        await this.validateEventDates(
+        this.validateEventDates(
           finalStart,
           finalEnd,
           evaluation.startDate,
@@ -217,7 +217,7 @@ export class ClassEventsService {
       throw new BadRequestException('El evento ya está cancelado');
     }
 
-    await this.validateEventOwnership(event.createdBy, user);
+    this.validateEventOwnership(event.createdBy, user);
 
     await this.classEventRepository.cancelEvent(eventId);
 
@@ -440,10 +440,7 @@ export class ClassEventsService {
     await this.cacheService.invalidateGroup('cache:my-schedule:*');
   }
 
-  private async validateEventOwnership(
-    creatorId: string,
-    user: User,
-  ): Promise<void> {
+  private validateEventOwnership(creatorId: string, user: User): void {
     const roles = (user.roles || []).map((r) => r.code);
     const isAdmin = roles.includes('ADMIN') || roles.includes('SUPER_ADMIN');
 
@@ -454,12 +451,12 @@ export class ClassEventsService {
     }
   }
 
-  private async validateEventDates(
+  private validateEventDates(
     startDatetime: Date,
     endDatetime: Date,
     evaluationStart: Date,
     evaluationEnd: Date,
-  ): Promise<void> {
+  ): void {
     if (endDatetime <= startDatetime) {
       throw new BadRequestException(
         'La fecha de fin debe ser posterior a la fecha de inicio',

@@ -12,12 +12,25 @@ import * as os from 'os';
 import * as fs from 'fs';
 import { User } from '@modules/users/domain/user.entity';
 import { RedisCacheService } from '@infrastructure/cache/redis-cache.service';
+import { Material } from '@modules/materials/domain/material.entity';
+import { DeletionRequest } from '@modules/materials/domain/deletion-request.entity';
+import { DeletionRequestStatus } from '@modules/materials/domain/deletion-request-status.entity';
+
+interface MaterialDataResponse {
+  data: {
+    id: string;
+    fileResourceId: string;
+  };
+}
+
+interface GenericDataResponse<T> {
+  data: T;
+}
 
 describe('E2E: Versionado, Deduplicación e Integridad', () => {
   let app: INestApplication;
   let dataSource: DataSource;
   let seeder: TestSeeder;
-  let storageService: StorageService;
 
   let professor: { user: User; token: string };
   let admin: { user: User; token: string };
@@ -43,17 +56,20 @@ describe('E2E: Versionado, Deduplicación e Integridad', () => {
           if (content.includes('version2')) return 'hash_v2_456';
           return 'hash_' + Date.now() + Math.random();
         }),
-        saveFile: jest.fn().mockImplementation(async (name, buffer) => {
-          const tempPath = path.join(os.tmpdir(), name);
-          await fs.promises.writeFile(tempPath, buffer);
-          return tempPath;
-        }),
+        saveFile: jest
+          .fn()
+          .mockImplementation(async (name: string, buffer: Buffer) => {
+            const tempPath = path.join(os.tmpdir(), name);
+            await fs.promises.writeFile(tempPath, buffer);
+            return tempPath;
+          }),
         deleteFile: jest.fn().mockResolvedValue(undefined),
         onModuleInit: jest.fn(),
       })
       .compile();
 
     app = moduleFixture.createNestApplication();
+    app.setGlobalPrefix('api/v1');
     app.useGlobalPipes(
       new ValidationPipe({ whitelist: true, transform: true }),
     );
@@ -61,7 +77,6 @@ describe('E2E: Versionado, Deduplicación e Integridad', () => {
     await app.init();
 
     dataSource = app.get(DataSource);
-    storageService = app.get(StorageService);
     const cacheService = app.get(RedisCacheService);
     seeder = new TestSeeder(dataSource, app);
 
@@ -103,7 +118,7 @@ describe('E2E: Versionado, Deduplicación e Integridad', () => {
     );
 
     const folderRes = await request(app.getHttpServer())
-      .post('/materials/folders')
+      .post('/api/v1/materials/folders')
       .set('Authorization', `Bearer ${professor.token}`)
       .send({
         evaluationId: evaluation.id,
@@ -112,40 +127,43 @@ describe('E2E: Versionado, Deduplicación e Integridad', () => {
       })
       .expect(201);
 
-    folderId = folderRes.body.data.id;
+    const folderBody = folderRes.body as GenericDataResponse<{ id: string }>;
+    folderId = folderBody.data.id;
   });
 
   afterAll(async () => {
-    await app.close();
+    if (app) await app.close();
   });
 
   describe('Caso 1: Deduplicación (Ahorro de Espacio)', () => {
     it('Subir Archivo A (Original)', async () => {
       const buffer = Buffer.from('%PDF-1.4 duplicate');
       const res = await request(app.getHttpServer())
-        .post('/materials')
+        .post('/api/v1/materials')
         .set('Authorization', `Bearer ${professor.token}`)
         .attach('file', buffer, 'original.pdf')
         .field('materialFolderId', folderId)
         .field('displayName', 'Original')
         .expect(201);
 
-      materialId = res.body.data.id;
-      originalFileResourceId = res.body.data.fileResourceId;
+      const body = res.body as MaterialDataResponse;
+      materialId = body.data.id;
+      originalFileResourceId = body.data.fileResourceId;
       expect(originalFileResourceId).toBeDefined();
     });
 
     it('Subir Archivo B (Duplicado) -> Debe reutilizar FileResource', async () => {
       const buffer = Buffer.from('%PDF-1.4 duplicate');
       const res = await request(app.getHttpServer())
-        .post('/materials')
+        .post('/api/v1/materials')
         .set('Authorization', `Bearer ${professor.token}`)
         .attach('file', buffer, 'copia.pdf')
         .field('materialFolderId', folderId)
         .field('displayName', 'Copia')
         .expect(201);
 
-      expect(res.body.data.fileResourceId).toBe(originalFileResourceId);
+      const body = res.body as MaterialDataResponse;
+      expect(body.data.fileResourceId).toBe(originalFileResourceId);
     });
   });
 
@@ -154,14 +172,15 @@ describe('E2E: Versionado, Deduplicación e Integridad', () => {
       const buffer = Buffer.from('%PDF-1.4 version2');
 
       const res = await request(app.getHttpServer())
-        .post(`/materials/${materialId}/versions`)
+        .post(`/api/v1/materials/${materialId}/versions`)
         .set('Authorization', `Bearer ${professor.token}`)
         .attach('file', buffer, 'v2.pdf')
         .expect(201);
 
-      expect(res.body.data.id).toBe(materialId);
+      const body = res.body as GenericDataResponse<{ id: string }>;
+      expect(body.data.id).toBe(materialId);
 
-      const mat = await dataSource.getRepository('Material').findOne({
+      const mat = await dataSource.getRepository(Material).findOneOrFail({
         where: { id: materialId },
         relations: { fileVersion: true },
       });
@@ -172,9 +191,11 @@ describe('E2E: Versionado, Deduplicación e Integridad', () => {
 
   describe('Caso 3: Integridad y Limpieza (Hard Delete)', () => {
     it('Hard Delete debe borrar el material y SU versión actual', async () => {
-      const reqRepo = dataSource.getRepository('DeletionRequest');
-      const statusRepo = dataSource.getRepository('DeletionRequestStatus');
-      const pending = await statusRepo.findOne({ where: { code: 'PENDING' } });
+      const reqRepo = dataSource.getRepository(DeletionRequest);
+      const statusRepo = dataSource.getRepository(DeletionRequestStatus);
+      const pending = await statusRepo.findOneOrFail({
+        where: { code: 'PENDING' },
+      });
 
       const req = await reqRepo.save(
         reqRepo.create({
@@ -189,7 +210,7 @@ describe('E2E: Versionado, Deduplicación e Integridad', () => {
       );
 
       await request(app.getHttpServer())
-        .post(`/admin/materials/requests/${req.id}/review`)
+        .post(`/api/v1/admin/materials/requests/${req.id}/review`)
         .set('Authorization', `Bearer ${admin.token}`)
         .send({ action: 'APPROVE' })
         .expect(200);
@@ -200,12 +221,12 @@ describe('E2E: Versionado, Deduplicación e Integridad', () => {
       );
 
       await request(app.getHttpServer())
-        .delete(`/admin/materials/${materialId}/hard-delete`)
+        .delete(`/api/v1/admin/materials/${materialId}/hard-delete`)
         .set('Authorization', `Bearer ${sa.token}`)
         .expect(200);
 
       const mat = await dataSource
-        .getRepository('Material')
+        .getRepository(Material)
         .findOne({ where: { id: materialId } });
       expect(mat).toBeNull();
     });

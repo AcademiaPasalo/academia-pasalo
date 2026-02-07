@@ -9,6 +9,11 @@ import { CourseCycle } from '@modules/courses/domain/course-cycle.entity';
 import { User } from '@modules/users/domain/user.entity';
 import { Evaluation } from '@modules/evaluations/domain/evaluation.entity';
 import { RedisCacheService } from '@infrastructure/cache/redis-cache.service';
+import { EnrollmentEvaluation } from '@modules/enrollments/domain/enrollment-evaluation.entity';
+
+interface EnrollmentResponse {
+  id: string;
+}
 
 describe('E2E: Revocación Administrativa', () => {
   let app: INestApplication;
@@ -78,18 +83,19 @@ describe('E2E: Revocación Administrativa', () => {
         evaluationIds: [pc1.id],
       });
 
-    enrollmentId = res.body.id; // Nota: El interceptor NO está activo en este test setup
+    const body = res.body as EnrollmentResponse;
+    enrollmentId = body.id;
   });
 
   afterAll(async () => {
-    await app.close();
+    if (app) await app.close();
   });
 
   it('Caso 1: Revocación Manual - Admin quita acceso a PC1', async () => {
     expect(await accessEngine.hasAccess(userTarget.id, pc1.id)).toBe(true);
 
     await dataSource
-      .getRepository('EnrollmentEvaluation')
+      .getRepository(EnrollmentEvaluation)
       .update(
         { enrollmentId, evaluationId: pc1.id },
         { isActive: false, revokedAt: new Date() },

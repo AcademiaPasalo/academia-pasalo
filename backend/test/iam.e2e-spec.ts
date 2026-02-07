@@ -1,4 +1,8 @@
-import { INestApplication, ValidationPipe, HttpStatus } from '@nestjs/common';
+import {
+  INestApplication,
+  ValidationPipe,
+  ExecutionContext,
+} from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { HttpAdapterHost, Reflector, APP_GUARD } from '@nestjs/core';
 import { ConfigService } from '@nestjs/config';
@@ -22,6 +26,16 @@ import { PhotoSource } from './../src/modules/users/domain/user.entity';
 import { RedisCacheService } from '../src/infrastructure/cache/redis-cache.service';
 
 const JWT_SECRET = 'test-jwt-secret';
+
+interface StandardResponse {
+  statusCode: number;
+  message: string;
+  data: unknown;
+}
+
+interface RequestWithUrl {
+  url: string;
+}
 
 describe('IAM (e2e)', () => {
   let app: INestApplication;
@@ -90,7 +104,6 @@ describe('IAM (e2e)', () => {
   const userSessionRepositoryMock = {
     findById: jest.fn(),
     findByIdWithUser: jest.fn(async (id: string) => {
-      // Sesión '99' es Admin, sesión '10' es Normal
       const user = id === '99' ? adminUser : normalUser;
       return {
         id,
@@ -103,8 +116,8 @@ describe('IAM (e2e)', () => {
   };
 
   class MockJwtAuthGuard extends JwtAuthGuard {
-    async canActivate(context: any): Promise<boolean> {
-      const req = context.switchToHttp().getRequest();
+    override async canActivate(context: ExecutionContext): Promise<boolean> {
+      const req = context.switchToHttp().getRequest<RequestWithUrl>();
       if (req.url.includes('/auth/google')) return true;
       return super.canActivate(context) as Promise<boolean>;
     }
@@ -193,7 +206,8 @@ describe('IAM (e2e)', () => {
       .send({ code: 't', deviceId: 'device-1' })
       .expect(200);
 
-    expect(response.body.data).toMatchObject({
+    const body = response.body as StandardResponse;
+    expect(body.data).toMatchObject({
       accessToken: 'access-token',
       refreshToken: 'refresh-token',
     });
@@ -213,7 +227,6 @@ describe('IAM (e2e)', () => {
   });
 
   it('GET /api/v1/users con token sin rol ADMIN/SUPER_ADMIN -> 403', async () => {
-    // Usamos sesión '10' que el mock mapea a normalUser (STUDENT)
     const token = signAccessToken(normalUser.id, '10');
     await request(app.getHttpServer())
       .get('/api/v1/users')
@@ -222,13 +235,13 @@ describe('IAM (e2e)', () => {
   });
 
   it('GET /api/v1/users con token ADMIN -> 200', async () => {
-    // Usamos sesión '99' que el mock mapea a adminUser (ADMIN)
     const token = signAccessToken(adminUser.id, '99');
     const response = await request(app.getHttpServer())
       .get('/api/v1/users')
       .set('Authorization', `Bearer ${token}`)
       .expect(200);
-    expect(Array.isArray(response.body.data)).toBe(true);
+    const body = response.body as StandardResponse;
+    expect(Array.isArray(body.data)).toBe(true);
   });
 
   it('GET /api/v1/users/:id requiere JWT pero no rol (200 con token sin rol)', async () => {
@@ -237,6 +250,7 @@ describe('IAM (e2e)', () => {
       .get(`/api/v1/users/${normalUser.id}`)
       .set('Authorization', `Bearer ${token}`)
       .expect(200);
-    expect(response.body.statusCode).toBe(200);
+    const body = response.body as StandardResponse;
+    expect(body.statusCode).toBe(200);
   });
 });

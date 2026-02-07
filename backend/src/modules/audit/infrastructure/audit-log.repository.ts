@@ -5,6 +5,10 @@ import { AuditLog } from '@modules/audit/domain/audit-log.entity';
 import { technicalSettings } from '@config/technical-settings';
 import type { EntityManager } from 'typeorm';
 
+interface MysqlDeleteResult {
+  affectedRows: number;
+}
+
 @Injectable()
 export class AuditLogRepository {
   constructor(
@@ -63,11 +67,10 @@ export class AuditLogRepository {
     const maxBatches = technicalSettings.audit.maxCleanupBatchesPerRun;
 
     do {
-      const result = await this.repository.query(
+      const result: MysqlDeleteResult = await this.repository.query(
         'DELETE FROM audit_log WHERE event_datetime < ? LIMIT ?',
         [date, batchSize],
       );
-
       batchDeleted = result.affectedRows || 0;
       totalDeleted += batchDeleted;
       iterationCount++;

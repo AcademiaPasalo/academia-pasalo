@@ -5,6 +5,10 @@ import type { EntityManager } from 'typeorm';
 import { SecurityEvent } from '@modules/auth/domain/security-event.entity';
 import { technicalSettings } from '@config/technical-settings';
 
+interface MysqlDeleteResult {
+  affectedRows: number;
+}
+
 @Injectable()
 export class SecurityEventRepository {
   constructor(
@@ -78,23 +82,17 @@ export class SecurityEventRepository {
     batchSize = technicalSettings.audit.cleanupBatchSize,
   ): Promise<number> {
     let totalDeleted = 0;
-
     let batchDeleted = 0;
-
     let iterationCount = 0;
-
     const maxBatches = technicalSettings.audit.maxCleanupBatchesPerRun;
 
     do {
-      const result = await this.ormRepository.query(
+      const result: MysqlDeleteResult = await this.ormRepository.query(
         'DELETE FROM security_event WHERE event_datetime < ? LIMIT ?',
         [date, batchSize],
       );
-
       batchDeleted = result.affectedRows || 0;
-
       totalDeleted += batchDeleted;
-
       iterationCount++;
     } while (batchDeleted === batchSize && iterationCount < maxBatches);
 

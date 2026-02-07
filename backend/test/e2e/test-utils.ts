@@ -9,6 +9,16 @@ import { User, PhotoSource } from '@modules/users/domain/user.entity';
 import { Role } from '@modules/users/domain/role.entity';
 import { RedisCacheService } from '@infrastructure/cache/redis-cache.service';
 
+interface BasicEntity {
+  id: string;
+  code: string;
+}
+
+interface CycleLevelEntity {
+  id: string;
+  levelNumber: number;
+}
+
 export class TestSeeder {
   private jwtService: JwtService;
   private cacheService: RedisCacheService;
@@ -49,17 +59,21 @@ export class TestSeeder {
     const typeRepo = this.dataSource.getRepository('CourseType');
     const levelRepo = this.dataSource.getRepository('CycleLevel');
 
-    let type = await typeRepo.findOne({ where: { code: 'REG' } });
+    let type = (await typeRepo.findOne({
+      where: { code: 'REG' },
+    })) as BasicEntity | null;
     if (!type)
-      type = await typeRepo.save(
+      type = (await typeRepo.save(
         typeRepo.create({ code: 'REG', name: 'Regular' }),
-      );
+      )) as BasicEntity;
 
-    let level = await levelRepo.findOne({ where: { levelNumber: 1 } });
+    let level = (await levelRepo.findOne({
+      where: { levelNumber: 1 },
+    })) as CycleLevelEntity | null;
     if (!level)
-      level = await levelRepo.save(
+      level = (await levelRepo.save(
         levelRepo.create({ levelNumber: 1, name: 'L1' }),
-      );
+      )) as CycleLevelEntity;
 
     const repo = this.dataSource.getRepository(Course);
     return await repo.save(
@@ -93,13 +107,13 @@ export class TestSeeder {
     const evalRepo = this.dataSource.getRepository(Evaluation);
     const typeRepo = this.dataSource.getRepository('EvaluationType');
 
-    let bankType = await typeRepo.findOne({
+    let bankType = (await typeRepo.findOne({
       where: { code: 'BANCO_ENUNCIADOS' },
-    });
+    })) as BasicEntity | null;
     if (!bankType)
-      bankType = await typeRepo.save(
+      bankType = (await typeRepo.save(
         typeRepo.create({ code: 'BANCO_ENUNCIADOS', name: 'Banco' }),
-      );
+      )) as BasicEntity;
 
     const cycle = await this.dataSource
       .getRepository(AcademicCycle)
@@ -167,11 +181,13 @@ export class TestSeeder {
     end: string,
   ): Promise<Evaluation> {
     const typeRepo = this.dataSource.getRepository('EvaluationType');
-    let type = await typeRepo.findOne({ where: { code: typeCode } });
+    let type = (await typeRepo.findOne({
+      where: { code: typeCode },
+    })) as BasicEntity | null;
     if (!type)
-      type = await typeRepo.save(
+      type = (await typeRepo.save(
         typeRepo.create({ code: typeCode, name: typeCode }),
-      );
+      )) as BasicEntity;
 
     const repo = this.dataSource.getRepository(Evaluation);
     const evaluation = repo.create({
@@ -207,12 +223,10 @@ export class TestSeeder {
       );
     }
 
-    // 1. Limpieza absoluta de roles previos
     await this.dataSource.query('DELETE FROM user_role WHERE user_id = ?', [
       user.id,
     ]);
 
-    // 2. Asignar nuevos roles
     const userRoles: Role[] = [];
     for (const roleCode of roles) {
       let role = await roleRepo.findOne({ where: { code: roleCode } });
@@ -226,19 +240,19 @@ export class TestSeeder {
     user.roles = userRoles;
     await userRepo.save(user);
 
-    // 3. Pequeño respiro para la DB
     await this.sleep(50);
 
-    // 4. Crear Sesión
     const statusRepo = this.dataSource.getRepository('SessionStatus');
-    let activeStatus = await statusRepo.findOne({ where: { code: 'ACTIVE' } });
+    let activeStatus = (await statusRepo.findOne({
+      where: { code: 'ACTIVE' },
+    })) as BasicEntity | null;
     if (!activeStatus)
-      activeStatus = await statusRepo.save(
+      activeStatus = (await statusRepo.save(
         statusRepo.create({ code: 'ACTIVE', name: 'Active' }),
-      );
+      )) as BasicEntity;
 
     const sessionRepo = this.dataSource.getRepository('UserSession');
-    const session = await sessionRepo.save(
+    const session = (await sessionRepo.save(
       sessionRepo.create({
         userId: user.id,
         deviceId: 'device-' + Date.now(),
@@ -250,23 +264,21 @@ export class TestSeeder {
         lastActivityAt: new Date(),
         createdAt: new Date(),
       }),
-    );
+    )) as { id: string };
 
-    // 5. Limpieza de Caché
     await this.cacheService.del(`cache:session:${session.id}:user`);
     await this.cacheService.invalidateGroup(`cache:access:user:${user.id}:*`);
 
-    // 6. Token
     const payload = {
       sub: user.id,
       email: user.email,
       roles: roles,
-      activeRole: roles[0], // Default active role
+      activeRole: roles[0],
       sessionId: session.id,
     };
 
     const token = this.jwtService.sign(payload);
-    user.roles = roles.map((code) => ({ code }) as any);
+    user.roles = userRoles;
 
     return { user, token };
   }

@@ -2,7 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtModule, JwtService } from '@nestjs/jwt';
-import { DataSource } from 'typeorm';
+import { DataSource, EntityManager } from 'typeorm';
 import { AuthService } from '../src/modules/auth/application/auth.service';
 import { SessionService } from '../src/modules/auth/application/session.service';
 import { SecurityEventService } from '../src/modules/auth/application/security-event.service';
@@ -46,10 +46,10 @@ describe('Security Scenarios (Integration)', () => {
 
   const mockDataSource = {
     transaction: jest.fn(
-      (cb: (manager: any) => Promise<any>): Promise<any> =>
-        cb(mockDataSource.manager),
+      (cb: (manager: EntityManager) => Promise<unknown>): Promise<unknown> =>
+        cb(mockDataSource.manager as EntityManager),
     ),
-    manager: {},
+    manager: {} as Partial<EntityManager>,
   };
 
   const mockUsersService = {
@@ -97,11 +97,11 @@ describe('Security Scenarios (Integration)', () => {
   };
 
   const mockSessionStatusRepository = {
-    findByCode: jest.fn((code) => Promise.resolve({ id: '100', code })),
+    findByCode: jest.fn((code: string) => Promise.resolve({ id: '100', code })),
   };
 
   const mockAnomalyDetector = {
-    resolveCoordinates: jest.fn().mockImplementation((meta) =>
+    resolveCoordinates: jest.fn().mockImplementation((meta: RequestMetadata) =>
       Promise.resolve({
         metadata: meta,
         locationSource: 'gps',
@@ -115,7 +115,6 @@ describe('Security Scenarios (Integration)', () => {
     }),
   };
 
-  // Mock actualizado para usar el Puerto
   const mockGeoProvider = {
     resolve: jest.fn().mockResolvedValue(null),
   };
@@ -207,12 +206,8 @@ describe('Security Scenarios (Integration)', () => {
     securityEventService =
       moduleFixture.get<SecurityEventService>(SecurityEventService);
 
-    (authService as any).verifyCodeAndGetEmail = jest
-      .fn()
-      .mockResolvedValue(mockUser.email);
-
     mockAnomalyDetector.detectLocationAnomaly.mockImplementation(
-      (userId, metadata) => {
+      (userId: string, metadata: RequestMetadata) => {
         if (metadata && metadata.ipAddress === '8.8.8.8') {
           return Promise.resolve({
             isAnomalous: true,
@@ -357,11 +352,16 @@ describe('Security Scenarios (Integration)', () => {
   describe('JWT STRATEGY & ACCESS CONTROL', () => {
     it('should REJECT access if session is BLOCKED in database', async () => {
       const strategy = new JwtStrategy(
-        { get: () => 'secret' } as any,
-        {} as any,
-        mockUserSessionRepository as any,
-        { getIdByCode: () => Promise.resolve('1') } as any,
-        { get: jest.fn().mockResolvedValue(null), set: jest.fn() } as any,
+        { get: () => 'secret' } as unknown as ConfigService,
+        {} as unknown as TokenService,
+        mockUserSessionRepository as unknown as UserSessionRepository,
+        {
+          getIdByCode: () => Promise.resolve('1'),
+        } as unknown as SessionStatusService,
+        {
+          get: jest.fn().mockResolvedValue(null),
+          set: jest.fn(),
+        } as unknown as RedisCacheService,
       );
 
       const payload = {

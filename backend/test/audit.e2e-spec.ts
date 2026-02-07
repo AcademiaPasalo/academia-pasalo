@@ -10,9 +10,14 @@ import { TestSeeder } from './e2e/test-utils';
 
 jest.setTimeout(60000);
 
+interface AuditHistoryResponse {
+  statusCode: number;
+  message: string;
+  data: unknown[];
+}
+
 describe('AuditController (e2e)', () => {
   let app: INestApplication;
-  let dataSource: DataSource;
   let seeder: TestSeeder;
   let accessToken: string;
 
@@ -39,10 +44,9 @@ describe('AuditController (e2e)', () => {
 
     await app.init();
 
-    dataSource = app.get(DataSource);
+    const dataSource = app.get(DataSource);
     seeder = new TestSeeder(dataSource, app);
 
-    // Crear un usuario ADMIN real con sesión activa en DB
     const auth = await seeder.createAuthenticatedUser('admin-audit@test.com', [
       'ADMIN',
     ]);
@@ -65,8 +69,9 @@ describe('AuditController (e2e)', () => {
       .set('Authorization', `Bearer ${accessToken}`)
       .expect(200);
 
-    expect(response.body.statusCode).toBe(200);
-    expect(Array.isArray(response.body.data)).toBe(true);
+    const body = response.body as AuditHistoryResponse;
+    expect(body.statusCode).toBe(200);
+    expect(Array.isArray(body.data)).toBe(true);
   });
 
   it('/audit/history (GET) - should filter by date', async () => {
@@ -85,7 +90,7 @@ describe('AuditController (e2e)', () => {
       .parse((res, callback) => {
         res.setEncoding('binary');
         let data = '';
-        res.on('data', (chunk) => {
+        res.on('data', (chunk: string) => {
           data += chunk;
         });
         res.on('end', () => {
@@ -101,6 +106,7 @@ describe('AuditController (e2e)', () => {
       'attachment; filename=reporte-auditoria',
     );
     expect(Buffer.isBuffer(response.body)).toBe(true);
-    expect(response.body.length).toBeGreaterThan(0);
+    const buffer = response.body as Buffer;
+    expect(buffer.length).toBeGreaterThan(0);
   });
 });

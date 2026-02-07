@@ -9,6 +9,7 @@ import { AcademicCycle } from '@modules/cycles/domain/academic-cycle.entity';
 import { CourseCycle } from '@modules/courses/domain/course-cycle.entity';
 import { User } from '@modules/users/domain/user.entity';
 import { Evaluation } from '@modules/evaluations/domain/evaluation.entity';
+import { EnrollmentEvaluation } from '@modules/enrollments/domain/enrollment-evaluation.entity';
 
 describe('E2E: Estructuras Dinámicas y Acceso Evolutivo', () => {
   let app: INestApplication;
@@ -22,7 +23,6 @@ describe('E2E: Estructuras Dinámicas y Acceso Evolutivo', () => {
   let userPartial: User;
   let pc1: Evaluation;
 
-  // Fechas dinámicas
   const now = new Date();
   const yesterday = new Date(now);
   yesterday.setDate(now.getDate() - 1);
@@ -50,7 +50,6 @@ describe('E2E: Estructuras Dinámicas y Acceso Evolutivo', () => {
     accessEngine = app.get(AccessEngineService);
     seeder = new TestSeeder(dataSource, app);
 
-    // 1. Setup Base
     const uniqueSuffix = Date.now().toString();
     currentCycle = await seeder.createCycle(
       `2026-DYN-${uniqueSuffix}`,
@@ -63,7 +62,6 @@ describe('E2E: Estructuras Dinámicas y Acceso Evolutivo', () => {
     );
     courseCycle = await seeder.linkCourseCycle(course.id, currentCycle.id);
 
-    // 2. Crear PC1 Inicial (IMPORTANTE: Antes de las matrículas)
     pc1 = await seeder.createEvaluation(
       courseCycle.id,
       'PC',
@@ -72,7 +70,6 @@ describe('E2E: Estructuras Dinámicas y Acceso Evolutivo', () => {
       formatDate(nextMonth),
     );
 
-    // 3. Crear Usuarios
     const adminEmail = TestSeeder.generateUniqueEmail('admin_dyn');
     const userFullEmail = TestSeeder.generateUniqueEmail('full_dyn');
     const userPartialEmail = TestSeeder.generateUniqueEmail('partial_dyn');
@@ -81,8 +78,6 @@ describe('E2E: Estructuras Dinámicas y Acceso Evolutivo', () => {
     userFull = await seeder.createUser(userFullEmail);
     userPartial = await seeder.createUser(userPartialEmail);
 
-    // 4. Matriculas Iniciales
-    // Full
     await request(app.getHttpServer())
       .post('/enrollments')
       .set('Authorization', `Bearer ${admin.token}`)
@@ -93,7 +88,6 @@ describe('E2E: Estructuras Dinámicas y Acceso Evolutivo', () => {
       })
       .expect(201);
 
-    // Parcial (Solo PC1)
     await request(app.getHttpServer())
       .post('/enrollments')
       .set('Authorization', `Bearer ${admin.token}`)
@@ -107,12 +101,10 @@ describe('E2E: Estructuras Dinámicas y Acceso Evolutivo', () => {
   });
 
   afterAll(async () => {
-    await app.close();
+    if (app) await app.close();
   });
 
   it('Caso 1: Creación tardía de PC2 - Usuario Full debe tener acceso automático', async () => {
-    // A. Crear PC2 DESPUÉS de la matrícula
-    // Usamos 'yesterday' para asegurar que sea accesible inmediatamente
     const pc2 = await seeder.createEvaluation(
       courseCycle.id,
       'PC',
@@ -121,14 +113,12 @@ describe('E2E: Estructuras Dinámicas y Acceso Evolutivo', () => {
       formatDate(next2Months),
     );
 
-    // B. Verificar acceso Full (Debería ser TRUE gracias al EvaluationSubscriber)
     const hasAccess = await accessEngine.hasAccess(userFull.id, pc2.id);
     expect(hasAccess).toBe(true);
   });
 
   it('Caso 2: Creación tardía de PC2 - Usuario Parcial NO debe tener acceso', async () => {
-    // Recuperamos la PC2 creada en el test anterior
-    const evaluations = await dataSource.getRepository('Evaluation').find({
+    const evaluations = await dataSource.getRepository(Evaluation).find({
       where: { courseCycleId: courseCycle.id, number: 2 },
     });
     const pc2 = evaluations[0];
@@ -138,15 +128,13 @@ describe('E2E: Estructuras Dinámicas y Acceso Evolutivo', () => {
   });
 
   it('Caso 3: Acceso a Banco de Enunciados - Usuario Parcial (Debe expirar con PC1)', async () => {
-    // Buscar la evaluación Banco (number 0)
-    const banco = await dataSource.getRepository('Evaluation').findOne({
+    const banco = await dataSource.getRepository(Evaluation).findOneOrFail({
       where: { courseCycleId: courseCycle.id, number: 0 },
     });
 
-    // Validar que existe acceso
     const accessRow = await dataSource
-      .getRepository('EnrollmentEvaluation')
-      .findOne({
+      .getRepository(EnrollmentEvaluation)
+      .findOneOrFail({
         where: {
           enrollment: { userId: userPartial.id },
           evaluationId: banco.id,
@@ -163,8 +151,6 @@ describe('E2E: Estructuras Dinámicas y Acceso Evolutivo', () => {
   });
 
   it('Caso 4: Creación tardía de Banco de Enunciados - Todos deben tener acceso (con clamping)', async () => {
-    // A. Simular creación de un Banco de Enunciados Extra (aunque normalmente solo hay uno)
-    // Para probar el subscriber con BANCO_ENUNCIADOS
     const extraBank = await seeder.createEvaluation(
       courseCycle.id,
       'BANCO_ENUNCIADOS',
@@ -173,10 +159,9 @@ describe('E2E: Estructuras Dinámicas y Acceso Evolutivo', () => {
       formatDate(next2Months),
     );
 
-    // B. Usuario Full debe tener acceso hasta el fin del ciclo (next2Months)
     const accessFull = await dataSource
-      .getRepository('EnrollmentEvaluation')
-      .findOne({
+      .getRepository(EnrollmentEvaluation)
+      .findOneOrFail({
         where: {
           enrollment: { userId: userFull.id },
           evaluationId: extraBank.id,
@@ -186,10 +171,9 @@ describe('E2E: Estructuras Dinámicas y Acceso Evolutivo', () => {
       formatDate(next2Months),
     );
 
-    // C. Usuario Parcial debe tener acceso solo hasta el fin de sus evaluaciones (PC1 = nextMonth)
     const accessPartial = await dataSource
-      .getRepository('EnrollmentEvaluation')
-      .findOne({
+      .getRepository(EnrollmentEvaluation)
+      .findOneOrFail({
         where: {
           enrollment: { userId: userPartial.id },
           evaluationId: extraBank.id,

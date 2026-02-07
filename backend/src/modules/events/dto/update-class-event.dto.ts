@@ -1,9 +1,7 @@
 import {
   IsString,
   IsOptional,
-  IsInt,
   IsDateString,
-  Min,
   MaxLength,
   IsUrl,
 } from 'class-validator';

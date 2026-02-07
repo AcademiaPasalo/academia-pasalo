@@ -14,17 +14,28 @@ import { User } from '@modules/users/domain/user.entity';
 import { CourseCycle } from '@modules/courses/domain/course-cycle.entity';
 import { Evaluation } from '@modules/evaluations/domain/evaluation.entity';
 import { RedisCacheService } from '@infrastructure/cache/redis-cache.service';
+import { Enrollment } from '@modules/enrollments/domain/enrollment.entity';
+
+interface MaterialFolderResponse {
+  data: {
+    id: string;
+  };
+}
+
+interface MaterialUploadResponse {
+  data: {
+    id: string;
+  };
+}
 
 describe('E2E: Gestión de Materiales y Seguridad', () => {
   let app: INestApplication;
   let dataSource: DataSource;
   let seeder: TestSeeder;
-  let storageService: StorageService;
 
   let admin: { user: User; token: string };
   let professor: { user: User; token: string };
   let studentWithAccess: { user: User; token: string };
-  let studentWithoutAccess: { user: User; token: string };
   let courseCycle: CourseCycle;
   let evaluation: Evaluation;
   let rootFolderId: string;
@@ -43,11 +54,13 @@ describe('E2E: Gestión de Materiales y Seguridad', () => {
       .overrideProvider(StorageService)
       .useValue({
         calculateHash: jest.fn().mockResolvedValue('mock-sha256-hash'),
-        saveFile: jest.fn().mockImplementation(async (name, buffer) => {
-          const tempPath = path.join(os.tmpdir(), name);
-          await fs.promises.writeFile(tempPath, buffer);
-          return tempPath;
-        }),
+        saveFile: jest
+          .fn()
+          .mockImplementation(async (name: string, buffer: Buffer) => {
+            const tempPath = path.join(os.tmpdir(), name);
+            await fs.promises.writeFile(tempPath, buffer);
+            return tempPath;
+          }),
         deleteFile: jest.fn().mockResolvedValue(undefined),
         onModuleInit: jest.fn(),
       })
@@ -65,7 +78,6 @@ describe('E2E: Gestión de Materiales y Seguridad', () => {
     await app.init();
 
     dataSource = app.get(DataSource);
-    storageService = app.get(StorageService);
     const cacheService = app.get(RedisCacheService);
     seeder = new TestSeeder(dataSource, app);
 
@@ -121,7 +133,6 @@ describe('E2E: Gestión de Materiales y Seguridad', () => {
       ['PROFESSOR'],
     );
 
-    // Asignar profesor al curso
     await dataSource.query(
       'INSERT INTO course_cycle_professor (course_cycle_id, professor_user_id, assigned_at) VALUES (?, ?, NOW())',
       [courseCycle.id, professor.user.id],
@@ -141,15 +152,10 @@ describe('E2E: Gestión de Materiales y Seguridad', () => {
         enrollmentTypeCode: 'FULL',
       })
       .expect(201);
-
-    studentWithoutAccess = await seeder.createAuthenticatedUser(
-      TestSeeder.generateUniqueEmail('student_fail'),
-      ['STUDENT'],
-    );
   });
 
   afterAll(async () => {
-    await app.close();
+    if (app) await app.close();
   });
 
   describe('GESTIÓN DE CARPETAS Y ARCHIVOS', () => {
@@ -164,7 +170,8 @@ describe('E2E: Gestión de Materiales y Seguridad', () => {
         })
         .expect(201);
 
-      rootFolderId = res.body.data.id;
+      const body = res.body as MaterialFolderResponse;
+      rootFolderId = body.data.id;
       expect(rootFolderId).toBeDefined();
     });
 
@@ -213,7 +220,9 @@ describe('E2E: Gestión de Materiales y Seguridad', () => {
           visibleFrom: future.toISOString(),
         })
         .expect(201);
-      lockedFolderId = resFolder.body.data.id;
+
+      const folderBody = resFolder.body as MaterialFolderResponse;
+      lockedFolderId = folderBody.data.id;
 
       const buffer = Buffer.from('%PDF-1.4 locked');
       const resMat = await request(app.getHttpServer())
@@ -223,7 +232,9 @@ describe('E2E: Gestión de Materiales y Seguridad', () => {
         .field('materialFolderId', lockedFolderId)
         .field('displayName', 'Examen Confidencial')
         .expect(201);
-      materialId = resMat.body.data.id;
+
+      const matBody = resMat.body as MaterialUploadResponse;
+      materialId = matBody.data.id;
     });
 
     it('Profesor NO debe poder ver raíces de un curso ajeno (403)', async () => {
@@ -248,7 +259,7 @@ describe('E2E: Gestión de Materiales y Seguridad', () => {
     });
 
     it('Estudiante con MATRÍCULA CANCELADA debe recibir 403', async () => {
-      const enrollmentRepo = dataSource.getRepository('Enrollment');
+      const enrollmentRepo = dataSource.getRepository(Enrollment);
       const enrollment = await enrollmentRepo.findOne({
         where: {
           userId: studentWithAccess.user.id,
@@ -259,13 +270,11 @@ describe('E2E: Gestión de Materiales y Seguridad', () => {
         await enrollmentRepo.update(enrollment.id, { cancelledAt: new Date() });
       }
 
-      // 2. IMPORTANTE: Invalidar el caché de acceso para que el sistema consulte la DB
       const cacheService = app.get(RedisCacheService);
       await cacheService.del(
         `cache:access:user:${studentWithAccess.user.id}:eval:${evaluation.id}`,
       );
 
-      // 3. Intentar ver carpetas (Debería fallar ahora que la matrícula está cancelada)
       await request(app.getHttpServer())
         .get(`/api/v1/materials/folders/evaluation/${evaluation.id}`)
         .set('Authorization', `Bearer ${studentWithAccess.token}`)

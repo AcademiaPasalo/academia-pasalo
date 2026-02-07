@@ -1,83 +1,47 @@
-import {
-  Injectable,
-  Logger,
-  OnModuleInit,
-  InternalServerErrorException,
-} from '@nestjs/common';
+import { Injectable, OnModuleInit, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import * as fs from 'fs/promises';
+import * as fs from 'fs';
 import * as path from 'path';
 import * as crypto from 'crypto';
+import { technicalSettings } from '@config/technical-settings';
 
 @Injectable()
 export class StorageService implements OnModuleInit {
   private readonly logger = new Logger(StorageService.name);
-  private readonly storageRoot: string;
+  private storagePath: string;
 
-  constructor(private readonly configService: ConfigService) {
-    this.storageRoot = this.configService.get<string>(
+  constructor(private configService: ConfigService) {
+    this.storagePath = this.configService.get<string>(
       'STORAGE_PATH',
-      path.join(process.cwd(), 'uploads'),
+      technicalSettings.uploads.storage.storagePathFallback,
     );
   }
 
   async onModuleInit() {
-    try {
-      await fs.mkdir(this.storageRoot, { recursive: true });
+    if (!fs.existsSync(this.storagePath)) {
       this.logger.log({
-        message: 'Directorio de almacenamiento inicializado',
-        path: this.storageRoot,
-        timestamp: new Date().toISOString(),
+        message: 'Creando directorio de almacenamiento',
+        path: this.storagePath,
       });
-    } catch (error) {
-      this.logger.error({
-        message: 'Fallo al inicializar el directorio de almacenamiento',
-        error: error instanceof Error ? error.message : 'Unknown error',
-        timestamp: new Date().toISOString(),
-      });
-      throw new InternalServerErrorException(
-        'Error crítico de infraestructura de almacenamiento.',
-      );
+      await fs.promises.mkdir(this.storagePath, { recursive: true });
     }
-  }
-
-  async calculateHash(buffer: Buffer): Promise<string> {
-    return crypto.createHash('sha256').update(buffer).digest('hex');
   }
 
   async saveFile(fileName: string, buffer: Buffer): Promise<string> {
-    try {
-      const filePath = path.join(this.storageRoot, fileName);
-      await fs.writeFile(filePath, buffer);
-      return filePath;
-    } catch (error) {
-      this.logger.error({
-        message: 'Error al guardar archivo físicamente',
-        fileName,
-        error: error instanceof Error ? error.message : 'Unknown error',
-        timestamp: new Date().toISOString(),
-      });
-      throw new InternalServerErrorException(
-        'No se pudo persistir el archivo en el servidor.',
-      );
-    }
+    const filePath = path.join(this.storagePath, fileName);
+    await fs.promises.writeFile(filePath, buffer);
+    return filePath;
   }
 
   async deleteFile(fileName: string): Promise<void> {
-    try {
-      const filePath = path.join(this.storageRoot, fileName);
-      await fs.unlink(filePath);
-    } catch (error) {
-      this.logger.warn({
-        message: 'Error al intentar eliminar archivo (posiblemente no exista)',
-        fileName,
-        error: error instanceof Error ? error.message : 'Unknown error',
-        timestamp: new Date().toISOString(),
-      });
+    const filePath = path.join(this.storagePath, fileName);
+    if (fs.existsSync(filePath)) {
+      await fs.promises.unlink(filePath);
     }
   }
 
-  getStorageRoot(): string {
-    return this.storageRoot;
+  calculateHash(buffer: Buffer): Promise<string> {
+    const hash = crypto.createHash('sha256').update(buffer).digest('hex');
+    return Promise.resolve(hash);
   }
 }
