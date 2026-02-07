@@ -1,4 +1,5 @@
-import { Controller, Get, Query, UseGuards } from '@nestjs/common';
+import { Controller, Get, Query, UseGuards, Res } from '@nestjs/common';
+import * as express from 'express';
 import { AuditService } from '@modules/audit/application/audit.service';
 import { JwtAuthGuard } from '@common/guards/jwt-auth.guard';
 import { RolesGuard } from '@common/guards/roles.guard';
@@ -26,4 +27,31 @@ export class AuditController {
       limit: limit ? Number(limit) : undefined,
     });
   }
+
+  @Get('export')
+  @Roles('SUPER_ADMIN', 'ADMIN')
+  async exportHistory(
+    @Res() res: express.Response,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+    @Query('userId') userId?: string,
+  ) {
+    const buffer = await this.auditService.exportHistoryToExcel({
+      startDate,
+      endDate,
+      userId,
+    });
+
+    const filename = `reporte-auditoria-${new Date().toISOString().split('T')[0]}.xlsx`;
+
+    res.set({
+      'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'Content-Disposition': `attachment; filename=${filename}`,
+      'Content-Length': buffer.length,
+    });
+
+    res.end(buffer);
+  }
 }
+
+

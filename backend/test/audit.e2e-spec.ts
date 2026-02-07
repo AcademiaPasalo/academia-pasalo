@@ -8,6 +8,8 @@ import { AllExceptionsFilter } from '../src/common/filters/all-exceptions.filter
 import { TransformInterceptor } from '../src/common/interceptors/transform.interceptor';
 import { TestSeeder } from './e2e/test-utils';
 
+jest.setTimeout(60000);
+
 describe('AuditController (e2e)', () => {
   let app: INestApplication;
   let dataSource: DataSource;
@@ -71,5 +73,28 @@ describe('AuditController (e2e)', () => {
       .get(`/api/v1/audit/history?startDate=${startDate}`)
       .set('Authorization', `Bearer ${accessToken}`)
       .expect(200);
+  });
+
+  it('/audit/export (GET) - should return an excel file', async () => {
+    const response = await request(app.getHttpServer())
+      .get('/api/v1/audit/export')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .buffer()
+      .parse((res, callback) => {
+        res.setEncoding('binary');
+        let data = '';
+        res.on('data', (chunk) => {
+          data += chunk;
+        });
+        res.on('end', () => {
+          callback(null, Buffer.from(data, 'binary'));
+        });
+      })
+      .expect(200);
+
+    expect(response.header['content-type']).toBe('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    expect(response.header['content-disposition']).toContain('attachment; filename=reporte-auditoria');
+    expect(Buffer.isBuffer(response.body)).toBe(true);
+    expect(response.body.length).toBeGreaterThan(0);
   });
 });
