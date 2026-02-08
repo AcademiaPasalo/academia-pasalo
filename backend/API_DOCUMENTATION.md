@@ -262,6 +262,11 @@ Base URL: `/api/v1/cycles` | `/api/v1/courses`
 *   **Endpoint:** `GET /`
 *   **Roles:** `ADMIN`, `SUPER_ADMIN`
 
+#### Obtener Materia por ID
+*   **Endpoint:** `GET /:id`
+*   **Roles:** `ADMIN`, `SUPER_ADMIN`
+*   **Response:** Objeto Course con su tipo y nivel.
+
 #### Listar Tipos y Niveles
 *   **GET /types**: Tipos de cursos (Ciencias, Letras, etc.).
 *   **GET /levels**: Niveles (Ciclo 1, Ciclo 2, etc.).
@@ -323,10 +328,53 @@ Base URL: `/api/v1/enrollments`
       "userId": "string",
       "courseCycleId": "string",
       "enrollmentTypeCode": "FULL | PARTIAL",
-      "evaluationIds": ["string"] (Opcional, para PARTIAL),
-      "historicalCourseCycleIds": ["string"] (Opcional, para acceso histórico)
+      "evaluationIds": ["string"],
+      "historicalCourseCycleIds": ["string"]
     }
     ```
+
+#### Tipos de Matrícula:
+
+| Tipo | `evaluationIds` | `historicalCourseCycleIds` | Comportamiento |
+|------|-----------------|---------------------------|----------------|
+| **FULL** | Ignorado | Opcional | Acceso a TODAS las evaluaciones del ciclo actual + ciclos históricos |
+| **PARTIAL** | **Requerido** | Opcional | Acceso SOLO a evaluaciones específicas (pueden ser de ciclos pasados) |
+
+#### Ejemplos de Uso:
+
+**1. FULL con acceso histórico:**
+```json
+{
+  "userId": "123",
+  "courseCycleId": "ciclo-2026-1",
+  "enrollmentTypeCode": "FULL",
+  "historicalCourseCycleIds": ["ciclo-2025-2", "ciclo-2025-1"]
+}
+```
+*Resultado: Acceso a todas las evaluaciones del ciclo actual + todos los exámenes de los 2 ciclos anteriores.*
+
+**2. PARTIAL solo ciclo actual:**
+```json
+{
+  "userId": "456",
+  "courseCycleId": "ciclo-2026-1",
+  "enrollmentTypeCode": "PARTIAL",
+  "evaluationIds": ["pc1-id", "pc2-id"]
+}
+```
+*Resultado: Acceso solo a PC1 y PC2 del ciclo actual.*
+
+**3. PARTIAL con evaluación de ciclo histórico:**
+```json
+{
+  "userId": "789",
+  "courseCycleId": "ciclo-2026-1",
+  "enrollmentTypeCode": "PARTIAL",
+  "evaluationIds": ["ex-final-2025-2"],
+  "historicalCourseCycleIds": ["ciclo-2025-2"]
+}
+```
+*Resultado: Acceso solo al examen final del ciclo 2025-2 para práctica.*
 
 ### 2. Cancelar Matrícula
 *   **Endpoint:** `DELETE /:id`

@@ -32,3 +32,15 @@ Cualquier código que viole estas reglas será rechazado automáticamente.
 - **PRUEBAS:** Cada nueva funcionalidad crítica debe incluir tests de integración que validen escenarios de éxito y fallo (especialmente transacciones).
 - **REVISIÓN:** Antes de entregar, verificar línea por línea contra esta guía.
 - **DUDAS:** Ante cualquier ambigüedad técnica, PREGUNTAR.
+
+### 6. PROCESOS EN SEGUNDO PLANO (BACKGROUND JOBS)
+- **INFRAESTRUCTURA:** Usar exclusivamente `QueueModule` (BullMQ + Redis).
+- **RESILIENCIA:**
+  - Configurar reintentos (`attempts`) y backoff exponencial en `technical-settings.ts`.
+  - Los Processors deben manejar excepciones y lanzar `throw error` controlado para activar el reintento automático.
+- **TRAZABILIDAD:**
+  - Todos los logs generados dentro de un Processor deben incluir la propiedad `job: jobName` en el objeto JSON.
+  - Procesos de borrado o mutación masiva deben dejar un registro en `audit_log`.
+- **SEGURIDAD:**
+  - Evitar bucles infinitos en operaciones masivas. Usar límites físicos (Circuit Breaker) y Batching.
+  - Configuración de horarios (Cron) debe ser centralizada en `technical-settings.ts`.

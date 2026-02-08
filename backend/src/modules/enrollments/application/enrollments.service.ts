@@ -178,7 +178,6 @@ export class EnrollmentsService {
       const courseCycleIdsToFetch: string[] = [dto.courseCycleId];
 
       if (
-        type.code === 'FULL' &&
         dto.historicalCourseCycleIds &&
         dto.historicalCourseCycleIds.length > 0
       ) {

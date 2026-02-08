@@ -3,7 +3,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { MaterialsService } from './application/materials.service';
 import { MaterialsAdminService } from './application/materials-admin.service';
 import { MaterialsController } from './presentation/materials.controller';
-import { MaterialFoldersController } from './presentation/material-folders.controller';
+
 import { MaterialsAdminController } from './presentation/materials-admin.controller';
 import { AuditModule } from '@modules/audit/audit.module';
 import { MaterialFolder } from './domain/material-folder.entity';
@@ -42,11 +42,7 @@ import { UsersModule } from '@modules/users/users.module';
     UsersModule,
     AuditModule,
   ],
-  controllers: [
-    MaterialsController,
-    MaterialFoldersController,
-    MaterialsAdminController,
-  ],
+  controllers: [MaterialsController, MaterialsAdminController],
   providers: [
     MaterialsService,
     MaterialsAdminService,
