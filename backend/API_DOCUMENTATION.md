@@ -340,6 +340,14 @@ Base URL: `/api/v1/enrollments`
 | **FULL** | Ignorado | Opcional | Acceso a TODAS las evaluaciones del ciclo actual + ciclos históricos |
 | **PARTIAL** | **Requerido** | Opcional | Acceso SOLO a evaluaciones específicas (pueden ser de ciclos pasados) |
 
+> [!IMPORTANT]
+> **Manejo de Fechas en Evaluaciones Históricas (PARTIAL)**
+> Si un alumno se matricula en una evaluación pasada (ej. PC1 2025-1) bajo modalidad `PARTIAL`:
+> 1. El sistema intentará igualar la fecha de acceso con su **símil del ciclo actual** (ej. PC1 2026-1).
+> 2. Si NO encuentra un símil, usará la **fecha fin del ciclo actual** como fallback.
+> 
+> **Para el Frontend:** Si observan que `accessEndDate` de la matrícula es posterior a `evaluation.endDate` (fecha original del examen), significa que el sistema extendió automáticamente el acceso (fallback). Se recomienda mostrar una advertencia al usuario indicando la fecha límite de su acceso y que no encontró su símil actual (caso muy extraño).
+
 #### Ejemplos de Uso:
 
 **1. FULL con acceso histórico:**

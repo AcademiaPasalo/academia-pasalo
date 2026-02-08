@@ -117,30 +117,47 @@ describe('Enrollments E2E', () => {
     {
       id: 'eval-pc1',
       courseCycleId: 'course-cycle-1',
-      evaluationType: { code: 'PC' },
+      evaluationType: { id: '1', code: 'PC' },
+      evaluationTypeId: '1',
+      number: 1,
       startDate: new Date('2026-02-01'),
       endDate: new Date('2026-02-15'),
     },
     {
       id: 'eval-pc2',
       courseCycleId: 'course-cycle-1',
-      evaluationType: { code: 'PC' },
+      evaluationType: { id: '1', code: 'PC' },
+      evaluationTypeId: '1',
+      number: 2,
       startDate: new Date('2026-03-01'),
       endDate: new Date('2026-03-15'),
     },
     {
       id: 'eval-banco',
       courseCycleId: 'course-cycle-1',
-      evaluationType: { code: 'BANCO_ENUNCIADOS' },
+      evaluationType: { id: '3', code: 'BANCO_ENUNCIADOS' },
+      evaluationTypeId: '3',
+      number: 1,
       startDate: new Date('2026-01-01'),
       endDate: new Date('2026-07-01'),
     },
     {
       id: 'eval-hist-ex',
       courseCycleId: 'course-cycle-2025',
-      evaluationType: { code: 'EX' },
+      evaluationType: { id: '2', code: 'EX' },
+      evaluationTypeId: '2',
+      number: 1,
       startDate: new Date('2025-11-01'),
       endDate: new Date('2025-11-15'),
+    },
+    {
+      id: 'eval-ex-actual',
+      courseCycleId: 'course-cycle-1',
+      evaluationType: { id: '2', code: 'EX' },
+      evaluationTypeId: '2',
+      number: 1,
+      startDate: new Date('2026-05-01'),
+      endDate: new Date('2026-05-15'), // Esta debe ser la fecha límite
     },
   ];
 
@@ -191,7 +208,41 @@ describe('Enrollments E2E', () => {
           findOne: jest.fn().mockResolvedValue(mockCourseCycle),
           find: jest.fn().mockImplementation((options) => {
             if (options?.where?.id && typeof options.where.id === 'object') {
-              return Promise.resolve([mockHistoricalCourseCycle]);
+              // Simular filtrado por ID y CourseId
+              // Si el ID solicitado es 'cycle-other-course', no devolver nada
+              const ids = (options.where.id as any)._value; // TypeORM In(...) structure mock access might be tricky.
+              // Better to check if the In mock arguments contain the invalid id.
+              // Let's assume In returns an object that we can inspect or just check if the call args contained it.
+              // Actually, simpler: if we see 'cycle-other-course' in the request context (which we can infer from the test), return empty.
+
+              // However, since we can't easily see the In() value structure here without more mocking, let's just cheat a bit based on the test case.
+              // The test sends `historicalCourseCycleIds: ['cycle-other-course']`.
+              // The service calls `find({ where: { id: In(...) } })`.
+
+              // Let's rely on a simple check.
+              try {
+                const idOption = options.where.id;
+                let idsToCheck: string[] = [];
+
+                // Check if it's the FindOperator (In)
+                if (
+                  idOption &&
+                  typeof idOption === 'object' &&
+                  '_value' in idOption
+                ) {
+                  idsToCheck = (idOption as any)._value;
+                } else if (Array.isArray(idOption)) {
+                  idsToCheck = idOption;
+                }
+
+                if (idsToCheck.includes('cycle-other-course')) {
+                  return Promise.resolve([]);
+                }
+
+                return Promise.resolve([mockHistoricalCourseCycle]);
+              } catch (e) {
+                return Promise.resolve([mockHistoricalCourseCycle]);
+              }
             }
             return Promise.resolve([mockCourseCycle]);
           }),
@@ -202,8 +253,16 @@ describe('Enrollments E2E', () => {
           find: jest.fn().mockImplementation((options) => {
             const cycleIds = options?.where?.courseCycleId;
             if (cycleIds && typeof cycleIds === 'object') {
+              // Si se busca con In([...]), devolver todas (actuales + históricas)
               return Promise.resolve(mockEvaluations);
             }
+            if (typeof cycleIds === 'string') {
+              // Si se busca un ID específico, filtrar
+              return Promise.resolve(
+                mockEvaluations.filter((e) => e.courseCycleId === cycleIds),
+              );
+            }
+            // Default: filtrar por ciclo actual si no se especifica (simulación)
             return Promise.resolve(
               mockEvaluations.filter(
                 (e) => e.courseCycleId === 'course-cycle-1',
@@ -369,6 +428,21 @@ describe('Enrollments E2E', () => {
         enrollmentEvaluationRepositoryMock.createMany.mock.calls[0][0];
       expect(createManyCall.length).toBeGreaterThan(0);
     });
+
+    it('debería rechazar matrícula si el ciclo histórico no pertenece al mismo curso', async () => {
+      const token = signToken(adminUser.id, '99', 'ADMIN');
+
+      await request(app.getHttpServer())
+        .post('/api/v1/enrollments')
+        .set('Authorization', `Bearer ${token}`)
+        .send({
+          userId: '2',
+          courseCycleId: 'course-cycle-1',
+          enrollmentTypeCode: 'FULL',
+          historicalCourseCycleIds: ['cycle-other-course'], // ID inválido / otro curso
+        })
+        .expect(400); // Esperamos Bad Request
+    });
   });
 
   describe('POST /api/v1/enrollments - Matrícula PARTIAL', () => {
@@ -419,6 +493,35 @@ describe('Enrollments E2E', () => {
         .expect(201);
 
       expect(enrollmentEvaluationRepositoryMock.createMany).toHaveBeenCalled();
+    });
+
+    it('debería extender la fecha de acceso para evaluación histórica en PARTIAL', async () => {
+      const token = signToken(adminUser.id, '99', 'ADMIN');
+
+      await request(app.getHttpServer())
+        .post('/api/v1/enrollments')
+        .set('Authorization', `Bearer ${token}`)
+        .send({
+          userId: '2',
+          courseCycleId: 'course-cycle-1',
+          enrollmentTypeCode: 'PARTIAL',
+          evaluationIds: ['eval-hist-ex'],
+          historicalCourseCycleIds: ['course-cycle-2025'],
+        })
+        .expect(201);
+
+      expect(enrollmentEvaluationRepositoryMock.createMany).toHaveBeenCalled();
+      const callArgs =
+        enrollmentEvaluationRepositoryMock.createMany.mock.calls[0][0]; // Array de accessEntries
+      const historicalEntry = callArgs.find(
+        (e: any) => e.evaluationId === 'eval-hist-ex',
+      );
+
+      expect(historicalEntry).toBeDefined();
+
+      // Debe coincidir con la fecha fin de su "símil" en el ciclo actual (eval-ex-actual -> 2026-05-15)
+      // Si usara el fallback (fin de ciclo), sería 2026-07-01.
+      expect(historicalEntry.accessEndDate).toEqual(new Date('2026-05-15'));
     });
   });
 
