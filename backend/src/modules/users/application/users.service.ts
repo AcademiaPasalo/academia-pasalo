@@ -12,7 +12,10 @@ import { UserRepository } from '@modules/users/infrastructure/user.repository';
 import { RoleRepository } from '@modules/users/infrastructure/role.repository';
 import { CreateUserDto } from '@modules/users/dto/create-user.dto';
 import { UpdateUserDto } from '@modules/users/dto/update-user.dto';
-import { DatabaseError, MySqlErrorCode } from '@common/interfaces/database-error.interface';
+import {
+  DatabaseError,
+  MySqlErrorCode,
+} from '@common/interfaces/database-error.interface';
 
 @Injectable()
 export class UsersService {
@@ -166,7 +169,10 @@ export class UsersService {
         const dbError = error as DatabaseError;
         const errno = dbError.errno ?? dbError.driverError?.errno;
 
-        if (errno === MySqlErrorCode.LOCK_WAIT_TIMEOUT || errno === MySqlErrorCode.DEADLOCK) {
+        if (
+          errno === MySqlErrorCode.LOCK_WAIT_TIMEOUT ||
+          errno === MySqlErrorCode.DEADLOCK
+        ) {
           throw new ServiceUnavailableException(
             'La operación no pudo completarse por alta concurrencia. Intente nuevamente.',
           );

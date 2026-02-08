@@ -12,8 +12,19 @@ import { GoogleProviderService } from '@modules/auth/application/google-provider
 import { TokenService } from '@modules/auth/application/token.service';
 import { RequestMetadata } from '@modules/auth/interfaces/request-metadata.interface';
 import { UsersService } from '@modules/users/application/users.service';
-import { PhotoSource } from '@modules/users/domain/user.entity';
+import { PhotoSource, User } from '@modules/users/domain/user.entity';
 import { RedisCacheService } from '@infrastructure/cache/redis-cache.service';
+import { UserSession } from '@modules/auth/domain/user-session.entity';
+
+interface TokenPayload {
+  sub: string;
+  email?: string;
+  roles?: string[];
+  sessionId?: string;
+  deviceId?: string;
+  type?: string;
+  iat?: number;
+}
 
 describe('AuthService', () => {
   let authService: AuthService;
@@ -96,14 +107,13 @@ describe('AuthService', () => {
   };
 
   const dataSourceMock = {
-    transaction: jest.fn((cb: any) => cb({})),
+    transaction: jest.fn((cb: (manager: unknown) => Promise<unknown>) =>
+      cb({}),
+    ),
   };
-
-  let verifyIdTokenMock: jest.Mock;
 
   beforeEach(async () => {
     jest.clearAllMocks();
-    verifyIdTokenMock = jest.fn();
 
     tokenServiceMock = {
       generateAccessToken: jest.fn(),
@@ -143,26 +153,32 @@ describe('AuthService', () => {
       }
     });
 
-    tokenServiceMock.generateAccessToken.mockImplementation((payload: any) => {
-      return Promise.resolve(jwtService.sign(payload));
-    });
+    tokenServiceMock.generateAccessToken.mockImplementation(
+      (payload: TokenPayload) => {
+        return Promise.resolve(jwtService.sign(payload));
+      },
+    );
 
-    tokenServiceMock.generateRefreshToken.mockImplementation((userId: string, deviceId: string) => {
-      const token = jwtService.sign({
-        sub: userId,
-        deviceId,
-        type: 'refresh',
-        iat: Date.now(), // Force unique token
-      });
-      return Promise.resolve({
-        token,
-        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
-      });
-    });
+    tokenServiceMock.generateRefreshToken.mockImplementation(
+      (userId: string, deviceId: string) => {
+        const token = jwtService.sign({
+          sub: userId,
+          deviceId,
+          type: 'refresh',
+          iat: Date.now(),
+        });
+        return Promise.resolve({
+          token,
+          expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+        });
+      },
+    );
   });
 
   it('loginWithGoogle: éxito -> retorna tokens', async () => {
-    googleProviderServiceMock.verifyCodeAndGetEmail.mockResolvedValue(baseUser.email);
+    googleProviderServiceMock.verifyCodeAndGetEmail.mockResolvedValue(
+      baseUser.email,
+    );
     usersServiceMock.findByEmail.mockResolvedValue(baseUser);
     sessionServiceMock.createSession.mockResolvedValue({
       session: { id: '777' },
@@ -170,7 +186,10 @@ describe('AuthService', () => {
       concurrentSessionId: null,
     });
 
-    const result = await authService.loginWithGoogle('google-auth-code', metadata);
+    const result = await authService.loginWithGoogle(
+      'google-auth-code',
+      metadata,
+    );
 
     expect(result.user.email).toBe(baseUser.email);
     expect(typeof result.accessToken).toBe('string');
@@ -187,29 +206,22 @@ describe('AuthService', () => {
 
     expect(securityEventServiceMock.logEvent).not.toHaveBeenCalled();
 
-    const decodedAccess = jwtService.verify(result.accessToken) as {
-      sub: string;
-      email: string;
-      roles: string[];
-      sessionId: string;
-    };
+    const decodedAccess = jwtService.verify(result.accessToken);
     expect(decodedAccess.sub).toBe(baseUser.id);
     expect(decodedAccess.email).toBe(baseUser.email);
     expect(decodedAccess.roles).toEqual(['STUDENT']);
     expect(decodedAccess.sessionId).toBe('777');
 
-    const decodedRefresh = jwtService.verify(result.refreshToken) as {
-      sub: string;
-      deviceId: string;
-      type: string;
-    };
+    const decodedRefresh = jwtService.verify(result.refreshToken);
     expect(decodedRefresh.sub).toBe(baseUser.id);
     expect(decodedRefresh.deviceId).toBe(metadata.deviceId);
     expect(decodedRefresh.type).toBe('refresh');
   });
 
   it('loginWithGoogle: correo no registrado -> 401', async () => {
-    googleProviderServiceMock.verifyCodeAndGetEmail.mockResolvedValue('nope@test.com');
+    googleProviderServiceMock.verifyCodeAndGetEmail.mockResolvedValue(
+      'nope@test.com',
+    );
     usersServiceMock.findByEmail.mockResolvedValue(null);
 
     await expect(
@@ -221,7 +233,9 @@ describe('AuthService', () => {
   });
 
   it('loginWithGoogle: token inválido/verificación falla -> 401', async () => {
-    googleProviderServiceMock.verifyCodeAndGetEmail.mockRejectedValue(new UnauthorizedException());
+    googleProviderServiceMock.verifyCodeAndGetEmail.mockRejectedValue(
+      new UnauthorizedException(),
+    );
 
     await expect(
       authService.loginWithGoogle('bad-code', metadata),
@@ -239,7 +253,9 @@ describe('AuthService', () => {
       authService.refreshAccessToken(refreshToken, 'device-b'),
     ).rejects.toBeInstanceOf(UnauthorizedException);
 
-    expect(sessionServiceMock.validateRefreshTokenSession).not.toHaveBeenCalled();
+    expect(
+      sessionServiceMock.validateRefreshTokenSession,
+    ).not.toHaveBeenCalled();
   });
 
   it('refreshAccessToken: éxito -> genera nuevo accessToken', async () => {
@@ -249,31 +265,32 @@ describe('AuthService', () => {
       type: 'refresh',
     });
 
-    sessionServiceMock.validateRefreshTokenSession.mockResolvedValue({ id: '123' });
+    sessionServiceMock.validateRefreshTokenSession.mockResolvedValue({
+      id: '123',
+    });
     sessionServiceMock.rotateRefreshToken.mockResolvedValue({ id: '123' });
     usersServiceMock.findOne.mockResolvedValue(baseUser);
 
-    const result = await authService.refreshAccessToken(refreshToken, metadata.deviceId);
+    const result = await authService.refreshAccessToken(
+      refreshToken,
+      metadata.deviceId,
+    );
 
     expect(result.refreshToken).not.toBe(refreshToken);
     expect(typeof result.accessToken).toBe('string');
     expect(sessionServiceMock.rotateRefreshToken).toHaveBeenCalledTimes(1);
 
-    // Verify blacklist and cache invalidation
-    expect(redisCacheServiceMock.del).toHaveBeenCalledWith('cache:session:123:user');
-    
+    expect(redisCacheServiceMock.del).toHaveBeenCalledWith(
+      'cache:session:123:user',
+    );
+
     expect(redisCacheServiceMock.set).toHaveBeenCalledWith(
       expect.stringMatching(/^blacklist:refresh:/),
       expect.objectContaining({ reason: 'TOKEN_ROTATED' }),
-      604800
+      604800,
     );
 
-    const decodedAccess = jwtService.verify(result.accessToken) as {
-      sub: string;
-      email: string;
-      roles: string[];
-      sessionId: string;
-    };
+    const decodedAccess = jwtService.verify(result.accessToken);
     expect(decodedAccess.sub).toBe(baseUser.id);
     expect(decodedAccess.sessionId).toBe('123');
   });
@@ -329,13 +346,19 @@ describe('AuthService', () => {
       userId: baseUser.id,
       deviceId: metadata.deviceId,
       sessionStatusId: '9',
-    };
+    } as unknown as UserSession;
 
-    sessionServiceMock.findSessionByRefreshToken.mockResolvedValue(blockedSession);
-    sessionServiceMock.findSessionByRefreshTokenForUpdate.mockResolvedValue(blockedSession);
+    sessionServiceMock.findSessionByRefreshToken.mockResolvedValue(
+      blockedSession,
+    );
+    sessionServiceMock.findSessionByRefreshTokenForUpdate.mockResolvedValue(
+      blockedSession,
+    );
 
     sessionStatusServiceMock.getIdByCode.mockResolvedValue('9');
-    googleProviderServiceMock.verifyCodeAndGetEmail.mockResolvedValue(baseUser.email);
+    googleProviderServiceMock.verifyCodeAndGetEmail.mockResolvedValue(
+      baseUser.email,
+    );
 
     usersServiceMock.findByEmail.mockResolvedValue(baseUser);
     sessionServiceMock.activateBlockedSession.mockResolvedValue(undefined);
@@ -351,7 +374,10 @@ describe('AuthService', () => {
     expect(typeof result.accessToken).toBe('string');
     expect(typeof result.refreshToken).toBe('string');
     expect(result.expiresIn).toBeDefined();
-    expect(sessionServiceMock.activateBlockedSession).toHaveBeenCalledWith('555', expect.anything());
+    expect(sessionServiceMock.activateBlockedSession).toHaveBeenCalledWith(
+      '555',
+      expect.anything(),
+    );
     expect(sessionServiceMock.rotateRefreshToken).toHaveBeenCalledTimes(1);
 
     const rotateArgs = sessionServiceMock.rotateRefreshToken.mock.calls[0];
@@ -361,4 +387,3 @@ describe('AuthService', () => {
     expect(rotateArgs[3]).toEqual(expect.anything());
   });
 });
-

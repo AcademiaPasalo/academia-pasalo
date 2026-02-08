@@ -1,4 +1,12 @@
-import { Controller, Post, Body, Get, Param, HttpStatus, HttpCode } from '@nestjs/common';
+import {
+  Controller,
+  Post,
+  Body,
+  Get,
+  Param,
+  HttpStatus,
+  HttpCode,
+} from '@nestjs/common';
 import { MaterialsService } from '@modules/materials/application/materials.service';
 import { CreateMaterialFolderDto } from '@modules/materials/dto/create-material-folder.dto';
 import { Auth } from '@common/decorators/auth.decorator';
@@ -16,7 +24,10 @@ export class MaterialFoldersController {
   @Roles('ADMIN', 'PROFESSOR', 'SUPER_ADMIN')
   @HttpCode(HttpStatus.CREATED)
   @ResponseMessage('Carpeta creada exitosamente')
-  async create(@CurrentUser() user: User, @Body() dto: CreateMaterialFolderDto) {
+  async create(
+    @CurrentUser() user: User,
+    @Body() dto: CreateMaterialFolderDto,
+  ) {
     return await this.materialsService.createFolder(user.id, dto);
   }
 

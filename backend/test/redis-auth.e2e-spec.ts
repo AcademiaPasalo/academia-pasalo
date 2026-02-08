@@ -8,6 +8,10 @@ import { UserSessionRepository } from './../src/modules/auth/infrastructure/user
 import { TestSeeder } from './e2e/test-utils';
 import { DataSource } from 'typeorm';
 
+interface JwtPayload {
+  sessionId: string;
+}
+
 describe('Redis Auth Security & Performance (E2E)', () => {
   let app: INestApplication;
   let redisService: RedisCacheService;
@@ -22,7 +26,6 @@ describe('Redis Auth Security & Performance (E2E)', () => {
     }).compile();
 
     app = moduleFixture.createNestApplication();
-    // IMPORTANTE: El prefijo debe coincidir con main.ts
     app.setGlobalPrefix('api/v1');
     await app.init();
 
@@ -32,7 +35,6 @@ describe('Redis Auth Security & Performance (E2E)', () => {
     jwtService = app.get(JwtService);
     seeder = new TestSeeder(dataSource, app);
 
-    // Limpieza inicial de Redis para evitar contaminación
     await redisService.invalidateGroup('*');
   });
 
@@ -44,11 +46,13 @@ describe('Redis Auth Security & Performance (E2E)', () => {
   let sessionId: string;
 
   it('STEP 1: Debe crear una sesión y generar caché al loguearse (Simulado)', async () => {
-    const auth = await seeder.createAuthenticatedUser(TestSeeder.generateUniqueEmail('redis'), ['STUDENT']);
+    const auth = await seeder.createAuthenticatedUser(
+      TestSeeder.generateUniqueEmail('redis'),
+      ['STUDENT'],
+    );
     token = auth.token;
 
-    // Decodificar el token para obtener el sessionId
-    const payload = jwtService.decode(token) as any;
+    const payload = jwtService.decode(token);
     sessionId = payload.sessionId;
 
     expect(sessionId).toBeDefined();
@@ -65,11 +69,11 @@ describe('Redis Auth Security & Performance (E2E)', () => {
 
     expect(repoSpy).toHaveBeenCalled();
     expect(redisSetSpy).toHaveBeenCalledWith(
-        expect.stringContaining(`cache:session:${sessionId}:user`),
-        expect.anything(),
-        expect.anything()
+      expect.stringContaining(`cache:session:${sessionId}:user`),
+      expect.anything(),
+      expect.anything(),
     );
-    
+
     repoSpy.mockRestore();
     redisSetSpy.mockRestore();
   });
@@ -82,9 +86,8 @@ describe('Redis Auth Security & Performance (E2E)', () => {
       .set('Authorization', `Bearer ${token}`)
       .expect(200);
 
-    // No debe llamar a la base de datos porque ya está en Redis
     expect(repoSpy).not.toHaveBeenCalled();
-    
+
     repoSpy.mockRestore();
   });
 
@@ -97,8 +100,7 @@ describe('Redis Auth Security & Performance (E2E)', () => {
       .expect(200);
 
     expect(redisDelSpy).toHaveBeenCalledWith(`cache:session:${sessionId}:user`);
-    
-    // La siguiente petición debe fallar (401) porque el caché fue borrado
+
     await request(app.getHttpServer())
       .get('/api/v1/enrollments/my-courses')
       .set('Authorization', `Bearer ${token}`)

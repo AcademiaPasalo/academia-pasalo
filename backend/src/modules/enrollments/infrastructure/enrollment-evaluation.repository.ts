@@ -10,13 +10,21 @@ export class EnrollmentEvaluationRepository {
     private readonly ormRepository: Repository<EnrollmentEvaluation>,
   ) {}
 
-  async createMany(data: Partial<EnrollmentEvaluation>[], manager?: EntityManager): Promise<EnrollmentEvaluation[]> {
-    const repo = manager ? manager.getRepository(EnrollmentEvaluation) : this.ormRepository;
+  async createMany(
+    data: Partial<EnrollmentEvaluation>[],
+    manager?: EntityManager,
+  ): Promise<EnrollmentEvaluation[]> {
+    const repo = manager
+      ? manager.getRepository(EnrollmentEvaluation)
+      : this.ormRepository;
     const items = repo.create(data);
     return await repo.save(items);
   }
 
-  async findActiveByEnrollmentAndEvaluation(enrollmentId: string, evaluationId: string): Promise<EnrollmentEvaluation | null> {
+  async findActiveByEnrollmentAndEvaluation(
+    enrollmentId: string,
+    evaluationId: string,
+  ): Promise<EnrollmentEvaluation | null> {
     return await this.ormRepository
       .createQueryBuilder('ee')
       .innerJoin('ee.enrollment', 'enrollment')

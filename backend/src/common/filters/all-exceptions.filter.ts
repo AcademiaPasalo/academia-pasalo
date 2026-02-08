@@ -9,6 +9,10 @@ import {
 import { HttpAdapterHost } from '@nestjs/core';
 import { NestErrorResponse } from '@common/interfaces/nest-error-response.interface';
 
+interface RequestWithUrl {
+  url: string;
+}
+
 @Catch()
 export class AllExceptionsFilter implements ExceptionFilter {
   private readonly logger = new Logger(AllExceptionsFilter.name);
@@ -18,6 +22,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
   catch(exception: unknown, host: ArgumentsHost): void {
     const { httpAdapter } = this.httpAdapterHost;
     const ctx = host.switchToHttp();
+    const request = ctx.getRequest<RequestWithUrl>();
 
     const httpStatus =
       exception instanceof HttpException
@@ -29,7 +34,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
       message: this.getErrorMessage(exception),
       error: this.getErrorName(httpStatus),
       timestamp: new Date().toISOString(),
-      path: httpAdapter.getRequestUrl(ctx.getRequest()),
+      path: httpAdapter.getRequestUrl(request),
     };
 
     if (httpStatus === HttpStatus.INTERNAL_SERVER_ERROR) {
@@ -39,7 +44,10 @@ export class AllExceptionsFilter implements ExceptionFilter {
         message: 'Error crítico en la aplicación',
         path: responseBody.path,
         statusCode: httpStatus,
-        errorDetails: exception instanceof Error ? exception.message : String(exception),
+        errorDetails:
+          exception instanceof Error
+            ? exception.message
+            : JSON.stringify(exception),
         stack: exception instanceof Error ? exception.stack : undefined,
         timestamp: responseBody.timestamp,
       });

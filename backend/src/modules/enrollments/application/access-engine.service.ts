@@ -14,13 +14,16 @@ export class AccessEngineService {
 
   async hasAccess(userId: string, evaluationId: string): Promise<boolean> {
     const cacheKey = `cache:access:user:${userId}:eval:${evaluationId}`;
-    
+
     const cachedAccess = await this.cacheService.get<boolean>(cacheKey);
     if (cachedAccess !== null) {
       return cachedAccess;
     }
 
-    const hasAccess = await this.enrollmentEvaluationRepository.checkAccess(userId, evaluationId);
+    const hasAccess = await this.enrollmentEvaluationRepository.checkAccess(
+      userId,
+      evaluationId,
+    );
 
     this.logger.debug({
       message: 'Access check result',
@@ -30,7 +33,11 @@ export class AccessEngineService {
       timestamp: new Date().toISOString(),
     });
 
-    await this.cacheService.set(cacheKey, hasAccess, technicalSettings.cache.enrollments.accessCheckCacheTtlSeconds);
+    await this.cacheService.set(
+      cacheKey,
+      hasAccess,
+      technicalSettings.cache.enrollments.accessCheckCacheTtlSeconds,
+    );
 
     return hasAccess;
   }

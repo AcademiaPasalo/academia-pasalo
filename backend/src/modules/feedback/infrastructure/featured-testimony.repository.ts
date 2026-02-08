@@ -17,26 +17,28 @@ export class FeaturedTestimonyRepository {
 
   async findActiveByCycle(courseCycleId: string): Promise<FeaturedTestimony[]> {
     return await this.ormRepository.find({
-      where: { 
-        courseCycleId, 
-        isActive: true 
+      where: {
+        courseCycleId,
+        isActive: true,
       },
-      relations: { 
+      relations: {
         courseTestimony: {
-            user: true
-        } 
+          user: true,
+        },
       },
       order: { displayOrder: 'ASC' },
     });
   }
 
-  async findByTestimonyId(courseTestimonyId: string): Promise<FeaturedTestimony | null> {
+  async findByTestimonyId(
+    courseTestimonyId: string,
+  ): Promise<FeaturedTestimony | null> {
     return await this.ormRepository.findOne({
       where: { courseTestimonyId },
     });
   }
 
   async save(entity: FeaturedTestimony): Promise<FeaturedTestimony> {
-      return await this.ormRepository.save(entity);
+    return await this.ormRepository.save(entity);
   }
 }

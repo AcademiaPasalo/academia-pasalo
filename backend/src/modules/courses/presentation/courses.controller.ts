@@ -37,7 +37,10 @@ export class CoursesController {
     @Param('id') courseCycleId: string,
     @CurrentUser() user: User,
   ) {
-    const content = await this.coursesService.getCourseContent(courseCycleId, user.id);
+    const content = await this.coursesService.getCourseContent(
+      courseCycleId,
+      user.id,
+    );
     return plainToInstance(CourseContentResponseDto, content, {
       excludeExtraneousValues: true,
     });
@@ -75,7 +78,10 @@ export class CoursesController {
     @Param('id') courseCycleId: string,
     @Body() dto: AssignCourseCycleProfessorDto,
   ): Promise<void> {
-    await this.coursesService.assignProfessorToCourseCycle(courseCycleId, dto.professorUserId);
+    await this.coursesService.assignProfessorToCourseCycle(
+      courseCycleId,
+      dto.professorUserId,
+    );
   }
 
   @Delete('cycle/:id/professors/:professorUserId')
@@ -86,7 +92,10 @@ export class CoursesController {
     @Param('id') courseCycleId: string,
     @Param('professorUserId') professorUserId: string,
   ): Promise<void> {
-    await this.coursesService.revokeProfessorFromCourseCycle(courseCycleId, professorUserId);
+    await this.coursesService.revokeProfessorFromCourseCycle(
+      courseCycleId,
+      professorUserId,
+    );
   }
 
   @Get()

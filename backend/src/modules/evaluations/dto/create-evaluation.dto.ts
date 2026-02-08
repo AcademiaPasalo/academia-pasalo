@@ -1,4 +1,12 @@
-import { IsString, IsNotEmpty, IsInt, IsDateString, IsDefined, Min, MaxLength } from 'class-validator';
+import {
+  IsString,
+  IsNotEmpty,
+  IsInt,
+  IsDateString,
+  IsDefined,
+  Min,
+  MaxLength,
+} from 'class-validator';
 
 export class CreateEvaluationDto {
   @IsString()

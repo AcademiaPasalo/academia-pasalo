@@ -10,13 +10,21 @@ export class CourseCycleRepository {
     private readonly ormRepository: Repository<CourseCycle>,
   ) {}
 
-  async create(data: Partial<CourseCycle>, manager?: EntityManager): Promise<CourseCycle> {
-    const repo = manager ? manager.getRepository(CourseCycle) : this.ormRepository;
+  async create(
+    data: Partial<CourseCycle>,
+    manager?: EntityManager,
+  ): Promise<CourseCycle> {
+    const repo = manager
+      ? manager.getRepository(CourseCycle)
+      : this.ormRepository;
     const courseCycle = repo.create(data);
     return await repo.save(courseCycle);
   }
 
-  async findByCourseAndCycle(courseId: string, cycleId: string): Promise<CourseCycle | null> {
+  async findByCourseAndCycle(
+    courseId: string,
+    cycleId: string,
+  ): Promise<CourseCycle | null> {
     return await this.ormRepository.findOne({
       where: {
         courseId,

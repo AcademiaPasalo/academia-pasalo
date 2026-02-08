@@ -62,7 +62,8 @@ export class SystemSettingRepository {
   }
 
   async invalidateAllCache(): Promise<void> {
-    await this.cacheService.invalidateGroup(`${SystemSettingRepository.CACHE_PREFIX}*`);
+    await this.cacheService.invalidateGroup(
+      `${SystemSettingRepository.CACHE_PREFIX}*`,
+    );
   }
 }
-

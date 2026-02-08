@@ -1,4 +1,10 @@
-import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn } from 'typeorm';
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  ManyToOne,
+  JoinColumn,
+} from 'typeorm';
 import { Enrollment } from '@modules/enrollments/domain/enrollment.entity';
 import { Evaluation } from '@modules/evaluations/domain/evaluation.entity';
 import { User } from '@modules/users/domain/user.entity';

@@ -45,10 +45,16 @@ export class ClassEventsController {
       user,
     );
 
-    const eventDetail = await this.classEventsService.getEventDetail(event.id, user.id);
+    const eventDetail = await this.classEventsService.getEventDetail(
+      event.id,
+      user.id,
+    );
     const status = this.classEventsService.calculateEventStatus(eventDetail);
-    
-    const canAccess = await this.classEventsService.canAccessMeetingLink(eventDetail, user);
+
+    const canAccess = await this.classEventsService.canAccessMeetingLink(
+      eventDetail,
+      user,
+    );
 
     return ClassEventResponseDto.fromEntity(eventDetail, status, canAccess);
   }
@@ -62,15 +68,26 @@ export class ClassEventsController {
     @Query('end') endDate: string,
   ): Promise<ClassEventResponseDto[]> {
     const start = startDate ? new Date(startDate) : new Date();
-    const end = endDate ? new Date(endDate) : new Date(start.getTime() + 7 * 24 * 60 * 60 * 1000);
+    const end = endDate
+      ? new Date(endDate)
+      : new Date(start.getTime() + 7 * 24 * 60 * 60 * 1000);
 
-    const events = await this.classEventsService.getMySchedule(user.id, start, end);
+    const events = await this.classEventsService.getMySchedule(
+      user.id,
+      start,
+      end,
+    );
 
-    return Promise.all(events.map(async (event) => {
-      const status = this.classEventsService.calculateEventStatus(event);
-      const canAccess = await this.classEventsService.canAccessMeetingLink(event, user);
-      return ClassEventResponseDto.fromEntity(event, status, canAccess);
-    }));
+    return Promise.all(
+      events.map(async (event) => {
+        const status = this.classEventsService.calculateEventStatus(event);
+        const canAccess = await this.classEventsService.canAccessMeetingLink(
+          event,
+          user,
+        );
+        return ClassEventResponseDto.fromEntity(event, status, canAccess);
+      }),
+    );
   }
 
   @Get('evaluation/:evaluationId')
@@ -79,17 +96,25 @@ export class ClassEventsController {
     @Param('evaluationId') evaluationId: string,
     @CurrentUser() user: User,
   ): Promise<ClassEventResponseDto[]> {
-    const events = await this.classEventsService.getEventsByEvaluation(evaluationId, user.id);
+    const events = await this.classEventsService.getEventsByEvaluation(
+      evaluationId,
+      user.id,
+    );
 
     if (events.length === 0) {
       return [];
     }
 
-    return Promise.all(events.map(async (event) => {
-      const status = this.classEventsService.calculateEventStatus(event);
-      const canAccess = await this.classEventsService.canAccessMeetingLink(event, user);
-      return ClassEventResponseDto.fromEntity(event, status, canAccess);
-    }));
+    return Promise.all(
+      events.map(async (event) => {
+        const status = this.classEventsService.calculateEventStatus(event);
+        const canAccess = await this.classEventsService.canAccessMeetingLink(
+          event,
+          user,
+        );
+        return ClassEventResponseDto.fromEntity(event, status, canAccess);
+      }),
+    );
   }
 
   @Get(':id')
@@ -100,7 +125,10 @@ export class ClassEventsController {
   ): Promise<ClassEventResponseDto> {
     const event = await this.classEventsService.getEventDetail(id, user.id);
     const status = this.classEventsService.calculateEventStatus(event);
-    const canAccess = await this.classEventsService.canAccessMeetingLink(event, user);
+    const canAccess = await this.classEventsService.canAccessMeetingLink(
+      event,
+      user,
+    );
 
     return ClassEventResponseDto.fromEntity(event, status, canAccess);
   }
@@ -123,9 +151,15 @@ export class ClassEventsController {
       dto.meetingLink,
     );
 
-    const eventDetail = await this.classEventsService.getEventDetail(event.id, user.id);
+    const eventDetail = await this.classEventsService.getEventDetail(
+      event.id,
+      user.id,
+    );
     const status = this.classEventsService.calculateEventStatus(eventDetail);
-    const canAccess = await this.classEventsService.canAccessMeetingLink(eventDetail, user);
+    const canAccess = await this.classEventsService.canAccessMeetingLink(
+      eventDetail,
+      user,
+    );
 
     return ClassEventResponseDto.fromEntity(eventDetail, status, canAccess);
   }

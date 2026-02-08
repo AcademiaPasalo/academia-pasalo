@@ -176,7 +176,7 @@ describe('SettingsService', () => {
       await service.getString('KEY_1');
       expect(repository.findByKey).toHaveBeenCalledTimes(1);
 
-      service.invalidateCache('KEY_1');
+      await service.invalidateCache('KEY_1');
 
       await service.getString('KEY_1');
       expect(repository.findByKey).toHaveBeenCalledTimes(2);
@@ -185,7 +185,7 @@ describe('SettingsService', () => {
     it('no debe afectar otros settings cacheados', async () => {
       const setting1 = mockSetting('KEY_1', 'value1');
       const setting2 = mockSetting('KEY_2', 'value2');
-      
+
       repository.findByKey
         .mockResolvedValueOnce(setting1)
         .mockResolvedValueOnce(setting2)
@@ -194,7 +194,7 @@ describe('SettingsService', () => {
       await service.getString('KEY_1');
       await service.getString('KEY_2');
 
-      service.invalidateCache('KEY_1');
+      await service.invalidateCache('KEY_1');
 
       await service.getString('KEY_1');
       await service.getString('KEY_2');
@@ -208,7 +208,7 @@ describe('SettingsService', () => {
       const setting1 = mockSetting('KEY_1', 'value1');
       const setting2 = mockSetting('KEY_2', 'value2');
       const setting3 = mockSetting('KEY_3', 'value3');
-      
+
       repository.findByKey
         .mockResolvedValueOnce(setting1)
         .mockResolvedValueOnce(setting2)
@@ -222,7 +222,7 @@ describe('SettingsService', () => {
       await service.getString('KEY_3');
       expect(repository.findByKey).toHaveBeenCalledTimes(3);
 
-      service.invalidateAllCache();
+      await service.invalidateAllCache();
 
       await service.getString('KEY_1');
       await service.getString('KEY_2');

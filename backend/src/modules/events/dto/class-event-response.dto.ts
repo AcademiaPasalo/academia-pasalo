@@ -32,7 +32,11 @@ export class ClassEventResponseDto {
   createdAt: Date;
   updatedAt: Date | null;
 
-  static fromEntity(event: ClassEvent, status: ClassEventStatus, canAccess: boolean): ClassEventResponseDto {
+  static fromEntity(
+    event: ClassEvent,
+    status: ClassEventStatus,
+    canAccess: boolean,
+  ): ClassEventResponseDto {
     return {
       id: event.id,
       sessionNumber: event.sessionNumber,

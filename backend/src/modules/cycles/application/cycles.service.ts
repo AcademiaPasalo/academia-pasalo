@@ -39,7 +39,9 @@ export class CyclesService {
         error: error instanceof Error ? error.message : 'Unknown error',
         timestamp: new Date().toISOString(),
       });
-      throw new NotFoundException('No se ha podido identificar el ciclo activo del sistema.');
+      throw new NotFoundException(
+        'No se ha podido identificar el ciclo activo del sistema.',
+      );
     }
   }
 }
