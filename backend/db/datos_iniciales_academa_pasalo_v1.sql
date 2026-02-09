@@ -64,6 +64,21 @@ INSERT INTO audit_action (code, name) VALUES
 ('FILE_ARCHIVE', 'Archivado de archivo o carpeta'),
 ('CONTENT_DISABLE', 'Desactivación de contenido');
 
+INSERT INTO audit_action (code, name) VALUES
+('FILE_DELETE', 'Eliminación permanente de archivo o recurso');
+
+INSERT INTO system_setting (setting_key, setting_value, description, created_at)
+VALUES (
+  'AUDIT_CLEANUP_RETENTION_DAYS',
+  '30',
+  'Días de retención de logs de auditoría y eventos de seguridad antes de la depuración automática.',
+  NOW()
+);
+
+-- También necesitamos el código de acción para el log de auto-limpieza
+INSERT INTO audit_action (code, name)
+VALUES ('AUDIT_CLEANUP_EXECUTED', 'Ejecución de limpieza automática de logs');
+
 INSERT INTO security_event_type (code, name) VALUES
 ('CONCURRENT_SESSION_DETECTED', 'Detección de sesión concurrente'),
 ('CONCURRENT_SESSION_RESOLVED', 'Resolución de sesión concurrente'),
@@ -72,6 +87,12 @@ INSERT INTO security_event_type (code, name) VALUES
 ('ANOMALOUS_LOGIN_REAUTH_FAILED', 'Reautenticación fallida tras login anómalo'),
 ('LOGIN_SUCCESS', 'Inicio de sesión de manera exitosa'),
 ('LOGOUT_SUCCESS', 'Cierre de sesión exitoso');
+
+INSERT INTO security_event_type (code, name) VALUES
+('NEW_DEVICE_DETECTED', 'Acceso detectado desde un dispositivo nuevo'),
+('LOGIN_FAILED', 'Intento de inicio de sesión fallido'),
+('ACCESS_DENIED', 'Acceso denegado a recurso protegido'),
+('PROFILE_SWITCH', 'Cambio de perfil de usuario');
 
 INSERT INTO enrollment_type (code, name) VALUES
 ('FULL', 'Curso Completo'),
