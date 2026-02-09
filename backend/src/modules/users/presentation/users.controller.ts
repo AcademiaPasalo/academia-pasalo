@@ -85,7 +85,16 @@ export class UsersController {
       );
     }
 
-    const user = await this.usersService.update(id, updateUserDto);
+    let finalUpdateDto = updateUserDto;
+
+    if (!isAdmin) {
+      finalUpdateDto = plainToInstance(UpdateUserDto, {
+        profilePhotoUrl: updateUserDto.profilePhotoUrl,
+        photoSource: updateUserDto.photoSource,
+      });
+    }
+
+    const user = await this.usersService.update(id, finalUpdateDto);
     return plainToInstance(UserResponseDto, user, {
       excludeExtraneousValues: true,
     });

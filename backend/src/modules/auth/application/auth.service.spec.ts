@@ -59,6 +59,7 @@ describe('AuthService', () => {
   const usersServiceMock = {
     findByEmail: jest.fn(),
     findOne: jest.fn(),
+    update: jest.fn(),
   };
 
   const sessionServiceMock = {
@@ -176,9 +177,11 @@ describe('AuthService', () => {
   });
 
   it('loginWithGoogle: éxito -> retorna tokens', async () => {
-    googleProviderServiceMock.verifyCodeAndGetEmail.mockResolvedValue(
-      baseUser.email,
-    );
+    googleProviderServiceMock.verifyCodeAndGetEmail.mockResolvedValue({
+      email: baseUser.email,
+      picture: 'https://example.com/photo.jpg',
+    });
+    usersServiceMock.update.mockResolvedValue(baseUser);
     usersServiceMock.findByEmail.mockResolvedValue(baseUser);
     sessionServiceMock.createSession.mockResolvedValue({
       session: { id: '777' },
@@ -219,9 +222,9 @@ describe('AuthService', () => {
   });
 
   it('loginWithGoogle: correo no registrado -> 401', async () => {
-    googleProviderServiceMock.verifyCodeAndGetEmail.mockResolvedValue(
-      'nope@test.com',
-    );
+    googleProviderServiceMock.verifyCodeAndGetEmail.mockResolvedValue({
+      email: 'nope@test.com',
+    });
     usersServiceMock.findByEmail.mockResolvedValue(null);
 
     await expect(
@@ -356,9 +359,9 @@ describe('AuthService', () => {
     );
 
     sessionStatusServiceMock.getIdByCode.mockResolvedValue('9');
-    googleProviderServiceMock.verifyCodeAndGetEmail.mockResolvedValue(
-      baseUser.email,
-    );
+    googleProviderServiceMock.verifyCodeAndGetEmail.mockResolvedValue({
+      email: baseUser.email,
+    });
 
     usersServiceMock.findByEmail.mockResolvedValue(baseUser);
     sessionServiceMock.activateBlockedSession.mockResolvedValue(undefined);

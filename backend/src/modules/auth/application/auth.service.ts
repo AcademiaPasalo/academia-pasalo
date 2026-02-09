@@ -45,10 +45,10 @@ export class AuthService {
     sessionStatus: SessionStatusCode;
     concurrentSessionId: string | null;
   }> {
-    const googleEmail =
+    const { email: googleEmail, picture } =
       await this.googleProviderService.verifyCodeAndGetEmail(authCode);
 
-    const user = await this.usersService.findByEmail(googleEmail);
+    let user = await this.usersService.findByEmail(googleEmail);
 
     if (!user) {
       this.logger.warn({
@@ -62,6 +62,14 @@ export class AuthService {
       throw new UnauthorizedException(
         'El correo no se encuentra registrado en el sistema. Contacte a administración.',
       );
+    }
+
+    if (!user.profilePhotoUrl && picture) {
+      user = await this.usersService.update(user.id, {
+        profilePhotoUrl: picture,
+        photoSource: 'google' as any,
+      });
+      await this.cacheService.del(`cache:user:profile:${user.id}`);
     }
 
     return await this.dataSource.transaction(async (manager) => {
@@ -318,8 +326,9 @@ export class AuthService {
     let userByEmail: User | null;
 
     try {
-      googleUserEmail =
+      const { email } =
         await this.googleProviderService.verifyCodeAndGetEmail(authCode);
+      googleUserEmail = email;
       userByEmail = await this.usersService.findByEmail(googleUserEmail);
       if (!userByEmail || userByEmail.id !== payload.sub) {
         throw new UnauthorizedException('Token de Google inválido o expirado');
