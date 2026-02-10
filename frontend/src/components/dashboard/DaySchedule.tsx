@@ -94,8 +94,22 @@ export default function DaySchedule() {
   };
 
   const formatTimeRange = (start: string, end: string) => {
-    const startTime = format(parseISO(start), 'h', { locale: es });
-    const endTime = format(parseISO(end), 'h:mma', { locale: es });
+    const startDate = parseISO(start);
+    const endDate = parseISO(end);
+    
+    const startMinutes = startDate.getMinutes();
+    const endMinutes = endDate.getMinutes();
+    
+    // Si ambos tienen minutos = 0, mostrar solo horas
+    if (startMinutes === 0 && endMinutes === 0) {
+      const startTime = format(startDate, 'h', { locale: es });
+      const endTime = format(endDate, 'h a', { locale: es }).toLowerCase();
+      return `${startTime} - ${endTime}`;
+    }
+    
+    // Si alguno tiene minutos, mostrar formato completo
+    const startTime = format(startDate, startMinutes === 0 ? 'h' : 'h:mm', { locale: es });
+    const endTime = format(endDate, endMinutes === 0 ? 'h a' : 'h:mm a', { locale: es }).toLowerCase();
     return `${startTime} - ${endTime}`;
   };
 
@@ -104,29 +118,42 @@ export default function DaySchedule() {
       {/* Header */}
       <div className="p-3 border-b border-stroke-primary flex justify-between items-center">
         <div className="flex items-center gap-1">
-          <Icon name="event" size={20} className="text-info-secondary-solid" />
+          <Icon name="event" size={20} className="text-magenta-violet-500" />
           <h2 className="text-sm font-semibold text-primary">Agenda del Día</h2>
         </div>
         <div className="flex items-center gap-2">
           <div className="flex items-center gap-0.5">
-            <span className="text-xs text-primary">
-              {format(currentDate, 'MMM', { locale: es })}
-            </span>
-            <span className="text-xs text-primary">
+            {/* Mostrar rango de meses si la semana cruza meses */}
+            {format(weekStart, 'M') !== format(weekEnd, 'M') ? (
+              <>
+                <span className="text-sm text-primary capitalize">
+                  {format(weekStart, 'MMM', { locale: es })}
+                </span>
+                <span className="text-sm text-primary">-</span>
+                <span className="text-sm text-primary capitalize">
+                  {format(weekEnd, 'MMM', { locale: es })}
+                </span>
+              </>
+            ) : (
+              <span className="text-sm text-primary capitalize">
+                {format(currentDate, 'MMM', { locale: es })}
+              </span>
+            )}
+            <span className="text-sm text-primary">
               {format(currentDate, 'yyyy')}
             </span>
           </div>
           <div className="flex items-center">
             <button 
               onClick={goToPreviousWeek}
-              className="p-1 rounded-lg hover:bg-secondary-hover"
+              className="p-1 rounded-lg hover:bg-secondary-hover flex items-center justify-center"
               aria-label="Semana anterior"
             >
               <Icon name="chevron_left" size={16} className="text-accent-primary" />
             </button>
             <button 
               onClick={goToNextWeek}
-              className="p-1 rounded-lg hover:bg-secondary-hover"
+              className="p-1 rounded-lg hover:bg-secondary-hover flex items-center justify-center"
               aria-label="Semana siguiente"
             >
               <Icon name="chevron_right" size={16} className="text-accent-primary" />
@@ -139,35 +166,28 @@ export default function DaySchedule() {
       <div className="p-3 flex items-center gap-1">
         {weekDays.map((day, index) => {
           const isSelected = isSameDay(day, currentDate);
-          const hasEvents = events.some(event => 
-            isSameDay(parseISO(event.startDatetime), day)
-          );
+          const isToday = isSameDay(day, new Date());
 
           return (
             <button
               key={index}
               onClick={() => setCurrentDate(day)}
               className={`flex-1 px-2 py-1.5 rounded-xl flex flex-col items-center gap-px transition-colors ${
-                isSelected ? 'bg-info-primary-solid/10' : 'bg-white hover:bg-secondary-hover'
+                isSelected ? 'bg-muted-indigo-50' : 'bg-white hover:bg-secondary-hover'
               }`}
             >
               <span className={`text-[8px] font-semibold uppercase ${
-                isSelected ? 'text-info-primary-solid' : 'text-tertiary'
+                isToday || isSelected ? 'text-info-primary-solid' : 'text-tertiary'
               }`}>
                 {format(day, 'EEE', { locale: es }).substring(0, 3)}
               </span>
-              <div className={`w-5 h-5 rounded-full flex items-center justify-center ${
-                isSelected ? 'bg-info-primary-solid' : ''
+              <div className={`w-5 h-5 p-0.5 rounded-full inline-flex justify-center items-center ${isToday ? 'bg-info-primary-solid' : ''
               }`}>
-                <span className={`text-xs font-medium ${
-                  isSelected ? 'text-white' : 'text-primary'
+                <span className={`text-xs font-medium ${isToday ? 'text-white' : isToday || isSelected ? 'text-info-primary-solid' : 'text-primary'
                 }`}>
                   {format(day, 'd')}
                 </span>
               </div>
-              {hasEvents && !isSelected && (
-                <div className="w-1 h-1 rounded-full bg-info-primary-solid mt-0.5" />
-              )}
             </button>
           );
         })}
@@ -192,17 +212,8 @@ export default function DaySchedule() {
             </button>
           </div>
         ) : todayEvents.length === 0 ? (
-          <div className="p-6 text-center">
-            <Icon name="event_busy" size={32} className="text-tertiary mx-auto mb-2" />
-            <p className="text-sm text-secondary">No hay clases programadas para hoy</p>
-            {!isSameDay(currentDate, new Date()) && (
-              <button 
-                onClick={goToToday}
-                className="mt-2 text-sm text-accent-primary hover:underline"
-              >
-                Ver hoy
-              </button>
-            )}
+          <div className="p-8 text-center">
+            <p className="text-sm text-gray-600">No tienes clases programadas</p>
           </div>
         ) : (
           todayEvents.map((event) => {
@@ -247,14 +258,6 @@ export default function DaySchedule() {
                         {formatTimeRange(event.startDatetime, event.endDatetime)}
                       </span>
                     </div>
-                    {event.topic && (
-                      <div className="flex items-center gap-1">
-                        <Icon name="topic" size={12} className="text-tertiary" />
-                        <span className="text-[10px] text-tertiary truncate">
-                          {event.topic}
-                        </span>
-                      </div>
-                    )}
                   </div>
                   {canJoinNow && (
                     <a

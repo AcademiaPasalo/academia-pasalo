@@ -40,8 +40,6 @@ export default function InicioContent() {
       setError(null);
       try {
         const response = await enrollmentService.getMyCourses();
-        console.log('✅ Response completa:', response);
-        console.log('✅ Tipo de response:', typeof response, Array.isArray(response));
         
         // HOTFIX: El servicio está retornando el array directamente en lugar del objeto ApiResponse
         // Verificar si response es un array o un objeto con data
@@ -80,9 +78,6 @@ export default function InicioContent() {
         const end = nextWeek.toISOString().split('T')[0];
         
         const response = await classEventService.getMySchedule({ start, end });
-        
-        console.log('📅 Response de eventos:', response);
-        console.log('📅 Tipo:', typeof response, Array.isArray(response));
         
         // Manejar respuesta que puede ser array o ApiResponse
         let events: ClassEvent[] = [];
@@ -181,7 +176,7 @@ export default function InicioContent() {
   // Obtener color consistente para un curso
   const getCourseColor = (courseCode: string): string => {
     const hash = courseCode.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
-    const colors = ['#68d391', '#cd45e8', '#42a5f5', '#ffa726', '#ef5350'];
+    const colors = ['#1E40A3', '#10B981', '#F13072', '#ffa726', '#ef5350'];
     return colors[hash % colors.length];
   };
 
@@ -215,13 +210,10 @@ export default function InicioContent() {
     );
   }
 
-  console.log('✅ Estado: RENDER - Enrollments:', enrollments.length);
-  console.log('📋 Enrollments completos:', enrollments);
-
   return (
-    <div className="grid grid-cols-1 xl:grid-cols-[1fr_400px] gap-6">
+    <div className="grid grid-cols-1 xl:grid-cols-[1fr_400px] gap-12">
       {/* Columna Izquierda: Cursos */}
-      <div className="space-y-6">
+      <div className="space-y-9">
         {/* Header: Mis Cursos con toggles */}
         <div className="flex justify-between items-center">
           <div className="flex items-center gap-2">
@@ -271,7 +263,7 @@ export default function InicioContent() {
         </div>
 
         {/* Grid de Cursos */}
-        <div className={viewMode === 'grid' ? 'grid grid-cols-1 md:grid-cols-2 gap-6' : 'flex flex-col gap-6'}>
+        <div className={viewMode === 'grid' ? 'grid grid-cols-1 md:grid-cols-2 gap-6' : 'flex flex-col gap-6'} style={viewMode === 'grid' ? { gridAutoRows: '1fr' } : undefined}>
           {enrollments.length === 0 ? (
             <div className="col-span-2 text-center py-12">
               <Icon name="school" size={64} className="text-secondary mx-auto mb-4" />
@@ -294,7 +286,7 @@ export default function InicioContent() {
               });
 
               return (
-                <div key={enrollment.id} className="space-y-3">
+                <div key={enrollment.id} className="flex flex-col gap-3 h-full">
                   <CourseCard
                     headerColor={getCourseColor(courseCode)}
                     category="CIENCIAS"
@@ -433,7 +425,7 @@ export default function InicioContent() {
             <div className="relative z-10 flex justify-end">
             <button
               onClick={() => setIsModalOpen(true)}
-              className="px-6 py-4 bg-magenta-violet-50 rounded-lg border border-magenta-violet-700 text-base font-medium text-magenta-violet-700 transition-colors hover:bg-magenta-violet-100"
+              className="w-full px-4 py-3 bg-magenta-violet-50 rounded-lg border border-magenta-violet-700 text-sm font-medium text-magenta-violet-700 transition-colors hover:bg-magenta-violet-100"
             >
               Agendar Tutoría
             </button>

@@ -1,3 +1,5 @@
+import Icon from "../ui/Icon";
+
 export interface CourseCardProps {
   /** Color de la banda superior/lateral del curso */
   headerColor: string;
@@ -111,9 +113,10 @@ export default function CourseCard({
           {/* Botón Ver Curso */}
           <button
             onClick={onViewCourse}
-            className="px-6 py-4 bg-accent-solid rounded-lg text-base font-medium text-white leading-4 hover:bg-accent-solid-hover transition-colors"
+            className="px-4 py-3 bg-accent-solid rounded-lg text-sm font-medium text-white hover:bg-accent-solid-hover transition-colors flex items-center justify-center gap-1"
           >
-            Ver Curso
+            <span>Ver Curso</span>
+            <Icon name="arrow_forward" size={14} className="text-white" />
           </button>
         </div>
       </div>
@@ -122,14 +125,14 @@ export default function CourseCard({
 
   // Vista de Galería (vertical/tarjetas)
   return (
-    <div className="bg-white rounded-2xl border border-stroke-primary overflow-hidden flex flex-col">
+    <div className="bg-white rounded-2xl border border-stroke-primary overflow-hidden flex flex-col h-full">
       {/* Banda de color superior */}
-      <div className="h-16" style={{ backgroundColor: headerColor }}></div>
+      <div className="h-16 flex-shrink-0" style={{ backgroundColor: headerColor }}></div>
 
-      {/* Contenido del card */}
-      <div className="p-4 flex-1 flex flex-col">
-        {/* Información del curso */}
-        <div className="space-y-2.5 mb-5">
+      {/* Contenido del card - usando flex con justify-between para empujar el footer abajo */}
+      <div className="p-4 flex-1 flex flex-col justify-between gap-4">
+        {/* Información del curso - pegado arriba */}
+        <div className="space-y-2.5">
           {/* Tags: Categoría y Ciclo */}
           <div className="flex items-center gap-2">
             <span className="px-2.5 py-1.5 bg-success-light rounded-full text-xs font-medium text-success-primary">
@@ -146,14 +149,14 @@ export default function CourseCard({
           </h3>
         </div>
 
-        {/* Footer: Docente(s) y botón - empuja el botón hacia abajo */}
-        <div className="mt-auto space-y-5">
+        {/* Footer: Docente(s) y botón - pegado abajo */}
+        <div className="space-y-5">
           {/* Información del/los docente(s) */}
           <div className="flex items-center gap-2">
             {/* Avatar(es) */}
             {teachers.length === 1 ? (
               <div
-                className="w-6 h-6 rounded-full flex items-center justify-center"
+                className="w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0"
                 style={{ backgroundColor: teachers[0].avatarColor || '#10b981' }}
               >
                 <span className="text-[10px] font-medium text-white">
@@ -161,13 +164,12 @@ export default function CourseCard({
                 </span>
               </div>
             ) : (
-              <div className="flex items-center -space-x-2">
+              <div className="flex items-center -space-x-2 flex-shrink-0">
                 {teachers.map((teacher, index) => (
                   <div
                     key={index}
-                    className={`w-6 h-6 rounded-full flex items-center justify-center border-2 border-white ${
-                      index === 0 ? 'z-10' : ''
-                    }`}
+                    className={`w-6 h-6 rounded-full flex items-center justify-center border-2 border-white ${index === 0 ? 'z-10' : ''
+                      }`}
                     style={{ backgroundColor: teacher.avatarColor || '#10b981' }}
                   >
                     <span className="text-[10px] font-medium text-white">
@@ -179,23 +181,22 @@ export default function CourseCard({
             )}
 
             {/* Nombre(s) del/los docente(s) */}
-            <div className="flex-1 flex items-start gap-1">
-              <span className="text-base font-medium text-secondary">Docente:</span>
+            <div className="flex-1 flex items-start gap-1 min-w-0">
+              <span className="text-base font-medium text-secondary flex-shrink-0">Docente:</span>
               <span className="flex-1 text-base text-secondary truncate">
                 {teachers.map((t) => t.name).join(' & ')}
               </span>
             </div>
           </div>
 
-          {/* Botón Ver Curso - alineado a la derecha */}
-          <div className="flex justify-end">
-            <button
-              onClick={onViewCourse}
-              className="px-6 py-4 bg-accent-solid rounded-lg text-base font-medium text-white hover:bg-accent-solid-hover transition-colors"
-            >
-              Ver Curso
-            </button>
-          </div>
+          {/* Botón Ver Curso */}
+          <button
+            onClick={onViewCourse}
+            className="w-full px-4 py-3 bg-accent-solid rounded-lg text-sm font-medium text-white hover:bg-accent-solid-hover transition-colors flex items-center justify-center gap-1"
+          >
+            <span>Ver Curso</span>
+            <Icon name="arrow_forward" size={14} className="text-white" />
+          </button>
         </div>
       </div>
     </div>
