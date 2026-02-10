@@ -40,10 +40,10 @@ export default function PlataformaPage() {
         console.error('Error en login:', err);
         // Map backend/SDK errors to friendly Spanish messages
         let message = 'Error al iniciar sesión';
-        
+
         if (err instanceof Error) {
           const errorMsg = err.message.toLowerCase();
-          
+
           // Detectar usuario no registrado
           if (
             errorMsg.includes('usuario no registrado') ||
@@ -63,10 +63,10 @@ export default function PlataformaPage() {
           const errorObj = err as Record<string, unknown>;
           const response = errorObj.response as Record<string, unknown> | undefined;
           const data = response?.data as Record<string, unknown> | undefined;
-          
-          const serverMsg = 
-            data?.message || 
-            data?.error || 
+
+          const serverMsg =
+            data?.message ||
+            data?.error ||
             errorObj.message;
 
           if (serverMsg && typeof serverMsg === 'string') {
@@ -77,7 +77,7 @@ export default function PlataformaPage() {
         // Forzar que el estado se actualice y se mantenga
         setIsLoggingIn(false);
         setError(message);
-        
+
         // Prevenir cualquier navegación después de un error
         return;
       }
@@ -141,11 +141,17 @@ export default function PlataformaPage() {
           </div>
 
           {/* Right Section - Login Form */}
-          <div className="w-full lg:w-1/2 flex flex-col items-end justify-center gap-6 px-6 sm:px-12 lg:px-[120px] py-20 lg:py-[200px] bg-gray-50">
-            {/* School Icon */} 
+          <div className="w-full lg:w-1/2 flex flex-col items-end justify-center gap-6 px-6 sm:px-12 lg:px-[120px] py-20 lg:py-[200px] bg-gray-50 relative overflow-hidden">
+            {/* Decorative Ellipses */}
+            <div className="lg:hidden visible absolute w-[200px] h-[200px] rounded-full bg-muted-indigo-100 -left-[-10px] bottom-[-100px]" />
+            <div className="lg:hidden visible absolute w-[200px] h-[200px] rounded-full bg-muted-indigo-100 right-[-120px] top-[-50px]" />
+            <div className="lg:hidden visible absolute w-[100px] h-[100px] rounded-full bg-muted-indigo-100 right-[90px] -top-[40px]" />
+            <div className="lg:hidden visible absolute w-[100px] h-[100px] rounded-full bg-muted-indigo-100 -left-[50px] bottom-[80px]" />
+
+            {/* School Icon */}
             <div className="p-4 bg-bg-accent-light rounded-full inline-flex justify-start items-center mx-auto">
-              <Icon name="school" size={48} variant="rounded" className="text-deep-blue-700"/>
-            </div>     
+              <Icon name="school" size={48} variant="rounded" className="text-deep-blue-700" />
+            </div>
 
             {/* Title */}
             <h5 className="text-gray-900 text-[28px] font-bold leading-[1.14em] tracking-[-0.007em] text-center w-full">
