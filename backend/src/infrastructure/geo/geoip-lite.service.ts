@@ -4,6 +4,7 @@ import {
   GeoProvider,
   GeoLocationResult,
 } from '@common/interfaces/geo-provider.interface';
+import { technicalSettings } from '@config/technical-settings';
 
 @Injectable()
 export class GeoIpLiteService implements GeoProvider {
@@ -12,13 +13,21 @@ export class GeoIpLiteService implements GeoProvider {
   resolve(ipAddress: string): GeoLocationResult | null {
     const ip = this.normalizeIp(ipAddress);
     if (!ip) {
-      if (process.env.MOCK_GEO_ENABLED === 'true') {
-        const mockLat = parseFloat(process.env.MOCK_GEO_LAT || '0');
-        const mockLon = parseFloat(process.env.MOCK_GEO_LON || '0');
-
-        this.logger.debug(
-          `Local IP detected. Using .env MOCK coordinates: [${mockLat}, ${mockLon}]`,
+      if (technicalSettings.geo.mockGeoEnabled) {
+        const mockLat = parseFloat(
+          process.env.MOCK_GEO_LAT || technicalSettings.geo.mockGeoDefaultLat,
         );
+        const mockLon = parseFloat(
+          process.env.MOCK_GEO_LON || technicalSettings.geo.mockGeoDefaultLon,
+        );
+
+        this.logger.debug({
+          level: 'debug',
+          context: GeoIpLiteService.name,
+          message: 'IP local detectada. Usando coordenadas MOCK.',
+          latitude: mockLat,
+          longitude: mockLon,
+        });
         return {
           latitude: mockLat,
           longitude: mockLon,
@@ -46,10 +55,11 @@ export class GeoIpLiteService implements GeoProvider {
       };
     } catch (error) {
       this.logger.warn({
-        message: 'GeoIP lookup failed',
+        level: 'warn',
+        context: GeoIpLiteService.name,
+        message: 'Fallo en la búsqueda de GeoIP',
         ip,
         error: error instanceof Error ? error.message : String(error),
-        timestamp: new Date().toISOString(),
       });
       return null;
     }

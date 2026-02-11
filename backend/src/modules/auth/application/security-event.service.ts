@@ -77,6 +77,18 @@ export class SecurityEventService {
     return await this.securityEventRepository.findByUserId(userId, limit);
   }
 
+  async countEventsByCode(
+    userId: string,
+    eventCode: string,
+    manager?: EntityManager,
+  ): Promise<number> {
+    return await this.securityEventRepository.countByUserIdAndTypeCode(
+      userId,
+      eventCode,
+      manager,
+    );
+  }
+
   private normalizeContext(context?: Record<string, unknown>): {
     ipAddress: string | null;
     userAgent: string | null;

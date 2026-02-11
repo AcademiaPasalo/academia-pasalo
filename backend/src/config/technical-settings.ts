@@ -57,6 +57,11 @@ export const technicalSettings = {
       // src/modules/auth/application/google-provider.service.ts
       googleRedirectUriFallback: 'postmessage',
     },
+
+    security: {
+      // src/modules/auth/application/session.service.ts
+      anomalyStrikeThreshold: 2,
+    },
   },
 
   cache: {
@@ -173,8 +178,8 @@ export const technicalSettings = {
     earthRadiusKm: 6371,
 
     // src/infrastructure/geo/geoip-lite.service.ts
+    mockGeoEnabled: process.env.MOCK_GEO_ENABLED === 'true',
     mockGeoDefaultLat: '0',
-    // src/infrastructure/geo/geoip-lite.service.ts
     mockGeoDefaultLon: '0',
   },
 

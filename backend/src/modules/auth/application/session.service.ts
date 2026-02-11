@@ -12,6 +12,8 @@ import {
   SessionStatusService,
 } from '@modules/auth/application/session-status.service';
 import { createHash } from 'crypto';
+import { ConcurrentDecision } from '@modules/auth/interfaces/security.constants';
+import { technicalSettings } from '@config/technical-settings';
 
 @Injectable()
 export class SessionService {
@@ -55,58 +57,20 @@ export class SessionService {
         manager,
       );
 
+      const isNewDevice =
+        !(await this.userSessionRepository.existsByUserIdAndDeviceId(
+          userId,
+          resolved.metadata.deviceId,
+          manager,
+        ));
+
       const anomaly = await this.sessionAnomalyDetector.detectLocationAnomaly(
         userId,
         resolved.metadata,
         resolved.locationSource,
+        isNewDevice,
         manager,
       );
-
-      if (anomaly.isAnomalous) {
-        const refreshTokenHash = this.hashRefreshToken(refreshToken);
-
-        const session = await this.userSessionRepository.create(
-          {
-            userId,
-            deviceId: resolved.metadata.deviceId,
-            ipAddress: resolved.metadata.ipAddress,
-            latitude: resolved.metadata.latitude || null,
-            longitude: resolved.metadata.longitude || null,
-            refreshTokenHash,
-            sessionStatusId: blockedStatusId,
-            activeRoleId: activeRoleId || null,
-            expiresAt,
-            lastActivityAt: new Date(),
-            isActive: false,
-            createdAt: new Date(),
-          },
-          manager,
-        );
-
-        await this.securityEventService.logEvent(
-          userId,
-          'ANOMALOUS_LOGIN_DETECTED',
-          {
-            ipAddress: resolved.metadata.ipAddress,
-            userAgent: resolved.metadata.userAgent,
-            deviceId: resolved.metadata.deviceId,
-            locationSource: resolved.locationSource,
-            city: resolved.metadata.city,
-            country: resolved.metadata.country,
-            previousSessionId: anomaly.previousSessionId,
-            distanceKm: anomaly.distanceKm,
-            timeDifferenceMinutes: anomaly.timeDifferenceMinutes,
-            newSessionId: session.id,
-          },
-          manager,
-        );
-
-        return {
-          session,
-          sessionStatus: 'BLOCKED_PENDING_REAUTH' as SessionStatusCode,
-          concurrentSessionId: null,
-        };
-      }
 
       const concurrentSession =
         await this.userSessionRepository.findOtherActiveSession(
@@ -116,14 +80,11 @@ export class SessionService {
           manager,
         );
 
-      const isNewDevice =
-        !(await this.userSessionRepository.existsByUserIdAndDeviceId(
-          userId,
-          resolved.metadata.deviceId,
-          manager,
-        ));
-
       const refreshTokenHash = this.hashRefreshToken(refreshToken);
+
+      const sessionStatusId = concurrentSession
+        ? pendingStatusId
+        : activeStatusId;
 
       const session = await this.userSessionRepository.create(
         {
@@ -133,7 +94,7 @@ export class SessionService {
           latitude: resolved.metadata.latitude || null,
           longitude: resolved.metadata.longitude || null,
           refreshTokenHash,
-          sessionStatusId: concurrentSession ? pendingStatusId : activeStatusId,
+          sessionStatusId,
           activeRoleId: activeRoleId || null,
           expiresAt,
           lastActivityAt: new Date(),
@@ -160,7 +121,32 @@ export class SessionService {
           },
           manager,
         );
-      } else {
+      }
+
+      if (anomaly.isAnomalous) {
+        await this.securityEventService.logEvent(
+          userId,
+          'ANOMALOUS_LOGIN_DETECTED',
+          {
+            ipAddress: resolved.metadata.ipAddress,
+            userAgent: resolved.metadata.userAgent,
+            deviceId: resolved.metadata.deviceId,
+            locationSource: resolved.locationSource,
+            city: resolved.metadata.city,
+            country: resolved.metadata.country,
+            anomalyType: anomaly.anomalyType,
+            previousSessionId: anomaly.previousSessionId,
+            distanceKm: anomaly.distanceKm,
+            timeDifferenceMinutes: anomaly.timeDifferenceMinutes,
+            newSessionId: session.id,
+          },
+          manager,
+        );
+
+        await this.handleAnomalousStrikes(userId, manager);
+      }
+
+      if (!concurrentSession && !anomaly.isAnomalous) {
         if (isNewDevice) {
           await this.securityEventService.logEvent(
             userId,
@@ -194,10 +180,12 @@ export class SessionService {
       this.logger.debug({
         level: 'debug',
         context: SessionService.name,
-        message: 'Sesión creada',
+        message: 'Sesión procesada',
         userId,
         sessionId: session.id,
         deviceId: resolved.metadata.deviceId,
+        isAnomalous: anomaly.isAnomalous,
+        isConcurrent: !!concurrentSession,
       });
 
       return {
@@ -391,7 +379,7 @@ export class SessionService {
     userId: string;
     deviceId: string;
     refreshToken: string;
-    decision: 'KEEP_NEW' | 'KEEP_EXISTING';
+    decision: ConcurrentDecision;
     ipAddress: string;
     userAgent: string;
     externalManager?: EntityManager;
@@ -552,5 +540,39 @@ export class SessionService {
       },
       manager,
     );
+  }
+
+  private async handleAnomalousStrikes(
+    userId: string,
+    manager: EntityManager,
+  ): Promise<void> {
+    const strikeCount =
+      await this.securityEventService.countEventsByCode(
+        userId,
+        'ANOMALOUS_LOGIN_DETECTED',
+        manager,
+      );
+
+    if (
+      strikeCount === technicalSettings.auth.security.anomalyStrikeThreshold
+    ) {
+      this.logger.log({
+        level: 'info',
+        context: SessionService.name,
+        message: 'Umbral de strikes alcanzado para el usuario. Preparando notificación.',
+        userId,
+        strikes: strikeCount,
+      });
+
+      /**
+       * TODO: Implementar integración con NotificationModule cuando esté disponible.
+       * Mensaje: "Hemos detectado accesos inusuales recientes en tu cuenta. Por seguridad, evita compartir tus credenciales."
+       * 
+       * await this.notificationService.create({
+       *   userId,
+       *   message: 'Hemos detectado accesos inusuales recientes en tu cuenta. Por seguridad, evita compartir tus credenciales.',
+       * });
+       */
+    }
   }
 }
