@@ -10,6 +10,7 @@ import {
 } from '@modules/auth/application/session-status.service';
 import { AuthSettingsService } from '@modules/auth/application/auth-settings.service';
 import { GoogleProviderService } from '@modules/auth/application/google-provider.service';
+import { SessionValidatorService } from '@modules/auth/application/session-validator.service';
 import { TokenService } from '@modules/auth/application/token.service';
 import { User } from '@modules/users/domain/user.entity';
 import { UserSession } from '@modules/auth/domain/user-session.entity';
@@ -30,6 +31,7 @@ export class AuthService {
     private readonly securityEventService: SecurityEventService,
     private readonly sessionStatusService: SessionStatusService,
     private readonly authSettingsService: AuthSettingsService,
+    private readonly sessionValidatorService: SessionValidatorService,
     private readonly cacheService: RedisCacheService,
     private readonly googleProviderService: GoogleProviderService,
     private readonly tokenService: TokenService,
@@ -107,7 +109,7 @@ export class AuthService {
       throw new UnauthorizedException('Dispositivo no autorizado');
     }
 
-    const session = await this.sessionService.validateRefreshTokenSession(
+    const session = await this.sessionValidatorService.validateRefreshTokenSession(
       payload.sub,
       deviceId,
       refreshToken,
@@ -146,6 +148,7 @@ export class AuthService {
       roles: user.roles.map((role) => role.code),
       activeRole: activeRole.code,
       sessionId: session.id,
+      deviceId: deviceId,
     };
 
     const newAccessToken =
@@ -198,6 +201,7 @@ export class AuthService {
         roles: user.roles.map((r) => r.code),
         activeRole: role.code,
         sessionId: session.id,
+        deviceId: metadata.deviceId,
       };
 
       const accessToken =
@@ -264,7 +268,7 @@ export class AuthService {
     await this.cacheService.del(`cache:session:${keptSessionId}:user`);
 
     const user = await this.usersService.findOne(payload.sub);
-    const session = await this.sessionService.validateSession(
+    const session = await this.sessionValidatorService.validateSession(
       keptSessionId,
       user.id,
       deviceId,
@@ -279,6 +283,7 @@ export class AuthService {
       roles: user.roles.map((role) => role.code),
       activeRole: activeRole.code,
       sessionId: keptSessionId,
+      deviceId: deviceId,
     };
 
     const accessToken =
@@ -446,6 +451,7 @@ export class AuthService {
         roles: userByEmail.roles.map((role) => role.code),
         activeRole: activeRole.code,
         sessionId: lockedSession.id,
+        deviceId: deviceId,
       };
 
       const accessToken =
@@ -493,6 +499,7 @@ export class AuthService {
       roles: user.roles.map((role) => role.code),
       activeRole: activeRole.code,
       sessionId: session.id,
+      deviceId: metadata.deviceId,
     };
 
     const accessToken =

@@ -107,6 +107,18 @@ export class UserSessionRepository {
     });
   }
 
+  async findSessionsByUserAndStatus(
+    userId: string,
+    statusId: string,
+    manager?: EntityManager,
+  ): Promise<UserSession[]> {
+    const repo = this.getRepository(manager);
+    return await repo.find({
+      where: { userId, sessionStatusId: statusId },
+      order: { createdAt: 'DESC' },
+    });
+  }
+
   async findLatestSessionByUserId(
     userId: string,
     manager?: EntityManager,

@@ -5,6 +5,11 @@ import { AuthSettingsService } from '@modules/auth/application/auth-settings.ser
 import { GeoProvider } from '@common/interfaces/geo-provider.interface';
 import { UserSessionRepository } from '@modules/auth/infrastructure/user-session.repository';
 import { RequestMetadata } from '@modules/auth/interfaces/request-metadata.interface';
+import {
+  AnomalyType,
+  ANOMALY_TYPES,
+} from '@modules/auth/interfaces/security.constants';
+import { technicalSettings } from '@config/technical-settings';
 
 @Injectable()
 export class SessionAnomalyDetectorService {
@@ -19,40 +24,25 @@ export class SessionAnomalyDetectorService {
     userId: string,
     metadata: RequestMetadata,
     locationSource: 'ip' | 'gps' | 'none',
+    isNewDevice: boolean,
     manager?: EntityManager,
   ): Promise<{
     isAnomalous: boolean;
+    anomalyType: AnomalyType;
     previousSessionId: string | null;
     distanceKm: number | null;
     timeDifferenceMinutes: number | null;
   }> {
-    if (locationSource === 'none') {
-      return {
-        isAnomalous: false,
-        previousSessionId: null,
-        distanceKm: null,
-        timeDifferenceMinutes: null,
-      };
-    }
-
-    if (!metadata.latitude || !metadata.longitude) {
-      return {
-        isAnomalous: false,
-        previousSessionId: null,
-        distanceKm: null,
-        timeDifferenceMinutes: null,
-      };
-    }
-
     const lastSession =
       await this.userSessionRepository.findLatestSessionByUserId(
         userId,
         manager,
       );
 
-    if (!lastSession || !lastSession.latitude || !lastSession.longitude) {
+    if (!lastSession) {
       return {
         isAnomalous: false,
+        anomalyType: ANOMALY_TYPES.NONE,
         previousSessionId: null,
         distanceKm: null,
         timeDifferenceMinutes: null,
@@ -60,20 +50,45 @@ export class SessionAnomalyDetectorService {
     }
 
     const timeDifferenceMs =
-      new Date().getTime() - lastSession.createdAt.getTime();
+      new Date().getTime() - lastSession.lastActivityAt.getTime();
     const timeDifferenceMinutes = timeDifferenceMs / (1000 * 60);
-
-    const distanceKm = this.geolocationService.calculateDistance(
-      lastSession.latitude,
-      lastSession.longitude,
-      metadata.latitude,
-      metadata.longitude,
-    );
 
     const timeWindowMinutes =
       locationSource === 'gps'
         ? await this.authSettingsService.getGeoGpsTimeWindowMinutes()
         : await this.authSettingsService.getGeoIpTimeWindowMinutes();
+
+    if (isNewDevice && timeDifferenceMinutes < timeWindowMinutes) {
+      return {
+        isAnomalous: true,
+        anomalyType: ANOMALY_TYPES.NEW_DEVICE_QUICK_CHANGE,
+        previousSessionId: lastSession.id,
+        distanceKm: null,
+        timeDifferenceMinutes,
+      };
+    }
+
+    if (
+      locationSource === 'none' ||
+      !this.isValidCoordinate(metadata.latitude, metadata.longitude) ||
+      !this.isValidCoordinate(lastSession.latitude, lastSession.longitude)
+    ) {
+      return {
+        isAnomalous: false,
+        anomalyType: ANOMALY_TYPES.NONE,
+        previousSessionId: lastSession.id,
+        distanceKm: null,
+        timeDifferenceMinutes,
+      };
+    }
+
+    const distanceKm = this.geolocationService.calculateDistance(
+      Number(lastSession.latitude),
+      Number(lastSession.longitude),
+      Number(metadata.latitude),
+      Number(metadata.longitude),
+    );
+
     const distanceThresholdKm =
       locationSource === 'gps'
         ? await this.authSettingsService.getGeoGpsDistanceKm()
@@ -83,21 +98,36 @@ export class SessionAnomalyDetectorService {
       timeDifferenceMinutes <= timeWindowMinutes &&
       distanceKm >= distanceThresholdKm;
 
-    if (!isAnomalous) {
-      return {
-        isAnomalous: false,
-        previousSessionId: lastSession.id,
-        distanceKm,
-        timeDifferenceMinutes,
-      };
-    }
-
     return {
-      isAnomalous: true,
+      isAnomalous,
+      anomalyType: isAnomalous
+        ? ANOMALY_TYPES.IMPOSSIBLE_TRAVEL
+        : ANOMALY_TYPES.NONE,
       previousSessionId: lastSession.id,
       distanceKm,
       timeDifferenceMinutes,
     };
+  }
+
+  private isValidCoordinate(
+    lat: number | string | undefined | null,
+    lon: number | string | undefined | null,
+  ): boolean {
+    if (lat === undefined || lat === null || lon === undefined || lon === null) {
+      return false;
+    }
+
+    const nLat = Number(lat);
+    const nLon = Number(lon);
+
+    if (isNaN(nLat) || isNaN(nLon)) {
+      return false;
+    }
+
+    const { minLat, maxLat, minLon, maxLon } =
+      technicalSettings.auth.security.coordinates;
+
+    return nLat >= minLat && nLat <= maxLat && nLon >= minLon && nLon <= maxLon;
   }
 
   async resolveCoordinates(metadata: RequestMetadata): Promise<{

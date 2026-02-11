@@ -4,7 +4,7 @@ import { JwtService } from '@nestjs/jwt';
 import request from 'supertest';
 import { AppModule } from './../src/app.module';
 import { RedisCacheService } from './../src/infrastructure/cache/redis-cache.service';
-import { UserSessionRepository } from './../src/modules/auth/infrastructure/user-session.repository';
+import { SessionValidatorService } from './../src/modules/auth/application/session-validator.service';
 import { TestSeeder } from './e2e/test-utils';
 import { DataSource } from 'typeorm';
 
@@ -15,7 +15,7 @@ interface JwtPayload {
 describe('Redis Auth Security & Performance (E2E)', () => {
   let app: INestApplication;
   let redisService: RedisCacheService;
-  let sessionRepository: UserSessionRepository;
+  let sessionValidator: SessionValidatorService;
   let jwtService: JwtService;
   let dataSource: DataSource;
   let seeder: TestSeeder;
@@ -27,19 +27,18 @@ describe('Redis Auth Security & Performance (E2E)', () => {
 
     app = moduleFixture.createNestApplication();
     app.setGlobalPrefix('api/v1');
-    await app.init();
-
-    dataSource = app.get(DataSource);
+    
     redisService = app.get(RedisCacheService);
-    sessionRepository = app.get(UserSessionRepository);
+    sessionValidator = app.get(SessionValidatorService);
     jwtService = app.get(JwtService);
+    dataSource = app.get(DataSource);
     seeder = new TestSeeder(dataSource, app);
 
-    await redisService.invalidateGroup('*');
+    await app.init();
   });
 
   afterAll(async () => {
-    await app.close();
+    if (app) await app.close();
   });
 
   let token: string;
@@ -52,14 +51,14 @@ describe('Redis Auth Security & Performance (E2E)', () => {
     );
     token = auth.token;
 
-    const payload = jwtService.decode(token);
+    const payload = jwtService.decode(token) as JwtPayload;
     sessionId = payload.sessionId;
 
     expect(sessionId).toBeDefined();
   });
 
   it('STEP 2: [PERFORMANCE] Primera petición debe ser Cache Miss (Hit DB) y guardar en Redis', async () => {
-    const repoSpy = jest.spyOn(sessionRepository, 'findByIdWithUser');
+    const validatorSpy = jest.spyOn(sessionValidator, 'validateSession');
     const redisSetSpy = jest.spyOn(redisService, 'set');
 
     await request(app.getHttpServer())
@@ -67,28 +66,28 @@ describe('Redis Auth Security & Performance (E2E)', () => {
       .set('Authorization', `Bearer ${token}`)
       .expect(200);
 
-    expect(repoSpy).toHaveBeenCalled();
+    expect(validatorSpy).toHaveBeenCalled();
     expect(redisSetSpy).toHaveBeenCalledWith(
       expect.stringContaining(`cache:session:${sessionId}:user`),
       expect.anything(),
       expect.anything(),
     );
 
-    repoSpy.mockRestore();
+    validatorSpy.mockRestore();
     redisSetSpy.mockRestore();
   });
 
   it('STEP 3: [PERFORMANCE] Segunda petición debe ser Cache Hit (CERO DB CALLS)', async () => {
-    const repoSpy = jest.spyOn(sessionRepository, 'findByIdWithUser');
+    const validatorSpy = jest.spyOn(sessionValidator, 'validateSession');
 
     await request(app.getHttpServer())
       .get('/api/v1/enrollments/my-courses')
       .set('Authorization', `Bearer ${token}`)
       .expect(200);
 
-    expect(repoSpy).not.toHaveBeenCalled();
+    expect(validatorSpy).not.toHaveBeenCalled();
 
-    repoSpy.mockRestore();
+    validatorSpy.mockRestore();
   });
 
   it('STEP 4: [SECURITY] Logout debe invalidar el token inmediatamente (Borrar caché)', async () => {

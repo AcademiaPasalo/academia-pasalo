@@ -9,6 +9,9 @@ import { SessionStatusService } from '../src/modules/auth/application/session-st
 import { AuthSettingsService } from '../src/modules/auth/application/auth-settings.service';
 import { GeolocationService } from '../src/modules/auth/application/geolocation.service';
 import { SessionAnomalyDetectorService } from '../src/modules/auth/application/session-anomaly-detector.service';
+import { SessionValidatorService } from '../src/modules/auth/application/session-validator.service';
+import { SessionConflictService } from '../src/modules/auth/application/session-conflict.service';
+import { SessionSecurityService } from '../src/modules/auth/application/session-security.service';
 import { UsersService } from '../src/modules/users/application/users.service';
 import { UserSessionRepository } from '../src/modules/auth/infrastructure/user-session.repository';
 import { SecurityEventRepository } from '../src/modules/auth/infrastructure/security-event.repository';
@@ -69,6 +72,7 @@ describe('Advanced Security Scenarios (Offensive Testing)', () => {
     update: jest.fn(),
     deactivateSession: jest.fn(),
     existsByUserIdAndDeviceId: jest.fn().mockResolvedValue(true),
+    findSessionsByUserAndStatus: jest.fn().mockResolvedValue([]),
   };
 
   const mockAnomalyDetector = {
@@ -78,7 +82,10 @@ describe('Advanced Security Scenarios (Offensive Testing)', () => {
         locationSource: meta.latitude && meta.longitude ? 'gps' : 'ip',
       }),
     ),
-    detectLocationAnomaly: jest.fn().mockResolvedValue({ isAnomalous: false }),
+    detectLocationAnomaly: jest.fn().mockResolvedValue({
+      isAnomalous: false,
+      anomalyType: 'NONE',
+    }),
   };
 
   beforeEach(async () => {
@@ -89,6 +96,9 @@ describe('Advanced Security Scenarios (Offensive Testing)', () => {
       providers: [
         AuthService,
         SessionService,
+        SessionValidatorService,
+        SessionConflictService,
+        SessionSecurityService,
         SecurityEventService,
         SessionStatusService,
         AuthSettingsService,

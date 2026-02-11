@@ -2,6 +2,7 @@ import {
   Injectable,
   Logger,
   InternalServerErrorException,
+  OnModuleInit,
 } from '@nestjs/common';
 import { SecurityEventRepository } from '@modules/auth/infrastructure/security-event.repository';
 import { SecurityEventTypeRepository } from '@modules/auth/infrastructure/security-event-type.repository';
@@ -9,13 +10,41 @@ import { SecurityEvent } from '@modules/auth/domain/security-event.entity';
 import type { EntityManager } from 'typeorm';
 
 @Injectable()
-export class SecurityEventService {
+export class SecurityEventService implements OnModuleInit {
   private readonly logger = new Logger(SecurityEventService.name);
+  private readonly typeCache = new Map<string, string>();
 
   constructor(
     private readonly securityEventRepository: SecurityEventRepository,
     private readonly securityEventTypeRepository: SecurityEventTypeRepository,
   ) {}
+
+  async onModuleInit() {
+    await this.refreshCache();
+  }
+
+  async refreshCache() {
+    try {
+      const types = await this.securityEventTypeRepository.findAll();
+      this.typeCache.clear();
+      for (const type of types) {
+        this.typeCache.set(type.code, type.id);
+      }
+      this.logger.debug({
+        level: 'debug',
+        context: SecurityEventService.name,
+        message: 'Caché de tipos de eventos de seguridad cargada',
+        count: this.typeCache.size,
+      });
+    } catch (error) {
+      this.logger.error({
+        level: 'error',
+        context: SecurityEventService.name,
+        message: 'Error al precargar caché de tipos de eventos',
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
 
   async logEvent(
     userId: string,
@@ -23,23 +52,30 @@ export class SecurityEventService {
     context?: Record<string, unknown>,
     manager?: EntityManager,
   ): Promise<SecurityEvent | null> {
-    const eventType = await this.securityEventTypeRepository.findByCode(
-      eventCode,
-      manager,
-    );
+    let eventTypeId = this.typeCache.get(eventCode);
 
-    if (!eventType) {
-      this.logger.warn({
-        level: 'warn',
-        context: SecurityEventService.name,
-        message: 'Tipo de evento de seguridad no encontrado en base de datos',
+    if (!eventTypeId || manager) {
+      const eventType = await this.securityEventTypeRepository.findByCode(
         eventCode,
-        userId,
-        extra: context || null,
-      });
-      throw new InternalServerErrorException(
-        'Configuración de auditoría de seguridad incompleta',
+        manager,
       );
+
+      if (!eventType) {
+        this.logger.warn({
+          level: 'warn',
+          context: SecurityEventService.name,
+          message: 'Tipo de evento de seguridad no encontrado en BD',
+          eventCode,
+          userId,
+        });
+        throw new InternalServerErrorException(
+          'Configuración de auditoría de seguridad incompleta',
+        );
+      }
+      eventTypeId = eventType.id;
+      if (!manager) {
+        this.typeCache.set(eventCode, eventTypeId);
+      }
     }
 
     const eventDatetime = new Date();
@@ -48,7 +84,7 @@ export class SecurityEventService {
     const securityEvent = await this.securityEventRepository.create(
       {
         userId,
-        securityEventTypeId: eventType.id,
+        securityEventTypeId: eventTypeId,
         eventDatetime,
         ipAddress,
         userAgent,
@@ -75,6 +111,18 @@ export class SecurityEventService {
     limit = 50,
   ): Promise<SecurityEvent[]> {
     return await this.securityEventRepository.findByUserId(userId, limit);
+  }
+
+  async countEventsByCode(
+    userId: string,
+    eventCode: string,
+    manager?: EntityManager,
+  ): Promise<number> {
+    return await this.securityEventRepository.countByUserIdAndTypeCode(
+      userId,
+      eventCode,
+      manager,
+    );
   }
 
   private normalizeContext(context?: Record<string, unknown>): {

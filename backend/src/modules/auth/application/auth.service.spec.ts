@@ -8,6 +8,7 @@ import { AuthSettingsService } from '@modules/auth/application/auth-settings.ser
 import { SecurityEventService } from '@modules/auth/application/security-event.service';
 import { SessionService } from '@modules/auth/application/session.service';
 import { SessionStatusService } from '@modules/auth/application/session-status.service';
+import { SessionValidatorService } from '@modules/auth/application/session-validator.service';
 import { GoogleProviderService } from '@modules/auth/application/google-provider.service';
 import { TokenService } from '@modules/auth/application/token.service';
 import { RequestMetadata } from '@modules/auth/interfaces/request-metadata.interface';
@@ -64,13 +65,19 @@ describe('AuthService', () => {
 
   const sessionServiceMock = {
     createSession: jest.fn(),
-    validateRefreshTokenSession: jest.fn(),
     rotateRefreshToken: jest.fn(),
     findSessionByRefreshToken: jest.fn(),
     findSessionByRefreshTokenForUpdate: jest.fn(),
     resolveConcurrentSession: jest.fn(),
     activateBlockedSession: jest.fn(),
     deactivateSession: jest.fn(),
+  };
+
+  const sessionValidatorServiceMock = {
+    validateRefreshTokenSession: jest.fn(),
+    validateSession: jest.fn(),
+    hashRefreshToken: jest.fn((t) => t),
+    findSessionByRefreshToken: jest.fn(),
   };
 
   const securityEventServiceMock = {
@@ -130,6 +137,10 @@ describe('AuthService', () => {
         { provide: DataSource, useValue: dataSourceMock },
         { provide: UsersService, useValue: usersServiceMock },
         { provide: SessionService, useValue: sessionServiceMock },
+        {
+          provide: SessionValidatorService,
+          useValue: sessionValidatorServiceMock,
+        },
         { provide: SecurityEventService, useValue: securityEventServiceMock },
         { provide: SessionStatusService, useValue: sessionStatusServiceMock },
         { provide: AuthSettingsService, useValue: authSettingsServiceMock },
@@ -257,7 +268,7 @@ describe('AuthService', () => {
     ).rejects.toBeInstanceOf(UnauthorizedException);
 
     expect(
-      sessionServiceMock.validateRefreshTokenSession,
+      sessionValidatorServiceMock.validateRefreshTokenSession,
     ).not.toHaveBeenCalled();
   });
 
@@ -268,7 +279,7 @@ describe('AuthService', () => {
       type: 'refresh',
     });
 
-    sessionServiceMock.validateRefreshTokenSession.mockResolvedValue({
+    sessionValidatorServiceMock.validateRefreshTokenSession.mockResolvedValue({
       id: '123',
     });
     sessionServiceMock.rotateRefreshToken.mockResolvedValue({ id: '123' });
@@ -388,5 +399,15 @@ describe('AuthService', () => {
     expect(typeof rotateArgs[1]).toBe('string');
     expect(rotateArgs[2]).toBeInstanceOf(Date);
     expect(rotateArgs[3]).toEqual(expect.anything());
+  });
+
+  it('switchProfile: intento de escalada de privilegios (rol no poseído) -> 401', async () => {
+    usersServiceMock.findOne.mockResolvedValue(baseUser);
+    
+    await expect(
+      authService.switchProfile('10', '777', '999', metadata) // 999 no es un rol de baseUser
+    ).rejects.toBeInstanceOf(UnauthorizedException);
+    
+    expect(sessionServiceMock.rotateRefreshToken).not.toHaveBeenCalled();
   });
 });

@@ -24,4 +24,9 @@ export class SessionStatusRepository {
       where: { code },
     });
   }
+
+  async findAll(manager?: EntityManager): Promise<SessionStatus[]> {
+    const repo = this.getRepository(manager);
+    return await repo.find();
+  }
 }
