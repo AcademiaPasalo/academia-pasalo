@@ -90,6 +90,7 @@ describe('Security Scenarios (Integration)', () => {
 
   const mockSecurityEventRepository = {
     create: jest.fn().mockResolvedValue({ id: '999' }),
+    countByUserIdAndTypeCode: jest.fn().mockResolvedValue(0),
   };
 
   const mockSecurityEventTypeRepository = {
@@ -205,12 +206,14 @@ describe('Security Scenarios (Integration)', () => {
     jwtService = moduleFixture.get<JwtService>(JwtService);
     securityEventService =
       moduleFixture.get<SecurityEventService>(SecurityEventService);
+    jest.spyOn(securityEventService, 'logEvent');
 
     mockAnomalyDetector.detectLocationAnomaly.mockImplementation(
-      (userId: string, metadata: RequestMetadata) => {
+      (userId: string, metadata: RequestMetadata, locationSource: string, isNewDevice: boolean) => {
         if (metadata && metadata.ipAddress === '8.8.8.8') {
           return Promise.resolve({
             isAnomalous: true,
+            anomalyType: 'IMPOSSIBLE_TRAVEL',
             previousSessionId: '50',
             distanceKm: 10000,
             timeDifferenceMinutes: 5,
@@ -218,6 +221,7 @@ describe('Security Scenarios (Integration)', () => {
         }
         return Promise.resolve({
           isAnomalous: false,
+          anomalyType: 'NONE',
           previousSessionId: null,
           distanceKm: null,
           timeDifferenceMinutes: null,
@@ -273,14 +277,23 @@ describe('Security Scenarios (Integration)', () => {
     });
   });
 
-  describe('IMPOSSIBLE TRAVEL (Anomaly Detection)', () => {
-    it('should BLOCK session if user moves too fast (Madrid -> Tokyo in 5 mins)', async () => {
-      mockUserSessionRepository.create.mockResolvedValue({ id: '123' });
+  describe('ANOMALY DETECTION (Passive Mode)', () => {
+    it('should NOT block session if user moves too fast (Passive Mode), but log it', async () => {
+      mockUserSessionRepository.create.mockResolvedValue({
+        id: '123',
+        sessionStatusId: '1',
+      });
       const result = await authService.loginWithGoogle('token', {
         ...mockMetadata,
         ipAddress: '8.8.8.8',
       });
-      expect(result.sessionStatus).toBe('BLOCKED_PENDING_REAUTH');
+      expect(result.sessionStatus).toBe('ACTIVE');
+      expect(securityEventService.logEvent).toHaveBeenCalledWith(
+        mockUser.id,
+        'ANOMALOUS_LOGIN_DETECTED',
+        expect.anything(),
+        expect.anything(),
+      );
     });
   });
 
