@@ -1,8 +1,7 @@
-import { Injectable, Logger, UnauthorizedException } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import type { EntityManager } from 'typeorm';
 import { UserSessionRepository } from '@modules/auth/infrastructure/user-session.repository';
-import { SecurityEventService } from '@modules/auth/application/security-event.service';
 import { SessionAnomalyDetectorService } from '@modules/auth/application/session-anomaly-detector.service';
 import { UserSession } from '@modules/auth/domain/user-session.entity';
 import { RequestMetadata } from '@modules/auth/interfaces/request-metadata.interface';
@@ -11,9 +10,10 @@ import {
   SessionStatusCode,
   SessionStatusService,
 } from '@modules/auth/application/session-status.service';
-import { createHash } from 'crypto';
 import { ConcurrentDecision } from '@modules/auth/interfaces/security.constants';
-import { technicalSettings } from '@config/technical-settings';
+import { SessionValidatorService } from '@modules/auth/application/session-validator.service';
+import { SessionConflictService } from '@modules/auth/application/session-conflict.service';
+import { SessionSecurityService } from '@modules/auth/application/session-security.service';
 
 @Injectable()
 export class SessionService {
@@ -22,10 +22,12 @@ export class SessionService {
   constructor(
     private readonly dataSource: DataSource,
     private readonly userSessionRepository: UserSessionRepository,
-    private readonly securityEventService: SecurityEventService,
     private readonly sessionAnomalyDetector: SessionAnomalyDetectorService,
     private readonly sessionStatusService: SessionStatusService,
     private readonly cacheService: RedisCacheService,
+    private readonly sessionValidator: SessionValidatorService,
+    private readonly sessionConflict: SessionConflictService,
+    private readonly sessionSecurity: SessionSecurityService,
   ) {}
 
   async createSession(
@@ -52,10 +54,6 @@ export class SessionService {
         'PENDING_CONCURRENT_RESOLUTION',
         manager,
       );
-      const blockedStatusId = await this.sessionStatusService.getIdByCode(
-        'BLOCKED_PENDING_REAUTH',
-        manager,
-      );
 
       const isNewDevice =
         !(await this.userSessionRepository.existsByUserIdAndDeviceId(
@@ -80,7 +78,8 @@ export class SessionService {
           manager,
         );
 
-      const refreshTokenHash = this.hashRefreshToken(refreshToken);
+      const refreshTokenHash =
+        this.sessionValidator.hashRefreshToken(refreshToken);
 
       const sessionStatusId = concurrentSession
         ? pendingStatusId
@@ -105,79 +104,23 @@ export class SessionService {
       );
 
       if (concurrentSession) {
-        await this.cleanupExcessPendingSessions(userId, manager);
-
-        await this.securityEventService.logEvent(
+        await this.sessionConflict.cleanupExcessPendingSessions(
           userId,
-          'CONCURRENT_SESSION_DETECTED',
-          {
-            ipAddress: resolved.metadata.ipAddress,
-            userAgent: resolved.metadata.userAgent,
-            deviceId: resolved.metadata.deviceId,
-            locationSource: resolved.locationSource,
-            city: resolved.metadata.city,
-            country: resolved.metadata.country,
-            newSessionId: session.id,
-            existingSessionId: concurrentSession.id,
-            existingDeviceId: concurrentSession.deviceId,
-          },
           manager,
         );
       }
 
-      if (anomaly.isAnomalous) {
-        await this.securityEventService.logEvent(
-          userId,
-          'ANOMALOUS_LOGIN_DETECTED',
-          {
-            ipAddress: resolved.metadata.ipAddress,
-            userAgent: resolved.metadata.userAgent,
-            deviceId: resolved.metadata.deviceId,
-            locationSource: resolved.locationSource,
-            city: resolved.metadata.city,
-            country: resolved.metadata.country,
-            anomalyType: anomaly.anomalyType,
-            previousSessionId: anomaly.previousSessionId,
-            distanceKm: anomaly.distanceKm,
-            timeDifferenceMinutes: anomaly.timeDifferenceMinutes,
-            newSessionId: session.id,
-          },
-          manager,
-        );
-
-        await this.handleAnomalousStrikes(userId, manager);
-      }
-
-      if (!concurrentSession && !anomaly.isAnomalous) {
-        if (isNewDevice) {
-          await this.securityEventService.logEvent(
-            userId,
-            'NEW_DEVICE_DETECTED',
-            {
-              ipAddress: resolved.metadata.ipAddress,
-              userAgent: resolved.metadata.userAgent,
-              deviceId: resolved.metadata.deviceId,
-              locationSource: resolved.locationSource,
-              city: resolved.metadata.city,
-              country: resolved.metadata.country,
-              sessionId: session.id,
-            },
-            manager,
-          );
-        }
-
-        await this.securityEventService.logEvent(
-          userId,
-          'LOGIN_SUCCESS',
-          {
-            ipAddress: resolved.metadata.ipAddress,
-            userAgent: resolved.metadata.userAgent,
-            deviceId: resolved.metadata.deviceId,
-            sessionId: session.id,
-          },
-          manager,
-        );
-      }
+      await this.sessionSecurity.logSessionCreationEvents({
+        userId,
+        metadata: resolved.metadata,
+        session,
+        locationSource: resolved.locationSource,
+        isNewDevice,
+        anomaly,
+        isConcurrent: !!concurrentSession,
+        existingSession: concurrentSession,
+        manager,
+      });
 
       this.logger.debug({
         level: 'debug',
@@ -206,69 +149,14 @@ export class SessionService {
     return await this.dataSource.transaction(runInTransaction);
   }
 
-  async validateRefreshTokenSession(
-    userId: string,
-    deviceId: string,
-    refreshToken: string,
-  ): Promise<UserSession> {
-    const refreshTokenHash = this.hashRefreshToken(refreshToken);
-
-    const isBlacklisted = await this.cacheService.get(
-      `blacklist:refresh:${refreshTokenHash}`,
-    );
-    if (isBlacklisted) {
-      this.logger.warn({
-        level: 'warn',
-        context: SessionService.name,
-        message: 'Intento de uso de refresh token revocado',
-        userId,
-        deviceId,
-      });
-      throw new UnauthorizedException('Token revocado');
-    }
-
-    const session =
-      await this.userSessionRepository.findByRefreshTokenHash(refreshTokenHash);
-
-    if (!session) {
-      throw new UnauthorizedException('Sesión inválida o expirada');
-    }
-
-    if (session.userId !== userId) {
-      throw new UnauthorizedException('Sesión inválida o expirada');
-    }
-
-    if (session.deviceId !== deviceId) {
-      throw new UnauthorizedException('Dispositivo no autorizado');
-    }
-
-    if (session.expiresAt < new Date()) {
-      await this.userSessionRepository.update(session.id, {
-        isActive: false,
-      });
-      throw new UnauthorizedException('Sesión inválida o expirada');
-    }
-
-    const activeStatusId =
-      await this.sessionStatusService.getIdByCode('ACTIVE');
-    if (session.sessionStatusId !== activeStatusId || !session.isActive) {
-      throw new UnauthorizedException('Sesión inválida o expirada');
-    }
-
-    await this.userSessionRepository.update(session.id, {
-      lastActivityAt: new Date(),
-    });
-
-    return session;
-  }
-
   async rotateRefreshToken(
     sessionId: string,
     refreshToken: string,
     expiresAt: Date,
     manager?: EntityManager,
   ): Promise<UserSession> {
-    const refreshTokenHash = this.hashRefreshToken(refreshToken);
+    const refreshTokenHash =
+      this.sessionValidator.hashRefreshToken(refreshToken);
 
     return await this.userSessionRepository.update(
       sessionId,
@@ -279,39 +167,6 @@ export class SessionService {
       },
       manager,
     );
-  }
-
-  async validateSession(
-    sessionId: string,
-    userId: string,
-    deviceId: string,
-  ): Promise<UserSession> {
-    const session = await this.userSessionRepository.findActiveById(sessionId);
-
-    if (!session) {
-      throw new UnauthorizedException('Sesión inválida o expirada');
-    }
-
-    if (session.userId !== userId) {
-      throw new UnauthorizedException('Sesión inválida o expirada');
-    }
-
-    if (session.deviceId !== deviceId) {
-      this.logger.warn({
-        level: 'warn',
-        context: SessionService.name,
-        message: 'Intento de uso de sesión con dispositivo diferente',
-        sessionId: session.id,
-        expectedDeviceId: session.deviceId,
-        providedDeviceId: deviceId,
-      });
-      throw new UnauthorizedException('Dispositivo no autorizado');
-    }
-
-    await this.userSessionRepository.update(session.id, {
-      lastActivityAt: new Date(),
-    });
-    return session;
   }
 
   async deactivateSession(
@@ -337,8 +192,13 @@ export class SessionService {
     const sessions =
       await this.userSessionRepository.findActiveSessionsByUserId(userId);
 
+    const revokedStatusId = await this.sessionStatusService.getIdByCode('REVOKED');
+
     for (const session of sessions) {
-      await this.userSessionRepository.deactivateSession(session.id);
+      await this.userSessionRepository.update(session.id, {
+        sessionStatusId: revokedStatusId,
+        isActive: false
+      });
       await this.cacheService.del(`cache:session:${session.id}:user`);
     }
 
@@ -351,15 +211,12 @@ export class SessionService {
     });
   }
 
-  private hashRefreshToken(token: string): string {
-    return createHash('sha256').update(token).digest('hex');
-  }
-
   async findSessionByRefreshToken(
     refreshToken: string,
     manager?: EntityManager,
   ): Promise<UserSession | null> {
-    const refreshTokenHash = this.hashRefreshToken(refreshToken);
+    const refreshTokenHash =
+      this.sessionValidator.hashRefreshToken(refreshToken);
     return await this.userSessionRepository.findByRefreshTokenHash(
       refreshTokenHash,
       manager,
@@ -370,7 +227,8 @@ export class SessionService {
     refreshToken: string,
     manager: EntityManager,
   ): Promise<UserSession | null> {
-    const refreshTokenHash = this.hashRefreshToken(refreshToken);
+    const refreshTokenHash =
+      this.sessionValidator.hashRefreshToken(refreshToken);
     return await this.userSessionRepository.findByRefreshTokenHashForUpdate(
       refreshTokenHash,
       manager,
@@ -386,144 +244,7 @@ export class SessionService {
     userAgent: string;
     externalManager?: EntityManager;
   }): Promise<{ keptSessionId: string | null }> {
-    const runInTransaction = async (manager: EntityManager) => {
-      const activeStatusId = await this.sessionStatusService.getIdByCode(
-        'ACTIVE',
-        manager,
-      );
-      const pendingStatusId = await this.sessionStatusService.getIdByCode(
-        'PENDING_CONCURRENT_RESOLUTION',
-        manager,
-      );
-      const revokedStatusId = await this.sessionStatusService.getIdByCode(
-        'REVOKED',
-        manager,
-      );
-
-      const refreshTokenHash = this.hashRefreshToken(params.refreshToken);
-      const newSession =
-        await this.userSessionRepository.findByRefreshTokenHashForUpdate(
-          refreshTokenHash,
-          manager,
-        );
-
-      if (
-        !newSession ||
-        newSession.userId !== params.userId ||
-        newSession.deviceId !== params.deviceId ||
-        newSession.sessionStatusId !== pendingStatusId
-      ) {
-        throw new UnauthorizedException('Sesión inválida o expirada');
-      }
-
-      const existingSession =
-        await this.userSessionRepository.findOtherActiveSession(
-          params.userId,
-          params.deviceId,
-          activeStatusId,
-          manager,
-        );
-
-      if (!existingSession) {
-        await this.userSessionRepository.update(
-          newSession.id,
-          {
-            sessionStatusId: activeStatusId,
-            isActive: true,
-          },
-          manager,
-        );
-
-        await this.securityEventService.logEvent(
-          params.userId,
-          'CONCURRENT_SESSION_RESOLVED',
-          {
-            ipAddress: params.ipAddress,
-            userAgent: params.userAgent,
-            decision: 'KEEP_NEW',
-            newSessionId: newSession.id,
-            existingSessionId: null,
-          },
-          manager,
-        );
-
-        return { keptSessionId: newSession.id };
-      }
-
-      const lockedExisting = await this.userSessionRepository.findByIdForUpdate(
-        existingSession.id,
-        manager,
-      );
-
-      if (!lockedExisting) {
-        throw new UnauthorizedException('Sesión inválida o expirada');
-      }
-
-      if (params.decision === 'KEEP_NEW') {
-        await this.userSessionRepository.update(
-          lockedExisting.id,
-          {
-            sessionStatusId: revokedStatusId,
-            isActive: false,
-          },
-          manager,
-        );
-
-        await this.userSessionRepository.update(
-          newSession.id,
-          {
-            sessionStatusId: activeStatusId,
-            isActive: true,
-          },
-          manager,
-        );
-
-        await this.securityEventService.logEvent(
-          params.userId,
-          'CONCURRENT_SESSION_RESOLVED',
-          {
-            ipAddress: params.ipAddress,
-            userAgent: params.userAgent,
-            decision: 'KEEP_NEW',
-            newSessionId: newSession.id,
-            existingSessionId: lockedExisting.id,
-          },
-          manager,
-        );
-
-        return { keptSessionId: newSession.id };
-      }
-
-      await this.userSessionRepository.update(
-        newSession.id,
-        {
-          sessionStatusId: revokedStatusId,
-          isActive: false,
-        },
-        manager,
-      );
-
-      await this.securityEventService.logEvent(
-        params.userId,
-        'CONCURRENT_SESSION_RESOLVED',
-        {
-          ipAddress: params.ipAddress,
-          userAgent: params.userAgent,
-          decision: 'KEEP_EXISTING',
-          newSessionId: newSession.id,
-          existingSessionId: lockedExisting.id,
-        },
-        manager,
-      );
-
-      return { keptSessionId: null };
-    };
-
-    if (params.externalManager) {
-      return await runInTransaction(params.externalManager);
-    }
-
-    return await this.dataSource.transaction(runInTransaction);
+    return await this.sessionConflict.resolveConcurrentSession(params);
   }
 
   async activateBlockedSession(
@@ -542,81 +263,5 @@ export class SessionService {
       },
       manager,
     );
-  }
-
-  private async handleAnomalousStrikes(
-    userId: string,
-    manager: EntityManager,
-  ): Promise<void> {
-    const strikeCount =
-      await this.securityEventService.countEventsByCode(
-        userId,
-        'ANOMALOUS_LOGIN_DETECTED',
-        manager,
-      );
-
-    if (
-      strikeCount === technicalSettings.auth.security.anomalyStrikeThreshold
-    ) {
-      this.logger.log({
-        level: 'info',
-        context: SessionService.name,
-        message: 'Umbral de strikes alcanzado para el usuario. Preparando notificación.',
-        userId,
-        strikes: strikeCount,
-      });
-
-      /**
-       * TODO: Implementar integración con NotificationModule cuando esté disponible.
-       * Mensaje: "Hemos detectado accesos inusuales recientes en tu cuenta. Por seguridad, evita compartir tus credenciales."
-       * 
-       * await this.notificationService.create({
-       *   userId,
-       *   message: 'Hemos detectado accesos inusuales recientes en tu cuenta. Por seguridad, evita compartir tus credenciales.',
-       * });
-       */
-    }
-  }
-
-  private async cleanupExcessPendingSessions(
-    userId: string,
-    manager: EntityManager,
-  ): Promise<void> {
-    const pendingStatusId = await this.sessionStatusService.getIdByCode(
-      'PENDING_CONCURRENT_RESOLUTION',
-      manager,
-    );
-
-    const pendingSessions = await this.userSessionRepository.findSessionsByUserAndStatus(
-      userId,
-      pendingStatusId,
-      manager,
-    );
-
-    if (
-      pendingSessions.length >=
-      technicalSettings.auth.security.maxPendingSessionsPerUser
-    ) {
-      const revokedStatusId = await this.sessionStatusService.getIdByCode(
-        'REVOKED',
-        manager,
-      );
-
-      // Revocar las más antiguas para dejar espacio a la nueva
-      const sessionsToRevoke = pendingSessions.slice(
-        technicalSettings.auth.security.maxPendingSessionsPerUser - 1,
-      );
-
-      for (const session of sessionsToRevoke) {
-        await this.userSessionRepository.update(
-          session.id,
-          {
-            sessionStatusId: revokedStatusId,
-            isActive: false,
-          },
-          manager,
-        );
-      }
-    }
   }
 }
