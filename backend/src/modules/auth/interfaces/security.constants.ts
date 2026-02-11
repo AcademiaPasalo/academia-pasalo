@@ -1,4 +1,7 @@
-export type AnomalyType = 'NONE' | 'IMPOSSIBLE_TRAVEL' | 'NEW_DEVICE_QUICK_CHANGE';
+export type AnomalyType =
+  | 'NONE'
+  | 'IMPOSSIBLE_TRAVEL'
+  | 'NEW_DEVICE_QUICK_CHANGE';
 
 export const ANOMALY_TYPES: Record<string, AnomalyType> = {
   NONE: 'NONE',

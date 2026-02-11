@@ -43,8 +43,9 @@ export class SessionConflictService {
         manager,
       );
 
-      const refreshTokenHash =
-        this.sessionValidator.hashRefreshToken(params.refreshToken);
+      const refreshTokenHash = this.sessionValidator.hashRefreshToken(
+        params.refreshToken,
+      );
       const newSession =
         await this.userSessionRepository.findByRefreshTokenHashForUpdate(
           refreshTokenHash,

@@ -171,14 +171,20 @@ describe('Security Scenarios (Integration)', () => {
           provide: TokenService,
           useValue: {
             generateAccessToken: jest.fn().mockResolvedValue('at'),
-            generateRefreshToken: jest.fn().mockResolvedValue({ token: 'rt', expiresAt: new Date() }),
-            verifyRefreshToken: jest.fn().mockReturnValue({ deviceId: 'device-A', sub: '1' }),
+            generateRefreshToken: jest
+              .fn()
+              .mockResolvedValue({ token: 'rt', expiresAt: new Date() }),
+            verifyRefreshToken: jest
+              .fn()
+              .mockReturnValue({ deviceId: 'device-A', sub: '1' }),
           },
         },
         {
           provide: GoogleProviderService,
           useValue: {
-            verifyCodeAndGetEmail: jest.fn().mockResolvedValue({ email: 'hacker@test.com' }),
+            verifyCodeAndGetEmail: jest
+              .fn()
+              .mockResolvedValue({ email: 'hacker@test.com' }),
           },
         },
       ],
@@ -187,9 +193,12 @@ describe('Security Scenarios (Integration)', () => {
     app = moduleFixture.createNestApplication();
     authService = moduleFixture.get<AuthService>(AuthService);
     jwtService = moduleFixture.get<JwtService>(JwtService);
-    securityEventService = moduleFixture.get<SecurityEventService>(SecurityEventService);
-    sessionValidatorService = moduleFixture.get<SessionValidatorService>(SessionValidatorService);
-    
+    securityEventService =
+      moduleFixture.get<SecurityEventService>(SecurityEventService);
+    sessionValidatorService = moduleFixture.get<SessionValidatorService>(
+      SessionValidatorService,
+    );
+
     jest.spyOn(securityEventService, 'logEvent');
   });
 
@@ -200,7 +209,9 @@ describe('Security Scenarios (Integration)', () => {
         deviceId: 'device-B-existing',
       });
       mockUserSessionRepository.create.mockResolvedValue({ id: '123' });
-      jest.spyOn(securityEventService, 'logEvent').mockRejectedValue(new Error('DB Error'));
+      jest
+        .spyOn(securityEventService, 'logEvent')
+        .mockRejectedValue(new Error('DB Error'));
 
       await expect(
         authService.loginWithGoogle('token', mockMetadata),
@@ -229,7 +240,7 @@ describe('Security Scenarios (Integration)', () => {
     it('should NOT block session if user moves too fast (Passive Mode), but log it', async () => {
       mockUserSessionRepository.findOtherActiveSession.mockResolvedValue(null);
       mockUserSessionRepository.create.mockResolvedValue({ id: '123' });
-      
+
       mockAnomalyDetector.detectLocationAnomaly.mockResolvedValue({
         isAnomalous: true,
         anomalyType: 'IMPOSSIBLE_TRAVEL',
@@ -242,13 +253,13 @@ describe('Security Scenarios (Integration)', () => {
         ...mockMetadata,
         ipAddress: '8.8.8.8',
       });
-      
+
       expect(result.sessionStatus).toBe('ACTIVE');
       expect(securityEventService.logEvent).toHaveBeenCalledWith(
         mockUser.id,
         'ANOMALOUS_LOGIN_DETECTED',
         expect.anything(),
-        expect.anything()
+        expect.anything(),
       );
     });
   });
@@ -257,7 +268,7 @@ describe('Security Scenarios (Integration)', () => {
     it('should REJECT access if session is BLOCKED in database', async () => {
       // Mock UsersService for this test
       const usersService = { findOne: jest.fn().mockResolvedValue(mockUser) };
-      
+
       const strategy = new JwtStrategy(
         { get: () => 'secret' } as any,
         usersService as any,
@@ -265,10 +276,21 @@ describe('Security Scenarios (Integration)', () => {
         mockRedisService as any,
       );
 
-      const payload = { sub: '1', email: 'h@t.com', roles: [], activeRole: 'STUDENT', sessionId: '500', deviceId: 'A' };
-      jest.spyOn(sessionValidatorService, 'validateSession').mockRejectedValue(new UnauthorizedException());
+      const payload = {
+        sub: '1',
+        email: 'h@t.com',
+        roles: [],
+        activeRole: 'STUDENT',
+        sessionId: '500',
+        deviceId: 'A',
+      };
+      jest
+        .spyOn(sessionValidatorService, 'validateSession')
+        .mockRejectedValue(new UnauthorizedException());
 
-      await expect(strategy.validate(payload)).rejects.toThrow(UnauthorizedException);
+      await expect(strategy.validate(payload)).rejects.toThrow(
+        UnauthorizedException,
+      );
     });
   });
 });

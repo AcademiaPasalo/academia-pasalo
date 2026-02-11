@@ -75,7 +75,8 @@ export class SessionValidatorService {
     userId: string,
     deviceId: string,
   ): Promise<UserSession> {
-    const session = await this.userSessionRepository.findByIdWithUser(sessionId);
+    const session =
+      await this.userSessionRepository.findByIdWithUser(sessionId);
 
     if (!session || session.userId !== userId) {
       throw new UnauthorizedException('Sesión inválida o expirada');

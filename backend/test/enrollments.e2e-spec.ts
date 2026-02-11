@@ -81,7 +81,7 @@ describe('Enrollments E2E', () => {
     courseId: 'c-1',
     academicCycleId: 'ac-1',
     academicCycle: mockAcademicCycle,
-    course: { id: 'c-1' }
+    course: { id: 'c-1' },
   };
 
   const usersServiceMock = {
@@ -93,13 +93,21 @@ describe('Enrollments E2E', () => {
   };
 
   const enrollmentRepositoryMock = {
-    save: jest.fn().mockImplementation((dto) => Promise.resolve({ id: 'enrollment-1', ...dto })),
+    save: jest
+      .fn()
+      .mockImplementation((dto) =>
+        Promise.resolve({ id: 'enrollment-1', ...dto }),
+      ),
     findOne: jest.fn().mockResolvedValue({ id: 'enrollment-1' }),
     findById: jest.fn().mockResolvedValue({ id: 'enrollment-1', userId: '2' }),
     update: jest.fn().mockResolvedValue({}),
     findActiveByUserAndCourseCycle: jest.fn().mockResolvedValue(null),
     findMyEnrollments: jest.fn().mockResolvedValue([]),
-    create: jest.fn().mockImplementation((dto) => Promise.resolve({ id: 'enrollment-1', ...dto })),
+    create: jest
+      .fn()
+      .mockImplementation((dto) =>
+        Promise.resolve({ id: 'enrollment-1', ...dto }),
+      ),
   };
 
   const mockCourseCycleRepo = {
@@ -127,15 +135,22 @@ describe('Enrollments E2E', () => {
     getRepository: jest.fn().mockImplementation((entity) => {
       // Manejar tanto clases como strings
       const name = typeof entity === 'function' ? entity.name : entity;
-      
+
       switch (name) {
-        case 'Enrollment': return enrollmentRepositoryMock;
-        case 'EnrollmentStatus': return enrollmentStatusRepositoryMock;
-        case 'EnrollmentType': return enrollmentTypeRepositoryMock;
-        case 'EnrollmentEvaluation': return enrollmentEvaluationRepositoryMock;
-        case 'CourseCycle': return mockCourseCycleRepo;
-        case 'Evaluation': return evaluationRepositoryMock;
-        default: return {};
+        case 'Enrollment':
+          return enrollmentRepositoryMock;
+        case 'EnrollmentStatus':
+          return enrollmentStatusRepositoryMock;
+        case 'EnrollmentType':
+          return enrollmentTypeRepositoryMock;
+        case 'EnrollmentEvaluation':
+          return enrollmentEvaluationRepositoryMock;
+        case 'CourseCycle':
+          return mockCourseCycleRepo;
+        case 'Evaluation':
+          return evaluationRepositoryMock;
+        default:
+          return {};
       }
     }),
   };
@@ -154,8 +169,20 @@ describe('Enrollments E2E', () => {
   const userSessionRepositoryMock = {
     findByIdWithUser: jest.fn(),
     findActiveById: jest.fn((id) => {
-      if (id === 'session-admin') return Promise.resolve({ id, userId: '1', deviceId: 'dev-1', isActive: true });
-      if (id === 'session-student') return Promise.resolve({ id, userId: '2', deviceId: 'dev-1', isActive: true });
+      if (id === 'session-admin')
+        return Promise.resolve({
+          id,
+          userId: '1',
+          deviceId: 'dev-1',
+          isActive: true,
+        });
+      if (id === 'session-student')
+        return Promise.resolve({
+          id,
+          userId: '2',
+          deviceId: 'dev-1',
+          isActive: true,
+        });
       return Promise.resolve(null);
     }),
     update: jest.fn(),

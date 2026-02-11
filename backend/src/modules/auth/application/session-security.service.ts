@@ -29,7 +29,15 @@ export class SessionSecurityService {
     existingSession?: UserSession | null;
     manager: EntityManager;
   }): Promise<void> {
-    const { userId, metadata, session, anomaly, isConcurrent, existingSession, manager } = params;
+    const {
+      userId,
+      metadata,
+      session,
+      anomaly,
+      isConcurrent,
+      existingSession,
+      manager,
+    } = params;
 
     if (isConcurrent && existingSession) {
       await this.securityEventService.logEvent(

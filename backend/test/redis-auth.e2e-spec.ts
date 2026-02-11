@@ -27,7 +27,7 @@ describe('Redis Auth Security & Performance (E2E)', () => {
 
     app = moduleFixture.createNestApplication();
     app.setGlobalPrefix('api/v1');
-    
+
     redisService = app.get(RedisCacheService);
     sessionValidator = app.get(SessionValidatorService);
     jwtService = app.get(JwtService);

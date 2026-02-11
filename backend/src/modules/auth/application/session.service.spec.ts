@@ -51,7 +51,10 @@ describe('SessionService', () => {
         },
         {
           provide: SessionAnomalyDetectorService,
-          useValue: { resolveCoordinates: jest.fn(), detectLocationAnomaly: jest.fn() },
+          useValue: {
+            resolveCoordinates: jest.fn(),
+            detectLocationAnomaly: jest.fn(),
+          },
         },
         {
           provide: SessionStatusService,
@@ -89,68 +92,117 @@ describe('SessionService', () => {
         metadata,
         locationSource: 'gps',
       });
-      (userSessionRepository.existsByUserIdAndDeviceId as jest.Mock).mockResolvedValue(true);
+      (
+        userSessionRepository.existsByUserIdAndDeviceId as jest.Mock
+      ).mockResolvedValue(true);
       (anomalyDetector.detectLocationAnomaly as jest.Mock).mockResolvedValue({
         isAnomalous: true,
         anomalyType: ANOMALY_TYPES.IMPOSSIBLE_TRAVEL,
       });
-      (userSessionRepository.findOtherActiveSession as jest.Mock).mockResolvedValue(null);
-      (sessionStatusService.getIdByCode as jest.Mock).mockResolvedValue('active-id');
-      (userSessionRepository.create as jest.Mock).mockResolvedValue({ id: 's1' });
+      (
+        userSessionRepository.findOtherActiveSession as jest.Mock
+      ).mockResolvedValue(null);
+      (sessionStatusService.getIdByCode as jest.Mock).mockResolvedValue(
+        'active-id',
+      );
+      (userSessionRepository.create as jest.Mock).mockResolvedValue({
+        id: 's1',
+      });
 
-      const result = await service.createSession('u1', metadata, 'token', new Date());
+      const result = await service.createSession(
+        'u1',
+        metadata,
+        'token',
+        new Date(),
+      );
 
       expect(result.sessionStatus).toBe('ACTIVE');
-      expect(sessionSecurityService.logSessionCreationEvents).toHaveBeenCalled();
+      expect(
+        sessionSecurityService.logSessionCreationEvents,
+      ).toHaveBeenCalled();
     });
 
     it('debe dar prioridad a Concurrencia (PENDING_CONCURRENT_RESOLUTION) sobre Anomalía', async () => {
-      (anomalyDetector.resolveCoordinates as jest.Mock).mockResolvedValue({ metadata, locationSource: 'none' });
-      (anomalyDetector.detectLocationAnomaly as jest.Mock).mockResolvedValue({ isAnomalous: true, anomalyType: ANOMALY_TYPES.IMPOSSIBLE_TRAVEL });
-      (userSessionRepository.findOtherActiveSession as jest.Mock).mockResolvedValue({ id: 'existing' });
-      (sessionStatusService.getIdByCode as jest.Mock).mockImplementation((code) => {
-        if (code === 'PENDING_CONCURRENT_RESOLUTION') return 'pending-id';
-        return 'other';
+      (anomalyDetector.resolveCoordinates as jest.Mock).mockResolvedValue({
+        metadata,
+        locationSource: 'none',
       });
-      (userSessionRepository.create as jest.Mock).mockResolvedValue({ id: 's-new' });
+      (anomalyDetector.detectLocationAnomaly as jest.Mock).mockResolvedValue({
+        isAnomalous: true,
+        anomalyType: ANOMALY_TYPES.IMPOSSIBLE_TRAVEL,
+      });
+      (
+        userSessionRepository.findOtherActiveSession as jest.Mock
+      ).mockResolvedValue({ id: 'existing' });
+      (sessionStatusService.getIdByCode as jest.Mock).mockImplementation(
+        (code) => {
+          if (code === 'PENDING_CONCURRENT_RESOLUTION') return 'pending-id';
+          return 'other';
+        },
+      );
+      (userSessionRepository.create as jest.Mock).mockResolvedValue({
+        id: 's-new',
+      });
 
-      const result = await service.createSession('u1', metadata, 'token', new Date());
+      const result = await service.createSession(
+        'u1',
+        metadata,
+        'token',
+        new Date(),
+      );
 
       expect(result.sessionStatus).toBe('PENDING_CONCURRENT_RESOLUTION');
       expect(result.concurrentSessionId).toBe('existing');
-      expect(sessionSecurityService.logSessionCreationEvents).toHaveBeenCalled();
+      expect(
+        sessionSecurityService.logSessionCreationEvents,
+      ).toHaveBeenCalled();
     });
 
     it('debe limpiar sesiones pendientes antiguas al alcanzar el límite (protección contra agotamiento)', async () => {
-      (anomalyDetector.resolveCoordinates as jest.Mock).mockResolvedValue({ metadata, locationSource: 'none' });
-      (anomalyDetector.detectLocationAnomaly as jest.Mock).mockResolvedValue({ isAnomalous: false, anomalyType: ANOMALY_TYPES.NONE });
-      (userSessionRepository.findOtherActiveSession as jest.Mock).mockResolvedValue({ id: 'active' });
-      
-      (sessionStatusService.getIdByCode as jest.Mock).mockResolvedValue('status-id');
-      (userSessionRepository.create as jest.Mock).mockResolvedValue({ id: 'new' });
+      (anomalyDetector.resolveCoordinates as jest.Mock).mockResolvedValue({
+        metadata,
+        locationSource: 'none',
+      });
+      (anomalyDetector.detectLocationAnomaly as jest.Mock).mockResolvedValue({
+        isAnomalous: false,
+        anomalyType: ANOMALY_TYPES.NONE,
+      });
+      (
+        userSessionRepository.findOtherActiveSession as jest.Mock
+      ).mockResolvedValue({ id: 'active' });
+
+      (sessionStatusService.getIdByCode as jest.Mock).mockResolvedValue(
+        'status-id',
+      );
+      (userSessionRepository.create as jest.Mock).mockResolvedValue({
+        id: 'new',
+      });
 
       await service.createSession('u1', metadata, 'token', new Date());
 
-      expect(sessionConflictService.cleanupExcessPendingSessions).toHaveBeenCalledWith(
-        'u1',
-        expect.anything()
-      );
+      expect(
+        sessionConflictService.cleanupExcessPendingSessions,
+      ).toHaveBeenCalledWith('u1', expect.anything());
     });
   });
 
   describe('deactivateAllUserSessions', () => {
     it('debe desactivar todas las sesiones y ponerlas en estado REVOKED', async () => {
       const activeSessions = [{ id: 's1' }, { id: 's2' }];
-      (userSessionRepository.findActiveSessionsByUserId as jest.Mock).mockResolvedValue(activeSessions);
-      (sessionStatusService.getIdByCode as jest.Mock).mockResolvedValue('revoked-id');
+      (
+        userSessionRepository.findActiveSessionsByUserId as jest.Mock
+      ).mockResolvedValue(activeSessions);
+      (sessionStatusService.getIdByCode as jest.Mock).mockResolvedValue(
+        'revoked-id',
+      );
 
       await service.deactivateAllUserSessions('u1');
 
       expect(userSessionRepository.update).toHaveBeenCalledTimes(2);
-      expect(userSessionRepository.update).toHaveBeenCalledWith(
-        's1',
-        { sessionStatusId: 'revoked-id', isActive: false }
-      );
+      expect(userSessionRepository.update).toHaveBeenCalledWith('s1', {
+        sessionStatusId: 'revoked-id',
+        isActive: false,
+      });
     });
   });
 });

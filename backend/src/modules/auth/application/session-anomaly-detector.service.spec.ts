@@ -67,18 +67,32 @@ describe('SessionAnomalyDetectorService', () => {
 
   describe('detectLocationAnomaly', () => {
     it('debe retornar NONE si no hay sesión previa', async () => {
-      (userSessionRepository.findLatestSessionByUserId as jest.Mock).mockResolvedValue(null);
+      (
+        userSessionRepository.findLatestSessionByUserId as jest.Mock
+      ).mockResolvedValue(null);
 
-      const result = await detector.detectLocationAnomaly('u1', metadata, 'gps', true);
+      const result = await detector.detectLocationAnomaly(
+        'u1',
+        metadata,
+        'gps',
+        true,
+      );
 
       expect(result.isAnomalous).toBe(false);
       expect(result.anomalyType).toBe(ANOMALY_TYPES.NONE);
     });
 
     it('debe detectar NEW_DEVICE_QUICK_CHANGE si el dispositivo es nuevo y el tiempo < ventana', async () => {
-      (userSessionRepository.findLatestSessionByUserId as jest.Mock).mockResolvedValue(lastSession);
+      (
+        userSessionRepository.findLatestSessionByUserId as jest.Mock
+      ).mockResolvedValue(lastSession);
 
-      const result = await detector.detectLocationAnomaly('u1', metadata, 'gps', true);
+      const result = await detector.detectLocationAnomaly(
+        'u1',
+        metadata,
+        'gps',
+        true,
+      );
 
       expect(result.isAnomalous).toBe(true);
       expect(result.anomalyType).toBe(ANOMALY_TYPES.NEW_DEVICE_QUICK_CHANGE);
@@ -86,21 +100,38 @@ describe('SessionAnomalyDetectorService', () => {
     });
 
     it('debe retornar NONE si el dispositivo es nuevo pero el tiempo > ventana', async () => {
-      const oldLastSession = { ...lastSession, lastActivityAt: new Date(Date.now() - 40 * 60 * 1000) } as UserSession;
-      (userSessionRepository.findLatestSessionByUserId as jest.Mock).mockResolvedValue(oldLastSession);
+      const oldLastSession = {
+        ...lastSession,
+        lastActivityAt: new Date(Date.now() - 40 * 60 * 1000),
+      } as UserSession;
+      (
+        userSessionRepository.findLatestSessionByUserId as jest.Mock
+      ).mockResolvedValue(oldLastSession);
       (geolocationService.calculateDistance as jest.Mock).mockReturnValue(2); // 2km
 
-      const result = await detector.detectLocationAnomaly('u1', metadata, 'gps', true);
+      const result = await detector.detectLocationAnomaly(
+        'u1',
+        metadata,
+        'gps',
+        true,
+      );
 
       expect(result.isAnomalous).toBe(false);
       expect(result.anomalyType).toBe(ANOMALY_TYPES.NONE);
     });
 
     it('debe detectar IMPOSSIBLE_TRAVEL si la distancia supera el umbral en la ventana de tiempo', async () => {
-      (userSessionRepository.findLatestSessionByUserId as jest.Mock).mockResolvedValue(lastSession);
+      (
+        userSessionRepository.findLatestSessionByUserId as jest.Mock
+      ).mockResolvedValue(lastSession);
       (geolocationService.calculateDistance as jest.Mock).mockReturnValue(50); // 50km en 10 min
 
-      const result = await detector.detectLocationAnomaly('u1', metadata, 'gps', false);
+      const result = await detector.detectLocationAnomaly(
+        'u1',
+        metadata,
+        'gps',
+        false,
+      );
 
       expect(result.isAnomalous).toBe(true);
       expect(result.anomalyType).toBe(ANOMALY_TYPES.IMPOSSIBLE_TRAVEL);
@@ -108,20 +139,34 @@ describe('SessionAnomalyDetectorService', () => {
     });
 
     it('debe retornar NONE si es dispositivo conocido y distancia dentro del umbral', async () => {
-      (userSessionRepository.findLatestSessionByUserId as jest.Mock).mockResolvedValue(lastSession);
+      (
+        userSessionRepository.findLatestSessionByUserId as jest.Mock
+      ).mockResolvedValue(lastSession);
       (geolocationService.calculateDistance as jest.Mock).mockReturnValue(2); // 2km
 
-      const result = await detector.detectLocationAnomaly('u1', metadata, 'gps', false);
+      const result = await detector.detectLocationAnomaly(
+        'u1',
+        metadata,
+        'gps',
+        false,
+      );
 
       expect(result.isAnomalous).toBe(false);
       expect(result.anomalyType).toBe(ANOMALY_TYPES.NONE);
     });
 
     it('debe retornar NONE si las coordenadas son inválidas (sanitización)', async () => {
-      (userSessionRepository.findLatestSessionByUserId as jest.Mock).mockResolvedValue(lastSession);
+      (
+        userSessionRepository.findLatestSessionByUserId as jest.Mock
+      ).mockResolvedValue(lastSession);
       const badMeta = { ...metadata, latitude: 999 }; // Latitud inválida
 
-      const result = await detector.detectLocationAnomaly('u1', badMeta, 'gps', false);
+      const result = await detector.detectLocationAnomaly(
+        'u1',
+        badMeta,
+        'gps',
+        false,
+      );
 
       expect(result.isAnomalous).toBe(false);
       expect(result.anomalyType).toBe(ANOMALY_TYPES.NONE);
@@ -137,7 +182,11 @@ describe('SessionAnomalyDetectorService', () => {
     });
 
     it('debe usar IP si no hay GPS y el proveedor resuelve', async () => {
-      const metaNoGps = { ...metadata, latitude: undefined, longitude: undefined };
+      const metaNoGps = {
+        ...metadata,
+        latitude: undefined,
+        longitude: undefined,
+      };
       (geoProvider.resolve as jest.Mock).mockReturnValue({
         latitude: -12,
         longitude: -77,
@@ -152,7 +201,11 @@ describe('SessionAnomalyDetectorService', () => {
     });
 
     it('debe retornar source none si no hay coordenadas ni resolución por IP', async () => {
-      const metaNoGps = { ...metadata, latitude: undefined, longitude: undefined };
+      const metaNoGps = {
+        ...metadata,
+        latitude: undefined,
+        longitude: undefined,
+      };
       (geoProvider.resolve as jest.Mock).mockReturnValue(null);
 
       const result = await detector.resolveCoordinates(metaNoGps);

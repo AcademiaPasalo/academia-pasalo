@@ -192,12 +192,13 @@ export class SessionService {
     const sessions =
       await this.userSessionRepository.findActiveSessionsByUserId(userId);
 
-    const revokedStatusId = await this.sessionStatusService.getIdByCode('REVOKED');
+    const revokedStatusId =
+      await this.sessionStatusService.getIdByCode('REVOKED');
 
     for (const session of sessions) {
       await this.userSessionRepository.update(session.id, {
         sessionStatusId: revokedStatusId,
-        isActive: false
+        isActive: false,
       });
       await this.cacheService.del(`cache:session:${session.id}:user`);
     }

@@ -113,7 +113,12 @@ export class SessionAnomalyDetectorService {
     lat: number | string | undefined | null,
     lon: number | string | undefined | null,
   ): boolean {
-    if (lat === undefined || lat === null || lon === undefined || lon === null) {
+    if (
+      lat === undefined ||
+      lat === null ||
+      lon === undefined ||
+      lon === null
+    ) {
       return false;
     }
 

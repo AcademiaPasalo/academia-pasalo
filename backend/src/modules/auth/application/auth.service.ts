@@ -109,11 +109,12 @@ export class AuthService {
       throw new UnauthorizedException('Dispositivo no autorizado');
     }
 
-    const session = await this.sessionValidatorService.validateRefreshTokenSession(
-      payload.sub,
-      deviceId,
-      refreshToken,
-    );
+    const session =
+      await this.sessionValidatorService.validateRefreshTokenSession(
+        payload.sub,
+        deviceId,
+        refreshToken,
+      );
 
     const user = await this.usersService.findOne(payload.sub);
 

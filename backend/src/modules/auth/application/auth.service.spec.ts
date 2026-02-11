@@ -403,11 +403,11 @@ describe('AuthService', () => {
 
   it('switchProfile: intento de escalada de privilegios (rol no poseído) -> 401', async () => {
     usersServiceMock.findOne.mockResolvedValue(baseUser);
-    
+
     await expect(
-      authService.switchProfile('10', '777', '999', metadata) // 999 no es un rol de baseUser
+      authService.switchProfile('10', '777', '999', metadata), // 999 no es un rol de baseUser
     ).rejects.toBeInstanceOf(UnauthorizedException);
-    
+
     expect(sessionServiceMock.rotateRefreshToken).not.toHaveBeenCalled();
   });
 });
