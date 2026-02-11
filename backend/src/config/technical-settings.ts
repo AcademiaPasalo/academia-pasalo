@@ -61,6 +61,13 @@ export const technicalSettings = {
     security: {
       // src/modules/auth/application/session.service.ts
       anomalyStrikeThreshold: 2,
+      maxPendingSessionsPerUser: 5,
+      coordinates: {
+        minLat: -90,
+        maxLat: 90,
+        minLon: -180,
+        maxLon: 180,
+      },
     },
   },
 

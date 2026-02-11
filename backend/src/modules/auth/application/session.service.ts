@@ -105,6 +105,8 @@ export class SessionService {
       );
 
       if (concurrentSession) {
+        await this.cleanupExcessPendingSessions(userId, manager);
+
         await this.securityEventService.logEvent(
           userId,
           'CONCURRENT_SESSION_DETECTED',
@@ -573,6 +575,48 @@ export class SessionService {
        *   message: 'Hemos detectado accesos inusuales recientes en tu cuenta. Por seguridad, evita compartir tus credenciales.',
        * });
        */
+    }
+  }
+
+  private async cleanupExcessPendingSessions(
+    userId: string,
+    manager: EntityManager,
+  ): Promise<void> {
+    const pendingStatusId = await this.sessionStatusService.getIdByCode(
+      'PENDING_CONCURRENT_RESOLUTION',
+      manager,
+    );
+
+    const pendingSessions = await this.userSessionRepository.findSessionsByUserAndStatus(
+      userId,
+      pendingStatusId,
+      manager,
+    );
+
+    if (
+      pendingSessions.length >=
+      technicalSettings.auth.security.maxPendingSessionsPerUser
+    ) {
+      const revokedStatusId = await this.sessionStatusService.getIdByCode(
+        'REVOKED',
+        manager,
+      );
+
+      // Revocar las más antiguas para dejar espacio a la nueva
+      const sessionsToRevoke = pendingSessions.slice(
+        technicalSettings.auth.security.maxPendingSessionsPerUser - 1,
+      );
+
+      for (const session of sessionsToRevoke) {
+        await this.userSessionRepository.update(
+          session.id,
+          {
+            sessionStatusId: revokedStatusId,
+            isActive: false,
+          },
+          manager,
+        );
+      }
     }
   }
 }

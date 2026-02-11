@@ -38,6 +38,8 @@ describe('SessionService', () => {
             create: jest.fn(),
             existsByUserIdAndDeviceId: jest.fn(),
             findOtherActiveSession: jest.fn(),
+            findSessionsByUserAndStatus: jest.fn(),
+            update: jest.fn(),
           },
         },
         {
@@ -110,8 +112,9 @@ describe('SessionService', () => {
 
     it('debe dar prioridad a Concurrencia (PENDING_CONCURRENT_RESOLUTION) sobre Anomalía', async () => {
       (anomalyDetector.resolveCoordinates as jest.Mock).mockResolvedValue({ metadata, locationSource: 'none' });
-      (anomalyDetector.detectLocationAnomaly as jest.Mock).mockResolvedValue({ isAnomalous: true });
+      (anomalyDetector.detectLocationAnomaly as jest.Mock).mockResolvedValue({ isAnomalous: true, anomalyType: ANOMALY_TYPES.IMPOSSIBLE_TRAVEL });
       (userSessionRepository.findOtherActiveSession as jest.Mock).mockResolvedValue({ id: 'existing' });
+      (userSessionRepository.findSessionsByUserAndStatus as jest.Mock).mockResolvedValue([]);
       (sessionStatusService.getIdByCode as jest.Mock).mockImplementation((code) => {
         if (code === 'PENDING_CONCURRENT_RESOLUTION') return 'pending-id';
         return 'other';
@@ -128,6 +131,25 @@ describe('SessionService', () => {
         'ANOMALOUS_LOGIN_DETECTED',
         expect.anything(),
         expect.anything(),
+      );
+    });
+
+    it('debe limpiar sesiones pendientes antiguas al alcanzar el límite (protección contra agotamiento)', async () => {
+      (anomalyDetector.resolveCoordinates as jest.Mock).mockResolvedValue({ metadata, locationSource: 'none' });
+      (anomalyDetector.detectLocationAnomaly as jest.Mock).mockResolvedValue({ isAnomalous: false, anomalyType: ANOMALY_TYPES.NONE });
+      (userSessionRepository.findOtherActiveSession as jest.Mock).mockResolvedValue({ id: 'active' });
+      
+      const manyPending = Array(technicalSettings.auth.security.maxPendingSessionsPerUser).fill({ id: 'old' });
+      (userSessionRepository.findSessionsByUserAndStatus as jest.Mock).mockResolvedValue(manyPending);
+      (sessionStatusService.getIdByCode as jest.Mock).mockResolvedValue('status-id');
+      (userSessionRepository.create as jest.Mock).mockResolvedValue({ id: 'new' });
+
+      await service.createSession('u1', metadata, 'token', new Date());
+
+      expect(userSessionRepository.update).toHaveBeenCalledWith(
+        'old',
+        expect.objectContaining({ isActive: false }),
+        expect.anything()
       );
     });
   });

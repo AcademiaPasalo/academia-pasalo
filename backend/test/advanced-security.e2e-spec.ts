@@ -69,6 +69,7 @@ describe('Advanced Security Scenarios (Offensive Testing)', () => {
     update: jest.fn(),
     deactivateSession: jest.fn(),
     existsByUserIdAndDeviceId: jest.fn().mockResolvedValue(true),
+    findSessionsByUserAndStatus: jest.fn().mockResolvedValue([]),
   };
 
   const mockAnomalyDetector = {
@@ -78,7 +79,10 @@ describe('Advanced Security Scenarios (Offensive Testing)', () => {
         locationSource: meta.latitude && meta.longitude ? 'gps' : 'ip',
       }),
     ),
-    detectLocationAnomaly: jest.fn().mockResolvedValue({ isAnomalous: false }),
+    detectLocationAnomaly: jest.fn().mockResolvedValue({
+      isAnomalous: false,
+      anomalyType: 'NONE',
+    }),
   };
 
   beforeEach(async () => {

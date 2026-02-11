@@ -116,6 +116,17 @@ describe('SessionAnomalyDetectorService', () => {
       expect(result.isAnomalous).toBe(false);
       expect(result.anomalyType).toBe(ANOMALY_TYPES.NONE);
     });
+
+    it('debe retornar NONE si las coordenadas son inválidas (sanitización)', async () => {
+      (userSessionRepository.findLatestSessionByUserId as jest.Mock).mockResolvedValue(lastSession);
+      const badMeta = { ...metadata, latitude: 999 }; // Latitud inválida
+
+      const result = await detector.detectLocationAnomaly('u1', badMeta, 'gps', false);
+
+      expect(result.isAnomalous).toBe(false);
+      expect(result.anomalyType).toBe(ANOMALY_TYPES.NONE);
+      expect(geolocationService.calculateDistance).not.toHaveBeenCalled();
+    });
   });
 
   describe('resolveCoordinates', () => {

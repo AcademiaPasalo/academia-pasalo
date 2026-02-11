@@ -9,6 +9,7 @@ import {
   AnomalyType,
   ANOMALY_TYPES,
 } from '@modules/auth/interfaces/security.constants';
+import { technicalSettings } from '@config/technical-settings';
 
 @Injectable()
 export class SessionAnomalyDetectorService {
@@ -69,10 +70,8 @@ export class SessionAnomalyDetectorService {
 
     if (
       locationSource === 'none' ||
-      !metadata.latitude ||
-      !metadata.longitude ||
-      !lastSession.latitude ||
-      !lastSession.longitude
+      !this.isValidCoordinate(metadata.latitude, metadata.longitude) ||
+      !this.isValidCoordinate(lastSession.latitude, lastSession.longitude)
     ) {
       return {
         isAnomalous: false,
@@ -108,6 +107,27 @@ export class SessionAnomalyDetectorService {
       distanceKm,
       timeDifferenceMinutes,
     };
+  }
+
+  private isValidCoordinate(
+    lat: number | string | undefined | null,
+    lon: number | string | undefined | null,
+  ): boolean {
+    if (lat === undefined || lat === null || lon === undefined || lon === null) {
+      return false;
+    }
+
+    const nLat = Number(lat);
+    const nLon = Number(lon);
+
+    if (isNaN(nLat) || isNaN(nLon)) {
+      return false;
+    }
+
+    const { minLat, maxLat, minLon, maxLon } =
+      technicalSettings.auth.security.coordinates;
+
+    return nLat >= minLat && nLat <= maxLat && nLon >= minLon && nLon <= maxLon;
   }
 
   async resolveCoordinates(metadata: RequestMetadata): Promise<{

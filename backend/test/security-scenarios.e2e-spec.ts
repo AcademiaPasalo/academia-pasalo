@@ -86,6 +86,7 @@ describe('Security Scenarios (Integration)', () => {
     update: jest.fn(),
     deactivateSession: jest.fn(),
     existsByUserIdAndDeviceId: jest.fn().mockResolvedValue(true),
+    findSessionsByUserAndStatus: jest.fn().mockResolvedValue([]),
   };
 
   const mockSecurityEventRepository = {
