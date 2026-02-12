@@ -24,9 +24,8 @@ jobs:
           if [ "$STATE" = "stopped" ]; then
             echo "EC2 Instance must be ON in order to make the DEPLOY"
             exit 1
-          else
-            echo "EC2 Instance is running"
           fi
+          echo "EC2 Instance is running"
 
   build-and-push:
     needs: validate-ec2-status
@@ -73,7 +72,7 @@ jobs:
     needs: build-and-push
     runs-on: ubuntu-latest
     steps:
-      - name: Deploy to EC2 (debug + validate ubuntu)
+      - name: Deploy to EC2
         uses: appleboy/ssh-action@v1.0.3
         env:
           DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
@@ -88,38 +87,17 @@ jobs:
           CORS_ORIGINS: ${{ secrets.CORS_ORIGINS }}
         with:
           host: ${{ secrets.EC2_HOST }}
-          username: ubuntu   # 🔥 fijo: no dependas del secret
+          username: ubuntu
           key: ${{ secrets.EC2_SSH_KEY }}
           script_stop: true
-          debug: true
           envs: DOCKER_USERNAME,DOCKER_PASSWORD,DB_PASSWORD,DB_NAME,JWT_SECRET,GOOGLE_CLIENT_ID,GOOGLE_CLIENT_SECRET,GOOGLE_REDIRECT_URI,MAXMIND_LICENSE_KEY,CORS_ORIGINS
           script: |
             set -Eeuo pipefail
-            set -x
-            trap 'echo "❌ FAIL line=$LINENO cmd=$BASH_COMMAND exit=$?" >&2' ERR
-
-            echo "===== CONTEXT ====="
-            WHO=$(whoami)
-            echo "whoami=$WHO"
-            hostname
-            pwd
-            date
-            docker --version || true
-            docker-compose --version || true
-            git --version || true
-            echo "==================="
-
-            # ✅ VALIDACIÓN HARD: si no es ubuntu, aborta (así no pierdes más runs)
-            if [ "$WHO" != "ubuntu" ]; then
-              echo "❌ ERROR: el workflow NO está entrando como ubuntu. whoami=$WHO"
-              echo "Revisa appleboy username / secrets."
-              exit 1
-            fi
 
             APP_DIR="/home/ubuntu/academia-pasalo"
             COMPOSE_FILE="$APP_DIR/backend/docker-compose.prod.yml"
 
-            echo "===== CLONE / UPDATE REPO ====="
+            # 0) Asegurar repo
             if [ ! -d "$APP_DIR/.git" ]; then
               mkdir -p "$APP_DIR"
               git clone git@github.com:${{ github.repository }}.git "$APP_DIR"
@@ -130,18 +108,22 @@ jobs:
             git reset --hard origin/main
             git clean -fd -e letsencrypt/ -e certbot/ || true
 
-            echo "===== DIRECTORIOS RUNTIME ====="
+            # 1) Runtime dirs (solo certbot; no tocamos letsencrypt porque suele ser root)
             mkdir -p "$APP_DIR/certbot/www/.well-known/acme-challenge" "$APP_DIR/letsencrypt"
-            chown -R ubuntu:ubuntu "$APP_DIR/certbot" "$APP_DIR/letsencrypt" || true
-            chmod -R 755 "$APP_DIR/certbot" "$APP_DIR/letsencrypt" || true
+            chown -R ubuntu:ubuntu "$APP_DIR/certbot" || true
+            chmod -R 755 "$APP_DIR/certbot" || true
 
-            echo "===== VALIDAR COMPOSE ====="
-            [ ! -f "$COMPOSE_FILE" ] && { echo "ERROR: No existe $COMPOSE_FILE"; ls -la "$APP_DIR/backend"; exit 1; }
+            # 2) Validar compose (sin "&&" para que drone-ssh no corte)
+            if [ ! -f "$COMPOSE_FILE" ]; then
+              echo "ERROR: No existe $COMPOSE_FILE"
+              ls -la "$APP_DIR/backend" || true
+              exit 1
+            fi
 
-            echo "===== DOCKER LOGIN ====="
+            # 3) Login Docker
             echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
 
-            echo "===== CREAR ENV ====="
+            # 4) Crear .env backend
             cat > "$APP_DIR/backend/.env" <<EOF
             GITHUB_REPOSITORY=${{ github.repository }}
             DOCKER_USERNAME=$DOCKER_USERNAME
@@ -155,20 +137,17 @@ jobs:
             CORS_ORIGINS=$CORS_ORIGINS
             EOF
 
-            echo "===== DOCKER COMPOSE DEPLOY ====="
+            # 5) Deploy
             docker-compose -f "$COMPOSE_FILE" pull
             docker-compose -f "$COMPOSE_FILE" down
             docker-compose -f "$COMPOSE_FILE" up -d
-            docker-compose -f "$COMPOSE_FILE" ps
 
-            echo "===== WAIT MYSQL ====="
-            # Espera real por healthcheck del servicio mysql (ya lo tienes en compose)
+            # 6) Esperar MySQL healthy (healthcheck ya está en tu compose)
             for i in $(seq 1 60); do
               if docker inspect -f '{{.State.Health.Status}}' academia-pasalo-mysql 2>/dev/null | grep -q healthy; then
                 echo "✅ MySQL healthy"
                 break
               fi
-              echo "... MySQL no healthy aún (try $i)"
               sleep 2
             done
 
@@ -178,22 +157,23 @@ jobs:
               exit 1
             }
 
-            echo "===== RUN SQL ====="
+            # 7) Ejecutar scripts SQL
             docker exec -i academia-pasalo-mysql mysql -u root -p"$DB_PASSWORD" "$DB_NAME" < "$APP_DIR/backend/db/eliminar_tablas_academia_pasalo_v1.sql"
             docker exec -i academia-pasalo-mysql mysql -u root -p"$DB_PASSWORD" "$DB_NAME" < "$APP_DIR/backend/db/creacion_tablas_academia_pasalo_v1.sql"
             docker exec -i academia-pasalo-mysql mysql -u root -p"$DB_PASSWORD" "$DB_NAME" < "$APP_DIR/backend/db/datos_iniciales_academa_pasalo_v1.sql"
             docker exec -i academia-pasalo-mysql mysql -u root -p"$DB_PASSWORD" "$DB_NAME" < "$APP_DIR/backend/db/datos_prueba_cursos_y_matriculas.sql"
 
-            echo "===== VERIFY DB ====="
+            # 8) Verificar BD
             TABLES_COUNT=$(docker exec academia-pasalo-mysql mysql -u root -p"$DB_PASSWORD" -D "$DB_NAME" -sN -e "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = '$DB_NAME';" 2>/dev/null || echo "0")
-            [ "$TABLES_COUNT" -gt 0 ] && echo "✅ BD OK: $TABLES_COUNT tablas" || { echo "❌ ERROR SQL"; docker logs academia-pasalo-mysql --tail 200; exit 1; }
+            [ "$TABLES_COUNT" -gt 0 ] || { echo "❌ Error en scripts SQL"; docker logs academia-pasalo-mysql --tail 200; exit 1; }
+            echo "✅ BD inicializada: $TABLES_COUNT tablas"
 
-            echo "===== VERIFY CONTAINERS ====="
+            # 9) Verificar contenedores clave
             for c in academia-pasalo-nginx academia-pasalo-backend academia-pasalo-frontend; do
               docker inspect "$c" >/dev/null 2>&1 || { echo "❌ $c no existe"; docker ps; exit 1; }
-              [ "$(docker inspect -f '{{.State.Status}}' "$c")" = "running" ] || { echo "❌ $c no running"; docker logs --tail=200 "$c"; exit 1; }
+              [ "$(docker inspect -f '{{.State.Status}}' "$c")" = "running" ] || { echo "❌ $c no está running"; docker logs --tail=200 "$c"; exit 1; }
             done
 
             docker image prune -f
-            echo "🎉 DEPLOY COMPLETADO"
+            echo "✅ Deploy completado"
             docker ps
