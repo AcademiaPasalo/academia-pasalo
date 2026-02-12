@@ -60,7 +60,7 @@ describe('Audit Cleanup Process (Integration)', () => {
     const job = { name: 'cleanup-old-logs' } as Job;
 
     await expect(processor.process(job)).rejects.toThrow(
-      'Error de configuración: El período mínimo de retención es de 7 días',
+      'Error de configuracion: El periodo minimo de retencion es de 7 dias',
     );
   });
 

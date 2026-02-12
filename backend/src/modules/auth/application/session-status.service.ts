@@ -6,12 +6,9 @@ import {
 } from '@nestjs/common';
 import { SessionStatusRepository } from '@modules/auth/infrastructure/session-status.repository';
 import type { EntityManager } from 'typeorm';
+import { type SessionStatusCodeValue } from '@modules/auth/interfaces/security.constants';
 
-export type SessionStatusCode =
-  | 'ACTIVE'
-  | 'PENDING_CONCURRENT_RESOLUTION'
-  | 'BLOCKED_PENDING_REAUTH'
-  | 'REVOKED';
+export type SessionStatusCode = SessionStatusCodeValue;
 
 @Injectable()
 export class SessionStatusService implements OnModuleInit {

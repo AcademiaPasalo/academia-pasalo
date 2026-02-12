@@ -186,7 +186,7 @@ export class AuthController {
       request.socket.remoteAddress ||
       '0.0.0.0';
 
-    const userAgent = request.headers['user-agent'] || 'Unknown';
+    const userAgent = request.headers['user-agent'] || 'Desconocido';
 
     return {
       ipAddress,
@@ -195,3 +195,4 @@ export class AuthController {
     };
   }
 }
+

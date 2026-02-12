@@ -61,7 +61,7 @@ async function bootstrap() {
     const isError = error instanceof Error;
     logger.error({
       message: 'Error fatal durante el inicio de la aplicación',
-      error: isError ? error.message : 'Unknown error',
+      error: isError ? error.message : 'Error desconocido',
       stack: isError ? error.stack : undefined,
     });
     process.exit(1);
@@ -69,3 +69,4 @@ async function bootstrap() {
 }
 
 void bootstrap();
+

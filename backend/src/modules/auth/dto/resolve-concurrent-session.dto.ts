@@ -1,4 +1,8 @@
 import { IsIn, IsNotEmpty, IsString, MaxLength } from 'class-validator';
+import {
+  CONCURRENT_DECISIONS,
+  type ConcurrentDecision,
+} from '@modules/auth/interfaces/security.constants';
 
 export class ResolveConcurrentSessionDto {
   @IsNotEmpty({ message: 'El refresh token es requerido' })
@@ -18,8 +22,9 @@ export class ResolveConcurrentSessionDto {
   @IsNotEmpty({ message: 'La decisión es requerida' })
   @IsString({ message: 'La decisión debe ser una cadena de texto' })
   @MaxLength(20, { message: 'La decisión excede el tamaño máximo permitido' })
-  @IsIn(['KEEP_NEW', 'KEEP_EXISTING'], {
+  @IsIn(Object.values(CONCURRENT_DECISIONS), {
     message: 'La decisión debe ser KEEP_NEW o KEEP_EXISTING',
   })
-  decision: 'KEEP_NEW' | 'KEEP_EXISTING';
+  decision: ConcurrentDecision;
 }
+

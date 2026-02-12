@@ -3,6 +3,7 @@ import { UserSessionRepository } from '@modules/auth/infrastructure/user-session
 import { RedisCacheService } from '@infrastructure/cache/redis-cache.service';
 import { SessionStatusService } from '@modules/auth/application/session-status.service';
 import { UserSession } from '@modules/auth/domain/user-session.entity';
+import { SESSION_STATUS_CODES } from '@modules/auth/interfaces/security.constants';
 import { createHash } from 'crypto';
 
 @Injectable()
@@ -49,7 +50,7 @@ export class SessionValidatorService {
 
     if (session.expiresAt < new Date()) {
       const revokedStatusId =
-        await this.sessionStatusService.getIdByCode('REVOKED');
+        await this.sessionStatusService.getIdByCode(SESSION_STATUS_CODES.REVOKED);
       await this.userSessionRepository.update(session.id, {
         isActive: false,
         sessionStatusId: revokedStatusId,
@@ -58,7 +59,7 @@ export class SessionValidatorService {
     }
 
     const activeStatusId =
-      await this.sessionStatusService.getIdByCode('ACTIVE');
+      await this.sessionStatusService.getIdByCode(SESSION_STATUS_CODES.ACTIVE);
     if (session.sessionStatusId !== activeStatusId || !session.isActive) {
       throw new UnauthorizedException('Sesión inválida o expirada');
     }
@@ -83,7 +84,7 @@ export class SessionValidatorService {
     }
 
     const activeStatusId =
-      await this.sessionStatusService.getIdByCode('ACTIVE');
+      await this.sessionStatusService.getIdByCode(SESSION_STATUS_CODES.ACTIVE);
 
     if (
       !session.isActive ||

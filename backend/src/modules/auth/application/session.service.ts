@@ -10,7 +10,10 @@ import {
   SessionStatusCode,
   SessionStatusService,
 } from '@modules/auth/application/session-status.service';
-import { ConcurrentDecision } from '@modules/auth/interfaces/security.constants';
+import {
+  ConcurrentDecision,
+  SESSION_STATUS_CODES,
+} from '@modules/auth/interfaces/security.constants';
 import { SessionValidatorService } from '@modules/auth/application/session-validator.service';
 import { SessionConflictService } from '@modules/auth/application/session-conflict.service';
 import { SessionSecurityService } from '@modules/auth/application/session-security.service';
@@ -48,11 +51,11 @@ export class SessionService {
 
     const runInTransaction = async (manager: EntityManager) => {
       const activeStatusId = await this.sessionStatusService.getIdByCode(
-        'ACTIVE',
+        SESSION_STATUS_CODES.ACTIVE,
         manager,
       );
       const pendingStatusId = await this.sessionStatusService.getIdByCode(
-        'PENDING_CONCURRENT_RESOLUTION',
+        SESSION_STATUS_CODES.PENDING_CONCURRENT_RESOLUTION,
         manager,
       );
 
@@ -138,8 +141,8 @@ export class SessionService {
       return {
         session,
         sessionStatus: (concurrentSession
-          ? 'PENDING_CONCURRENT_RESOLUTION'
-          : 'ACTIVE') as SessionStatusCode,
+          ? SESSION_STATUS_CODES.PENDING_CONCURRENT_RESOLUTION
+          : SESSION_STATUS_CODES.ACTIVE) as SessionStatusCode,
         concurrentSessionId: concurrentSession ? concurrentSession.id : null,
       };
     };
@@ -178,7 +181,7 @@ export class SessionService {
     manager?: EntityManager,
   ): Promise<void> {
     const revokedStatusId = await this.sessionStatusService.getIdByCode(
-      'REVOKED',
+      SESSION_STATUS_CODES.REVOKED,
       manager,
     );
 
@@ -197,7 +200,7 @@ export class SessionService {
       await this.userSessionRepository.findActiveSessionsByUserId(userId);
 
     const revokedStatusId =
-      await this.sessionStatusService.getIdByCode('REVOKED');
+      await this.sessionStatusService.getIdByCode(SESSION_STATUS_CODES.REVOKED);
 
     for (const session of sessions) {
       await this.userSessionRepository.update(session.id, {
@@ -253,7 +256,7 @@ export class SessionService {
     manager?: EntityManager,
   ): Promise<void> {
     const activeStatusId = await this.sessionStatusService.getIdByCode(
-      'ACTIVE',
+      SESSION_STATUS_CODES.ACTIVE,
       manager,
     );
     await this.userSessionRepository.update(

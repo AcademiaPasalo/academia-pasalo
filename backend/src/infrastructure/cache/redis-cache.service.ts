@@ -68,7 +68,7 @@ export class RedisCacheService implements OnModuleInit, OnModuleDestroy {
       this.logger.error({
         message: 'Error al obtener dato de caché',
         key,
-        error: error instanceof Error ? error.message : 'Unknown error',
+        error: error instanceof Error ? error.message : 'Error desconocido',
         timestamp: new Date().toISOString(),
       });
       return null;
@@ -87,7 +87,7 @@ export class RedisCacheService implements OnModuleInit, OnModuleDestroy {
       this.logger.error({
         message: 'Error al guardar dato en caché',
         key,
-        error: error instanceof Error ? error.message : 'Unknown error',
+        error: error instanceof Error ? error.message : 'Error desconocido',
         timestamp: new Date().toISOString(),
       });
     }
@@ -100,7 +100,7 @@ export class RedisCacheService implements OnModuleInit, OnModuleDestroy {
       this.logger.error({
         message: 'Error al eliminar dato de caché',
         key,
-        error: error instanceof Error ? error.message : 'Unknown error',
+        error: error instanceof Error ? error.message : 'Error desconocido',
         timestamp: new Date().toISOString(),
       });
     }
@@ -164,3 +164,4 @@ export class RedisCacheService implements OnModuleInit, OnModuleDestroy {
     });
   }
 }
+

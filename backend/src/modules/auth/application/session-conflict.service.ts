@@ -4,7 +4,12 @@ import type { EntityManager } from 'typeorm';
 import { UserSessionRepository } from '@modules/auth/infrastructure/user-session.repository';
 import { SecurityEventService } from '@modules/auth/application/security-event.service';
 import { SessionStatusService } from '@modules/auth/application/session-status.service';
-import { ConcurrentDecision } from '@modules/auth/interfaces/security.constants';
+import {
+  ConcurrentDecision,
+  CONCURRENT_DECISIONS,
+  SECURITY_EVENT_CODES,
+  SESSION_STATUS_CODES,
+} from '@modules/auth/interfaces/security.constants';
 import { technicalSettings } from '@config/technical-settings';
 
 @Injectable()
@@ -29,15 +34,15 @@ export class SessionConflictService {
   }): Promise<{ keptSessionId: string | null }> {
     const runInTransaction = async (manager: EntityManager) => {
       const activeStatusId = await this.sessionStatusService.getIdByCode(
-        'ACTIVE',
+        SESSION_STATUS_CODES.ACTIVE,
         manager,
       );
       const pendingStatusId = await this.sessionStatusService.getIdByCode(
-        'PENDING_CONCURRENT_RESOLUTION',
+        SESSION_STATUS_CODES.PENDING_CONCURRENT_RESOLUTION,
         manager,
       );
       const revokedStatusId = await this.sessionStatusService.getIdByCode(
-        'REVOKED',
+        SESSION_STATUS_CODES.REVOKED,
         manager,
       );
 
@@ -76,11 +81,11 @@ export class SessionConflictService {
 
         await this.securityEventService.logEvent(
           params.userId,
-          'CONCURRENT_SESSION_RESOLVED',
+          SECURITY_EVENT_CODES.CONCURRENT_SESSION_RESOLVED,
           {
             ipAddress: params.ipAddress,
             userAgent: params.userAgent,
-            decision: 'KEEP_NEW',
+            decision: CONCURRENT_DECISIONS.KEEP_NEW,
             newSessionId: newSession.id,
             existingSessionId: null,
           },
@@ -99,7 +104,7 @@ export class SessionConflictService {
         throw new UnauthorizedException('Sesión inválida o expirada');
       }
 
-      if (params.decision === 'KEEP_NEW') {
+      if (params.decision === CONCURRENT_DECISIONS.KEEP_NEW) {
         await this.userSessionRepository.update(
           lockedExisting.id,
           {
@@ -120,11 +125,11 @@ export class SessionConflictService {
 
         await this.securityEventService.logEvent(
           params.userId,
-          'CONCURRENT_SESSION_RESOLVED',
+          SECURITY_EVENT_CODES.CONCURRENT_SESSION_RESOLVED,
           {
             ipAddress: params.ipAddress,
             userAgent: params.userAgent,
-            decision: 'KEEP_NEW',
+            decision: CONCURRENT_DECISIONS.KEEP_NEW,
             newSessionId: newSession.id,
             existingSessionId: lockedExisting.id,
           },
@@ -145,11 +150,11 @@ export class SessionConflictService {
 
       await this.securityEventService.logEvent(
         params.userId,
-        'CONCURRENT_SESSION_RESOLVED',
+        SECURITY_EVENT_CODES.CONCURRENT_SESSION_RESOLVED,
         {
           ipAddress: params.ipAddress,
           userAgent: params.userAgent,
-          decision: 'KEEP_EXISTING',
+          decision: CONCURRENT_DECISIONS.KEEP_EXISTING,
           newSessionId: newSession.id,
           existingSessionId: lockedExisting.id,
         },
@@ -171,7 +176,7 @@ export class SessionConflictService {
     manager: EntityManager,
   ): Promise<void> {
     const pendingStatusId = await this.sessionStatusService.getIdByCode(
-      'PENDING_CONCURRENT_RESOLUTION',
+      SESSION_STATUS_CODES.PENDING_CONCURRENT_RESOLUTION,
       manager,
     );
 
@@ -187,7 +192,7 @@ export class SessionConflictService {
       technicalSettings.auth.security.maxPendingSessionsPerUser
     ) {
       const revokedStatusId = await this.sessionStatusService.getIdByCode(
-        'REVOKED',
+        SESSION_STATUS_CODES.REVOKED,
         manager,
       );
 

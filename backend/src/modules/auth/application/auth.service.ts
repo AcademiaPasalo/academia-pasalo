@@ -26,6 +26,8 @@ import {
   IDENTITY_SOURCE_FLOWS,
   SECURITY_EVENT_CODES,
   SECURITY_MESSAGES,
+  SESSION_STATUS_CODES,
+  type ConcurrentDecision,
   type IdentitySourceFlow,
 } from '@modules/auth/interfaces/security.constants';
 import { RedisCacheService } from '@infrastructure/cache/redis-cache.service';
@@ -96,7 +98,7 @@ export class AuthService {
       const { accessToken, refreshToken, sessionStatus, concurrentSessionId } =
         await this.generateTokens(user, metadata, manager);
 
-      if (sessionStatus !== 'ACTIVE') {
+      if (sessionStatus !== SESSION_STATUS_CODES.ACTIVE) {
         this.logger.warn({
           level: 'warn',
           context: AuthService.name,
@@ -163,7 +165,7 @@ export class AuthService {
         }
 
         const activeStatusId = await this.sessionStatusService.getIdByCode(
-          'ACTIVE',
+          SESSION_STATUS_CODES.ACTIVE,
           manager,
         );
         if (
@@ -280,7 +282,7 @@ export class AuthService {
 
       await this.securityEventService.logEvent(
         userId,
-        'PROFILE_SWITCH',
+        SECURITY_EVENT_CODES.PROFILE_SWITCH,
         {
           ipAddress: metadata.ipAddress,
           userAgent: metadata.userAgent,
@@ -301,7 +303,7 @@ export class AuthService {
   async logout(sessionId: string, userId: string): Promise<void> {
     await this.sessionService.deactivateSession(sessionId);
     await this.cacheService.del(`cache:session:${sessionId}:user`);
-    await this.securityEventService.logEvent(userId, 'LOGOUT_SUCCESS', {
+    await this.securityEventService.logEvent(userId, SECURITY_EVENT_CODES.LOGOUT_SUCCESS, {
       sessionId,
     });
   }
@@ -309,7 +311,7 @@ export class AuthService {
   async resolveConcurrentSession(
     refreshToken: string,
     deviceId: string,
-    decision: 'KEEP_NEW' | 'KEEP_EXISTING',
+    decision: ConcurrentDecision,
     metadata: RequestMetadata,
   ): Promise<{
     keptSessionId: string | null;
@@ -401,7 +403,7 @@ export class AuthService {
     }
 
     const blockedStatusId = await this.sessionStatusService.getIdByCode(
-      'BLOCKED_PENDING_REAUTH',
+      SESSION_STATUS_CODES.BLOCKED_PENDING_REAUTH,
     );
     if (session.sessionStatusId !== blockedStatusId) {
       throw new UnauthorizedException('Sesión inválida o expirada');
@@ -445,7 +447,7 @@ export class AuthService {
         }
 
         const blockedStatusIdInTx = await this.sessionStatusService.getIdByCode(
-          'BLOCKED_PENDING_REAUTH',
+          SESSION_STATUS_CODES.BLOCKED_PENDING_REAUTH,
           manager,
         );
 
@@ -458,7 +460,7 @@ export class AuthService {
 
         await this.securityEventService.logEvent(
           payload.sub,
-          'ANOMALOUS_LOGIN_REAUTH_FAILED',
+          SECURITY_EVENT_CODES.ANOMALOUS_LOGIN_REAUTH_FAILED,
           {
             ipAddress: metadata.ipAddress,
             userAgent: metadata.userAgent,
@@ -492,7 +494,7 @@ export class AuthService {
       }
 
       const blockedStatusIdInTx = await this.sessionStatusService.getIdByCode(
-        'BLOCKED_PENDING_REAUTH',
+        SESSION_STATUS_CODES.BLOCKED_PENDING_REAUTH,
         manager,
       );
       if (lockedSession.sessionStatusId !== blockedStatusIdInTx) {
@@ -508,7 +510,7 @@ export class AuthService {
 
       await this.securityEventService.logEvent(
         payload.sub,
-        'ANOMALOUS_LOGIN_REAUTH_SUCCESS',
+        SECURITY_EVENT_CODES.ANOMALOUS_LOGIN_REAUTH_SUCCESS,
         {
           ipAddress: metadata.ipAddress,
           userAgent: metadata.userAgent,

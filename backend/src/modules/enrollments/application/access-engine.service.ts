@@ -26,7 +26,7 @@ export class AccessEngineService {
     );
 
     this.logger.debug({
-      message: 'Access check result',
+      message: 'Resultado de verificación de acceso',
       userId,
       evaluationId,
       hasAccess,
