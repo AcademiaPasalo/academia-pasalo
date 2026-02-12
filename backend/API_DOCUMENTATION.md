@@ -212,12 +212,45 @@ Base URL: `/api/v1/users`
 *   **Endpoint:** `PATCH /:id`
 *   **Roles:** `ADMIN`, `SUPER_ADMIN` o el **Propietario** de la cuenta.
 *   **Request Body:** Similar a `POST /` (todos los campos son opcionales).
+*   **Campo adicional de seguridad:** `isActive?: boolean`
+    *   `false` = cuenta inactiva (baneada)
+    *   `true` = cuenta activa
 
-### 5. Eliminar Usuario
+### 5. Banear Usuario (Admin Action)
+*   **Endpoint:** `PATCH /:id/ban`
+*   **Roles:** `ADMIN`, `SUPER_ADMIN`
+*   **Request Body:** No requiere body.
+*   **Purpose:** Desactivar una cuenta de usuario de forma inmediata por razones operativas o de seguridad.
+*   **Reglas de negocio:**
+    *   El administrador **no puede banearse a sí mismo** (`403`).
+    *   El baneo marca `user.isActive = false`.
+    *   Se invalidan identidades en caché y se revocan sesiones activas del usuario.
+    *   El usuario baneado queda bloqueado en `login`, `refresh` y validación de sesión con respuesta `403`.
+*   **Response (`data`):** Objeto `User` actualizado.
+*   **Errores esperados:**
+    *   `403` si intenta auto-banearse.
+    *   `404` si el usuario no existe.
+
+#### Ejemplo de Response
+```json
+{
+  "statusCode": 200,
+  "message": "Usuario baneado exitosamente",
+  "data": {
+    "id": "25",
+    "email": "estudiante@academia.com",
+    "isActive": false,
+    "roles": [{ "code": "STUDENT", "name": "Alumno" }]
+  },
+  "timestamp": "2026-02-12T23:50:00.000Z"
+}
+```
+
+### 6. Eliminar Usuario
 *   **Endpoint:** `DELETE /:id`
 *   **Roles:** `ADMIN`, `SUPER_ADMIN`
 
-### 6. Gestión de Roles
+### 7. Gestión de Roles
 *   **Asignar:** `POST /:id/roles/:roleCode`
     *   **Roles:** `SUPER_ADMIN`
 *   **Remover:** `DELETE /:id/roles/:roleCode`

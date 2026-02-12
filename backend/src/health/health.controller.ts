@@ -29,7 +29,6 @@ export class HealthController {
           return {
             redis: {
               status: 'down',
-              error: error instanceof Error ? error.message : 'Unknown error',
             },
           };
         }

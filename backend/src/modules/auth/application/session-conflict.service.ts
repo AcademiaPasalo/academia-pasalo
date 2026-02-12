@@ -4,7 +4,6 @@ import type { EntityManager } from 'typeorm';
 import { UserSessionRepository } from '@modules/auth/infrastructure/user-session.repository';
 import { SecurityEventService } from '@modules/auth/application/security-event.service';
 import { SessionStatusService } from '@modules/auth/application/session-status.service';
-import { SessionValidatorService } from '@modules/auth/application/session-validator.service';
 import { ConcurrentDecision } from '@modules/auth/interfaces/security.constants';
 import { technicalSettings } from '@config/technical-settings';
 
@@ -17,13 +16,12 @@ export class SessionConflictService {
     private readonly userSessionRepository: UserSessionRepository,
     private readonly securityEventService: SecurityEventService,
     private readonly sessionStatusService: SessionStatusService,
-    private readonly sessionValidator: SessionValidatorService,
   ) {}
 
   async resolveConcurrentSession(params: {
     userId: string;
     deviceId: string;
-    refreshToken: string;
+    refreshTokenJti: string;
     decision: ConcurrentDecision;
     ipAddress: string;
     userAgent: string;
@@ -43,12 +41,9 @@ export class SessionConflictService {
         manager,
       );
 
-      const refreshTokenHash = this.sessionValidator.hashRefreshToken(
-        params.refreshToken,
-      );
       const newSession =
-        await this.userSessionRepository.findByRefreshTokenHashForUpdate(
-          refreshTokenHash,
+        await this.userSessionRepository.findByRefreshTokenJtiForUpdate(
+          params.refreshTokenJti,
           manager,
         );
 

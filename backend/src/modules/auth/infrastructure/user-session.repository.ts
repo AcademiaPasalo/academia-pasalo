@@ -22,6 +22,7 @@ export class UserSessionRepository {
       | 'deviceId'
       | 'ipAddress'
       | 'refreshTokenHash'
+      | 'refreshTokenJti'
       | 'sessionStatusId'
       | 'expiresAt'
       | 'lastActivityAt'
@@ -32,6 +33,7 @@ export class UserSessionRepository {
       deviceId: string;
       ipAddress: string;
       refreshTokenHash: string;
+      refreshTokenJti: string | null;
       sessionStatusId: string;
       expiresAt: Date;
       lastActivityAt: Date;
@@ -93,6 +95,16 @@ export class UserSessionRepository {
     const repo = this.getRepository(manager);
     return await repo.findOne({
       where: { refreshTokenHash },
+    });
+  }
+
+  async findByRefreshTokenJti(
+    refreshTokenJti: string,
+    manager?: EntityManager,
+  ): Promise<UserSession | null> {
+    const repo = this.getRepository(manager);
+    return await repo.findOne({
+      where: { refreshTokenJti },
     });
   }
 
@@ -195,6 +207,18 @@ export class UserSessionRepository {
       .createQueryBuilder('s')
       .setLock('pessimistic_write')
       .where('s.refreshTokenHash = :refreshTokenHash', { refreshTokenHash })
+      .getOne();
+  }
+
+  async findByRefreshTokenJtiForUpdate(
+    refreshTokenJti: string,
+    manager: EntityManager,
+  ): Promise<UserSession | null> {
+    return await manager
+      .getRepository(UserSession)
+      .createQueryBuilder('s')
+      .setLock('pessimistic_write')
+      .where('s.refreshTokenJti = :refreshTokenJti', { refreshTokenJti })
       .getOne();
   }
 

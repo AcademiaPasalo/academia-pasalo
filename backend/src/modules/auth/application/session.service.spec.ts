@@ -113,6 +113,7 @@ describe('SessionService', () => {
         'u1',
         metadata,
         'token',
+        'jti-1',
         new Date(),
       );
 
@@ -148,6 +149,7 @@ describe('SessionService', () => {
         'u1',
         metadata,
         'token',
+        'jti-2',
         new Date(),
       );
 
@@ -178,7 +180,7 @@ describe('SessionService', () => {
         id: 'new',
       });
 
-      await service.createSession('u1', metadata, 'token', new Date());
+      await service.createSession('u1', metadata, 'token', 'jti-3', new Date());
 
       expect(
         sessionConflictService.cleanupExcessPendingSessions,

@@ -108,3 +108,33 @@ El uso de IP (GeoIP) tiene un margen de error de ciudad (10-40km). No sirve para
 **Tablas Afectadas:**
 - `user_session`: Almacena coordenadas, IP, device_id y estado.
 - `security_event`: Registra el historial de intentos y motivos de bloqueo.
+
+### D. Refresh Token Rotation con `jti` (Fortalecimiento de Identidad)
+
+Para evitar ambiguedades en renovacion de sesion y mejorar trazabilidad, el backend ahora usa `jti` (JWT ID) en refresh tokens.
+
+**Archivos:** `src/modules/auth/application/token.service.ts`, `src/modules/auth/application/auth.service.ts`, `src/modules/auth/application/session.service.ts`, `src/modules/auth/infrastructure/user-session.repository.ts`
+
+1. **Emision de refresh token:**
+   - Se genera `jti` unico por token de refresh.
+   - Ese `jti` viaja dentro del JWT (claim `jti`).
+2. **Persistencia de sesion:**
+   - La tabla `user_session` guarda `refresh_token_jti`.
+   - El lookup de sesion para refresh y reauth usa `refresh_token_jti` con lock pesimista.
+3. **Rotacion segura:**
+   - En cada refresh se emite nuevo token con nuevo `jti`.
+   - Se actualiza la sesion en transaccion.
+   - Se invalida cache de sesion y se blacklistea hash del refresh anterior.
+4. **Contrato API:**
+   - No cambia el contrato con frontend.
+   - El frontend sigue enviando/recibiendo `refreshToken` como antes.
+   - `jti` es control interno del backend.
+
+### E. IP Confiable (Pendiente de Cierre con DevOps)
+
+La deteccion de anomalias basada en IP depende de una cadena de proxies confiable.
+
+Estado actual:
+- Pendiente de coordinacion con DevOps para cerrar configuracion final de IP confiable.
+- Objetivo tecnico: usar IP resuelta por la plataforma (`request.ip`) con `trust proxy` correctamente definido segun topologia real de despliegue.
+- Riesgo si no se cierra: posibilidad de contaminar auditoria de seguridad con headers de IP manipulados.

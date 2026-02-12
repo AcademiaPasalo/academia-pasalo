@@ -34,6 +34,7 @@ export class SessionService {
     userId: string,
     metadata: RequestMetadata,
     refreshToken: string,
+    refreshTokenJti: string,
     expiresAt: Date,
     activeRoleId?: string,
     externalManager?: EntityManager,
@@ -93,6 +94,7 @@ export class SessionService {
           latitude: resolved.metadata.latitude || null,
           longitude: resolved.metadata.longitude || null,
           refreshTokenHash,
+          refreshTokenJti,
           sessionStatusId,
           activeRoleId: activeRoleId || null,
           expiresAt,
@@ -152,6 +154,7 @@ export class SessionService {
   async rotateRefreshToken(
     sessionId: string,
     refreshToken: string,
+    refreshTokenJti: string,
     expiresAt: Date,
     manager?: EntityManager,
   ): Promise<UserSession> {
@@ -162,6 +165,7 @@ export class SessionService {
       sessionId,
       {
         refreshTokenHash,
+        refreshTokenJti,
         expiresAt,
         lastActivityAt: new Date(),
       },
@@ -213,25 +217,21 @@ export class SessionService {
   }
 
   async findSessionByRefreshToken(
-    refreshToken: string,
+    refreshTokenJti: string,
     manager?: EntityManager,
   ): Promise<UserSession | null> {
-    const refreshTokenHash =
-      this.sessionValidator.hashRefreshToken(refreshToken);
-    return await this.userSessionRepository.findByRefreshTokenHash(
-      refreshTokenHash,
+    return await this.userSessionRepository.findByRefreshTokenJti(
+      refreshTokenJti,
       manager,
     );
   }
 
   async findSessionByRefreshTokenForUpdate(
-    refreshToken: string,
+    refreshTokenJti: string,
     manager: EntityManager,
   ): Promise<UserSession | null> {
-    const refreshTokenHash =
-      this.sessionValidator.hashRefreshToken(refreshToken);
-    return await this.userSessionRepository.findByRefreshTokenHashForUpdate(
-      refreshTokenHash,
+    return await this.userSessionRepository.findByRefreshTokenJtiForUpdate(
+      refreshTokenJti,
       manager,
     );
   }
@@ -239,7 +239,7 @@ export class SessionService {
   async resolveConcurrentSession(params: {
     userId: string;
     deviceId: string;
-    refreshToken: string;
+    refreshTokenJti: string;
     decision: ConcurrentDecision;
     ipAddress: string;
     userAgent: string;

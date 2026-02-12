@@ -162,7 +162,7 @@ describe('AuthService', () => {
     tokenServiceMock.verifyRefreshToken.mockImplementation((token: string) => {
       try {
         const payload = jwtService.verify(token);
-        if (payload.type !== 'refresh' || !payload.sub || !payload.deviceId) {
+        if (payload.type !== 'refresh' || !payload.sub || !payload.deviceId || !payload.jti) {
           throw new UnauthorizedException('Refresh token inválido');
         }
         return payload;
@@ -183,10 +183,12 @@ describe('AuthService', () => {
           sub: userId,
           deviceId,
           type: 'refresh',
+          jti: "jti-mock",
           iat: Date.now(),
         });
         return Promise.resolve({
           token,
+          refreshTokenJti: 'jti-mock',
           expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
         });
       },
@@ -222,7 +224,8 @@ describe('AuthService', () => {
     expect(createSessionArgs[0]).toBe(baseUser.id);
     expect(createSessionArgs[1]).toEqual(metadata);
     expect(typeof createSessionArgs[2]).toBe('string');
-    expect(createSessionArgs[3]).toBeInstanceOf(Date);
+    expect(typeof createSessionArgs[3]).toBe('string');
+    expect(createSessionArgs[4]).toBeInstanceOf(Date);
 
     expect(securityEventServiceMock.logEvent).not.toHaveBeenCalled();
 
@@ -291,6 +294,7 @@ describe('AuthService', () => {
       sub: baseUser.id,
       deviceId: 'device-a',
       type: 'refresh',
+          jti: "jti-mock",
     });
 
     await expect(
@@ -298,7 +302,7 @@ describe('AuthService', () => {
     ).rejects.toBeInstanceOf(UnauthorizedException);
 
     expect(
-      sessionValidatorServiceMock.validateRefreshTokenSession,
+      sessionServiceMock.findSessionByRefreshTokenForUpdate,
     ).not.toHaveBeenCalled();
   });
 
@@ -307,10 +311,18 @@ describe('AuthService', () => {
       sub: baseUser.id,
       deviceId: metadata.deviceId,
       type: 'refresh',
+          jti: "jti-mock",
     });
 
-    sessionValidatorServiceMock.validateRefreshTokenSession.mockResolvedValue({
+    sessionStatusServiceMock.getIdByCode.mockResolvedValue('active-status-id');
+    sessionServiceMock.findSessionByRefreshTokenForUpdate.mockResolvedValue({
       id: '123',
+      userId: baseUser.id,
+      deviceId: metadata.deviceId,
+      isActive: true,
+      sessionStatusId: 'active-status-id',
+      expiresAt: new Date(Date.now() + 60_000),
+      activeRoleId: baseUser.roles[0].id,
     });
     sessionServiceMock.rotateRefreshToken.mockResolvedValue({ id: '123' });
     usersServiceMock.findOne.mockResolvedValue(baseUser);
@@ -344,11 +356,9 @@ describe('AuthService', () => {
       sub: baseUser.id,
       deviceId: metadata.deviceId,
       type: 'refresh',
+          jti: "jti-mock",
     });
 
-    sessionValidatorServiceMock.validateRefreshTokenSession.mockResolvedValue({
-      id: '123',
-    });
     usersServiceMock.findOne.mockResolvedValue({
       ...baseUser,
       isActive: false,
@@ -392,6 +402,7 @@ describe('AuthService', () => {
       sub: baseUser.id,
       deviceId: metadata.deviceId,
       type: 'refresh',
+          jti: "jti-mock",
     });
 
     sessionServiceMock.resolveConcurrentSession.mockResolvedValue({
@@ -413,6 +424,7 @@ describe('AuthService', () => {
       sub: baseUser.id,
       deviceId: metadata.deviceId,
       type: 'refresh',
+          jti: "jti-mock",
     });
 
     sessionServiceMock.resolveConcurrentSession.mockResolvedValue({
@@ -448,6 +460,7 @@ describe('AuthService', () => {
       sub: baseUser.id,
       deviceId: metadata.deviceId,
       type: 'refresh',
+          jti: "jti-mock",
     });
 
     const blockedSession = {
@@ -492,6 +505,7 @@ describe('AuthService', () => {
       sub: baseUser.id,
       deviceId: metadata.deviceId,
       type: 'refresh',
+          jti: "jti-mock",
     });
 
     const blockedSession = {
@@ -537,8 +551,9 @@ describe('AuthService', () => {
     const rotateArgs = sessionServiceMock.rotateRefreshToken.mock.calls[0];
     expect(rotateArgs[0]).toBe('555');
     expect(typeof rotateArgs[1]).toBe('string');
-    expect(rotateArgs[2]).toBeInstanceOf(Date);
-    expect(rotateArgs[3]).toEqual(expect.anything());
+    expect(typeof rotateArgs[2]).toBe('string');
+    expect(rotateArgs[3]).toBeInstanceOf(Date);
+    expect(rotateArgs[4]).toEqual(expect.anything());
   });
 
   it('switchProfile: intento de escalada de privilegios (rol no poseído) -> 401', async () => {
@@ -551,3 +566,5 @@ describe('AuthService', () => {
     expect(sessionServiceMock.rotateRefreshToken).not.toHaveBeenCalled();
   });
 });
+
+

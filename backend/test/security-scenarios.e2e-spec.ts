@@ -78,6 +78,8 @@ describe('Security Scenarios (Integration)', () => {
     findLatestSessionByUserId: jest.fn().mockResolvedValue(null),
     findByRefreshTokenHash: jest.fn(),
     findByRefreshTokenHashForUpdate: jest.fn(),
+    findByRefreshTokenJti: jest.fn(),
+    findByRefreshTokenJtiForUpdate: jest.fn(),
     findById: jest.fn(),
     findActiveById: jest.fn(),
     findByIdWithUser: jest.fn(),
@@ -184,10 +186,19 @@ describe('Security Scenarios (Integration)', () => {
             generateAccessToken: jest.fn().mockResolvedValue('at'),
             generateRefreshToken: jest
               .fn()
-              .mockResolvedValue({ token: 'rt', expiresAt: new Date() }),
+              .mockResolvedValue({
+                token: 'rt',
+                refreshTokenJti: 'jti-rt',
+                expiresAt: new Date(),
+              }),
             verifyRefreshToken: jest
               .fn()
-              .mockReturnValue({ deviceId: 'device-A', sub: '1' }),
+              .mockReturnValue({
+                deviceId: 'device-A',
+                sub: '1',
+                jti: 'jti-rt',
+                type: 'refresh',
+              }),
           },
         },
         {
@@ -331,12 +342,14 @@ describe('Security Scenarios (Integration)', () => {
       jest.spyOn(tokenService, 'verifyRefreshToken').mockReturnValue({
         sub: mockUser.id,
         deviceId: mockMetadata.deviceId,
+        jti: 'jti-inactive',
+        type: 'refresh',
       });
       mockUsersService.findOne.mockResolvedValue({
         ...mockUser,
         isActive: false,
       });
-      mockUserSessionRepository.findByRefreshTokenHash.mockResolvedValue({
+      mockUserSessionRepository.findByRefreshTokenJtiForUpdate.mockResolvedValue({
         id: 'session-r1',
         userId: mockUser.id,
         deviceId: mockMetadata.deviceId,

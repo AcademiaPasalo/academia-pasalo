@@ -2,11 +2,13 @@ import { Injectable, UnauthorizedException, Logger } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { JwtPayload } from '@modules/auth/interfaces/jwt-payload.interface';
 import { AuthSettingsService } from '@modules/auth/application/auth-settings.service';
+import { randomUUID } from 'crypto';
 
 export type RefreshTokenPayload = {
   sub: string;
   deviceId: string;
   type: 'refresh';
+  jti: string;
   iat?: number;
   exp?: number;
 };
@@ -31,12 +33,14 @@ export class TokenService {
   async generateRefreshToken(
     userId: string,
     deviceId: string,
-  ): Promise<{ token: string; expiresAt: Date }> {
+  ): Promise<{ token: string; expiresAt: Date; refreshTokenJti: string }> {
     const ttlDays = await this.authSettingsService.getRefreshTokenTtlDays();
+    const refreshTokenJti = randomUUID();
     const payload: RefreshTokenPayload = {
       sub: userId,
       deviceId,
       type: 'refresh',
+      jti: refreshTokenJti,
     };
 
     const token = this.jwtService.sign(payload, {
@@ -45,7 +49,7 @@ export class TokenService {
 
     const expiresAt = new Date(Date.now() + ttlDays * 24 * 60 * 60 * 1000);
 
-    return { token, expiresAt };
+    return { token, expiresAt, refreshTokenJti };
   }
 
   verifyRefreshToken(token: string): RefreshTokenPayload {
@@ -56,7 +60,8 @@ export class TokenService {
         !payload ||
         payload.type !== 'refresh' ||
         typeof payload.sub !== 'string' ||
-        typeof payload.deviceId !== 'string'
+        typeof payload.deviceId !== 'string' ||
+        typeof payload.jti !== 'string'
       ) {
         throw new UnauthorizedException('Refresh token inválido');
       }

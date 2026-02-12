@@ -112,6 +112,7 @@ CREATE TABLE user_session (
   latitude DECIMAL(10,7),
   longitude DECIMAL(10,7),
   refresh_token_hash VARCHAR(255) NOT NULL,
+  refresh_token_jti VARCHAR(36) NULL,
   session_status_id BIGINT NOT NULL,
   active_role_id BIGINT NULL,
   expires_at DATETIME NOT NULL,
@@ -501,4 +502,8 @@ CREATE INDEX idx_class_event_professor_event ON class_event_professor(class_even
 CREATE INDEX idx_class_event_professor_user ON class_event_professor(professor_user_id);
 CREATE INDEX idx_class_event_professor_active ON class_event_professor(class_event_id, revoked_at);
 
+CREATE INDEX idx_user_session_refresh_token_hash
+ON user_session(refresh_token_hash);
 
+CREATE UNIQUE INDEX uq_user_session_refresh_token_jti
+ON user_session(refresh_token_jti);

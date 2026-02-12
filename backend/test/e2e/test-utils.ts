@@ -259,6 +259,7 @@ export class TestSeeder {
         deviceId,
         ipAddress: '127.0.0.1',
         refreshTokenHash: 'hash-' + Date.now(),
+        refreshTokenJti: 'jti-' + Date.now(),
         sessionStatusId: activeStatus.id,
         isActive: true,
         expiresAt: new Date(Date.now() + 1000 * 60 * 60),

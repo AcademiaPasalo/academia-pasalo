@@ -62,6 +62,8 @@ describe('Advanced Security Scenarios (Offensive Testing)', () => {
     findLatestSessionByUserId: jest.fn(),
     findByRefreshTokenHash: jest.fn(),
     findByRefreshTokenHashForUpdate: jest.fn(),
+    findByRefreshTokenJti: jest.fn(),
+    findByRefreshTokenJtiForUpdate: jest.fn(),
     findById: jest.fn(),
     findByIdWithUser: jest.fn().mockResolvedValue({
       id: '100',
@@ -151,12 +153,26 @@ describe('Advanced Security Scenarios (Offensive Testing)', () => {
           useValue: {
             generateRefreshToken: jest
               .fn()
-              .mockResolvedValue({ token: 'new_rt', expiresAt: new Date() }),
+              .mockResolvedValue({
+                token: 'new_rt',
+                refreshTokenJti: 'jti-new-rt',
+                expiresAt: new Date(),
+              }),
             generateAccessToken: jest.fn().mockResolvedValue('new_at'),
             verifyRefreshToken: jest.fn((token: string) => {
               if (token === 'zombie_token')
-                return { sub: '100', deviceId: 'device-zombie' };
-              return { sub: '100', deviceId: 'device-original' };
+                return {
+                  sub: '100',
+                  deviceId: 'device-zombie',
+                  jti: 'jti-zombie',
+                  type: 'refresh',
+                };
+              return {
+                sub: '100',
+                deviceId: 'device-original',
+                jti: 'jti-original',
+                type: 'refresh',
+              };
             }),
           },
         },
@@ -203,7 +219,7 @@ describe('Advanced Security Scenarios (Offensive Testing)', () => {
     it('should REJECT refresh attempt with a token from a revoked session', async () => {
       const zombieRefreshToken = 'zombie_token';
 
-      mockUserSessionRepository.findByRefreshTokenHash = jest
+      mockUserSessionRepository.findByRefreshTokenJtiForUpdate = jest
         .fn()
         .mockResolvedValue(null);
 

@@ -73,3 +73,14 @@ D. ESTRATEGIA DE CACHÉ (Redis)
    - Eliminación Grupal (Bulk Invalidation):
      - Estrategia: Uso de "Key Namespacing" (ej. `cache:course:123`, `cache:course:list`).
      - Método `invalidateGroup(pattern: string)`: Utilizar comandos eficientes (SCAN) para limpiar patrones específicos sin bloquear el servidor.
+E. SEGURIDAD DE IDENTIDAD (Refresh con JTI)
+   - Regla: Cada refresh token debe incluir `jti` unico.
+   - Persistencia: `user_session.refresh_token_jti` como referencia canonical del refresh vigente.
+   - Validacion: Flujos de refresh/reauth/resolucion concurrente deben ubicar sesion por `refresh_token_jti` y ejecutar lock pesimista en operaciones criticas.
+   - Rotacion: Cada renovacion emite nuevo refresh token con nuevo `jti`; el anterior queda invalidado por blacklist de hash.
+   - Contrato API: No se exponen nuevos campos al frontend; el control de `jti` es interno del backend.
+
+F. RESOLUCION DE IP CONFIABLE (PENDIENTE DEVOPS)
+   - Requisito: Configurar `trust proxy` acorde a la topologia real de despliegue.
+   - Backend: Obtener IP de seguridad por `request.ip` y no confiar en lectura manual de headers.
+   - Dependencia: Confirmacion de cadena de proxies y headers finales por DevOps.

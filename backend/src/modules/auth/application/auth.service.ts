@@ -127,12 +127,15 @@ export class AuthService {
       throw new UnauthorizedException('Dispositivo no autorizado');
     }
 
-    const session =
-      await this.sessionValidatorService.validateRefreshTokenSession(
-        payload.sub,
-        deviceId,
-        refreshToken,
-      );
+    const oldTokenHash = createHash('sha256')
+      .update(refreshToken)
+      .digest('hex');
+    const isBlacklisted = await this.cacheService.get(
+      `blacklist:refresh:${oldTokenHash}`,
+    );
+    if (isBlacklisted) {
+      throw new UnauthorizedException('Token revocado');
+    }
 
     const user = await this.usersService.findOne(payload.sub);
     await this.assertUserIsActive(
@@ -143,11 +146,57 @@ export class AuthService {
       IDENTITY_SOURCE_FLOWS.REFRESH_TOKEN,
     );
 
-    await this.cacheService.del(`cache:session:${session.id}:user`);
+    const { sessionId, activeRoleId, newRefreshToken } =
+      await this.dataSource.transaction(async (manager) => {
+        const lockedSession =
+          await this.sessionService.findSessionByRefreshTokenForUpdate(
+            payload.jti,
+            manager,
+          );
 
-    const oldTokenHash = createHash('sha256')
-      .update(refreshToken)
-      .digest('hex');
+        if (!lockedSession || lockedSession.userId !== payload.sub) {
+          throw new UnauthorizedException('Sesión inválida o expirada');
+        }
+
+        if (lockedSession.deviceId !== deviceId) {
+          throw new UnauthorizedException('Dispositivo no autorizado');
+        }
+
+        const activeStatusId = await this.sessionStatusService.getIdByCode(
+          'ACTIVE',
+          manager,
+        );
+        if (
+          !lockedSession.isActive ||
+          lockedSession.sessionStatusId !== activeStatusId
+        ) {
+          throw new UnauthorizedException('Sesión inválida o expirada');
+        }
+
+        if (lockedSession.expiresAt < new Date()) {
+          await this.sessionService.deactivateSession(lockedSession.id, manager);
+          throw new UnauthorizedException('Sesión inválida o expirada');
+        }
+
+        const { token, expiresAt, refreshTokenJti } =
+          await this.tokenService.generateRefreshToken(user.id, deviceId);
+        await this.sessionService.rotateRefreshToken(
+          lockedSession.id,
+          token,
+          refreshTokenJti,
+          expiresAt,
+          manager,
+        );
+
+        return {
+          sessionId: lockedSession.id,
+          activeRoleId: lockedSession.activeRoleId,
+          newRefreshToken: token,
+        };
+      });
+
+    await this.cacheService.del(`cache:session:${sessionId}:user`);
+
     const ttlSeconds =
       technicalSettings.auth.tokens.refreshTokenBlacklistTtlSeconds;
     await this.cacheService.set(
@@ -156,24 +205,15 @@ export class AuthService {
       ttlSeconds,
     );
 
-    const { token: newRefreshToken, expiresAt: newExpiresAt } =
-      await this.tokenService.generateRefreshToken(user.id, deviceId);
-
-    await this.sessionService.rotateRefreshToken(
-      session.id,
-      newRefreshToken,
-      newExpiresAt,
-    );
-
     const activeRole =
-      user.roles.find((r) => r.id === session.activeRoleId) || user.roles[0];
+      user.roles.find((r) => r.id === activeRoleId) || user.roles[0];
 
     const accessPayload: JwtPayload = {
       sub: user.id,
       email: user.email,
       roles: user.roles.map((role) => role.code),
       activeRole: activeRole.code,
-      sessionId: session.id,
+      sessionId,
       deviceId: deviceId,
     };
 
@@ -205,12 +245,17 @@ export class AuthService {
         updatedAt: new Date(),
       });
 
-      const { token: newRefreshToken, expiresAt: newExpiresAt } =
+      const {
+        token: newRefreshToken,
+        expiresAt: newExpiresAt,
+        refreshTokenJti,
+      } =
         await this.tokenService.generateRefreshToken(userId, metadata.deviceId);
 
       const session = await this.sessionService.rotateRefreshToken(
         sessionId,
         newRefreshToken,
+        refreshTokenJti,
         newExpiresAt,
         manager,
       );
@@ -281,7 +326,7 @@ export class AuthService {
       await this.sessionService.resolveConcurrentSession({
         userId: payload.sub,
         deviceId,
-        refreshToken,
+        refreshTokenJti: payload.jti,
         decision,
         ipAddress: metadata.ipAddress,
         userAgent: metadata.userAgent,
@@ -346,7 +391,7 @@ export class AuthService {
     }
 
     const session =
-      await this.sessionService.findSessionByRefreshToken(refreshToken);
+      await this.sessionService.findSessionByRefreshToken(payload.jti);
     if (
       !session ||
       session.userId !== payload.sub ||
@@ -384,7 +429,7 @@ export class AuthService {
       await this.dataSource.transaction(async (manager) => {
         const lockedSession =
           await this.sessionService.findSessionByRefreshTokenForUpdate(
-            refreshToken,
+            payload.jti,
             manager,
           );
 
@@ -434,7 +479,7 @@ export class AuthService {
     return await this.dataSource.transaction(async (manager) => {
       const lockedSession =
         await this.sessionService.findSessionByRefreshTokenForUpdate(
-          refreshToken,
+          payload.jti,
           manager,
         );
 
@@ -473,12 +518,17 @@ export class AuthService {
         manager,
       );
 
-      const { token: newRefreshToken, expiresAt: newExpiresAt } =
+      const {
+        token: newRefreshToken,
+        expiresAt: newExpiresAt,
+        refreshTokenJti,
+      } =
         await this.tokenService.generateRefreshToken(payload.sub, deviceId);
 
       await this.sessionService.rotateRefreshToken(
         lockedSession.id,
         newRefreshToken,
+        refreshTokenJti,
         newExpiresAt,
         manager,
       );
@@ -570,7 +620,7 @@ export class AuthService {
     sessionStatus: SessionStatusCode;
     concurrentSessionId: string | null;
   }> {
-    const { token: refreshToken, expiresAt } =
+    const { token: refreshToken, expiresAt, refreshTokenJti } =
       await this.tokenService.generateRefreshToken(user.id, metadata.deviceId);
 
     const activeRole =
@@ -581,6 +631,7 @@ export class AuthService {
         user.id,
         metadata,
         refreshToken,
+        refreshTokenJti,
         expiresAt,
         activeRole?.id,
         manager,
