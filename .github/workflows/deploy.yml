@@ -73,7 +73,7 @@ jobs:
     needs: build-and-push
     runs-on: ubuntu-latest
     steps:
-      - name: Deploy to EC2 (DEBUG MODE)
+      - name: Deploy to EC2 (debug + validate ubuntu)
         uses: appleboy/ssh-action@v1.0.3
         env:
           DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
@@ -88,7 +88,7 @@ jobs:
           CORS_ORIGINS: ${{ secrets.CORS_ORIGINS }}
         with:
           host: ${{ secrets.EC2_HOST }}
-          username: ${{ secrets.EC2_USER }}
+          username: ubuntu   # 🔥 fijo: no dependas del secret
           key: ${{ secrets.EC2_SSH_KEY }}
           script_stop: true
           debug: true
@@ -98,11 +98,9 @@ jobs:
             set -x
             trap 'echo "❌ FAIL line=$LINENO cmd=$BASH_COMMAND exit=$?" >&2' ERR
 
-            APP_DIR="/home/ubuntu/academia-pasalo"
-            COMPOSE_FILE="$APP_DIR/backend/docker-compose.prod.yml"
-
             echo "===== CONTEXT ====="
-            whoami
+            WHO=$(whoami)
+            echo "whoami=$WHO"
             hostname
             pwd
             date
@@ -110,6 +108,16 @@ jobs:
             docker-compose --version || true
             git --version || true
             echo "==================="
+
+            # ✅ VALIDACIÓN HARD: si no es ubuntu, aborta (así no pierdes más runs)
+            if [ "$WHO" != "ubuntu" ]; then
+              echo "❌ ERROR: el workflow NO está entrando como ubuntu. whoami=$WHO"
+              echo "Revisa appleboy username / secrets."
+              exit 1
+            fi
+
+            APP_DIR="/home/ubuntu/academia-pasalo"
+            COMPOSE_FILE="$APP_DIR/backend/docker-compose.prod.yml"
 
             echo "===== CLONE / UPDATE REPO ====="
             if [ ! -d "$APP_DIR/.git" ]; then
@@ -124,8 +132,8 @@ jobs:
 
             echo "===== DIRECTORIOS RUNTIME ====="
             mkdir -p "$APP_DIR/certbot/www/.well-known/acme-challenge" "$APP_DIR/letsencrypt"
-            chown -R ubuntu:ubuntu "$APP_DIR/certbot" || true
-            chmod -R 755 "$APP_DIR/certbot" || true
+            chown -R ubuntu:ubuntu "$APP_DIR/certbot" "$APP_DIR/letsencrypt" || true
+            chmod -R 755 "$APP_DIR/certbot" "$APP_DIR/letsencrypt" || true
 
             echo "===== VALIDAR COMPOSE ====="
             [ ! -f "$COMPOSE_FILE" ] && { echo "ERROR: No existe $COMPOSE_FILE"; ls -la "$APP_DIR/backend"; exit 1; }
@@ -154,8 +162,21 @@ jobs:
             docker-compose -f "$COMPOSE_FILE" ps
 
             echo "===== WAIT MYSQL ====="
-            sleep 25
-            docker ps
+            # Espera real por healthcheck del servicio mysql (ya lo tienes en compose)
+            for i in $(seq 1 60); do
+              if docker inspect -f '{{.State.Health.Status}}' academia-pasalo-mysql 2>/dev/null | grep -q healthy; then
+                echo "✅ MySQL healthy"
+                break
+              fi
+              echo "... MySQL no healthy aún (try $i)"
+              sleep 2
+            done
+
+            docker inspect -f '{{.State.Health.Status}}' academia-pasalo-mysql | grep -q healthy || {
+              echo "❌ MySQL no llegó a healthy"
+              docker logs academia-pasalo-mysql --tail 200
+              exit 1
+            }
 
             echo "===== RUN SQL ====="
             docker exec -i academia-pasalo-mysql mysql -u root -p"$DB_PASSWORD" "$DB_NAME" < "$APP_DIR/backend/db/eliminar_tablas_academia_pasalo_v1.sql"
