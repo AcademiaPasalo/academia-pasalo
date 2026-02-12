@@ -95,7 +95,9 @@ export class UsersService {
         );
 
         if (existingUser) {
-          throw new ConflictException('El correo electrónico ya está registrado');
+          throw new ConflictException(
+            'El correo electrónico ya está registrado',
+          );
         }
       }
 

@@ -184,21 +184,17 @@ describe('Security Scenarios (Integration)', () => {
           provide: TokenService,
           useValue: {
             generateAccessToken: jest.fn().mockResolvedValue('at'),
-            generateRefreshToken: jest
-              .fn()
-              .mockResolvedValue({
-                token: 'rt',
-                refreshTokenJti: 'jti-rt',
-                expiresAt: new Date(),
-              }),
-            verifyRefreshToken: jest
-              .fn()
-              .mockReturnValue({
-                deviceId: 'device-A',
-                sub: '1',
-                jti: 'jti-rt',
-                type: 'refresh',
-              }),
+            generateRefreshToken: jest.fn().mockResolvedValue({
+              token: 'rt',
+              refreshTokenJti: 'jti-rt',
+              expiresAt: new Date(),
+            }),
+            verifyRefreshToken: jest.fn().mockReturnValue({
+              deviceId: 'device-A',
+              sub: '1',
+              jti: 'jti-rt',
+              type: 'refresh',
+            }),
           },
         },
         {
@@ -349,14 +345,16 @@ describe('Security Scenarios (Integration)', () => {
         ...mockUser,
         isActive: false,
       });
-      mockUserSessionRepository.findByRefreshTokenJtiForUpdate.mockResolvedValue({
-        id: 'session-r1',
-        userId: mockUser.id,
-        deviceId: mockMetadata.deviceId,
-        isActive: true,
-        expiresAt: new Date(Date.now() + 60_000),
-        sessionStatusId: '100',
-      });
+      mockUserSessionRepository.findByRefreshTokenJtiForUpdate.mockResolvedValue(
+        {
+          id: 'session-r1',
+          userId: mockUser.id,
+          deviceId: mockMetadata.deviceId,
+          isActive: true,
+          expiresAt: new Date(Date.now() + 60_000),
+          sessionStatusId: '100',
+        },
+      );
 
       await expect(
         authService.refreshAccessToken(refreshToken, mockMetadata.deviceId),

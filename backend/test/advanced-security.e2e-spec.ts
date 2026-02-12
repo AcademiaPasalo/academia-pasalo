@@ -151,13 +151,11 @@ describe('Advanced Security Scenarios (Offensive Testing)', () => {
         {
           provide: TokenService,
           useValue: {
-            generateRefreshToken: jest
-              .fn()
-              .mockResolvedValue({
-                token: 'new_rt',
-                refreshTokenJti: 'jti-new-rt',
-                expiresAt: new Date(),
-              }),
+            generateRefreshToken: jest.fn().mockResolvedValue({
+              token: 'new_rt',
+              refreshTokenJti: 'jti-new-rt',
+              expiresAt: new Date(),
+            }),
             generateAccessToken: jest.fn().mockResolvedValue('new_at'),
             verifyRefreshToken: jest.fn((token: string) => {
               if (token === 'zombie_token')

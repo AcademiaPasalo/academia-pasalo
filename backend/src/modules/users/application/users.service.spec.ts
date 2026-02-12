@@ -120,7 +120,9 @@ describe('UsersService', () => {
 
     await usersService.assignRole('1', 'ADMIN');
 
-    expect(identitySecurityServiceMock.invalidateUserIdentity).toHaveBeenCalledWith(
+    expect(
+      identitySecurityServiceMock.invalidateUserIdentity,
+    ).toHaveBeenCalledWith(
       '1',
       expect.objectContaining({
         revokeSessions: false,
@@ -155,7 +157,9 @@ describe('UsersService', () => {
 
     await usersService.update('1', { email: 'new@test.com' });
 
-    expect(identitySecurityServiceMock.invalidateUserIdentity).toHaveBeenCalledWith(
+    expect(
+      identitySecurityServiceMock.invalidateUserIdentity,
+    ).toHaveBeenCalledWith(
       '1',
       expect.objectContaining({
         revokeSessions: false,
@@ -189,7 +193,9 @@ describe('UsersService', () => {
 
     await usersService.update('1', { isActive: false });
 
-    expect(identitySecurityServiceMock.invalidateUserIdentity).toHaveBeenCalledWith(
+    expect(
+      identitySecurityServiceMock.invalidateUserIdentity,
+    ).toHaveBeenCalledWith(
       '1',
       expect.objectContaining({
         revokeSessions: true,
@@ -223,7 +229,9 @@ describe('UsersService', () => {
 
     await usersService.update('1', { isActive: true });
 
-    expect(identitySecurityServiceMock.invalidateUserIdentity).toHaveBeenCalledWith(
+    expect(
+      identitySecurityServiceMock.invalidateUserIdentity,
+    ).toHaveBeenCalledWith(
       '1',
       expect.objectContaining({
         revokeSessions: false,
@@ -258,7 +266,9 @@ describe('UsersService', () => {
 
     await usersService.removeRole('1', 'ADMIN');
 
-    expect(identitySecurityServiceMock.invalidateUserIdentity).toHaveBeenCalledWith(
+    expect(
+      identitySecurityServiceMock.invalidateUserIdentity,
+    ).toHaveBeenCalledWith(
       '1',
       expect.objectContaining({
         revokeSessions: false,

@@ -49,8 +49,9 @@ export class SessionValidatorService {
     }
 
     if (session.expiresAt < new Date()) {
-      const revokedStatusId =
-        await this.sessionStatusService.getIdByCode(SESSION_STATUS_CODES.REVOKED);
+      const revokedStatusId = await this.sessionStatusService.getIdByCode(
+        SESSION_STATUS_CODES.REVOKED,
+      );
       await this.userSessionRepository.update(session.id, {
         isActive: false,
         sessionStatusId: revokedStatusId,
@@ -58,8 +59,9 @@ export class SessionValidatorService {
       throw new UnauthorizedException('Sesión inválida o expirada');
     }
 
-    const activeStatusId =
-      await this.sessionStatusService.getIdByCode(SESSION_STATUS_CODES.ACTIVE);
+    const activeStatusId = await this.sessionStatusService.getIdByCode(
+      SESSION_STATUS_CODES.ACTIVE,
+    );
     if (session.sessionStatusId !== activeStatusId || !session.isActive) {
       throw new UnauthorizedException('Sesión inválida o expirada');
     }
@@ -83,8 +85,9 @@ export class SessionValidatorService {
       throw new UnauthorizedException('Sesión inválida o expirada');
     }
 
-    const activeStatusId =
-      await this.sessionStatusService.getIdByCode(SESSION_STATUS_CODES.ACTIVE);
+    const activeStatusId = await this.sessionStatusService.getIdByCode(
+      SESSION_STATUS_CODES.ACTIVE,
+    );
 
     if (
       !session.isActive ||

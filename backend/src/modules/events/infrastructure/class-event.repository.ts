@@ -116,7 +116,7 @@ export class ClassEventRepository {
     await repo.update(id, { ...data, updatedAt: new Date() });
     const updated = await repo.findOne({ where: { id } });
     if (!updated) {
-      throw new Error('Evento de clase no encontrado después de actualizar');
+      throw new Error('Evento de clase no encontrado despuï¿½s de actualizar');
     }
     return updated;
   }
@@ -172,4 +172,3 @@ export class ClassEventRepository {
       .getMany();
   }
 }
-

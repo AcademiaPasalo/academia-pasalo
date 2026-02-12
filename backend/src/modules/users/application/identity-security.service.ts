@@ -32,8 +32,7 @@ export class IdentitySecurityService {
     },
   ): Promise<void> {
     const revokeSessions = options?.revokeSessions ?? false;
-    const reason =
-      options?.reason ?? IDENTITY_INVALIDATION_REASONS.UNSPECIFIED;
+    const reason = options?.reason ?? IDENTITY_INVALIDATION_REASONS.UNSPECIFIED;
     const manager = options?.manager;
 
     const activeSessions =

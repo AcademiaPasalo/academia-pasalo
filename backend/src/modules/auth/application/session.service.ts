@@ -199,8 +199,9 @@ export class SessionService {
     const sessions =
       await this.userSessionRepository.findActiveSessionsByUserId(userId);
 
-    const revokedStatusId =
-      await this.sessionStatusService.getIdByCode(SESSION_STATUS_CODES.REVOKED);
+    const revokedStatusId = await this.sessionStatusService.getIdByCode(
+      SESSION_STATUS_CODES.REVOKED,
+    );
 
     for (const session of sessions) {
       await this.userSessionRepository.update(session.id, {

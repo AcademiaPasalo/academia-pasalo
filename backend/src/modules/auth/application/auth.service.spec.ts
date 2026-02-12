@@ -162,7 +162,12 @@ describe('AuthService', () => {
     tokenServiceMock.verifyRefreshToken.mockImplementation((token: string) => {
       try {
         const payload = jwtService.verify(token);
-        if (payload.type !== 'refresh' || !payload.sub || !payload.deviceId || !payload.jti) {
+        if (
+          payload.type !== 'refresh' ||
+          !payload.sub ||
+          !payload.deviceId ||
+          !payload.jti
+        ) {
           throw new UnauthorizedException('Refresh token inválido');
         }
         return payload;
@@ -183,7 +188,7 @@ describe('AuthService', () => {
           sub: userId,
           deviceId,
           type: 'refresh',
-          jti: "jti-mock",
+          jti: 'jti-mock',
           iat: Date.now(),
         });
         return Promise.resolve({
@@ -294,7 +299,7 @@ describe('AuthService', () => {
       sub: baseUser.id,
       deviceId: 'device-a',
       type: 'refresh',
-          jti: "jti-mock",
+      jti: 'jti-mock',
     });
 
     await expect(
@@ -311,7 +316,7 @@ describe('AuthService', () => {
       sub: baseUser.id,
       deviceId: metadata.deviceId,
       type: 'refresh',
-          jti: "jti-mock",
+      jti: 'jti-mock',
     });
 
     sessionStatusServiceMock.getIdByCode.mockResolvedValue('active-status-id');
@@ -356,7 +361,7 @@ describe('AuthService', () => {
       sub: baseUser.id,
       deviceId: metadata.deviceId,
       type: 'refresh',
-          jti: "jti-mock",
+      jti: 'jti-mock',
     });
 
     usersServiceMock.findOne.mockResolvedValue({
@@ -402,7 +407,7 @@ describe('AuthService', () => {
       sub: baseUser.id,
       deviceId: metadata.deviceId,
       type: 'refresh',
-          jti: "jti-mock",
+      jti: 'jti-mock',
     });
 
     sessionServiceMock.resolveConcurrentSession.mockResolvedValue({
@@ -424,7 +429,7 @@ describe('AuthService', () => {
       sub: baseUser.id,
       deviceId: metadata.deviceId,
       type: 'refresh',
-          jti: "jti-mock",
+      jti: 'jti-mock',
     });
 
     sessionServiceMock.resolveConcurrentSession.mockResolvedValue({
@@ -460,7 +465,7 @@ describe('AuthService', () => {
       sub: baseUser.id,
       deviceId: metadata.deviceId,
       type: 'refresh',
-          jti: "jti-mock",
+      jti: 'jti-mock',
     });
 
     const blockedSession = {
@@ -488,7 +493,9 @@ describe('AuthService', () => {
       ),
     ).rejects.toBeInstanceOf(ForbiddenException);
 
-    expect(googleProviderServiceMock.verifyCodeAndGetEmail).not.toHaveBeenCalled();
+    expect(
+      googleProviderServiceMock.verifyCodeAndGetEmail,
+    ).not.toHaveBeenCalled();
     expect(sessionServiceMock.activateBlockedSession).not.toHaveBeenCalled();
     expect(securityEventServiceMock.logEvent).toHaveBeenCalledWith(
       baseUser.id,
@@ -505,7 +512,7 @@ describe('AuthService', () => {
       sub: baseUser.id,
       deviceId: metadata.deviceId,
       type: 'refresh',
-          jti: "jti-mock",
+      jti: 'jti-mock',
     });
 
     const blockedSession = {
@@ -566,5 +573,3 @@ describe('AuthService', () => {
     expect(sessionServiceMock.rotateRefreshToken).not.toHaveBeenCalled();
   });
 });
-
-
