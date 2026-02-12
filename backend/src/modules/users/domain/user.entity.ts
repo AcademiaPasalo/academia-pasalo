@@ -62,6 +62,9 @@ export class User {
   @JoinColumn({ name: 'last_active_role_id' })
   lastActiveRole: Role | null;
 
+  @Column({ type: 'boolean', name: 'is_active', default: true })
+  isActive: boolean;
+
   @Column({ type: 'datetime', nullable: false, name: 'created_at' })
   createdAt: Date;
 

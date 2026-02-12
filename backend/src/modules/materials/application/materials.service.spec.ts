@@ -18,6 +18,7 @@ import { MaterialStatus } from '@modules/materials/domain/material-status.entity
 import { FolderStatus } from '@modules/materials/domain/folder-status.entity';
 import { DeletionRequestStatus } from '@modules/materials/domain/deletion-request-status.entity';
 import { Material } from '@modules/materials/domain/material.entity';
+import { FileResource } from '@modules/materials/domain/file-resource.entity';
 
 const mockFolder = (
   id = '1',
@@ -51,6 +52,7 @@ describe('MaterialsService', () => {
   let accessEngine: jest.Mocked<AccessEngineService>;
   let userRepo: jest.Mocked<UserRepository>;
   let auditService: jest.Mocked<AuditService>;
+  let cacheService: jest.Mocked<RedisCacheService>;
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -139,6 +141,7 @@ describe('MaterialsService', () => {
     accessEngine = module.get(AccessEngineService);
     userRepo = module.get(UserRepository);
     auditService = module.get(AuditService);
+    cacheService = module.get(RedisCacheService);
 
     userRepo.findById.mockResolvedValue({
       id: 'user-1',
@@ -218,6 +221,58 @@ describe('MaterialsService', () => {
         'material',
         'saved-id',
         mockManager,
+      );
+    });
+  });
+
+  describe('addVersion', () => {
+    it('should invalidate folder cache using materialFolderId', async () => {
+      const file = mockFile();
+      const persistedMaterial = {
+        id: 'mat-1',
+        materialFolderId: 'folder-77',
+        fileVersionId: 'ver-1',
+      } as Material;
+
+      const mockManager = {
+        findOne: jest
+          .fn()
+          .mockResolvedValueOnce(persistedMaterial)
+          .mockResolvedValueOnce({ id: 'ver-1', versionNumber: 1 }),
+        create: jest.fn((_: unknown, data: object) => data),
+        save: jest
+          .fn()
+          .mockResolvedValueOnce({ id: 'ver-2', versionNumber: 2 })
+          .mockResolvedValueOnce(persistedMaterial),
+      } as unknown as EntityManager;
+
+      dataSource.transaction.mockImplementation(
+        (
+          cbOrIsolation:
+            | string
+            | ((manager: EntityManager) => Promise<unknown>),
+          cb?: (manager: EntityManager) => Promise<unknown>,
+        ) => {
+          if (typeof cbOrIsolation === 'function') {
+            return cbOrIsolation(mockManager);
+          }
+          if (cb) {
+            return cb(mockManager);
+          }
+          return Promise.resolve();
+        },
+      );
+
+      storageService.calculateHash.mockResolvedValue('hash-v2');
+      resourceRepo.findByHash.mockResolvedValue({
+        id: 'resource-1',
+        storageUrl: '/path/file.pdf',
+      } as FileResource);
+
+      await service.addVersion('user1', 'mat-1', file);
+
+      expect(cacheService.del).toHaveBeenCalledWith(
+        'cache:materials:contents:folder:folder-77',
       );
     });
   });

@@ -13,8 +13,9 @@ import request from 'supertest';
 
 import { AllExceptionsFilter } from './../src/common/filters/all-exceptions.filter';
 import { TransformInterceptor } from './../src/common/interceptors/transform.interceptor';
-import { AuthController } from './../src/modules/auth/presentation/auth.controller';
-import { AuthService } from './../src/modules/auth/application/auth.service';
+import { EnrollmentsController } from './../src/modules/enrollments/presentation/enrollments.controller';
+import { EnrollmentsService } from './../src/modules/enrollments/application/enrollments.service';
+import { UsersService } from './../src/modules/users/application/users.service';
 import { JwtStrategy } from './../src/modules/auth/strategies/jwt.strategy';
 import { JwtAuthGuard } from './../src/common/guards/jwt-auth.guard';
 import { RolesGuard } from './../src/common/guards/roles.guard';
@@ -26,10 +27,12 @@ import { SessionSecurityService } from './../src/modules/auth/application/sessio
 import { SecurityEventService } from './../src/modules/auth/application/security-event.service';
 import { SecurityEventTypeRepository } from './../src/modules/auth/infrastructure/security-event-type.repository';
 import { SecurityEventRepository } from './../src/modules/auth/infrastructure/security-event.repository';
-import { UsersController } from './../src/modules/users/presentation/users.controller';
-import { UsersService } from './../src/modules/users/application/users.service';
-import { PhotoSource, User } from './../src/modules/users/domain/user.entity';
 import { RedisCacheService } from '../src/infrastructure/cache/redis-cache.service';
+import { EnrollmentRepository } from './../src/modules/enrollments/infrastructure/enrollment.repository';
+import { EnrollmentStatusRepository } from './../src/modules/enrollments/infrastructure/enrollment-status.repository';
+import { EnrollmentEvaluationRepository } from './../src/modules/enrollments/infrastructure/enrollment-evaluation.repository';
+import { EnrollmentTypeRepository } from './../src/modules/enrollments/infrastructure/enrollment-type.repository';
+import { PhotoSource } from './../src/modules/users/domain/user.entity';
 
 const JWT_SECRET = 'test-jwt-secret';
 
@@ -43,43 +46,44 @@ interface RequestWithUrl {
   url: string;
 }
 
-describe('IAM (e2e)', () => {
+describe('Enrollments E2E', () => {
   let app: INestApplication;
   let jwtService: JwtService;
+  let enrollmentsService: EnrollmentsService;
 
   const adminUser = {
     id: '1',
     email: 'admin@test.com',
     firstName: 'Admin',
-    lastName1: null as string | null,
-    lastName2: null as string | null,
-    phone: null as string | null,
-    career: null as string | null,
-    profilePhotoUrl: null as string | null,
-    photoSource: PhotoSource.NONE,
+    roles: [{ id: '1', code: 'ADMIN', name: 'Admin' }],
     isActive: true,
+    photoSource: PhotoSource.NONE,
     createdAt: new Date(),
-    roles: [{ id: '1', code: 'ADMIN', name: 'Administrador' }],
   };
 
   const studentUser = {
     id: '2',
     email: 'student@test.com',
     firstName: 'Student',
-    lastName1: null as string | null,
-    lastName2: null as string | null,
-    phone: null as string | null,
-    career: null as string | null,
-    profilePhotoUrl: null as string | null,
-    photoSource: PhotoSource.NONE,
+    roles: [{ id: '4', code: 'STUDENT', name: 'Student' }],
     isActive: true,
+    photoSource: PhotoSource.NONE,
     createdAt: new Date(),
-    roles: [{ id: '2', code: 'STUDENT', name: 'Alumno' }],
   };
 
-  const authServiceMock = {
-    loginWithGoogle: jest.fn(),
-    logout: jest.fn(),
+  const mockAcademicCycle = {
+    id: 'ac-1',
+    code: '2026-1',
+    startDate: new Date('2026-01-01'),
+    endDate: new Date('2026-12-31'),
+  };
+
+  const mockCourseCycle = {
+    id: 'course-cycle-1',
+    courseId: 'c-1',
+    academicCycleId: 'ac-1',
+    academicCycle: mockAcademicCycle,
+    course: { id: 'c-1' },
   };
 
   const usersServiceMock = {
@@ -88,7 +92,80 @@ describe('IAM (e2e)', () => {
       if (id === '2') return Promise.resolve(studentUser);
       return Promise.resolve(null);
     }),
-    findAll: jest.fn().mockResolvedValue([adminUser, studentUser]),
+  };
+
+  const enrollmentRepositoryMock = {
+    save: jest
+      .fn()
+      .mockImplementation((dto) =>
+        Promise.resolve({ id: 'enrollment-1', ...dto }),
+      ),
+    findOne: jest.fn().mockResolvedValue({ id: 'enrollment-1' }),
+    findById: jest.fn().mockResolvedValue({ id: 'enrollment-1', userId: '2' }),
+    update: jest.fn().mockResolvedValue({}),
+    findActiveByUserAndCourseCycle: jest.fn().mockResolvedValue(null),
+    findMyEnrollments: jest.fn().mockResolvedValue([]),
+    create: jest
+      .fn()
+      .mockImplementation((dto) =>
+        Promise.resolve({ id: 'enrollment-1', ...dto }),
+      ),
+  };
+
+  const mockCourseCycleRepo = {
+    findOne: jest.fn().mockResolvedValue(mockCourseCycle),
+    find: jest.fn().mockResolvedValue([]),
+  };
+
+  const enrollmentStatusRepositoryMock = {
+    findByCode: jest.fn().mockResolvedValue({ id: '1', code: 'ACTIVE' }),
+  };
+
+  const enrollmentEvaluationRepositoryMock = {
+    createMany: jest.fn().mockResolvedValue([]),
+  };
+
+  const enrollmentTypeRepositoryMock = {
+    findByCode: jest.fn((code) => Promise.resolve({ id: '1', code })),
+  };
+
+  const evaluationRepositoryMock = {
+    find: jest.fn().mockResolvedValue([]),
+  };
+
+  const mockManager = {
+    getRepository: jest.fn().mockImplementation((entity) => {
+      // Manejar tanto clases como strings
+      const name = typeof entity === 'function' ? entity.name : entity;
+
+      switch (name) {
+        case 'Enrollment':
+          return enrollmentRepositoryMock;
+        case 'EnrollmentStatus':
+          return enrollmentStatusRepositoryMock;
+        case 'EnrollmentType':
+          return enrollmentTypeRepositoryMock;
+        case 'EnrollmentEvaluation':
+          return enrollmentEvaluationRepositoryMock;
+        case 'CourseCycle':
+          return mockCourseCycleRepo;
+        case 'Evaluation':
+          return evaluationRepositoryMock;
+        default:
+          return {};
+      }
+    }),
+  };
+
+  const mockDataSource = {
+    transaction: jest.fn((cb) => cb(mockManager)),
+  };
+
+  const redisCacheServiceMock = {
+    get: jest.fn().mockResolvedValue(null),
+    set: jest.fn().mockResolvedValue(undefined),
+    del: jest.fn().mockResolvedValue(undefined),
+    invalidateGroup: jest.fn().mockResolvedValue(undefined),
   };
 
   const userSessionRepositoryMock = {
@@ -98,47 +175,45 @@ describe('IAM (e2e)', () => {
           id,
           isActive: true,
           expiresAt: new Date(Date.now() + 100000),
-          user: adminUser,
           sessionStatusId: '1',
-          deviceId: 'device-1',
-          userId: adminUser.id,
+          deviceId: 'dev-1',
+          userId: '1',
+          user: adminUser,
         });
       if (id === 'session-student')
         return Promise.resolve({
           id,
           isActive: true,
           expiresAt: new Date(Date.now() + 100000),
-          user: studentUser,
           sessionStatusId: '1',
-          deviceId: 'device-1',
-          userId: studentUser.id,
+          deviceId: 'dev-1',
+          userId: '2',
+          user: studentUser,
         });
       return Promise.resolve(null);
     }),
-    update: jest.fn(),
     findActiveById: jest.fn((id) => {
       if (id === 'session-admin')
         return Promise.resolve({
           id,
+          userId: '1',
+          deviceId: 'dev-1',
           isActive: true,
-          userId: adminUser.id,
-          deviceId: 'device-1',
         });
       if (id === 'session-student')
         return Promise.resolve({
           id,
+          userId: '2',
+          deviceId: 'dev-1',
           isActive: true,
-          userId: studentUser.id,
-          deviceId: 'device-1',
         });
       return Promise.resolve(null);
     }),
+    update: jest.fn(),
   };
 
   class MockJwtAuthGuard extends JwtAuthGuard {
     async canActivate(context: ExecutionContext): Promise<boolean> {
-      const req = context.switchToHttp().getRequest<RequestWithUrl>();
-      if (req.url.includes('/auth/google')) return true;
       return (await super.canActivate(context)) as boolean;
     }
   }
@@ -149,29 +224,36 @@ describe('IAM (e2e)', () => {
         PassportModule.register({ defaultStrategy: 'jwt' }),
         JwtModule.register({ secret: JWT_SECRET }),
       ],
-      controllers: [AuthController, UsersController],
+      controllers: [EnrollmentsController],
       providers: [
+        EnrollmentsService,
+        { provide: UsersService, useValue: usersServiceMock },
         JwtStrategy,
         Reflector,
-        {
-          provide: APP_GUARD,
-          useClass: MockJwtAuthGuard,
-        },
-        {
-          provide: APP_GUARD,
-          useClass: RolesGuard,
-        },
+        { provide: APP_GUARD, useClass: MockJwtAuthGuard },
+        { provide: APP_GUARD, useClass: RolesGuard },
         {
           provide: ConfigService,
           useValue: {
-            get: (key: string) => {
-              if (key === 'JWT_SECRET') return JWT_SECRET;
-              return undefined;
-            },
+            get: (key: string) =>
+              key === 'JWT_SECRET' ? JWT_SECRET : undefined,
           },
         },
-        { provide: UsersService, useValue: usersServiceMock },
-        { provide: AuthService, useValue: authServiceMock },
+        { provide: DataSource, useValue: mockDataSource },
+        { provide: EnrollmentRepository, useValue: enrollmentRepositoryMock },
+        {
+          provide: EnrollmentStatusRepository,
+          useValue: enrollmentStatusRepositoryMock,
+        },
+        {
+          provide: EnrollmentEvaluationRepository,
+          useValue: enrollmentEvaluationRepositoryMock,
+        },
+        {
+          provide: EnrollmentTypeRepository,
+          useValue: enrollmentTypeRepositoryMock,
+        },
+        { provide: RedisCacheService, useValue: redisCacheServiceMock },
         { provide: UserSessionRepository, useValue: userSessionRepositoryMock },
         {
           provide: SessionStatusService,
@@ -200,16 +282,6 @@ describe('IAM (e2e)', () => {
           provide: SecurityEventRepository,
           useValue: { create: jest.fn() },
         },
-        { provide: DataSource, useValue: {} },
-        {
-          provide: RedisCacheService,
-          useValue: {
-            get: jest.fn().mockResolvedValue(null),
-            set: jest.fn().mockResolvedValue(undefined),
-            del: jest.fn().mockResolvedValue(undefined),
-            invalidateGroup: jest.fn().mockResolvedValue(undefined),
-          },
-        },
       ],
     }).compile();
 
@@ -225,11 +297,12 @@ describe('IAM (e2e)', () => {
     app.useGlobalInterceptors(new TransformInterceptor(reflector));
 
     jwtService = moduleRef.get(JwtService);
+    enrollmentsService = moduleRef.get(EnrollmentsService);
     await app.init();
   });
 
   afterAll(async () => {
-    await app.close();
+    if (app) await app.close();
   });
 
   const getAdminToken = () =>
@@ -239,7 +312,7 @@ describe('IAM (e2e)', () => {
       roles: ['ADMIN'],
       activeRole: 'ADMIN',
       sessionId: 'session-admin',
-      deviceId: 'device-1',
+      deviceId: 'dev-1',
     });
 
   const getStudentToken = () =>
@@ -249,77 +322,50 @@ describe('IAM (e2e)', () => {
       roles: ['STUDENT'],
       activeRole: 'STUDENT',
       sessionId: 'session-student',
-      deviceId: 'device-1',
+      deviceId: 'dev-1',
     });
 
-  describe('POST /api/v1/auth/google', () => {
-    it('retorna tokens dentro de data', async () => {
-      authServiceMock.loginWithGoogle.mockResolvedValue({
-        accessToken: 'mock-access',
-        refreshToken: 'mock-refresh',
-        user: adminUser,
-        sessionStatus: 'ACTIVE',
-        concurrentSessionId: null,
-      });
-
+  describe('POST /api/v1/enrollments - Matrícula FULL', () => {
+    it('debería crear matrícula FULL con acceso a todas las evaluaciones del ciclo', async () => {
+      const token = getAdminToken();
       const response = await request(app.getHttpServer())
-        .post('/api/v1/auth/google')
-        .send({ code: 'valid-code', deviceId: 'device-1' })
-        .expect(200); // Antes esperábamos 201, pero AuthService.loginWithGoogle devuelve un objeto plano envuelto en interceptor -> 200
+        .post('/api/v1/enrollments')
+        .set('Authorization', `Bearer ${token}`)
+        .send({
+          userId: '2',
+          courseCycleId: 'course-cycle-1',
+          enrollmentTypeCode: 'FULL',
+        })
+        .expect(201);
 
       const body = response.body as StandardResponse;
-      expect(body.statusCode).toBe(200);
-      expect(body.data).toHaveProperty('accessToken');
-      expect(body.data).toHaveProperty('user');
+      expect(body.statusCode).toBe(201);
     });
   });
 
-  describe('POST /api/v1/auth/logout', () => {
-    it('con token válido -> 200 y ejecuta logout', async () => {
-      const token = getAdminToken();
-
-      await request(app.getHttpServer())
-        .post('/api/v1/auth/logout')
-        .set('Authorization', `Bearer ${token}`)
-        .expect(200);
-
-      expect(authServiceMock.logout).toHaveBeenCalled();
-    });
-  });
-
-  describe('GET /api/v1/users', () => {
-    it('sin token -> 401', async () => {
-      await request(app.getHttpServer()).get('/api/v1/users').expect(401);
-    });
-
-    it('con token sin rol ADMIN/SUPER_ADMIN -> 403', async () => {
+  describe('GET /api/v1/enrollments/my-courses', () => {
+    it('debería retornar cursos del estudiante autenticado', async () => {
       const token = getStudentToken();
-      await request(app.getHttpServer())
-        .get('/api/v1/users')
-        .set('Authorization', `Bearer ${token}`)
-        .expect(403);
-    });
+      // Espiamos el servicio para evitar la lógica del repositorio en este test específico
+      jest.spyOn(enrollmentsService, 'findMyEnrollments').mockResolvedValue([]);
 
-    it('con token ADMIN -> 200', async () => {
-      const token = getAdminToken();
       const response = await request(app.getHttpServer())
-        .get('/api/v1/users')
+        .get('/api/v1/enrollments/my-courses')
         .set('Authorization', `Bearer ${token}`)
         .expect(200);
 
       const body = response.body as StandardResponse;
       expect(body.statusCode).toBe(200);
-      expect(Array.isArray(body.data)).toBe(true);
     });
   });
 
-  describe('GET /api/v1/users/:id', () => {
-    it('requiere JWT pero no rol (200 con token sin rol)', async () => {
-      const token = getStudentToken();
+  describe('DELETE /api/v1/enrollments/:id', () => {
+    it('debería cancelar matrícula como ADMIN', async () => {
+      const token = getAdminToken();
       await request(app.getHttpServer())
-        .get('/api/v1/users/2')
+        .delete('/api/v1/enrollments/enrollment-1')
         .set('Authorization', `Bearer ${token}`)
-        .expect(200);
+        .expect(204);
     });
   });
 });

@@ -9,6 +9,9 @@ import { SessionStatusService } from '../src/modules/auth/application/session-st
 import { AuthSettingsService } from '../src/modules/auth/application/auth-settings.service';
 import { GeolocationService } from '../src/modules/auth/application/geolocation.service';
 import { SessionAnomalyDetectorService } from '../src/modules/auth/application/session-anomaly-detector.service';
+import { SessionValidatorService } from '../src/modules/auth/application/session-validator.service';
+import { SessionConflictService } from '../src/modules/auth/application/session-conflict.service';
+import { SessionSecurityService } from '../src/modules/auth/application/session-security.service';
 import { UsersService } from '../src/modules/users/application/users.service';
 import { UserSessionRepository } from '../src/modules/auth/infrastructure/user-session.repository';
 import { SecurityEventRepository } from '../src/modules/auth/infrastructure/security-event.repository';
@@ -30,6 +33,7 @@ describe('Advanced Security Scenarios (Offensive Testing)', () => {
     id: '100',
     email: 'victim@test.com',
     roles: [{ code: 'STUDENT' }],
+    isActive: true,
   };
 
   const mockMetadataBase: RequestMetadata = {
@@ -58,6 +62,8 @@ describe('Advanced Security Scenarios (Offensive Testing)', () => {
     findLatestSessionByUserId: jest.fn(),
     findByRefreshTokenHash: jest.fn(),
     findByRefreshTokenHashForUpdate: jest.fn(),
+    findByRefreshTokenJti: jest.fn(),
+    findByRefreshTokenJtiForUpdate: jest.fn(),
     findById: jest.fn(),
     findByIdWithUser: jest.fn().mockResolvedValue({
       id: '100',
@@ -69,6 +75,7 @@ describe('Advanced Security Scenarios (Offensive Testing)', () => {
     update: jest.fn(),
     deactivateSession: jest.fn(),
     existsByUserIdAndDeviceId: jest.fn().mockResolvedValue(true),
+    findSessionsByUserAndStatus: jest.fn().mockResolvedValue([]),
   };
 
   const mockAnomalyDetector = {
@@ -78,7 +85,10 @@ describe('Advanced Security Scenarios (Offensive Testing)', () => {
         locationSource: meta.latitude && meta.longitude ? 'gps' : 'ip',
       }),
     ),
-    detectLocationAnomaly: jest.fn().mockResolvedValue({ isAnomalous: false }),
+    detectLocationAnomaly: jest.fn().mockResolvedValue({
+      isAnomalous: false,
+      anomalyType: 'NONE',
+    }),
   };
 
   beforeEach(async () => {
@@ -89,6 +99,9 @@ describe('Advanced Security Scenarios (Offensive Testing)', () => {
       providers: [
         AuthService,
         SessionService,
+        SessionValidatorService,
+        SessionConflictService,
+        SessionSecurityService,
         SecurityEventService,
         SessionStatusService,
         AuthSettingsService,
@@ -138,14 +151,26 @@ describe('Advanced Security Scenarios (Offensive Testing)', () => {
         {
           provide: TokenService,
           useValue: {
-            generateRefreshToken: jest
-              .fn()
-              .mockResolvedValue({ token: 'new_rt', expiresAt: new Date() }),
+            generateRefreshToken: jest.fn().mockResolvedValue({
+              token: 'new_rt',
+              refreshTokenJti: 'jti-new-rt',
+              expiresAt: new Date(),
+            }),
             generateAccessToken: jest.fn().mockResolvedValue('new_at'),
             verifyRefreshToken: jest.fn((token: string) => {
               if (token === 'zombie_token')
-                return { sub: '100', deviceId: 'device-zombie' };
-              return { sub: '100', deviceId: 'device-original' };
+                return {
+                  sub: '100',
+                  deviceId: 'device-zombie',
+                  jti: 'jti-zombie',
+                  type: 'refresh',
+                };
+              return {
+                sub: '100',
+                deviceId: 'device-original',
+                jti: 'jti-original',
+                type: 'refresh',
+              };
             }),
           },
         },
@@ -154,7 +179,7 @@ describe('Advanced Security Scenarios (Offensive Testing)', () => {
           useValue: {
             verifyCodeAndGetEmail: jest
               .fn()
-              .mockResolvedValue('victim@test.com'),
+              .mockResolvedValue({ email: 'victim@test.com' }),
           },
         },
       ],
@@ -192,7 +217,7 @@ describe('Advanced Security Scenarios (Offensive Testing)', () => {
     it('should REJECT refresh attempt with a token from a revoked session', async () => {
       const zombieRefreshToken = 'zombie_token';
 
-      mockUserSessionRepository.findByRefreshTokenHash = jest
+      mockUserSessionRepository.findByRefreshTokenJtiForUpdate = jest
         .fn()
         .mockResolvedValue(null);
 

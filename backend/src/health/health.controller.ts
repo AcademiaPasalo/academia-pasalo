@@ -23,13 +23,13 @@ export class HealthController {
         try {
           await this.cacheService.set('health:check', 'ok', 10);
           const result = await this.cacheService.get('health:check');
-          if (result !== 'ok') throw new Error('Redis check failed');
+          if (result !== 'ok')
+            throw new Error('La verificaci�n de Redis fall�');
           return { redis: { status: 'up' } };
         } catch (error) {
           return {
             redis: {
               status: 'down',
-              error: error instanceof Error ? error.message : 'Unknown error',
             },
           };
         }

@@ -7,6 +7,13 @@ import { SecurityEventRepository } from '@modules/auth/infrastructure/security-e
 import { SettingsService } from '@modules/settings/application/settings.service';
 import { AuditService } from '@modules/audit/application/audit.service';
 import { technicalSettings } from '@config/technical-settings';
+import {
+  AUDIT_ACTION_CODES,
+  AUDIT_ENTITY_TYPES,
+  AUDIT_JOB_NAMES,
+  AUDIT_SYSTEM_ACTOR,
+  AUDIT_SYSTEM_SETTING_KEYS,
+} from '@modules/audit/interfaces/audit.constants';
 
 @Processor(QUEUES.AUDIT)
 export class AuditCleanupProcessor extends WorkerHost {
@@ -22,7 +29,7 @@ export class AuditCleanupProcessor extends WorkerHost {
   }
 
   async process(job: Job): Promise<void> {
-    if (job.name === 'cleanup-old-logs') {
+    if (job.name === AUDIT_JOB_NAMES.CLEANUP_OLD_LOGS) {
       await this.handleCleanup(job.name);
     }
   }
@@ -31,13 +38,13 @@ export class AuditCleanupProcessor extends WorkerHost {
     this.logger.log({
       context: AuditCleanupProcessor.name,
       job: jobName,
-      message: 'Iniciando proceso de limpieza de logs de auditoría',
+      message: 'Iniciando proceso de limpieza de logs de auditoria',
     });
 
     let retentionDays: number;
     try {
       const retentionDaysStr = await this.settingsService.getString(
-        'AUDIT_CLEANUP_RETENTION_DAYS',
+        AUDIT_SYSTEM_SETTING_KEYS.CLEANUP_RETENTION_DAYS,
       );
       retentionDays =
         parseInt(retentionDaysStr, 10) ||
@@ -46,11 +53,11 @@ export class AuditCleanupProcessor extends WorkerHost {
       if (retentionDays < technicalSettings.audit.retentionMinSafeDays) {
         this.logger.error({
           context: AuditCleanupProcessor.name,
-          message: `Error de seguridad: Se intentó configurar una retención menor a ${technicalSettings.audit.retentionMinSafeDays} días`,
+          message: `Error de seguridad: Se intento configurar una retencion menor a ${technicalSettings.audit.retentionMinSafeDays} dias`,
           valueReceived: retentionDays,
         });
         throw new InternalServerErrorException(
-          `Error de configuración: El período mínimo de retención es de ${technicalSettings.audit.retentionMinSafeDays} días`,
+          `Error de configuracion: El periodo minimo de retencion es de ${technicalSettings.audit.retentionMinSafeDays} dias`,
         );
       }
     } catch (error) {
@@ -60,7 +67,8 @@ export class AuditCleanupProcessor extends WorkerHost {
         context: AuditCleanupProcessor.name,
         job: jobName,
         message:
-          'No se encontró AUDIT_CLEANUP_RETENTION_DAYS en system_setting, usando valor por defecto',
+          'No se encontro la configuracion de retencion en system_setting, usando valor por defecto',
+        missingKey: AUDIT_SYSTEM_SETTING_KEYS.CLEANUP_RETENTION_DAYS,
         defaultValue: technicalSettings.audit.retentionDefaultDays,
       });
       retentionDays = technicalSettings.audit.retentionDefaultDays;
@@ -86,17 +94,17 @@ export class AuditCleanupProcessor extends WorkerHost {
 
       await this.auditService
         .logAction(
-          '1',
-          'AUDIT_CLEANUP_EXECUTED',
-          'SYSTEM',
-          `Deleted Security: ${totalSecurityDeleted}, Audit: ${totalAuditDeleted}`,
+          AUDIT_SYSTEM_ACTOR.USER_ID,
+          AUDIT_ACTION_CODES.CLEANUP_EXECUTED,
+          AUDIT_ENTITY_TYPES.SYSTEM,
+          `Eliminados seguridad: ${totalSecurityDeleted}, auditoria: ${totalAuditDeleted}`,
         )
         .catch((err: Error) => {
           this.logger.warn({
             context: AuditCleanupProcessor.name,
             job: jobName,
             message:
-              'No se pudo registrar la acción de limpieza en el audit_log',
+              'No se pudo registrar la accion de limpieza en el audit_log',
             error: err.message,
           });
         });
@@ -105,8 +113,8 @@ export class AuditCleanupProcessor extends WorkerHost {
       this.logger.error({
         context: AuditCleanupProcessor.name,
         job: jobName,
-        message: 'Error crítico durante la limpieza de logs de auditoría',
-        error: isError ? error.message : 'Unknown error',
+        message: 'Error critico durante la limpieza de logs de auditoria',
+        error: isError ? error.message : 'Error desconocido',
         stack: isError ? error.stack : undefined,
       });
       throw error;

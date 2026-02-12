@@ -293,7 +293,7 @@ export class MaterialsService {
         return updatedMaterial;
       });
 
-      await this.invalidateFolderCache(materialId);
+      await this.invalidateFolderCache(result.materialFolderId);
       return result;
     } catch (error) {
       if (isNewFile && storagePath) await this.rollbackFile(storagePath);

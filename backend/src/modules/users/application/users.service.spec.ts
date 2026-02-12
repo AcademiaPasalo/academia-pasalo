@@ -4,9 +4,11 @@ import type { EntityManager } from 'typeorm';
 import { DataSource } from 'typeorm';
 
 import { UsersService } from '@modules/users/application/users.service';
+import { IdentitySecurityService } from '@modules/users/application/identity-security.service';
 import { UserRepository } from '@modules/users/infrastructure/user.repository';
 import { RoleRepository } from '@modules/users/infrastructure/role.repository';
 import { PhotoSource } from '@modules/users/domain/user.entity';
+import { IDENTITY_INVALIDATION_REASONS } from '@modules/auth/interfaces/security.constants';
 import type { DatabaseError } from '@common/interfaces/database-error.interface';
 import { MySqlErrorCode } from '@common/interfaces/database-error.interface';
 
@@ -34,6 +36,10 @@ describe('UsersService', () => {
     findAll: jest.fn(),
   };
 
+  const identitySecurityServiceMock = {
+    invalidateUserIdentity: jest.fn(),
+  };
+
   beforeEach(async () => {
     jest.clearAllMocks();
 
@@ -43,6 +49,10 @@ describe('UsersService', () => {
         { provide: DataSource, useValue: dataSourceMock },
         { provide: UserRepository, useValue: userRepositoryMock },
         { provide: RoleRepository, useValue: roleRepositoryMock },
+        {
+          provide: IdentitySecurityService,
+          useValue: identitySecurityServiceMock,
+        },
       ],
     }).compile();
 
@@ -60,6 +70,7 @@ describe('UsersService', () => {
       career: null,
       profilePhotoUrl: null,
       photoSource: PhotoSource.NONE,
+      isActive: true,
       createdAt: new Date(),
       updatedAt: null,
       roles: [],
@@ -79,6 +90,190 @@ describe('UsersService', () => {
 
     await expect(usersService.assignRole('1', 'ADMIN')).rejects.toBeInstanceOf(
       ConflictException,
+    );
+  });
+
+  it('assignRole: éxito invalida identidad por cambio de rol', async () => {
+    const user = {
+      id: '1',
+      email: 'a@test.com',
+      firstName: 'A',
+      lastName1: null,
+      lastName2: null,
+      phone: null,
+      career: null,
+      profilePhotoUrl: null,
+      photoSource: PhotoSource.NONE,
+      isActive: true,
+      createdAt: new Date(),
+      updatedAt: null,
+      roles: [],
+    };
+    const role = { id: '2', code: 'ADMIN', name: 'Admin' };
+
+    userRepositoryMock.findById.mockResolvedValue(user);
+    roleRepositoryMock.findByCode.mockResolvedValue(role);
+    userRepositoryMock.save.mockResolvedValue({
+      ...user,
+      roles: [role],
+    });
+
+    await usersService.assignRole('1', 'ADMIN');
+
+    expect(
+      identitySecurityServiceMock.invalidateUserIdentity,
+    ).toHaveBeenCalledWith(
+      '1',
+      expect.objectContaining({
+        revokeSessions: false,
+        reason: IDENTITY_INVALIDATION_REASONS.ROLE_CHANGE,
+      }),
+    );
+  });
+
+  it('update: cambio de email invalida identidad sin revocar sesiones', async () => {
+    const existing = {
+      id: '1',
+      email: 'old@test.com',
+      firstName: 'A',
+      lastName1: null,
+      lastName2: null,
+      phone: null,
+      career: null,
+      profilePhotoUrl: null,
+      photoSource: PhotoSource.NONE,
+      isActive: true,
+      createdAt: new Date(),
+      updatedAt: null,
+      roles: [],
+    };
+
+    userRepositoryMock.findById.mockResolvedValue(existing);
+    userRepositoryMock.findByEmail.mockResolvedValue(null);
+    userRepositoryMock.save.mockResolvedValue({
+      ...existing,
+      email: 'new@test.com',
+    });
+
+    await usersService.update('1', { email: 'new@test.com' });
+
+    expect(
+      identitySecurityServiceMock.invalidateUserIdentity,
+    ).toHaveBeenCalledWith(
+      '1',
+      expect.objectContaining({
+        revokeSessions: false,
+        reason: IDENTITY_INVALIDATION_REASONS.SENSITIVE_UPDATE,
+      }),
+    );
+  });
+
+  it('update: baneo revoca sesiones e invalida identidad', async () => {
+    const existing = {
+      id: '1',
+      email: 'user@test.com',
+      firstName: 'A',
+      lastName1: null,
+      lastName2: null,
+      phone: null,
+      career: null,
+      profilePhotoUrl: null,
+      photoSource: PhotoSource.NONE,
+      isActive: true,
+      createdAt: new Date(),
+      updatedAt: null,
+      roles: [],
+    };
+
+    userRepositoryMock.findById.mockResolvedValue(existing);
+    userRepositoryMock.save.mockResolvedValue({
+      ...existing,
+      isActive: false,
+    });
+
+    await usersService.update('1', { isActive: false });
+
+    expect(
+      identitySecurityServiceMock.invalidateUserIdentity,
+    ).toHaveBeenCalledWith(
+      '1',
+      expect.objectContaining({
+        revokeSessions: true,
+        reason: IDENTITY_INVALIDATION_REASONS.USER_BANNED,
+      }),
+    );
+  });
+
+  it('update: desbaneo invalida identidad sin revocar sesiones antiguas', async () => {
+    const existing = {
+      id: '1',
+      email: 'user@test.com',
+      firstName: 'A',
+      lastName1: null,
+      lastName2: null,
+      phone: null,
+      career: null,
+      profilePhotoUrl: null,
+      photoSource: PhotoSource.NONE,
+      isActive: false,
+      createdAt: new Date(),
+      updatedAt: null,
+      roles: [],
+    };
+
+    userRepositoryMock.findById.mockResolvedValue(existing);
+    userRepositoryMock.save.mockResolvedValue({
+      ...existing,
+      isActive: true,
+    });
+
+    await usersService.update('1', { isActive: true });
+
+    expect(
+      identitySecurityServiceMock.invalidateUserIdentity,
+    ).toHaveBeenCalledWith(
+      '1',
+      expect.objectContaining({
+        revokeSessions: false,
+        reason: IDENTITY_INVALIDATION_REASONS.SENSITIVE_UPDATE,
+      }),
+    );
+  });
+
+  it('removeRole: éxito invalida identidad por cambio de rol', async () => {
+    const role = { id: '2', code: 'ADMIN', name: 'Admin' };
+    const user = {
+      id: '1',
+      email: 'a@test.com',
+      firstName: 'A',
+      lastName1: null,
+      lastName2: null,
+      phone: null,
+      career: null,
+      profilePhotoUrl: null,
+      photoSource: PhotoSource.NONE,
+      isActive: true,
+      createdAt: new Date(),
+      updatedAt: null,
+      roles: [role],
+    };
+
+    userRepositoryMock.findById.mockResolvedValue(user);
+    userRepositoryMock.save.mockResolvedValue({
+      ...user,
+      roles: [],
+    });
+
+    await usersService.removeRole('1', 'ADMIN');
+
+    expect(
+      identitySecurityServiceMock.invalidateUserIdentity,
+    ).toHaveBeenCalledWith(
+      '1',
+      expect.objectContaining({
+        revokeSessions: false,
+        reason: IDENTITY_INVALIDATION_REASONS.ROLE_CHANGE,
+      }),
     );
   });
 });

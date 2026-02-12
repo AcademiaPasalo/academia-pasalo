@@ -34,7 +34,9 @@ export class GoogleProviderService {
     );
   }
 
-  async verifyCodeAndGetEmail(code: string): Promise<string> {
+  async verifyCodeAndGetEmail(
+    code: string,
+  ): Promise<{ email: string; picture?: string }> {
     try {
       const { tokens } = await this.googleClient.getToken(code);
       this.googleClient.setCredentials(tokens);
@@ -52,7 +54,10 @@ export class GoogleProviderService {
         );
       }
 
-      return payload.email;
+      return {
+        email: payload.email,
+        picture: payload.picture,
+      };
     } catch (error) {
       this.logger.error({
         level: 'error',

@@ -13,6 +13,9 @@ import { SecurityEventService } from './application/security-event.service';
 import { AuthSettingsService } from './application/auth-settings.service';
 import { GeolocationService } from './application/geolocation.service';
 import { SessionAnomalyDetectorService } from './application/session-anomaly-detector.service';
+import { SessionValidatorService } from './application/session-validator.service';
+import { SessionConflictService } from './application/session-conflict.service';
+import { SessionSecurityService } from './application/session-security.service';
 import { JwtStrategy } from './strategies/jwt.strategy';
 import { User } from '@modules/users/domain/user.entity';
 import { UserSession } from './domain/user-session.entity';
@@ -64,6 +67,9 @@ import { technicalSettings } from '@config/technical-settings';
     AuthSettingsService,
     GeolocationService,
     SessionAnomalyDetectorService,
+    SessionValidatorService,
+    SessionConflictService,
+    SessionSecurityService,
     JwtStrategy,
     UserSessionRepository,
     SecurityEventRepository,
@@ -77,6 +83,9 @@ import { technicalSettings } from '@config/technical-settings';
     SessionStatusRepository,
     SecurityEventService,
     SecurityEventRepository,
+    SessionValidatorService,
+    SessionConflictService,
+    SessionSecurityService,
   ],
 })
 export class AuthModule {}

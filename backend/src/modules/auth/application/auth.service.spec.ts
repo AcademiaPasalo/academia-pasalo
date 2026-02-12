@@ -1,4 +1,4 @@
-import { UnauthorizedException } from '@nestjs/common';
+import { ForbiddenException, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtModule, JwtService } from '@nestjs/jwt';
 import { Test } from '@nestjs/testing';
@@ -8,9 +8,15 @@ import { AuthSettingsService } from '@modules/auth/application/auth-settings.ser
 import { SecurityEventService } from '@modules/auth/application/security-event.service';
 import { SessionService } from '@modules/auth/application/session.service';
 import { SessionStatusService } from '@modules/auth/application/session-status.service';
+import { SessionValidatorService } from '@modules/auth/application/session-validator.service';
 import { GoogleProviderService } from '@modules/auth/application/google-provider.service';
 import { TokenService } from '@modules/auth/application/token.service';
 import { RequestMetadata } from '@modules/auth/interfaces/request-metadata.interface';
+import {
+  IDENTITY_DENY_REASONS,
+  IDENTITY_SOURCE_FLOWS,
+  SECURITY_EVENT_CODES,
+} from '@modules/auth/interfaces/security.constants';
 import { UsersService } from '@modules/users/application/users.service';
 import { PhotoSource, User } from '@modules/users/domain/user.entity';
 import { RedisCacheService } from '@infrastructure/cache/redis-cache.service';
@@ -59,17 +65,24 @@ describe('AuthService', () => {
   const usersServiceMock = {
     findByEmail: jest.fn(),
     findOne: jest.fn(),
+    update: jest.fn(),
   };
 
   const sessionServiceMock = {
     createSession: jest.fn(),
-    validateRefreshTokenSession: jest.fn(),
     rotateRefreshToken: jest.fn(),
     findSessionByRefreshToken: jest.fn(),
     findSessionByRefreshTokenForUpdate: jest.fn(),
     resolveConcurrentSession: jest.fn(),
     activateBlockedSession: jest.fn(),
     deactivateSession: jest.fn(),
+  };
+
+  const sessionValidatorServiceMock = {
+    validateRefreshTokenSession: jest.fn(),
+    validateSession: jest.fn(),
+    hashRefreshToken: jest.fn((t) => t),
+    findSessionByRefreshToken: jest.fn(),
   };
 
   const securityEventServiceMock = {
@@ -101,6 +114,7 @@ describe('AuthService', () => {
     career: null as string | null,
     profilePhotoUrl: null as string | null,
     photoSource: PhotoSource.NONE,
+    isActive: true,
     createdAt: new Date('2026-01-01T00:00:00.000Z'),
     updatedAt: null as Date | null,
     roles: [{ id: '1', code: 'STUDENT', name: 'Student' }],
@@ -129,6 +143,10 @@ describe('AuthService', () => {
         { provide: DataSource, useValue: dataSourceMock },
         { provide: UsersService, useValue: usersServiceMock },
         { provide: SessionService, useValue: sessionServiceMock },
+        {
+          provide: SessionValidatorService,
+          useValue: sessionValidatorServiceMock,
+        },
         { provide: SecurityEventService, useValue: securityEventServiceMock },
         { provide: SessionStatusService, useValue: sessionStatusServiceMock },
         { provide: AuthSettingsService, useValue: authSettingsServiceMock },
@@ -144,7 +162,12 @@ describe('AuthService', () => {
     tokenServiceMock.verifyRefreshToken.mockImplementation((token: string) => {
       try {
         const payload = jwtService.verify(token);
-        if (payload.type !== 'refresh' || !payload.sub || !payload.deviceId) {
+        if (
+          payload.type !== 'refresh' ||
+          !payload.sub ||
+          !payload.deviceId ||
+          !payload.jti
+        ) {
           throw new UnauthorizedException('Refresh token inválido');
         }
         return payload;
@@ -165,10 +188,12 @@ describe('AuthService', () => {
           sub: userId,
           deviceId,
           type: 'refresh',
+          jti: 'jti-mock',
           iat: Date.now(),
         });
         return Promise.resolve({
           token,
+          refreshTokenJti: 'jti-mock',
           expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
         });
       },
@@ -176,9 +201,11 @@ describe('AuthService', () => {
   });
 
   it('loginWithGoogle: éxito -> retorna tokens', async () => {
-    googleProviderServiceMock.verifyCodeAndGetEmail.mockResolvedValue(
-      baseUser.email,
-    );
+    googleProviderServiceMock.verifyCodeAndGetEmail.mockResolvedValue({
+      email: baseUser.email,
+      picture: 'https://example.com/photo.jpg',
+    });
+    usersServiceMock.update.mockResolvedValue(baseUser);
     usersServiceMock.findByEmail.mockResolvedValue(baseUser);
     sessionServiceMock.createSession.mockResolvedValue({
       session: { id: '777' },
@@ -202,7 +229,8 @@ describe('AuthService', () => {
     expect(createSessionArgs[0]).toBe(baseUser.id);
     expect(createSessionArgs[1]).toEqual(metadata);
     expect(typeof createSessionArgs[2]).toBe('string');
-    expect(createSessionArgs[3]).toBeInstanceOf(Date);
+    expect(typeof createSessionArgs[3]).toBe('string');
+    expect(createSessionArgs[4]).toBeInstanceOf(Date);
 
     expect(securityEventServiceMock.logEvent).not.toHaveBeenCalled();
 
@@ -219,9 +247,9 @@ describe('AuthService', () => {
   });
 
   it('loginWithGoogle: correo no registrado -> 401', async () => {
-    googleProviderServiceMock.verifyCodeAndGetEmail.mockResolvedValue(
-      'nope@test.com',
-    );
+    googleProviderServiceMock.verifyCodeAndGetEmail.mockResolvedValue({
+      email: 'nope@test.com',
+    });
     usersServiceMock.findByEmail.mockResolvedValue(null);
 
     await expect(
@@ -230,6 +258,30 @@ describe('AuthService', () => {
 
     expect(sessionServiceMock.createSession).not.toHaveBeenCalled();
     expect(securityEventServiceMock.logEvent).not.toHaveBeenCalled();
+  });
+
+  it('loginWithGoogle: usuario inactivo -> 403', async () => {
+    googleProviderServiceMock.verifyCodeAndGetEmail.mockResolvedValue({
+      email: baseUser.email,
+    });
+    usersServiceMock.findByEmail.mockResolvedValue({
+      ...baseUser,
+      isActive: false,
+    });
+
+    await expect(
+      authService.loginWithGoogle('google-auth-code', metadata),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+
+    expect(sessionServiceMock.createSession).not.toHaveBeenCalled();
+    expect(securityEventServiceMock.logEvent).toHaveBeenCalledWith(
+      baseUser.id,
+      SECURITY_EVENT_CODES.ACCESS_DENIED,
+      expect.objectContaining({
+        reason: IDENTITY_DENY_REASONS.INACTIVE_ACCOUNT,
+        sourceFlow: IDENTITY_SOURCE_FLOWS.LOGIN_GOOGLE,
+      }),
+    );
   });
 
   it('loginWithGoogle: token inválido/verificación falla -> 401', async () => {
@@ -247,6 +299,7 @@ describe('AuthService', () => {
       sub: baseUser.id,
       deviceId: 'device-a',
       type: 'refresh',
+      jti: 'jti-mock',
     });
 
     await expect(
@@ -254,7 +307,7 @@ describe('AuthService', () => {
     ).rejects.toBeInstanceOf(UnauthorizedException);
 
     expect(
-      sessionServiceMock.validateRefreshTokenSession,
+      sessionServiceMock.findSessionByRefreshTokenForUpdate,
     ).not.toHaveBeenCalled();
   });
 
@@ -263,10 +316,18 @@ describe('AuthService', () => {
       sub: baseUser.id,
       deviceId: metadata.deviceId,
       type: 'refresh',
+      jti: 'jti-mock',
     });
 
-    sessionServiceMock.validateRefreshTokenSession.mockResolvedValue({
+    sessionStatusServiceMock.getIdByCode.mockResolvedValue('active-status-id');
+    sessionServiceMock.findSessionByRefreshTokenForUpdate.mockResolvedValue({
       id: '123',
+      userId: baseUser.id,
+      deviceId: metadata.deviceId,
+      isActive: true,
+      sessionStatusId: 'active-status-id',
+      expiresAt: new Date(Date.now() + 60_000),
+      activeRoleId: baseUser.roles[0].id,
     });
     sessionServiceMock.rotateRefreshToken.mockResolvedValue({ id: '123' });
     usersServiceMock.findOne.mockResolvedValue(baseUser);
@@ -295,6 +356,34 @@ describe('AuthService', () => {
     expect(decodedAccess.sessionId).toBe('123');
   });
 
+  it('refreshAccessToken: usuario inactivo -> 403', async () => {
+    const refreshToken = jwtService.sign({
+      sub: baseUser.id,
+      deviceId: metadata.deviceId,
+      type: 'refresh',
+      jti: 'jti-mock',
+    });
+
+    usersServiceMock.findOne.mockResolvedValue({
+      ...baseUser,
+      isActive: false,
+    });
+
+    await expect(
+      authService.refreshAccessToken(refreshToken, metadata.deviceId),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+
+    expect(sessionServiceMock.rotateRefreshToken).not.toHaveBeenCalled();
+    expect(securityEventServiceMock.logEvent).toHaveBeenCalledWith(
+      baseUser.id,
+      SECURITY_EVENT_CODES.ACCESS_DENIED,
+      expect.objectContaining({
+        reason: IDENTITY_DENY_REASONS.INACTIVE_ACCOUNT,
+        sourceFlow: IDENTITY_SOURCE_FLOWS.REFRESH_TOKEN,
+      }),
+    );
+  });
+
   it('refreshAccessToken: refresh token inválido -> 401', async () => {
     await expect(
       authService.refreshAccessToken('not-a-jwt', metadata.deviceId),
@@ -318,6 +407,7 @@ describe('AuthService', () => {
       sub: baseUser.id,
       deviceId: metadata.deviceId,
       type: 'refresh',
+      jti: 'jti-mock',
     });
 
     sessionServiceMock.resolveConcurrentSession.mockResolvedValue({
@@ -334,11 +424,95 @@ describe('AuthService', () => {
     expect(result.keptSessionId).toBeNull();
   });
 
+  it('resolveConcurrentSession: usuario inactivo -> 403', async () => {
+    const refreshToken = jwtService.sign({
+      sub: baseUser.id,
+      deviceId: metadata.deviceId,
+      type: 'refresh',
+      jti: 'jti-mock',
+    });
+
+    sessionServiceMock.resolveConcurrentSession.mockResolvedValue({
+      keptSessionId: '555',
+    });
+    usersServiceMock.findOne.mockResolvedValue({
+      ...baseUser,
+      isActive: false,
+    });
+
+    await expect(
+      authService.resolveConcurrentSession(
+        refreshToken,
+        metadata.deviceId,
+        'KEEP_NEW',
+        metadata,
+      ),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+
+    expect(sessionValidatorServiceMock.validateSession).not.toHaveBeenCalled();
+    expect(securityEventServiceMock.logEvent).toHaveBeenCalledWith(
+      baseUser.id,
+      SECURITY_EVENT_CODES.ACCESS_DENIED,
+      expect.objectContaining({
+        reason: IDENTITY_DENY_REASONS.INACTIVE_ACCOUNT,
+        sourceFlow: IDENTITY_SOURCE_FLOWS.CONCURRENT_RESOLUTION,
+      }),
+    );
+  });
+
+  it('reauthAnomalousSession: usuario inactivo -> 403', async () => {
+    const refreshToken = jwtService.sign({
+      sub: baseUser.id,
+      deviceId: metadata.deviceId,
+      type: 'refresh',
+      jti: 'jti-mock',
+    });
+
+    const blockedSession = {
+      id: '555',
+      userId: baseUser.id,
+      deviceId: metadata.deviceId,
+      sessionStatusId: '9',
+    } as unknown as UserSession;
+
+    sessionServiceMock.findSessionByRefreshToken.mockResolvedValue(
+      blockedSession,
+    );
+    sessionStatusServiceMock.getIdByCode.mockResolvedValue('9');
+    usersServiceMock.findOne.mockResolvedValue({
+      ...baseUser,
+      isActive: false,
+    });
+
+    await expect(
+      authService.reauthAnomalousSession(
+        'google-auth-code',
+        refreshToken,
+        metadata.deviceId,
+        metadata,
+      ),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+
+    expect(
+      googleProviderServiceMock.verifyCodeAndGetEmail,
+    ).not.toHaveBeenCalled();
+    expect(sessionServiceMock.activateBlockedSession).not.toHaveBeenCalled();
+    expect(securityEventServiceMock.logEvent).toHaveBeenCalledWith(
+      baseUser.id,
+      SECURITY_EVENT_CODES.ACCESS_DENIED,
+      expect.objectContaining({
+        reason: IDENTITY_DENY_REASONS.INACTIVE_ACCOUNT,
+        sourceFlow: IDENTITY_SOURCE_FLOWS.ANOMALOUS_REAUTH,
+      }),
+    );
+  });
+
   it('reauthAnomalousSession: éxito -> activa sesión y retorna tokens', async () => {
     const refreshToken = jwtService.sign({
       sub: baseUser.id,
       deviceId: metadata.deviceId,
       type: 'refresh',
+      jti: 'jti-mock',
     });
 
     const blockedSession = {
@@ -356,10 +530,11 @@ describe('AuthService', () => {
     );
 
     sessionStatusServiceMock.getIdByCode.mockResolvedValue('9');
-    googleProviderServiceMock.verifyCodeAndGetEmail.mockResolvedValue(
-      baseUser.email,
-    );
+    googleProviderServiceMock.verifyCodeAndGetEmail.mockResolvedValue({
+      email: baseUser.email,
+    });
 
+    usersServiceMock.findOne.mockResolvedValue(baseUser);
     usersServiceMock.findByEmail.mockResolvedValue(baseUser);
     sessionServiceMock.activateBlockedSession.mockResolvedValue(undefined);
     sessionServiceMock.rotateRefreshToken.mockResolvedValue({ id: '555' });
@@ -383,7 +558,18 @@ describe('AuthService', () => {
     const rotateArgs = sessionServiceMock.rotateRefreshToken.mock.calls[0];
     expect(rotateArgs[0]).toBe('555');
     expect(typeof rotateArgs[1]).toBe('string');
-    expect(rotateArgs[2]).toBeInstanceOf(Date);
-    expect(rotateArgs[3]).toEqual(expect.anything());
+    expect(typeof rotateArgs[2]).toBe('string');
+    expect(rotateArgs[3]).toBeInstanceOf(Date);
+    expect(rotateArgs[4]).toEqual(expect.anything());
+  });
+
+  it('switchProfile: intento de escalada de privilegios (rol no poseído) -> 401', async () => {
+    usersServiceMock.findOne.mockResolvedValue(baseUser);
+
+    await expect(
+      authService.switchProfile('10', '777', '999', metadata), // 999 no es un rol de baseUser
+    ).rejects.toBeInstanceOf(UnauthorizedException);
+
+    expect(sessionServiceMock.rotateRefreshToken).not.toHaveBeenCalled();
   });
 });

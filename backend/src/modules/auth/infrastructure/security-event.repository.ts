@@ -77,6 +77,20 @@ export class SecurityEventRepository {
     return await query.orderBy('e.eventDatetime', 'DESC').take(limit).getMany();
   }
 
+  async countByUserIdAndTypeCode(
+    userId: string,
+    eventTypeCode: string,
+    manager?: EntityManager,
+  ): Promise<number> {
+    const repo = this.getRepository(manager);
+    return await repo
+      .createQueryBuilder('e')
+      .innerJoin('e.securityEventType', 'et')
+      .where('e.userId = :userId', { userId })
+      .andWhere('et.code = :eventTypeCode', { eventTypeCode })
+      .getCount();
+  }
+
   async deleteOlderThan(
     date: Date,
     batchSize = technicalSettings.audit.cleanupBatchSize,

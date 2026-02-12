@@ -85,7 +85,30 @@ export class UsersController {
       );
     }
 
-    const user = await this.usersService.update(id, updateUserDto);
+    let finalUpdateDto = updateUserDto;
+
+    if (!isAdmin) {
+      finalUpdateDto = plainToInstance(UpdateUserDto, {
+        profilePhotoUrl: updateUserDto.profilePhotoUrl,
+        photoSource: updateUserDto.photoSource,
+      });
+    }
+
+    const user = await this.usersService.update(id, finalUpdateDto);
+    return plainToInstance(UserResponseDto, user, {
+      excludeExtraneousValues: true,
+    });
+  }
+
+  @Patch(':id/ban')
+  @Roles('ADMIN', 'SUPER_ADMIN')
+  @ResponseMessage('Usuario baneado exitosamente')
+  async banUser(@Param('id') id: string, @CurrentUser() currentUser: User) {
+    if (currentUser.id === id) {
+      throw new ForbiddenException('No puedes banear tu propia cuenta');
+    }
+
+    const user = await this.usersService.update(id, { isActive: false });
     return plainToInstance(UserResponseDto, user, {
       excludeExtraneousValues: true,
     });

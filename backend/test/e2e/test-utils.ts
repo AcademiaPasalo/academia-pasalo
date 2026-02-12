@@ -251,13 +251,15 @@ export class TestSeeder {
         statusRepo.create({ code: 'ACTIVE', name: 'Active' }),
       )) as BasicEntity;
 
+    const deviceId = 'device-' + Date.now();
     const sessionRepo = this.dataSource.getRepository('UserSession');
     const session = (await sessionRepo.save(
       sessionRepo.create({
         userId: user.id,
-        deviceId: 'device-' + Date.now(),
+        deviceId,
         ipAddress: '127.0.0.1',
         refreshTokenHash: 'hash-' + Date.now(),
+        refreshTokenJti: 'jti-' + Date.now(),
         sessionStatusId: activeStatus.id,
         isActive: true,
         expiresAt: new Date(Date.now() + 1000 * 60 * 60),
@@ -275,6 +277,7 @@ export class TestSeeder {
       roles: roles,
       activeRole: roles[0],
       sessionId: session.id,
+      deviceId,
     };
 
     const token = this.jwtService.sign(payload);

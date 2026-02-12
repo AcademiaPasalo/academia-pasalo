@@ -1,16 +1,16 @@
 import {
   Injectable,
   UnauthorizedException,
+  ForbiddenException,
   InternalServerErrorException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
 import { JwtPayload } from '@modules/auth/interfaces/jwt-payload.interface';
-import { UsersService } from '@modules/users/application/users.service';
 import { User } from '@modules/users/domain/user.entity';
-import { UserSessionRepository } from '@modules/auth/infrastructure/user-session.repository';
-import { SessionStatusService } from '@modules/auth/application/session-status.service';
+import { SessionValidatorService } from '@modules/auth/application/session-validator.service';
+import { SECURITY_MESSAGES } from '@modules/auth/interfaces/security.constants';
 import { RedisCacheService } from '@infrastructure/cache/redis-cache.service';
 import { technicalSettings } from '@config/technical-settings';
 
@@ -20,9 +20,7 @@ export type UserWithSession = User & { sessionId: string; activeRole: string };
 export class JwtStrategy extends PassportStrategy(Strategy) {
   constructor(
     private readonly configService: ConfigService,
-    private readonly usersService: UsersService,
-    private readonly userSessionRepository: UserSessionRepository,
-    private readonly sessionStatusService: SessionStatusService,
+    private readonly sessionValidatorService: SessionValidatorService,
     private readonly cacheService: RedisCacheService,
   ) {
     const secret = configService.get<string>('JWT_SECRET');
@@ -39,35 +37,32 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
 
   async validate(payload: JwtPayload): Promise<UserWithSession> {
     const cacheKey = `cache:session:${payload.sessionId}:user`;
-    const cachedUser = await this.cacheService.get<UserWithSession>(cacheKey);
-
-    if (cachedUser) {
-      return cachedUser;
-    }
-
-    const activeStatusId =
-      await this.sessionStatusService.getIdByCode('ACTIVE');
-
-    const session = await this.userSessionRepository.findByIdWithUser(
+    const session = await this.sessionValidatorService.validateSession(
       payload.sessionId,
+      payload.sub,
+      payload.deviceId,
     );
 
-    if (
-      !session ||
-      !session.isActive ||
-      session.sessionStatusId !== activeStatusId ||
-      session.expiresAt < new Date()
-    ) {
-      throw new UnauthorizedException('Sesión inválida o expirada');
+    if (!session.user) {
+      await this.cacheService.del(cacheKey);
+      throw new UnauthorizedException('Usuario no encontrado');
     }
 
-    if (!session.user) {
-      throw new UnauthorizedException('Usuario no encontrado');
+    if (!session.user.isActive) {
+      await this.cacheService.del(cacheKey);
+      throw new ForbiddenException(SECURITY_MESSAGES.INACTIVE_ACCOUNT);
     }
 
     const userWithSession = session.user as UserWithSession;
     userWithSession.sessionId = payload.sessionId;
     userWithSession.activeRole = payload.activeRole;
+
+    const cachedUser = await this.cacheService.get<UserWithSession>(cacheKey);
+    if (cachedUser && cachedUser.id === userWithSession.id) {
+      cachedUser.sessionId = payload.sessionId;
+      cachedUser.activeRole = payload.activeRole;
+      return cachedUser;
+    }
 
     await this.cacheService.set(
       cacheKey,

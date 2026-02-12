@@ -178,7 +178,6 @@ export class EnrollmentsService {
       const courseCycleIdsToFetch: string[] = [dto.courseCycleId];
 
       if (
-        type.code === 'FULL' &&
         dto.historicalCourseCycleIds &&
         dto.historicalCourseCycleIds.length > 0
       ) {
@@ -207,6 +206,9 @@ export class EnrollmentsService {
       });
 
       if (allEvaluations.length > 0) {
+        const currentCycleEvaluations = allEvaluations.filter(
+          (e) => e.courseCycleId === dto.courseCycleId,
+        );
         let evaluationsToGrant: Evaluation[] = [];
         let bankAccessLimitDate: Date | null = null;
 
@@ -246,6 +248,8 @@ export class EnrollmentsService {
         const accessEntries = evaluationsToGrant.map((evaluation) => {
           let accessEnd = new Date(evaluation.endDate);
 
+          const isHistorical = evaluation.courseCycleId !== dto.courseCycleId;
+
           if (
             evaluation.evaluationType.code === 'BANCO_ENUNCIADOS' &&
             bankAccessLimitDate
@@ -254,6 +258,20 @@ export class EnrollmentsService {
           } else if (type.code === 'FULL') {
             const cycleEnd = new Date(courseCycle.academicCycle.endDate);
             accessEnd = accessEnd > cycleEnd ? accessEnd : cycleEnd;
+          } else if (isHistorical) {
+            const simil = currentCycleEvaluations.find(
+              (c) =>
+                String(c.evaluationTypeId) ===
+                  String(evaluation.evaluationTypeId) &&
+                c.number === evaluation.number,
+            );
+
+            if (simil) {
+              accessEnd = new Date(simil.endDate);
+            } else {
+              const cycleEnd = new Date(courseCycle.academicCycle.endDate);
+              accessEnd = accessEnd > cycleEnd ? accessEnd : cycleEnd;
+            }
           }
 
           return {

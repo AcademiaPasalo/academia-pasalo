@@ -139,13 +139,13 @@ INSERT INTO enrollment (user_id, course_cycle_id, enrollment_status_id, enrollme
 SET @t_pc = (SELECT id FROM evaluation_type WHERE code = 'PC' LIMIT 1);
 SET @t_ex = (SELECT id FROM evaluation_type WHERE code = 'EX' LIMIT 1);
 
--- Fechas (YYYY-MM-DD HH:MM:SS) - Gap de aprox 3 días entre evaluaciones
-SET @d1_s = '2026-01-16 08:00:00'; SET @d1_e = '2026-01-20 23:59:59'; -- PC1
-SET @d2_s = '2026-01-23 08:00:00'; SET @d2_e = '2026-01-27 23:59:59'; -- PC2
-SET @d3_s = '2026-01-30 08:00:00'; SET @d3_e = '2026-02-03 23:59:59'; -- EX1
-SET @d4_s = '2026-02-06 08:00:00'; SET @d4_e = '2026-02-10 23:59:59'; -- PC3
-SET @d5_s = '2026-02-13 08:00:00'; SET @d5_e = '2026-02-17 23:59:59'; -- PC4
-SET @d6_s = '2026-02-20 08:00:00'; SET @d6_e = '2026-02-24 23:59:59'; -- EX2
+-- Fechas (YYYY-MM-DD HH:MM:SS) - Ajustadas a UTC (+5h) para que en Perú (GMT-5) se vean a las 08:00 AM y 23:59 PM
+SET @d1_s = '2026-01-16 13:00:00'; SET @d1_e = '2026-01-21 04:59:59'; -- PC1
+SET @d2_s = '2026-01-23 13:00:00'; SET @d2_e = '2026-01-28 04:59:59'; -- PC2
+SET @d3_s = '2026-01-30 13:00:00'; SET @d3_e = '2026-02-04 04:59:59'; -- EX1
+SET @d4_s = '2026-02-06 13:00:00'; SET @d4_e = '2026-02-11 04:59:59'; -- PC3
+SET @d5_s = '2026-02-13 13:00:00'; SET @d5_e = '2026-02-18 04:59:59'; -- PC4
+SET @d6_s = '2026-02-20 13:00:00'; SET @d6_e = '2026-02-25 04:59:59'; -- EX2
 
 INSERT INTO evaluation (course_cycle_id, evaluation_type_id, number, start_date, end_date) VALUES
 -- Álgebra

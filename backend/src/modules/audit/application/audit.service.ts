@@ -15,6 +15,7 @@ import { UnifiedAuditHistoryDto } from '@modules/audit/dto/unified-audit-history
 import { QUEUES } from '@infrastructure/queue/queue.constants';
 import { JobScheduler } from '@infrastructure/queue/queue.interfaces';
 import { technicalSettings } from '@config/technical-settings';
+import { AUDIT_JOB_NAMES } from '@modules/audit/interfaces/audit.constants';
 import type { EntityManager } from 'typeorm';
 
 @Injectable()
@@ -34,7 +35,7 @@ export class AuditService implements OnApplicationBootstrap {
   }
 
   private async setupRepeatableJobs() {
-    const jobName = 'cleanup-old-logs';
+    const jobName = AUDIT_JOB_NAMES.CLEANUP_OLD_LOGS;
     const cronPattern = technicalSettings.audit.cleanupCronPattern;
 
     const schedulers =
