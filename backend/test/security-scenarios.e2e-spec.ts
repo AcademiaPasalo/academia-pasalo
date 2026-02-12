@@ -1,5 +1,9 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { INestApplication, UnauthorizedException } from '@nestjs/common';
+import {
+  ForbiddenException,
+  INestApplication,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtModule, JwtService } from '@nestjs/jwt';
 import { DataSource, EntityManager } from 'typeorm';
@@ -25,11 +29,17 @@ import { JwtStrategy } from '../src/modules/auth/strategies/jwt.strategy';
 import { RedisCacheService } from '../src/infrastructure/cache/redis-cache.service';
 import { TokenService } from '../src/modules/auth/application/token.service';
 import { GoogleProviderService } from '../src/modules/auth/application/google-provider.service';
+import {
+  IDENTITY_DENY_REASONS,
+  IDENTITY_SOURCE_FLOWS,
+  SECURITY_EVENT_CODES,
+} from '../src/modules/auth/interfaces/security.constants';
 
 describe('Security Scenarios (Integration)', () => {
   let app: INestApplication;
   let authService: AuthService;
   let jwtService: JwtService;
+  let tokenService: TokenService;
   let securityEventService: SecurityEventService;
   let sessionValidatorService: SessionValidatorService;
 
@@ -37,6 +47,7 @@ describe('Security Scenarios (Integration)', () => {
     id: '1',
     email: 'hacker@test.com',
     roles: [{ code: 'STUDENT' }],
+    isActive: true,
   };
 
   const mockMetadata: RequestMetadata = {
@@ -198,6 +209,7 @@ describe('Security Scenarios (Integration)', () => {
     sessionValidatorService = moduleFixture.get<SessionValidatorService>(
       SessionValidatorService,
     );
+    tokenService = moduleFixture.get<TokenService>(TokenService);
 
     jest.spyOn(securityEventService, 'logEvent');
   });
@@ -271,7 +283,6 @@ describe('Security Scenarios (Integration)', () => {
 
       const strategy = new JwtStrategy(
         { get: () => 'secret' } as any,
-        usersService as any,
         sessionValidatorService,
         mockRedisService as any,
       );
@@ -290,6 +301,61 @@ describe('Security Scenarios (Integration)', () => {
 
       await expect(strategy.validate(payload)).rejects.toThrow(
         UnauthorizedException,
+      );
+    });
+  });
+
+  describe('INACTIVE IDENTITY (Policy)', () => {
+    it('should block login with 403 when account is inactive', async () => {
+      mockUsersService.findByEmail.mockResolvedValue({
+        ...mockUser,
+        isActive: false,
+      });
+
+      await expect(
+        authService.loginWithGoogle('token', mockMetadata),
+      ).rejects.toThrow(ForbiddenException);
+
+      expect(securityEventService.logEvent).toHaveBeenCalledWith(
+        mockUser.id,
+        SECURITY_EVENT_CODES.ACCESS_DENIED,
+        expect.objectContaining({
+          reason: IDENTITY_DENY_REASONS.INACTIVE_ACCOUNT,
+          sourceFlow: IDENTITY_SOURCE_FLOWS.LOGIN_GOOGLE,
+        }),
+      );
+    });
+
+    it('should block refresh with 403 when account is inactive', async () => {
+      const refreshToken = 'rt-inactive';
+      jest.spyOn(tokenService, 'verifyRefreshToken').mockReturnValue({
+        sub: mockUser.id,
+        deviceId: mockMetadata.deviceId,
+      });
+      mockUsersService.findOne.mockResolvedValue({
+        ...mockUser,
+        isActive: false,
+      });
+      mockUserSessionRepository.findByRefreshTokenHash.mockResolvedValue({
+        id: 'session-r1',
+        userId: mockUser.id,
+        deviceId: mockMetadata.deviceId,
+        isActive: true,
+        expiresAt: new Date(Date.now() + 60_000),
+        sessionStatusId: '100',
+      });
+
+      await expect(
+        authService.refreshAccessToken(refreshToken, mockMetadata.deviceId),
+      ).rejects.toThrow(ForbiddenException);
+
+      expect(securityEventService.logEvent).toHaveBeenCalledWith(
+        mockUser.id,
+        SECURITY_EVENT_CODES.ACCESS_DENIED,
+        expect.objectContaining({
+          reason: IDENTITY_DENY_REASONS.INACTIVE_ACCOUNT,
+          sourceFlow: IDENTITY_SOURCE_FLOWS.REFRESH_TOKEN,
+        }),
       );
     });
   });

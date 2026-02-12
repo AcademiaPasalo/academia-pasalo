@@ -1,4 +1,4 @@
-import { UnauthorizedException } from '@nestjs/common';
+import { ForbiddenException, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtModule, JwtService } from '@nestjs/jwt';
 import { Test } from '@nestjs/testing';
@@ -12,6 +12,11 @@ import { SessionValidatorService } from '@modules/auth/application/session-valid
 import { GoogleProviderService } from '@modules/auth/application/google-provider.service';
 import { TokenService } from '@modules/auth/application/token.service';
 import { RequestMetadata } from '@modules/auth/interfaces/request-metadata.interface';
+import {
+  IDENTITY_DENY_REASONS,
+  IDENTITY_SOURCE_FLOWS,
+  SECURITY_EVENT_CODES,
+} from '@modules/auth/interfaces/security.constants';
 import { UsersService } from '@modules/users/application/users.service';
 import { PhotoSource, User } from '@modules/users/domain/user.entity';
 import { RedisCacheService } from '@infrastructure/cache/redis-cache.service';
@@ -109,6 +114,7 @@ describe('AuthService', () => {
     career: null as string | null,
     profilePhotoUrl: null as string | null,
     photoSource: PhotoSource.NONE,
+    isActive: true,
     createdAt: new Date('2026-01-01T00:00:00.000Z'),
     updatedAt: null as Date | null,
     roles: [{ id: '1', code: 'STUDENT', name: 'Student' }],
@@ -246,6 +252,30 @@ describe('AuthService', () => {
     expect(securityEventServiceMock.logEvent).not.toHaveBeenCalled();
   });
 
+  it('loginWithGoogle: usuario inactivo -> 403', async () => {
+    googleProviderServiceMock.verifyCodeAndGetEmail.mockResolvedValue({
+      email: baseUser.email,
+    });
+    usersServiceMock.findByEmail.mockResolvedValue({
+      ...baseUser,
+      isActive: false,
+    });
+
+    await expect(
+      authService.loginWithGoogle('google-auth-code', metadata),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+
+    expect(sessionServiceMock.createSession).not.toHaveBeenCalled();
+    expect(securityEventServiceMock.logEvent).toHaveBeenCalledWith(
+      baseUser.id,
+      SECURITY_EVENT_CODES.ACCESS_DENIED,
+      expect.objectContaining({
+        reason: IDENTITY_DENY_REASONS.INACTIVE_ACCOUNT,
+        sourceFlow: IDENTITY_SOURCE_FLOWS.LOGIN_GOOGLE,
+      }),
+    );
+  });
+
   it('loginWithGoogle: token inválido/verificación falla -> 401', async () => {
     googleProviderServiceMock.verifyCodeAndGetEmail.mockRejectedValue(
       new UnauthorizedException(),
@@ -309,6 +339,36 @@ describe('AuthService', () => {
     expect(decodedAccess.sessionId).toBe('123');
   });
 
+  it('refreshAccessToken: usuario inactivo -> 403', async () => {
+    const refreshToken = jwtService.sign({
+      sub: baseUser.id,
+      deviceId: metadata.deviceId,
+      type: 'refresh',
+    });
+
+    sessionValidatorServiceMock.validateRefreshTokenSession.mockResolvedValue({
+      id: '123',
+    });
+    usersServiceMock.findOne.mockResolvedValue({
+      ...baseUser,
+      isActive: false,
+    });
+
+    await expect(
+      authService.refreshAccessToken(refreshToken, metadata.deviceId),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+
+    expect(sessionServiceMock.rotateRefreshToken).not.toHaveBeenCalled();
+    expect(securityEventServiceMock.logEvent).toHaveBeenCalledWith(
+      baseUser.id,
+      SECURITY_EVENT_CODES.ACCESS_DENIED,
+      expect.objectContaining({
+        reason: IDENTITY_DENY_REASONS.INACTIVE_ACCOUNT,
+        sourceFlow: IDENTITY_SOURCE_FLOWS.REFRESH_TOKEN,
+      }),
+    );
+  });
+
   it('refreshAccessToken: refresh token inválido -> 401', async () => {
     await expect(
       authService.refreshAccessToken('not-a-jwt', metadata.deviceId),
@@ -348,6 +408,85 @@ describe('AuthService', () => {
     expect(result.keptSessionId).toBeNull();
   });
 
+  it('resolveConcurrentSession: usuario inactivo -> 403', async () => {
+    const refreshToken = jwtService.sign({
+      sub: baseUser.id,
+      deviceId: metadata.deviceId,
+      type: 'refresh',
+    });
+
+    sessionServiceMock.resolveConcurrentSession.mockResolvedValue({
+      keptSessionId: '555',
+    });
+    usersServiceMock.findOne.mockResolvedValue({
+      ...baseUser,
+      isActive: false,
+    });
+
+    await expect(
+      authService.resolveConcurrentSession(
+        refreshToken,
+        metadata.deviceId,
+        'KEEP_NEW',
+        metadata,
+      ),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+
+    expect(sessionValidatorServiceMock.validateSession).not.toHaveBeenCalled();
+    expect(securityEventServiceMock.logEvent).toHaveBeenCalledWith(
+      baseUser.id,
+      SECURITY_EVENT_CODES.ACCESS_DENIED,
+      expect.objectContaining({
+        reason: IDENTITY_DENY_REASONS.INACTIVE_ACCOUNT,
+        sourceFlow: IDENTITY_SOURCE_FLOWS.CONCURRENT_RESOLUTION,
+      }),
+    );
+  });
+
+  it('reauthAnomalousSession: usuario inactivo -> 403', async () => {
+    const refreshToken = jwtService.sign({
+      sub: baseUser.id,
+      deviceId: metadata.deviceId,
+      type: 'refresh',
+    });
+
+    const blockedSession = {
+      id: '555',
+      userId: baseUser.id,
+      deviceId: metadata.deviceId,
+      sessionStatusId: '9',
+    } as unknown as UserSession;
+
+    sessionServiceMock.findSessionByRefreshToken.mockResolvedValue(
+      blockedSession,
+    );
+    sessionStatusServiceMock.getIdByCode.mockResolvedValue('9');
+    usersServiceMock.findOne.mockResolvedValue({
+      ...baseUser,
+      isActive: false,
+    });
+
+    await expect(
+      authService.reauthAnomalousSession(
+        'google-auth-code',
+        refreshToken,
+        metadata.deviceId,
+        metadata,
+      ),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+
+    expect(googleProviderServiceMock.verifyCodeAndGetEmail).not.toHaveBeenCalled();
+    expect(sessionServiceMock.activateBlockedSession).not.toHaveBeenCalled();
+    expect(securityEventServiceMock.logEvent).toHaveBeenCalledWith(
+      baseUser.id,
+      SECURITY_EVENT_CODES.ACCESS_DENIED,
+      expect.objectContaining({
+        reason: IDENTITY_DENY_REASONS.INACTIVE_ACCOUNT,
+        sourceFlow: IDENTITY_SOURCE_FLOWS.ANOMALOUS_REAUTH,
+      }),
+    );
+  });
+
   it('reauthAnomalousSession: éxito -> activa sesión y retorna tokens', async () => {
     const refreshToken = jwtService.sign({
       sub: baseUser.id,
@@ -374,6 +513,7 @@ describe('AuthService', () => {
       email: baseUser.email,
     });
 
+    usersServiceMock.findOne.mockResolvedValue(baseUser);
     usersServiceMock.findByEmail.mockResolvedValue(baseUser);
     sessionServiceMock.activateBlockedSession.mockResolvedValue(undefined);
     sessionServiceMock.rotateRefreshToken.mockResolvedValue({ id: '555' });

@@ -77,7 +77,7 @@ describe('Redis Auth Security & Performance (E2E)', () => {
     redisSetSpy.mockRestore();
   });
 
-  it('STEP 3: [PERFORMANCE] Segunda petición debe ser Cache Hit (CERO DB CALLS)', async () => {
+  it('STEP 3: [SECURITY] Segunda petición valida sesión en BD para detectar baneo en caliente', async () => {
     const validatorSpy = jest.spyOn(sessionValidator, 'validateSession');
 
     await request(app.getHttpServer())
@@ -85,7 +85,7 @@ describe('Redis Auth Security & Performance (E2E)', () => {
       .set('Authorization', `Bearer ${token}`)
       .expect(200);
 
-    expect(validatorSpy).not.toHaveBeenCalled();
+    expect(validatorSpy).toHaveBeenCalled();
 
     validatorSpy.mockRestore();
   });

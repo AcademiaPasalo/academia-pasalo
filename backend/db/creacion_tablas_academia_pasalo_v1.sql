@@ -90,6 +90,7 @@ CREATE TABLE user (
   profile_photo_url VARCHAR(500) NULL,
   photo_source ENUM('google', 'uploaded', 'none') NOT NULL DEFAULT 'none',
   last_active_role_id BIGINT NULL,
+  is_active BOOLEAN NOT NULL DEFAULT TRUE,
   created_at DATETIME NOT NULL,
   updated_at DATETIME,
   FOREIGN KEY (last_active_role_id) REFERENCES role(id)

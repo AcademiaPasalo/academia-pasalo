@@ -57,6 +57,7 @@ describe('IAM (e2e)', () => {
     career: null as string | null,
     profilePhotoUrl: null as string | null,
     photoSource: PhotoSource.NONE,
+    isActive: true,
     createdAt: new Date(),
     roles: [{ id: '1', code: 'ADMIN', name: 'Administrador' }],
   };
@@ -71,6 +72,7 @@ describe('IAM (e2e)', () => {
     career: null as string | null,
     profilePhotoUrl: null as string | null,
     photoSource: PhotoSource.NONE,
+    isActive: true,
     createdAt: new Date(),
     roles: [{ id: '2', code: 'STUDENT', name: 'Alumno' }],
   };
@@ -98,6 +100,8 @@ describe('IAM (e2e)', () => {
           expiresAt: new Date(Date.now() + 100000),
           user: adminUser,
           sessionStatusId: '1',
+          deviceId: 'device-1',
+          userId: adminUser.id,
         });
       if (id === 'session-student')
         return Promise.resolve({
@@ -106,6 +110,8 @@ describe('IAM (e2e)', () => {
           expiresAt: new Date(Date.now() + 100000),
           user: studentUser,
           sessionStatusId: '1',
+          deviceId: 'device-1',
+          userId: studentUser.id,
         });
       return Promise.resolve(null);
     }),

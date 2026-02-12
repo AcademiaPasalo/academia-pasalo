@@ -1,4 +1,9 @@
-import { Injectable, UnauthorizedException, Logger } from '@nestjs/common';
+import {
+  Injectable,
+  UnauthorizedException,
+  ForbiddenException,
+  Logger,
+} from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import type { EntityManager } from 'typeorm';
 import { UsersService } from '@modules/users/application/users.service';
@@ -12,10 +17,17 @@ import { AuthSettingsService } from '@modules/auth/application/auth-settings.ser
 import { GoogleProviderService } from '@modules/auth/application/google-provider.service';
 import { SessionValidatorService } from '@modules/auth/application/session-validator.service';
 import { TokenService } from '@modules/auth/application/token.service';
-import { User } from '@modules/users/domain/user.entity';
+import { PhotoSource, User } from '@modules/users/domain/user.entity';
 import { UserSession } from '@modules/auth/domain/user-session.entity';
 import { JwtPayload } from '@modules/auth/interfaces/jwt-payload.interface';
 import { RequestMetadata } from '@modules/auth/interfaces/request-metadata.interface';
+import {
+  IDENTITY_DENY_REASONS,
+  IDENTITY_SOURCE_FLOWS,
+  SECURITY_EVENT_CODES,
+  SECURITY_MESSAGES,
+  type IdentitySourceFlow,
+} from '@modules/auth/interfaces/security.constants';
 import { RedisCacheService } from '@infrastructure/cache/redis-cache.service';
 import { createHash } from 'crypto';
 import { technicalSettings } from '@config/technical-settings';
@@ -66,10 +78,16 @@ export class AuthService {
       );
     }
 
+    await this.assertUserIsActive(
+      user,
+      metadata,
+      IDENTITY_SOURCE_FLOWS.LOGIN_GOOGLE,
+    );
+
     if (!user.profilePhotoUrl && picture) {
       user = await this.usersService.update(user.id, {
         profilePhotoUrl: picture,
-        photoSource: 'google' as any,
+        photoSource: PhotoSource.GOOGLE,
       });
       await this.cacheService.del(`cache:user:profile:${user.id}`);
     }
@@ -117,6 +135,13 @@ export class AuthService {
       );
 
     const user = await this.usersService.findOne(payload.sub);
+    await this.assertUserIsActive(
+      user,
+      {
+        deviceId,
+      },
+      IDENTITY_SOURCE_FLOWS.REFRESH_TOKEN,
+    );
 
     await this.cacheService.del(`cache:session:${session.id}:user`);
 
@@ -269,6 +294,15 @@ export class AuthService {
     await this.cacheService.del(`cache:session:${keptSessionId}:user`);
 
     const user = await this.usersService.findOne(payload.sub);
+    await this.assertUserIsActive(
+      user,
+      {
+        ipAddress: metadata.ipAddress,
+        userAgent: metadata.userAgent,
+        deviceId,
+      },
+      IDENTITY_SOURCE_FLOWS.CONCURRENT_RESOLUTION,
+    );
     const session = await this.sessionValidatorService.validateSession(
       keptSessionId,
       user.id,
@@ -327,6 +361,13 @@ export class AuthService {
     if (session.sessionStatusId !== blockedStatusId) {
       throw new UnauthorizedException('Sesión inválida o expirada');
     }
+
+    const user = await this.usersService.findOne(payload.sub);
+    await this.assertUserIsActive(
+      user,
+      metadata,
+      IDENTITY_SOURCE_FLOWS.ANOMALOUS_REAUTH,
+    );
 
     let googleUserEmail: string | undefined;
     let userByEmail: User | null;
@@ -466,6 +507,57 @@ export class AuthService {
         expiresIn: accessTokenTtlMinutes * 60,
       };
     });
+  }
+
+  private async assertUserIsActive(
+    user: User,
+    metadata: {
+      ipAddress?: string;
+      userAgent?: string;
+      deviceId?: string;
+    },
+    sourceFlow: IdentitySourceFlow,
+  ): Promise<void> {
+    if (user.isActive) {
+      return;
+    }
+
+    this.logger.warn({
+      level: 'warn',
+      context: AuthService.name,
+      message: 'Acceso denegado por cuenta inactiva',
+      userId: user.id,
+      email: user.email,
+      sourceFlow,
+      ipAddress: metadata.ipAddress || null,
+      deviceId: metadata.deviceId || null,
+    });
+
+    try {
+      await this.securityEventService.logEvent(
+        user.id,
+        SECURITY_EVENT_CODES.ACCESS_DENIED,
+        {
+        ipAddress: metadata.ipAddress,
+        userAgent: metadata.userAgent,
+        deviceId: metadata.deviceId,
+        sourceFlow,
+        reason: IDENTITY_DENY_REASONS.INACTIVE_ACCOUNT,
+      },
+      );
+    } catch (error) {
+      this.logger.error({
+        level: 'error',
+        context: AuthService.name,
+        message:
+          'No se pudo registrar evento de seguridad para cuenta inactiva',
+        userId: user.id,
+        sourceFlow,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+
+    throw new ForbiddenException(SECURITY_MESSAGES.INACTIVE_ACCOUNT);
   }
 
   private async generateTokens(

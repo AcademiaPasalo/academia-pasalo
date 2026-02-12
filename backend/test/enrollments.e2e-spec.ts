@@ -56,6 +56,7 @@ describe('Enrollments E2E', () => {
     email: 'admin@test.com',
     firstName: 'Admin',
     roles: [{ id: '1', code: 'ADMIN', name: 'Admin' }],
+    isActive: true,
     photoSource: PhotoSource.NONE,
     createdAt: new Date(),
   };
@@ -65,6 +66,7 @@ describe('Enrollments E2E', () => {
     email: 'student@test.com',
     firstName: 'Student',
     roles: [{ id: '4', code: 'STUDENT', name: 'Student' }],
+    isActive: true,
     photoSource: PhotoSource.NONE,
     createdAt: new Date(),
   };
@@ -167,7 +169,29 @@ describe('Enrollments E2E', () => {
   };
 
   const userSessionRepositoryMock = {
-    findByIdWithUser: jest.fn(),
+    findByIdWithUser: jest.fn((id) => {
+      if (id === 'session-admin')
+        return Promise.resolve({
+          id,
+          isActive: true,
+          expiresAt: new Date(Date.now() + 100000),
+          sessionStatusId: '1',
+          deviceId: 'dev-1',
+          userId: '1',
+          user: adminUser,
+        });
+      if (id === 'session-student')
+        return Promise.resolve({
+          id,
+          isActive: true,
+          expiresAt: new Date(Date.now() + 100000),
+          sessionStatusId: '1',
+          deviceId: 'dev-1',
+          userId: '2',
+          user: studentUser,
+        });
+      return Promise.resolve(null);
+    }),
     findActiveById: jest.fn((id) => {
       if (id === 'session-admin')
         return Promise.resolve({

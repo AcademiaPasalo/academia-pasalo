@@ -33,6 +33,7 @@ describe('Advanced Security Scenarios (Offensive Testing)', () => {
     id: '100',
     email: 'victim@test.com',
     roles: [{ code: 'STUDENT' }],
+    isActive: true,
   };
 
   const mockMetadataBase: RequestMetadata = {
@@ -164,7 +165,7 @@ describe('Advanced Security Scenarios (Offensive Testing)', () => {
           useValue: {
             verifyCodeAndGetEmail: jest
               .fn()
-              .mockResolvedValue('victim@test.com'),
+              .mockResolvedValue({ email: 'victim@test.com' }),
           },
         },
       ],

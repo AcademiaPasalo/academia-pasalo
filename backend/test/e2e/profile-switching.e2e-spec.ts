@@ -58,6 +58,7 @@ describe('Profile Switching (e2e)', () => {
     lastName2: null,
     roles: [mockRoleStudent, mockRoleTeacher],
     lastActiveRoleId: '10',
+    isActive: true,
     photoSource: PhotoSource.NONE,
     createdAt: new Date(),
   } as User;
@@ -75,6 +76,8 @@ describe('Profile Switching (e2e)', () => {
       id: 'session-123',
       isActive: true,
       expiresAt: new Date(Date.now() + 100000),
+      deviceId: 'device-abc',
+      userId: multiRoleUser.id,
       user: multiRoleUser,
       sessionStatusId: '1',
     }),

@@ -12,6 +12,8 @@ import { UserRepository } from '@modules/users/infrastructure/user.repository';
 import { RoleRepository } from '@modules/users/infrastructure/role.repository';
 import { CreateUserDto } from '@modules/users/dto/create-user.dto';
 import { UpdateUserDto } from '@modules/users/dto/update-user.dto';
+import { IdentitySecurityService } from '@modules/users/application/identity-security.service';
+import { IDENTITY_INVALIDATION_REASONS } from '@modules/auth/interfaces/security.constants';
 import {
   DatabaseError,
   MySqlErrorCode,
@@ -25,6 +27,7 @@ export class UsersService {
     private readonly dataSource: DataSource,
     private readonly userRepository: UserRepository,
     private readonly roleRepository: RoleRepository,
+    private readonly identitySecurityService: IdentitySecurityService,
   ) {}
 
   async create(createUserDto: CreateUserDto): Promise<User> {
@@ -72,30 +75,59 @@ export class UsersService {
   }
 
   async update(id: string, updateUserDto: UpdateUserDto): Promise<User> {
-    const user = await this.findOne(id);
+    return await this.dataSource.transaction(async (manager) => {
+      const user = await this.userRepository.findById(id, manager);
+      if (!user) {
+        throw new NotFoundException('Usuario no encontrado');
+      }
 
-    if (updateUserDto.email && updateUserDto.email !== user.email) {
-      const existingUser = await this.userRepository.findByEmail(
-        updateUserDto.email,
+      const shouldInvalidateIdentity = this.shouldInvalidateIdentityOnUpdate(
+        user,
+        updateUserDto,
       );
+      const shouldRevokeSessions =
+        updateUserDto.isActive === false && user.isActive !== false;
 
-      if (existingUser) {
-        throw new ConflictException('El correo electrónico ya está registrado');
-      }
-    }
+      if (updateUserDto.email && updateUserDto.email !== user.email) {
+        const existingUser = await this.userRepository.findByEmail(
+          updateUserDto.email,
+          manager,
+        );
 
-    Object.assign(user, updateUserDto);
-    user.updatedAt = new Date();
-    try {
-      return await this.userRepository.save(user);
-    } catch (error) {
-      const dbError = error as DatabaseError;
-      const errno = dbError.errno ?? dbError.driverError?.errno;
-      if (errno === MySqlErrorCode.DUPLICATE_ENTRY) {
-        throw new ConflictException('El correo electrónico ya está registrado');
+        if (existingUser) {
+          throw new ConflictException('El correo electrónico ya está registrado');
+        }
       }
-      throw error;
-    }
+
+      Object.assign(user, updateUserDto);
+      user.updatedAt = new Date();
+
+      let updatedUser: User;
+      try {
+        updatedUser = await this.userRepository.save(user, manager);
+      } catch (error) {
+        const dbError = error as DatabaseError;
+        const errno = dbError.errno ?? dbError.driverError?.errno;
+        if (errno === MySqlErrorCode.DUPLICATE_ENTRY) {
+          throw new ConflictException(
+            'El correo electrónico ya está registrado',
+          );
+        }
+        throw error;
+      }
+
+      if (shouldInvalidateIdentity) {
+        await this.identitySecurityService.invalidateUserIdentity(id, {
+          revokeSessions: shouldRevokeSessions,
+          reason: shouldRevokeSessions
+            ? IDENTITY_INVALIDATION_REASONS.USER_BANNED
+            : IDENTITY_INVALIDATION_REASONS.SENSITIVE_UPDATE,
+          manager,
+        });
+      }
+
+      return updatedUser;
+    });
   }
 
   async remove(id: string): Promise<void> {
@@ -141,6 +173,12 @@ export class UsersService {
         message: 'Rol asignado al usuario',
         userId,
         roleCode,
+      });
+
+      await this.identitySecurityService.invalidateUserIdentity(userId, {
+        revokeSessions: false,
+        reason: IDENTITY_INVALIDATION_REASONS.ROLE_CHANGE,
+        manager,
       });
 
       return updatedUser;
@@ -197,7 +235,34 @@ export class UsersService {
         roleCode,
       });
 
+      await this.identitySecurityService.invalidateUserIdentity(userId, {
+        revokeSessions: false,
+        reason: IDENTITY_INVALIDATION_REASONS.ROLE_CHANGE,
+        manager,
+      });
+
       return updatedUser;
     });
+  }
+
+  private shouldInvalidateIdentityOnUpdate(
+    currentUser: User,
+    updateUserDto: UpdateUserDto,
+  ): boolean {
+    if (
+      typeof updateUserDto.email === 'string' &&
+      updateUserDto.email !== currentUser.email
+    ) {
+      return true;
+    }
+
+    if (
+      typeof updateUserDto.isActive === 'boolean' &&
+      updateUserDto.isActive !== currentUser.isActive
+    ) {
+      return true;
+    }
+
+    return false;
   }
 }
