@@ -2,3 +2,4 @@
 # Runtime (server-only)
 letsencrypt/
 certbot/
+.claude
