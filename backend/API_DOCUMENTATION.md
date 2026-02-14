@@ -28,6 +28,17 @@ Los errores (400, 401, 403, 404, 409, 500) tienen esta estructura:
 }
 ```
 
+### Convencion de IDs en ejemplos
+
+Los valores de ejemplo como `"123"`, `"course-cycle-id"` o `"pc1-id"` son placeholders de documentacion.
+No deben enviarse de forma literal.
+
+Regla para frontend:
+
+1. Primero obtener IDs reales desde endpoints de consulta (`/cycles`, `/courses`, `/evaluations`, `/enrollments/my-courses`).
+2. Luego enviar esos IDs reales en endpoints de escritura (`POST`, `PATCH`, `DELETE`).
+3. Todo campo `...Id` en request body o params espera un ID existente en BD.
+
 ---
 
 ## 🔐 ÉPICA 1: Autenticación y Seguridad (Auth)
@@ -366,12 +377,30 @@ Base URL: `/api/v1/enrollments`
     }
     ```
 
+#### Modelo de dominio (clave para Frontend)
+
+La matricula SIEMPRE se registra sobre un `courseCycleId` (un curso especifico dentro de un ciclo academico).
+La jerarquia correcta es:
+
+1. `academicCycle` (ej. 2026-1)
+2. `courseCycle` (ej. Algebra en 2026-1)
+3. `evaluation` (PC1, PC2, Final) perteneciente a ese `courseCycle`
+
+No existe matricula "directa a todo el ciclo academico" sin curso. Siempre hay un curso base (`courseCycleId`).
+
 #### Tipos de Matrícula:
 
 | Tipo | `evaluationIds` | `historicalCourseCycleIds` | Comportamiento |
 |------|-----------------|---------------------------|----------------|
-| **FULL** | Ignorado | Opcional | Acceso a TODAS las evaluaciones del ciclo actual + ciclos históricos |
-| **PARTIAL** | **Requerido** | Opcional | Acceso SOLO a evaluaciones específicas (pueden ser de ciclos pasados) |
+| **FULL** | Ignorado | Opcional | Acceso a TODAS las evaluaciones del `courseCycleId` base + acceso historico de los `courseCycleId` enviados |
+| **PARTIAL** | **Requerido** | Opcional | Acceso SOLO a las evaluaciones listadas en `evaluationIds` (del curso base o cursos historicos permitidos) |
+
+Reglas de validacion recomendadas para el Frontend:
+
+1. `FULL`: no enviar `evaluationIds`.
+2. `PARTIAL`: enviar al menos 1 `evaluationId`.
+3. Cada `evaluationId` debe pertenecer al `courseCycleId` base o a uno de `historicalCourseCycleIds`.
+4. `historicalCourseCycleIds` no crea matricula independiente; solo amplia alcance para evaluaciones historicas.
 
 > [!IMPORTANT]
 > **Manejo de Fechas en Evaluaciones Históricas (PARTIAL)**
@@ -387,35 +416,35 @@ Base URL: `/api/v1/enrollments`
 ```json
 {
   "userId": "123",
-  "courseCycleId": "ciclo-2026-1",
+  "courseCycleId": "algebra-2026-1",
   "enrollmentTypeCode": "FULL",
-  "historicalCourseCycleIds": ["ciclo-2025-2", "ciclo-2025-1"]
+  "historicalCourseCycleIds": ["algebra-2025-2", "algebra-2025-1"]
 }
 ```
-*Resultado: Acceso a todas las evaluaciones del ciclo actual + todos los exámenes de los 2 ciclos anteriores.*
+*Resultado: Acceso a todas las evaluaciones de Algebra 2026-1 + todos los examenes de Algebra en 2025-2 y 2025-1.*
 
 **2. PARTIAL solo ciclo actual:**
 ```json
 {
   "userId": "456",
-  "courseCycleId": "ciclo-2026-1",
+  "courseCycleId": "algebra-2026-1",
   "enrollmentTypeCode": "PARTIAL",
   "evaluationIds": ["pc1-id", "pc2-id"]
 }
 ```
-*Resultado: Acceso solo a PC1 y PC2 del ciclo actual.*
+*Resultado: Acceso solo a PC1 y PC2 de Algebra 2026-1.*
 
 **3. PARTIAL con evaluación de ciclo histórico:**
 ```json
 {
   "userId": "789",
-  "courseCycleId": "ciclo-2026-1",
+  "courseCycleId": "algebra-2026-1",
   "enrollmentTypeCode": "PARTIAL",
-  "evaluationIds": ["ex-final-2025-2"],
-  "historicalCourseCycleIds": ["ciclo-2025-2"]
+  "evaluationIds": ["algebra-final-2025-2"],
+  "historicalCourseCycleIds": ["algebra-2025-2"]
 }
 ```
-*Resultado: Acceso solo al examen final del ciclo 2025-2 para práctica.*
+*Resultado: Acceso solo al examen final de Algebra 2025-2 para practica.*
 
 ### 2. Cancelar Matrícula
 *   **Endpoint:** `DELETE /:id`

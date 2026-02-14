@@ -19,6 +19,16 @@ Esta API gestiona el núcleo de la experiencia académica: cursos, materiales ed
     }
     ```
 
+### Convencion de IDs en ejemplos
+Los IDs mostrados en ejemplos (`"123"`, `"pc1-id"`, `"courseCycleId"`) son referenciales.
+No son valores literales para copiar/pegar.
+
+Flujo esperado para frontend:
+
+1. Consultar primero recursos base para obtener IDs reales.
+2. Reutilizar esos IDs en operaciones de escritura.
+3. Validar que cada `...Id` pertenezca al contexto correcto (curso/ciclo/evaluacion).
+
 ---
 
 ## 📅 ÉPICA: CALENDARIO Y CLASES EN VIVO (`/class-events`)
@@ -140,6 +150,13 @@ Permite que otros profesores también sean anfitriones del evento.
 ---
 
 ## 📚 ÉPICA: CURSOS Y NAVEGACIÓN ACADÉMICA (`/courses`, `/enrollments`)
+
+Regla de modelo academico:
+
+1. Un `academicCycle` contiene varios `courseCycle`.
+2. Cada `courseCycle` representa un curso puntual en ese ciclo.
+3. Cada `evaluation` pertenece a un `courseCycle`.
+4. La matricula se registra sobre un `courseCycle` (no directamente sobre todo el ciclo academico).
 
 ### 1. Dashboard: Mis Cursos Matriculados
 Obtiene el listado de cursos donde el alumno tiene una matrícula activa.

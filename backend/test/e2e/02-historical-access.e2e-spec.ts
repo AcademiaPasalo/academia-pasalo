@@ -9,6 +9,10 @@ import { AcademicCycle } from '@modules/cycles/domain/academic-cycle.entity';
 import { CourseCycle } from '@modules/courses/domain/course-cycle.entity';
 import { User } from '@modules/users/domain/user.entity';
 import { Evaluation } from '@modules/evaluations/domain/evaluation.entity';
+import { Enrollment } from '@modules/enrollments/domain/enrollment.entity';
+import { EnrollmentEvaluation } from '@modules/enrollments/domain/enrollment-evaluation.entity';
+
+jest.setTimeout(60000);
 
 describe('E2E: Acceso Histórico y Ciclos Pasados', () => {
   let app: INestApplication;
@@ -21,7 +25,9 @@ describe('E2E: Acceso Histórico y Ciclos Pasados', () => {
   let pastCourseCycle: CourseCycle;
   let currentCourseCycle: CourseCycle;
   let userFull: User;
+  let userPartial: User;
   let pastPC1: Evaluation;
+  let currentPC1: Evaluation;
 
   const now = new Date();
   const pastDateStart = new Date();
@@ -85,11 +91,26 @@ describe('E2E: Acceso Histórico y Ciclos Pasados', () => {
       formatDate(pastPCEnd),
     );
 
+    const currentPCStart = new Date(now);
+    currentPCStart.setDate(currentPCStart.getDate() + 10);
+    const currentPCEnd = new Date(currentPCStart);
+    currentPCEnd.setDate(currentPCEnd.getDate() + 20);
+
+    currentPC1 = await seeder.createEvaluation(
+      currentCourseCycle.id,
+      'PC',
+      1,
+      formatDate(currentPCStart),
+      formatDate(currentPCEnd),
+    );
+
     const adminEmail = TestSeeder.generateUniqueEmail('admin_hist');
     const userFullEmail = TestSeeder.generateUniqueEmail('full_hist');
+    const userPartialEmail = TestSeeder.generateUniqueEmail('partial_hist');
 
     const admin = await seeder.createAuthenticatedUser(adminEmail, ['ADMIN']);
     userFull = await seeder.createUser(userFullEmail);
+    userPartial = await seeder.createUser(userPartialEmail);
 
     await request(app.getHttpServer())
       .post('/enrollments')
@@ -98,6 +119,18 @@ describe('E2E: Acceso Histórico y Ciclos Pasados', () => {
         userId: userFull.id,
         courseCycleId: currentCourseCycle.id,
         enrollmentTypeCode: 'FULL',
+        historicalCourseCycleIds: [pastCourseCycle.id],
+      })
+      .expect(201);
+
+    await request(app.getHttpServer())
+      .post('/enrollments')
+      .set('Authorization', `Bearer ${admin.token}`)
+      .send({
+        userId: userPartial.id,
+        courseCycleId: currentCourseCycle.id,
+        enrollmentTypeCode: 'PARTIAL',
+        evaluationIds: [pastPC1.id],
         historicalCourseCycleIds: [pastCourseCycle.id],
       })
       .expect(201);
@@ -110,5 +143,28 @@ describe('E2E: Acceso Histórico y Ciclos Pasados', () => {
   it('Caso 1: Acceso a Ciclo Pasado - Usuario Full debería ver contenido histórico', async () => {
     const hasAccess = await accessEngine.hasAccess(userFull.id, pastPC1.id);
     expect(hasAccess).toBe(true);
+  });
+  it('Caso 2: PARTIAL historico alinea accessEndDate con su simil actual', async () => {
+    const enrollment = await dataSource.getRepository(Enrollment).findOneOrFail({
+      where: {
+        userId: userPartial.id,
+        courseCycleId: currentCourseCycle.id,
+        cancelledAt: null,
+      },
+    });
+
+    const accessRow = await dataSource
+      .getRepository(EnrollmentEvaluation)
+      .findOneOrFail({
+        where: {
+          enrollmentId: enrollment.id,
+          evaluationId: pastPC1.id,
+        },
+      });
+
+    const format = (d: Date) => d.toISOString().split('T')[0];
+    expect(format(new Date(accessRow.accessEndDate))).toBe(
+      format(new Date(currentPC1.endDate)),
+    );
   });
 });
