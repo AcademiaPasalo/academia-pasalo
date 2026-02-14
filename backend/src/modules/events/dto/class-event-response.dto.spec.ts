@@ -31,10 +31,10 @@ describe('ClassEventResponseDto', () => {
       event,
       CLASS_EVENT_STATUS.PROGRAMADA,
       {
-      canJoinLive: false,
-      canWatchRecording: false,
-      canCopyLiveLink: false,
-      canCopyRecordingLink: false,
+        canJoinLive: false,
+        canWatchRecording: false,
+        canCopyLiveLink: false,
+        canCopyRecordingLink: false,
       },
     );
 

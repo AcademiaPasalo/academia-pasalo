@@ -111,7 +111,9 @@ describe('E2E: Acceso Histórico y Ciclos Pasados', () => {
     const userFullEmail = TestSeeder.generateUniqueEmail('full_hist');
     const userPartialEmail = TestSeeder.generateUniqueEmail('partial_hist');
 
-    const admin = await seeder.createAuthenticatedUser(adminEmail, [ROLE_CODES.ADMIN]);
+    const admin = await seeder.createAuthenticatedUser(adminEmail, [
+      ROLE_CODES.ADMIN,
+    ]);
     userFull = await seeder.createUser(userFullEmail);
     userPartial = await seeder.createUser(userPartialEmail);
 
@@ -148,13 +150,15 @@ describe('E2E: Acceso Histórico y Ciclos Pasados', () => {
     expect(hasAccess).toBe(true);
   });
   it('Caso 2: PARTIAL historico alinea accessEndDate con su simil actual', async () => {
-    const enrollment = await dataSource.getRepository(Enrollment).findOneOrFail({
-      where: {
-        userId: userPartial.id,
-        courseCycleId: currentCourseCycle.id,
-        cancelledAt: null,
-      },
-    });
+    const enrollment = await dataSource
+      .getRepository(Enrollment)
+      .findOneOrFail({
+        where: {
+          userId: userPartial.id,
+          courseCycleId: currentCourseCycle.id,
+          cancelledAt: null,
+        },
+      });
 
     const accessRow = await dataSource
       .getRepository(EnrollmentEvaluation)

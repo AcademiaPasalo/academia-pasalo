@@ -141,7 +141,8 @@ describe('SessionService', () => {
       ).mockResolvedValue({ id: 'existing' });
       (sessionStatusService.getIdByCode as jest.Mock).mockImplementation(
         (code) => {
-          if (code === SESSION_STATUS_CODES.PENDING_CONCURRENT_RESOLUTION) return 'pending-id';
+          if (code === SESSION_STATUS_CODES.PENDING_CONCURRENT_RESOLUTION)
+            return 'pending-id';
           return 'other';
         },
       );
@@ -157,7 +158,9 @@ describe('SessionService', () => {
         new Date(),
       );
 
-      expect(result.sessionStatus).toBe(SESSION_STATUS_CODES.PENDING_CONCURRENT_RESOLUTION);
+      expect(result.sessionStatus).toBe(
+        SESSION_STATUS_CODES.PENDING_CONCURRENT_RESOLUTION,
+      );
       expect(result.concurrentSessionId).toBe('existing');
       expect(
         sessionSecurityService.logSessionCreationEvents,

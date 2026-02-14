@@ -12,6 +12,7 @@ import { User } from '@modules/users/domain/user.entity';
 import { ClassEvent } from '@modules/events/domain/class-event.entity';
 import { Evaluation } from '@modules/evaluations/domain/evaluation.entity';
 import { ROLE_CODES } from '@common/constants/role-codes.constants';
+import { CLASS_EVENT_CACHE_KEYS } from '@modules/events/domain/class-event.constants';
 
 describe('ClassEventsService', () => {
   let service: ClassEventsService;
@@ -166,6 +167,12 @@ describe('ClassEventsService', () => {
 
       expect(classEventRepository.create).toHaveBeenCalled();
       expect(classEventRecordingStatusRepository.findByCode).toHaveBeenCalled();
+      expect(cacheService.del).toHaveBeenCalledWith(
+        CLASS_EVENT_CACHE_KEYS.EVALUATION_LIST('eval-1'),
+      );
+      expect(cacheService.invalidateGroup).toHaveBeenCalledWith(
+        CLASS_EVENT_CACHE_KEYS.GLOBAL_SCHEDULE_GROUP,
+      );
     });
 
     it('debe usar cache para estado de grabacion si ya existe', async () => {
@@ -192,7 +199,9 @@ describe('ClassEventsService', () => {
         mockProfessor,
       );
 
-      expect(classEventRecordingStatusRepository.findByCode).not.toHaveBeenCalled();
+      expect(
+        classEventRecordingStatusRepository.findByCode,
+      ).not.toHaveBeenCalled();
       cacheService.get.mockResolvedValue(null);
     });
   });
@@ -377,7 +386,10 @@ describe('ClassEventsService', () => {
       userRepository.findById.mockResolvedValue(mockStudent);
       enrollmentEvaluationRepository.checkAccess.mockResolvedValue(false);
 
-      const result = await service.checkUserAuthorization('student-1', 'eval-1');
+      const result = await service.checkUserAuthorization(
+        'student-1',
+        'eval-1',
+      );
 
       expect(result).toBe(false);
       expect(enrollmentEvaluationRepository.checkAccess).toHaveBeenCalledWith(
@@ -390,7 +402,10 @@ describe('ClassEventsService', () => {
       userRepository.findById.mockResolvedValue(mockStudent);
       enrollmentEvaluationRepository.checkAccess.mockResolvedValue(false);
 
-      const result = await service.checkUserAuthorization('student-1', 'eval-1');
+      const result = await service.checkUserAuthorization(
+        'student-1',
+        'eval-1',
+      );
 
       expect(result).toBe(false);
     });
@@ -431,6 +446,15 @@ describe('ClassEventsService', () => {
           recordingUrl: 'https://video.example.com/ready-1',
           recordingStatusId: '3',
         }),
+      );
+      expect(cacheService.del).toHaveBeenCalledWith(
+        CLASS_EVENT_CACHE_KEYS.EVALUATION_LIST('eval-1'),
+      );
+      expect(cacheService.del).toHaveBeenCalledWith(
+        CLASS_EVENT_CACHE_KEYS.DETAIL('event-1'),
+      );
+      expect(cacheService.invalidateGroup).toHaveBeenCalledWith(
+        CLASS_EVENT_CACHE_KEYS.GLOBAL_SCHEDULE_GROUP,
       );
     });
   });

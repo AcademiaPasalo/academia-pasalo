@@ -33,7 +33,10 @@ import {
 import { ClassEventRepository } from '@modules/events/infrastructure/class-event.repository';
 import * as fs from 'fs';
 import { technicalSettings } from '@config/technical-settings';
-import { ADMIN_ROLE_CODES, ROLE_CODES } from '@common/constants/role-codes.constants';
+import {
+  ADMIN_ROLE_CODES,
+  ROLE_CODES,
+} from '@common/constants/role-codes.constants';
 import {
   DELETION_REQUEST_STATUS_CODES,
   FOLDER_STATUS_CODES,
@@ -127,7 +130,10 @@ export class MaterialsService {
     if (!folder) throw new NotFoundException('Carpeta destino no encontrada');
 
     if (dto.classEventId) {
-      await this.validateClassEventAssociation(dto.classEventId, folder.evaluationId);
+      await this.validateClassEventAssociation(
+        dto.classEventId,
+        folder.evaluationId,
+      );
     }
 
     const now = new Date();
@@ -378,7 +384,8 @@ export class MaterialsService {
     user: User,
     classEventId: string,
   ): Promise<Material[]> {
-    const classEvent = await this.classEventRepository.findByIdSimple(classEventId);
+    const classEvent =
+      await this.classEventRepository.findByIdSimple(classEventId);
     if (!classEvent) {
       throw new NotFoundException('Sesion de clase no encontrada');
     }
@@ -391,7 +398,8 @@ export class MaterialsService {
       return this.applyVisibilityFilter(user, [], cached).materials;
     }
 
-    const materials = await this.materialRepository.findByClassEventId(classEventId);
+    const materials =
+      await this.materialRepository.findByClassEventId(classEventId);
     await this.cacheService.set(cacheKey, materials, this.CACHE_TTL);
 
     return this.applyVisibilityFilter(user, [], materials).materials;
@@ -574,7 +582,8 @@ export class MaterialsService {
     classEventId: string,
     evaluationId: string,
   ) {
-    const classEvent = await this.classEventRepository.findByIdSimple(classEventId);
+    const classEvent =
+      await this.classEventRepository.findByIdSimple(classEventId);
     if (!classEvent) {
       throw new NotFoundException('Sesion de clase no encontrada');
     }

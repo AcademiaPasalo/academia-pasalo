@@ -73,7 +73,9 @@ describe('E2E: Revocación Administrativa', () => {
     const adminEmail = TestSeeder.generateUniqueEmail('admin_rev');
     const userTargetEmail = TestSeeder.generateUniqueEmail('target_rev');
 
-    const admin = await seeder.createAuthenticatedUser(adminEmail, [ROLE_CODES.ADMIN]);
+    const admin = await seeder.createAuthenticatedUser(adminEmail, [
+      ROLE_CODES.ADMIN,
+    ]);
     userTarget = await seeder.createUser(userTargetEmail);
 
     const res = await request(app.getHttpServer())

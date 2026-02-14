@@ -11,4 +11,3 @@ export class ClassEventRecordingStatus {
   @Column({ type: 'varchar', length: 100 })
   name: string;
 }
-

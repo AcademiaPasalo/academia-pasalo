@@ -21,10 +21,14 @@ import { technicalSettings } from '@config/technical-settings';
 import {
   ClassEventAccess,
   ClassEventStatus,
+  CLASS_EVENT_CACHE_KEYS,
   CLASS_EVENT_RECORDING_STATUS_CODES,
   CLASS_EVENT_STATUS,
 } from '@modules/events/domain/class-event.constants';
-import { ADMIN_ROLE_CODES, ROLE_CODES } from '@common/constants/role-codes.constants';
+import {
+  ADMIN_ROLE_CODES,
+  ROLE_CODES,
+} from '@common/constants/role-codes.constants';
 
 @Injectable()
 export class ClassEventsService {
@@ -144,7 +148,7 @@ export class ClassEventsService {
       throw new ForbiddenException('No tienes acceso a esta evaluación');
     }
 
-    const cacheKey = `cache:class-events:evaluation:${evaluationId}`;
+    const cacheKey = CLASS_EVENT_CACHE_KEYS.EVALUATION_LIST(evaluationId);
     const cached = await this.cacheService.get<ClassEvent[]>(cacheKey);
     if (cached) {
       return cached;
@@ -198,7 +202,8 @@ export class ClassEventsService {
     if (topic !== undefined) updateData.topic = topic;
     if (startDatetime !== undefined) updateData.startDatetime = startDatetime;
     if (endDatetime !== undefined) updateData.endDatetime = endDatetime;
-    if (liveMeetingUrl !== undefined) updateData.liveMeetingUrl = liveMeetingUrl;
+    if (liveMeetingUrl !== undefined)
+      updateData.liveMeetingUrl = liveMeetingUrl;
     if (recordingUrl !== undefined) updateData.recordingUrl = recordingUrl;
 
     if (startDatetime || endDatetime) {
@@ -470,7 +475,11 @@ export class ClassEventsService {
     start: Date,
     end: Date,
   ): Promise<ClassEvent[]> {
-    const cacheKey = `cache:my-schedule:user:${userId}:from:${start.toISOString().split('T')[0]}:to:${end.toISOString().split('T')[0]}`;
+    const cacheKey = CLASS_EVENT_CACHE_KEYS.MY_SCHEDULE(
+      userId,
+      start.toISOString().split('T')[0],
+      end.toISOString().split('T')[0],
+    );
 
     const cached = await this.cacheService.get<ClassEvent[]>(cacheKey);
     if (cached) return cached;
@@ -518,14 +527,16 @@ export class ClassEventsService {
     eventId?: string,
   ): Promise<void> {
     await this.cacheService.del(
-      `cache:class-events:evaluation:${evaluationId}`,
+      CLASS_EVENT_CACHE_KEYS.EVALUATION_LIST(evaluationId),
     );
 
     if (eventId) {
-      await this.cacheService.del(`cache:class-event:${eventId}`);
+      await this.cacheService.del(CLASS_EVENT_CACHE_KEYS.DETAIL(eventId));
     }
 
-    await this.cacheService.invalidateGroup('cache:my-schedule:*');
+    await this.cacheService.invalidateGroup(
+      CLASS_EVENT_CACHE_KEYS.GLOBAL_SCHEDULE_GROUP,
+    );
   }
 
   private async getRecordingStatusIdByCode(

@@ -9,4 +9,3 @@ export const ADMIN_ROLE_CODES: readonly string[] = [
   ROLE_CODES.ADMIN,
   ROLE_CODES.SUPER_ADMIN,
 ];
-

@@ -10,11 +10,13 @@ import { User } from '@modules/users/domain/user.entity';
 import { CourseCycle } from '@modules/courses/domain/course-cycle.entity';
 import { PHOTO_SOURCES } from '@modules/auth/interfaces/security.constants';
 
-export enum PhotoSource {
-  PROFILE = PHOTO_SOURCES.PROFILE,
-  UPLOADED = PHOTO_SOURCES.UPLOADED,
-  NONE = PHOTO_SOURCES.NONE,
-}
+export const PhotoSource = {
+  PROFILE: PHOTO_SOURCES.PROFILE,
+  UPLOADED: PHOTO_SOURCES.UPLOADED,
+  NONE: PHOTO_SOURCES.NONE,
+} as const;
+
+export type PhotoSource = (typeof PhotoSource)[keyof typeof PhotoSource];
 
 @Entity('course_testimony')
 @Unique(['userId', 'courseCycleId'])

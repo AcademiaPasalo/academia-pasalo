@@ -16,17 +16,20 @@ import { CourseCycle } from '@modules/courses/domain/course-cycle.entity';
 import { Evaluation } from '@modules/evaluations/domain/evaluation.entity';
 import { RedisCacheService } from '@infrastructure/cache/redis-cache.service';
 import { MyEnrollmentsResponseDto } from '@modules/enrollments/dto/my-enrollments-response.dto';
+import { technicalSettings } from '@config/technical-settings';
 import {
   ENROLLMENT_CACHE_KEYS,
   ENROLLMENT_STATUS_CODES,
   ENROLLMENT_TYPE_CODES,
 } from '@modules/enrollments/domain/enrollment.constants';
 import { EVALUATION_TYPE_CODES } from '@modules/evaluations/domain/evaluation.constants';
+import { CLASS_EVENT_CACHE_KEYS } from '@modules/events/domain/class-event.constants';
 
 @Injectable()
 export class EnrollmentsService {
   private readonly logger = new Logger(EnrollmentsService.name);
-  private readonly DASHBOARD_CACHE_TTL = 3600;
+  private readonly DASHBOARD_CACHE_TTL =
+    technicalSettings.cache.enrollments.myEnrollmentsDashboardCacheTtlSeconds;
 
   constructor(
     private readonly dataSource: DataSource,
@@ -301,16 +304,17 @@ export class EnrollmentsService {
       await this.cacheService.invalidateGroup(
         ENROLLMENT_CACHE_KEYS.USER_ACCESS_GROUP(dto.userId),
       );
-
-      this.logger.log(
-        JSON.stringify({
-          message: 'Matrícula procesada exitosamente',
-          userId: dto.userId,
-          courseCycleId: dto.courseCycleId,
-          enrollmentId: enrollment.id,
-          timestamp: new Date().toISOString(),
-        }),
+      await this.cacheService.invalidateGroup(
+        CLASS_EVENT_CACHE_KEYS.USER_SCHEDULE_GROUP(dto.userId),
       );
+
+      this.logger.log({
+        message: 'Matrícula procesada exitosamente',
+        userId: dto.userId,
+        courseCycleId: dto.courseCycleId,
+        enrollmentId: enrollment.id,
+        timestamp: new Date().toISOString(),
+      });
 
       return enrollment;
     });
@@ -332,14 +336,15 @@ export class EnrollmentsService {
     await this.cacheService.invalidateGroup(
       ENROLLMENT_CACHE_KEYS.USER_ACCESS_GROUP(enrollment.userId),
     );
-
-    this.logger.log(
-      JSON.stringify({
-        message: 'Matrícula cancelada e invalidación de caché procesada',
-        userId: enrollment.userId,
-        enrollmentId,
-        timestamp: new Date().toISOString(),
-      }),
+    await this.cacheService.invalidateGroup(
+      CLASS_EVENT_CACHE_KEYS.USER_SCHEDULE_GROUP(enrollment.userId),
     );
+
+    this.logger.log({
+      message: 'Matrícula cancelada e invalidación de caché procesada',
+      userId: enrollment.userId,
+      enrollmentId,
+      timestamp: new Date().toISOString(),
+    });
   }
 }

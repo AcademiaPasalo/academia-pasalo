@@ -161,7 +161,9 @@ export class AuthService {
         }
 
         if (lockedSession.deviceId !== deviceId) {
-          throw new UnauthorizedException(SECURITY_MESSAGES.UNAUTHORIZED_DEVICE);
+          throw new UnauthorizedException(
+            SECURITY_MESSAGES.UNAUTHORIZED_DEVICE,
+          );
         }
 
         const activeStatusId = await this.sessionStatusService.getIdByCode(

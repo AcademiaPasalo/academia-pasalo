@@ -37,7 +37,12 @@ export class ClassEvent {
   @Column({ name: 'live_meeting_url', type: 'varchar', length: 500 })
   liveMeetingUrl: string;
 
-  @Column({ name: 'recording_url', type: 'varchar', length: 500, nullable: true })
+  @Column({
+    name: 'recording_url',
+    type: 'varchar',
+    length: 500,
+    nullable: true,
+  })
   recordingUrl: string | null;
 
   @Column({ name: 'recording_status_id', type: 'bigint' })

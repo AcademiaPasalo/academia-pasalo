@@ -73,7 +73,9 @@ export class ClassEventsController {
     user: User,
   ): Promise<ClassEventResponseDto> {
     const status = this.classEventsService.calculateEventStatus(event);
-    const needsAuthorization = Boolean(event.liveMeetingUrl || event.recordingUrl);
+    const needsAuthorization = Boolean(
+      event.liveMeetingUrl || event.recordingUrl,
+    );
     const hasAuthorization = needsAuthorization
       ? await this.classEventsService.checkUserAuthorizationForUser(
           user,

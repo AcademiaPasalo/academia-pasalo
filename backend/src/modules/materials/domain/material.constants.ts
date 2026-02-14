@@ -19,7 +19,8 @@ export const DELETION_REQUEST_STATUS_CODES = {
 export const MATERIAL_CACHE_KEYS = {
   ROOTS: (evaluationId: string) => `cache:materials:roots:eval:${evaluationId}`,
   CONTENTS: (folderId: string) => `cache:materials:contents:folder:${folderId}`,
-  CLASS_EVENT: (classEventId: string) => `cache:materials:class-event:${classEventId}`,
+  CLASS_EVENT: (classEventId: string) =>
+    `cache:materials:class-event:${classEventId}`,
 } as const;
 
 export type MaterialStatusCode =

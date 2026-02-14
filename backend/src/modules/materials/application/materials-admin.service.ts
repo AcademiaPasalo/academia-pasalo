@@ -46,7 +46,9 @@ export class MaterialsAdminService {
 
   async findAllPendingRequests(): Promise<DeletionRequest[]> {
     const pendingStatus =
-      await this.catalogRepository.findDeletionRequestStatusByCode(DELETION_REQUEST_STATUS_CODES.PENDING);
+      await this.catalogRepository.findDeletionRequestStatusByCode(
+        DELETION_REQUEST_STATUS_CODES.PENDING,
+      );
     if (!pendingStatus)
       throw new InternalServerErrorException(
         `Error de configuración: Estado ${DELETION_REQUEST_STATUS_CODES.PENDING} faltante`,
@@ -64,7 +66,9 @@ export class MaterialsAdminService {
     if (!request) throw new NotFoundException('Solicitud no encontrada');
 
     const pendingStatus =
-      await this.catalogRepository.findDeletionRequestStatusByCode(DELETION_REQUEST_STATUS_CODES.PENDING);
+      await this.catalogRepository.findDeletionRequestStatusByCode(
+        DELETION_REQUEST_STATUS_CODES.PENDING,
+      );
     if (request.deletionRequestStatusId !== pendingStatus?.id) {
       throw new BadRequestException('Esta solicitud ya fue revisada');
     }

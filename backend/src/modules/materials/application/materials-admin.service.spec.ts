@@ -86,12 +86,18 @@ describe('MaterialsAdminService', () => {
 
       requestRepo.findById.mockResolvedValue(mockRequest);
       materialRepo.findById.mockResolvedValue(mockMaterial);
-      catalogRepo.findDeletionRequestStatusByCode.mockImplementation(async (code) => {
-        if (code === DELETION_REQUEST_STATUS_CODES.PENDING) return { id: 'status-pending' } as any;
-        if (code === DELETION_REQUEST_STATUS_CODES.APPROVED) return { id: 'status-approved' } as any;
-        return null;
-      });
-      catalogRepo.findMaterialStatusByCode.mockResolvedValue({ id: 'status-archived' } as any);
+      catalogRepo.findDeletionRequestStatusByCode.mockImplementation(
+        async (code) => {
+          if (code === DELETION_REQUEST_STATUS_CODES.PENDING)
+            return { id: 'status-pending' } as any;
+          if (code === DELETION_REQUEST_STATUS_CODES.APPROVED)
+            return { id: 'status-approved' } as any;
+          return null;
+        },
+      );
+      catalogRepo.findMaterialStatusByCode.mockResolvedValue({
+        id: 'status-archived',
+      } as any);
 
       dataSource.transaction.mockImplementation(async (cb: any) => {
         const manager = {
@@ -105,15 +111,24 @@ describe('MaterialsAdminService', () => {
         reason: 'ok',
       });
 
-      expect(cacheService.del).toHaveBeenCalledWith('cache:materials:contents:folder:folder-1');
-      expect(cacheService.del).toHaveBeenCalledWith('cache:materials:class-event:event-1');
+      expect(cacheService.del).toHaveBeenCalledWith(
+        'cache:materials:contents:folder:folder-1',
+      );
+      expect(cacheService.del).toHaveBeenCalledWith(
+        'cache:materials:class-event:event-1',
+      );
     });
   });
 
   describe('hardDeleteMaterial', () => {
     it('should invalidate cache after physical deletion', async () => {
-      materialRepo.findById.mockResolvedValue({ ...mockMaterial, materialStatusId: 'status-archived' } as Material);
-      catalogRepo.findMaterialStatusByCode.mockResolvedValue({ id: 'status-archived' } as any);
+      materialRepo.findById.mockResolvedValue({
+        ...mockMaterial,
+        materialStatusId: 'status-archived',
+      } as Material);
+      catalogRepo.findMaterialStatusByCode.mockResolvedValue({
+        id: 'status-archived',
+      } as any);
 
       dataSource.transaction.mockImplementation(async (cb: any) => {
         const manager = {
@@ -129,8 +144,12 @@ describe('MaterialsAdminService', () => {
 
       await service.hardDeleteMaterial('admin-1', 'mat-1');
 
-      expect(cacheService.del).toHaveBeenCalledWith('cache:materials:contents:folder:folder-1');
-      expect(cacheService.del).toHaveBeenCalledWith('cache:materials:class-event:event-1');
+      expect(cacheService.del).toHaveBeenCalledWith(
+        'cache:materials:contents:folder:folder-1',
+      );
+      expect(cacheService.del).toHaveBeenCalledWith(
+        'cache:materials:class-event:event-1',
+      );
     });
   });
 });

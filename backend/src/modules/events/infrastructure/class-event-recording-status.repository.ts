@@ -21,4 +21,3 @@ export class ClassEventRecordingStatusRepository {
     return await repo.findOne({ where: { code } });
   }
 }
-

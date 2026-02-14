@@ -361,10 +361,12 @@ describe('MaterialsService', () => {
 
     it('should allow access to professor if assignment is active', async () => {
       folderRepo.findById.mockResolvedValue(mockFolder('folder-1', '100'));
-      catalogRepo.findFolderStatusByCode.mockResolvedValue({ id: '1' } as FolderStatus);
+      catalogRepo.findFolderStatusByCode.mockResolvedValue({
+        id: '1',
+      } as FolderStatus);
       folderRepo.findSubFolders.mockResolvedValue([]);
       materialRepo.findByFolderId.mockResolvedValue([]);
-      
+
       dataSource.query.mockResolvedValue([{ 1: 1 }]); // Found active assignment
 
       const result = await service.getFolderContents(mockProfessor, 'folder-1');
@@ -423,9 +425,16 @@ describe('MaterialsService', () => {
       // Mock de una transacción que tarda un poco para simular concurrencia
       dataSource.transaction.mockImplementation(async (cb: any) => {
         const mockManager = {
-          findOne: jest.fn().mockResolvedValueOnce(persistedMaterial).mockResolvedValueOnce({ id: 'ver-1', versionNumber: 1 }),
+          findOne: jest
+            .fn()
+            .mockResolvedValueOnce(persistedMaterial)
+            .mockResolvedValueOnce({ id: 'ver-1', versionNumber: 1 }),
           create: jest.fn((_: any, data: any) => data),
-          save: jest.fn().mockImplementation((entity) => Promise.resolve({ ...entity, id: 'new-ver' })),
+          save: jest
+            .fn()
+            .mockImplementation((entity) =>
+              Promise.resolve({ ...entity, id: 'new-ver' }),
+            ),
         } as any;
         return await cb(mockManager);
       });

@@ -77,7 +77,9 @@ describe('E2E: Estructuras Dinámicas y Acceso Evolutivo', () => {
     const userFullEmail = TestSeeder.generateUniqueEmail('full_dyn');
     const userPartialEmail = TestSeeder.generateUniqueEmail('partial_dyn');
 
-    const admin = await seeder.createAuthenticatedUser(adminEmail, [ROLE_CODES.ADMIN]);
+    const admin = await seeder.createAuthenticatedUser(adminEmail, [
+      ROLE_CODES.ADMIN,
+    ]);
     userFull = await seeder.createUser(userFullEmail);
     userPartial = await seeder.createUser(userPartialEmail);
 

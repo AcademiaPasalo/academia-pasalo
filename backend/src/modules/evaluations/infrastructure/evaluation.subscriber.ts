@@ -85,7 +85,9 @@ export class EvaluationSubscriber implements EntitySubscriberInterface<Evaluatio
           .innerJoinAndSelect('ee.evaluation', 'ev')
           .innerJoinAndSelect('ev.evaluationType', 'et')
           .where('ee.enrollmentId IN (:...ids)', { ids: enrollmentIds })
-          .andWhere('et.code != :bancoCode', { bancoCode: EVALUATION_TYPE_CODES.BANCO_ENUNCIADOS })
+          .andWhere('et.code != :bancoCode', {
+            bancoCode: EVALUATION_TYPE_CODES.BANCO_ENUNCIADOS,
+          })
           .getMany();
 
         const accessMap = new Map<string, Evaluation[]>();

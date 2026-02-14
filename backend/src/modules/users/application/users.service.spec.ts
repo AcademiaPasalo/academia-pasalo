@@ -89,8 +89,9 @@ describe('UsersService', () => {
     };
     userRepositoryMock.save.mockRejectedValue(error);
 
-          await expect(usersService.assignRole('1', ROLE_CODES.ADMIN)).rejects.toBeInstanceOf(      ConflictException,
-    );
+    await expect(
+      usersService.assignRole('1', ROLE_CODES.ADMIN),
+    ).rejects.toBeInstanceOf(ConflictException);
   });
 
   it('assignRole: éxito invalida identidad por cambio de rol', async () => {

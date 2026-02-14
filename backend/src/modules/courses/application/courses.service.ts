@@ -31,6 +31,7 @@ import {
   EVALUATION_TYPE_CODES,
 } from '@modules/evaluations/domain/evaluation.constants';
 import { COURSE_CACHE_KEYS } from '@modules/courses/domain/course.constants';
+import { technicalSettings } from '@config/technical-settings';
 
 type EvaluationWithAccess = Evaluation & {
   enrollmentEvaluations?: EnrollmentEvaluation[];
@@ -40,8 +41,10 @@ type EvaluationWithAccess = Evaluation & {
 @Injectable()
 export class CoursesService {
   private readonly logger = new Logger(CoursesService.name);
-  private readonly CONTENT_CACHE_TTL = 600;
-  private readonly PROFESSOR_ASSIGNMENT_CACHE_TTL = 3600;
+  private readonly CONTENT_CACHE_TTL =
+    technicalSettings.cache.courses.courseContentCacheTtlSeconds;
+  private readonly PROFESSOR_ASSIGNMENT_CACHE_TTL =
+    technicalSettings.cache.courses.professorAssignmentCacheTtlSeconds;
 
   constructor(
     private readonly dataSource: DataSource,

@@ -47,4 +47,3 @@ export class MaterialsAdminController {
     await this.adminService.hardDeleteMaterial(user.id, materialId);
   }
 }
-

@@ -20,7 +20,10 @@ import { Auth } from '@common/decorators/auth.decorator';
 import { Roles } from '@common/decorators/roles.decorator';
 import { CurrentUser } from '@common/decorators/current-user.decorator';
 import { User } from '@modules/users/domain/user.entity';
-import { ADMIN_ROLE_CODES, ROLE_CODES } from '@common/constants/role-codes.constants';
+import {
+  ADMIN_ROLE_CODES,
+  ROLE_CODES,
+} from '@common/constants/role-codes.constants';
 
 @Controller('users')
 @Auth()

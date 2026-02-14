@@ -107,7 +107,10 @@ export class MaterialsController {
     @CurrentUser() user: User,
     @Param('classEventId') classEventId: string,
   ) {
-    return await this.materialsService.getClassEventMaterials(user, classEventId);
+    return await this.materialsService.getClassEventMaterials(
+      user,
+      classEventId,
+    );
   }
 
   @Get(':id/download')

@@ -283,7 +283,10 @@ export class TestSeeder {
     })) as BasicEntity | null;
     if (!activeStatus)
       activeStatus = (await statusRepo.save(
-        statusRepo.create({ code: SESSION_STATUS_CODES.ACTIVE, name: 'Active' }),
+        statusRepo.create({
+          code: SESSION_STATUS_CODES.ACTIVE,
+          name: 'Active',
+        }),
       )) as BasicEntity;
 
     const deviceId = 'device-' + Date.now();

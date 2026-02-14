@@ -24,7 +24,7 @@ describe('E2E: Integridad de Seguridad y Blindaje de Accesos', () => {
   let admin: { user: User; token: string };
   let studentPartial: { user: User; token: string };
   let studentFull: { user: User; token: string };
-  
+
   let evaluationPC1: Evaluation;
   let evaluationPC2: Evaluation;
   let pc1FolderId: string;
@@ -44,7 +44,9 @@ describe('E2E: Integridad de Seguridad y Blindaje de Accesos', () => {
 
     app = moduleFixture.createNestApplication();
     app.setGlobalPrefix('api/v1');
-    app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
+    app.useGlobalPipes(
+      new ValidationPipe({ whitelist: true, transform: true }),
+    );
     app.useGlobalInterceptors(new TransformInterceptor(app.get(Reflector)));
 
     await app.init();
@@ -55,37 +57,83 @@ describe('E2E: Integridad de Seguridad y Blindaje de Accesos', () => {
 
     await cacheService.invalidateGroup('*');
     await dataSource.query('SET FOREIGN_KEY_CHECKS = 0');
-    const tables = ['deletion_request', 'enrollment_evaluation', 'enrollment', 'material', 'class_event', 'material_folder', 'evaluation', 'course_cycle', 'academic_cycle', 'course', 'user_role', 'user', 'user_session'];
+    const tables = [
+      'deletion_request',
+      'enrollment_evaluation',
+      'enrollment',
+      'material',
+      'class_event',
+      'material_folder',
+      'evaluation',
+      'course_cycle',
+      'academic_cycle',
+      'course',
+      'user_role',
+      'user',
+      'user_session',
+    ];
     for (const table of tables) await dataSource.query(`DELETE FROM ${table}`);
     await dataSource.query('SET FOREIGN_KEY_CHECKS = 1');
 
     await seeder.ensureMaterialStatuses();
-    
+
     // 1. Crear Estructura Base
-    const cycle = await seeder.createCycle(`Integrity-Cycle-${Date.now()}`, formatDate(yesterday), formatDate(nextMonth));
+    const cycle = await seeder.createCycle(
+      `Integrity-Cycle-${Date.now()}`,
+      formatDate(yesterday),
+      formatDate(nextMonth),
+    );
     const course = await seeder.createCourse(`INT-101`, 'Seguridad de Datos');
     const courseCycle = await seeder.linkCourseCycle(course.id, cycle.id);
 
     // 2. Crear Evaluaciones (PC1 y PC2)
-    evaluationPC1 = await seeder.createEvaluation(courseCycle.id, EVALUATION_TYPE_CODES.PC, 1, formatDate(yesterday), formatDate(nextMonth));
-    evaluationPC2 = await seeder.createEvaluation(courseCycle.id, EVALUATION_TYPE_CODES.PC, 2, formatDate(yesterday), formatDate(nextMonth));
+    evaluationPC1 = await seeder.createEvaluation(
+      courseCycle.id,
+      EVALUATION_TYPE_CODES.PC,
+      1,
+      formatDate(yesterday),
+      formatDate(nextMonth),
+    );
+    evaluationPC2 = await seeder.createEvaluation(
+      courseCycle.id,
+      EVALUATION_TYPE_CODES.PC,
+      2,
+      formatDate(yesterday),
+      formatDate(nextMonth),
+    );
 
     // 3. Crear Usuarios
-    admin = await seeder.createAuthenticatedUser('admin@integrity.com', [ROLE_CODES.ADMIN]);
-    studentPartial = await seeder.createAuthenticatedUser('partial@integrity.com', [ROLE_CODES.STUDENT]);
-    studentFull = await seeder.createAuthenticatedUser('full@integrity.com', [ROLE_CODES.STUDENT]);
+    admin = await seeder.createAuthenticatedUser('admin@integrity.com', [
+      ROLE_CODES.ADMIN,
+    ]);
+    studentPartial = await seeder.createAuthenticatedUser(
+      'partial@integrity.com',
+      [ROLE_CODES.STUDENT],
+    );
+    studentFull = await seeder.createAuthenticatedUser('full@integrity.com', [
+      ROLE_CODES.STUDENT,
+    ]);
 
     // 4. Matricular Alumnos
     await request(app.getHttpServer())
       .post('/api/v1/enrollments')
       .set('Authorization', `Bearer ${admin.token}`)
-      .send({ userId: studentPartial.user.id, courseCycleId: courseCycle.id, enrollmentTypeCode: ENROLLMENT_TYPE_CODES.PARTIAL, evaluationIds: [evaluationPC1.id] })
+      .send({
+        userId: studentPartial.user.id,
+        courseCycleId: courseCycle.id,
+        enrollmentTypeCode: ENROLLMENT_TYPE_CODES.PARTIAL,
+        evaluationIds: [evaluationPC1.id],
+      })
       .expect(201);
 
     await request(app.getHttpServer())
       .post('/api/v1/enrollments')
       .set('Authorization', `Bearer ${admin.token}`)
-      .send({ userId: studentFull.user.id, courseCycleId: courseCycle.id, enrollmentTypeCode: ENROLLMENT_TYPE_CODES.FULL })
+      .send({
+        userId: studentFull.user.id,
+        courseCycleId: courseCycle.id,
+        enrollmentTypeCode: ENROLLMENT_TYPE_CODES.FULL,
+      })
       .expect(201);
 
     // 5. Crear Contenido en PC1 y PC2
@@ -121,8 +169,8 @@ describe('E2E: Integridad de Seguridad y Blindaje de Accesos', () => {
         title: 'Sesion PC2',
         topic: 'Hack attempt',
         startDatetime: new Date(now.getTime() + 3600000).toISOString(), // +1 hora
-        endDatetime: new Date(now.getTime() + 7200000).toISOString(),   // +2 horas
-        liveMeetingUrl: 'https://zoom.us/secret'
+        endDatetime: new Date(now.getTime() + 7200000).toISOString(), // +2 horas
+        liveMeetingUrl: 'https://zoom.us/secret',
       })
       .expect(201);
     pc2SessionId = resPC2Session.body.data.id;
@@ -181,9 +229,11 @@ describe('E2E: Integridad de Seguridad y Blindaje de Accesos', () => {
   describe('CASOS DE INTEGRIDAD TEMPORAL', () => {
     it('debe revocar acceso INSTANTÁNEAMENTE si el Admin marca la evaluación como inactiva', async () => {
       // 1. Obtener el ID de la matrícula primero
-      const enrollment = await dataSource.getRepository(Enrollment).findOneOrFail({
-        where: { userId: studentPartial.user.id }
-      });
+      const enrollment = await dataSource
+        .getRepository(Enrollment)
+        .findOneOrFail({
+          where: { userId: studentPartial.user.id },
+        });
 
       // 2. Verificar que tiene acceso inicial
       await request(app.getHttpServer())
@@ -192,13 +242,17 @@ describe('E2E: Integridad de Seguridad y Blindaje de Accesos', () => {
         .expect(200);
 
       // 3. Desactivar acceso en DB
-      await dataSource.getRepository(EnrollmentEvaluation).update(
-        { evaluationId: evaluationPC1.id, enrollmentId: enrollment.id },
-        { isActive: false }
-      );
-      
+      await dataSource
+        .getRepository(EnrollmentEvaluation)
+        .update(
+          { evaluationId: evaluationPC1.id, enrollmentId: enrollment.id },
+          { isActive: false },
+        );
+
       // 4. Limpiar caché específico para forzar re-evaluación
-      await cacheService.invalidateGroup(`cache:access:user:${studentPartial.user.id}:*`);
+      await cacheService.invalidateGroup(
+        `cache:access:user:${studentPartial.user.id}:*`,
+      );
 
       // 5. Intentar acceder -> 403
       await request(app.getHttpServer())
@@ -209,16 +263,22 @@ describe('E2E: Integridad de Seguridad y Blindaje de Accesos', () => {
 
     it('debe revocar acceso si la fecha actual supera accessEndDate', async () => {
       // 1. Obtener el ID de la matrícula primero
-      const enrollment = await dataSource.getRepository(Enrollment).findOneOrFail({
-        where: { userId: studentPartial.user.id }
-      });
+      const enrollment = await dataSource
+        .getRepository(Enrollment)
+        .findOneOrFail({
+          where: { userId: studentPartial.user.id },
+        });
 
       // 2. Restaurar acceso pero con fecha expirada (ayer)
-      await dataSource.getRepository(EnrollmentEvaluation).update(
-        { evaluationId: evaluationPC1.id, enrollmentId: enrollment.id },
-        { isActive: true, accessEndDate: yesterday }
+      await dataSource
+        .getRepository(EnrollmentEvaluation)
+        .update(
+          { evaluationId: evaluationPC1.id, enrollmentId: enrollment.id },
+          { isActive: true, accessEndDate: yesterday },
+        );
+      await cacheService.invalidateGroup(
+        `cache:access:user:${studentPartial.user.id}:*`,
       );
-      await cacheService.invalidateGroup(`cache:access:user:${studentPartial.user.id}:*`);
 
       // 3. Intentar acceder -> 403
       await request(app.getHttpServer())
