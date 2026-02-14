@@ -11,6 +11,7 @@ import Icon from '@/components/ui/Icon';
 // Importar componentes de estudiante
 import StudentInicioContent from '@/components/pages/student/InicioContent';
 import StudentCursoContent from '@/components/pages/student/CursoContent';
+import StudentCalendarioContent from '@/components/pages/student/CalendarioContent';
 
 // Importar componentes de docente
 import TeacherInicioContent from '@/components/pages/teacher/InicioContent';
@@ -27,6 +28,7 @@ const componentMap: Record<string, React.ComponentType<any>> = {
   // Estudiante
   'student/InicioContent': StudentInicioContent,
   'student/CursoContent': StudentCursoContent,
+  'student/CalendarioContent': StudentCalendarioContent,
   
   // Docente
   'teacher/InicioContent': TeacherInicioContent,

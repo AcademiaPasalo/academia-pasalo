@@ -17,7 +17,7 @@ export type BackendRoleCode = 'STUDENT' | 'PROFESSOR' | 'ADMIN' | 'SUPER_ADMIN';
 export function mapBackendRoleToUserRole(backendCode: string): UserRole {
   const mapping: Record<string, UserRole> = {
     'STUDENT': 'STUDENT',
-    'PROFESSOR': 'TEACHER', // ⚠️ Backend usa PROFESSOR, frontend usa TEACHER
+    'PROFESSOR': 'TEACHER',
     'ADMIN': 'ADMIN',
     'SUPER_ADMIN': 'SUPER_ADMIN'
   };
