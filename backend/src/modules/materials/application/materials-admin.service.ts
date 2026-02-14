@@ -19,6 +19,16 @@ import { FileVersion } from '@modules/materials/domain/file-version.entity';
 import { FileResource } from '@modules/materials/domain/file-resource.entity';
 import { Material } from '@modules/materials/domain/material.entity';
 import { AuditService } from '@modules/audit/application/audit.service';
+import {
+  AUDIT_ACTION_CODES,
+  AUDIT_ENTITY_TYPES,
+} from '@modules/audit/interfaces/audit.constants';
+import { RedisCacheService } from '@infrastructure/cache/redis-cache.service';
+import {
+  DELETION_REQUEST_STATUS_CODES,
+  MATERIAL_CACHE_KEYS,
+  MATERIAL_STATUS_CODES,
+} from '@modules/materials/domain/material.constants';
 
 @Injectable()
 export class MaterialsAdminService {
@@ -31,14 +41,15 @@ export class MaterialsAdminService {
     private readonly catalogRepository: MaterialCatalogRepository,
     private readonly storageService: StorageService,
     private readonly auditService: AuditService,
+    private readonly cacheService: RedisCacheService,
   ) {}
 
   async findAllPendingRequests(): Promise<DeletionRequest[]> {
     const pendingStatus =
-      await this.catalogRepository.findDeletionRequestStatusByCode('PENDING');
+      await this.catalogRepository.findDeletionRequestStatusByCode(DELETION_REQUEST_STATUS_CODES.PENDING);
     if (!pendingStatus)
       throw new InternalServerErrorException(
-        'Configuración corrupta: Estado PENDING faltante',
+        `Error de configuración: Estado ${DELETION_REQUEST_STATUS_CODES.PENDING} faltante`,
       );
 
     return await this.requestRepository.findByStatusId(pendingStatus.id);
@@ -53,7 +64,7 @@ export class MaterialsAdminService {
     if (!request) throw new NotFoundException('Solicitud no encontrada');
 
     const pendingStatus =
-      await this.catalogRepository.findDeletionRequestStatusByCode('PENDING');
+      await this.catalogRepository.findDeletionRequestStatusByCode(DELETION_REQUEST_STATUS_CODES.PENDING);
     if (request.deletionRequestStatusId !== pendingStatus?.id) {
       throw new BadRequestException('Esta solicitud ya fue revisada');
     }
@@ -85,14 +96,21 @@ export class MaterialsAdminService {
     adminId: string,
     manager: EntityManager,
   ) {
+    const material = await this.materialRepository.findById(materialId);
+    if (!material) throw new NotFoundException('Material no encontrado');
+
     const approvedStatus =
-      await this.catalogRepository.findDeletionRequestStatusByCode('APPROVED');
+      await this.catalogRepository.findDeletionRequestStatusByCode(
+        DELETION_REQUEST_STATUS_CODES.APPROVED,
+      );
     const archivedMaterialStatus =
-      await this.catalogRepository.findMaterialStatusByCode('ARCHIVED');
+      await this.catalogRepository.findMaterialStatusByCode(
+        MATERIAL_STATUS_CODES.ARCHIVED,
+      );
 
     if (!approvedStatus || !archivedMaterialStatus) {
       throw new InternalServerErrorException(
-        'Estados de sistema faltantes (APPROVED/ARCHIVED)',
+        `Error de configuración: Estados de sistema faltantes (${DELETION_REQUEST_STATUS_CODES.APPROVED}/${MATERIAL_STATUS_CODES.ARCHIVED})`,
       );
     }
 
@@ -111,11 +129,13 @@ export class MaterialsAdminService {
 
     await this.auditService.logAction(
       adminId,
-      'CONTENT_DISABLE',
-      'material',
+      AUDIT_ACTION_CODES.CONTENT_DISABLE,
+      AUDIT_ENTITY_TYPES.MATERIAL,
       materialId,
       manager,
     );
+
+    await this.invalidateMaterialCaches(material);
   }
 
   private async handleRejection(
@@ -124,9 +144,13 @@ export class MaterialsAdminService {
     manager: EntityManager,
   ) {
     const rejectedStatus =
-      await this.catalogRepository.findDeletionRequestStatusByCode('REJECTED');
+      await this.catalogRepository.findDeletionRequestStatusByCode(
+        DELETION_REQUEST_STATUS_CODES.REJECTED,
+      );
     if (!rejectedStatus)
-      throw new InternalServerErrorException('Estado REJECTED faltante');
+      throw new InternalServerErrorException(
+        `Error de configuración: Estado ${DELETION_REQUEST_STATUS_CODES.REJECTED} faltante`,
+      );
 
     await manager.update(DeletionRequest, requestId, {
       deletionRequestStatusId: rejectedStatus.id,
@@ -141,7 +165,9 @@ export class MaterialsAdminService {
     if (!material) throw new NotFoundException('Material no encontrado');
 
     const archivedStatus =
-      await this.catalogRepository.findMaterialStatusByCode('ARCHIVED');
+      await this.catalogRepository.findMaterialStatusByCode(
+        MATERIAL_STATUS_CODES.ARCHIVED,
+      );
     if (material.materialStatusId !== archivedStatus?.id) {
       throw new BadRequestException(
         'Solo se pueden eliminar físicamente materiales que estén ARCHIVADOS.',
@@ -165,8 +191,8 @@ export class MaterialsAdminService {
 
       await this.auditService.logAction(
         adminId,
-        'FILE_DELETE',
-        'material',
+        AUDIT_ACTION_CODES.FILE_DELETE,
+        AUDIT_ENTITY_TYPES.MATERIAL,
         materialId,
         manager,
       );
@@ -206,10 +232,32 @@ export class MaterialsAdminService {
       }
     }
 
+    await this.invalidateMaterialCaches(material);
+
     this.logger.warn({
       message: 'Material eliminado físicamente (Hard Delete)',
       materialId,
       adminId,
     });
+  }
+
+  private async invalidateMaterialCaches(material: Material): Promise<void> {
+    const promises: Promise<void>[] = [];
+
+    promises.push(
+      this.cacheService.del(
+        MATERIAL_CACHE_KEYS.CONTENTS(material.materialFolderId),
+      ),
+    );
+
+    if (material.classEventId) {
+      promises.push(
+        this.cacheService.del(
+          MATERIAL_CACHE_KEYS.CLASS_EVENT(material.classEventId),
+        ),
+      );
+    }
+
+    await Promise.all(promises);
   }
 }

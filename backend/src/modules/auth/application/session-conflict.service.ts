@@ -8,6 +8,7 @@ import {
   ConcurrentDecision,
   CONCURRENT_DECISIONS,
   SECURITY_EVENT_CODES,
+  SECURITY_MESSAGES,
   SESSION_STATUS_CODES,
 } from '@modules/auth/interfaces/security.constants';
 import { technicalSettings } from '@config/technical-settings';
@@ -58,7 +59,7 @@ export class SessionConflictService {
         newSession.deviceId !== params.deviceId ||
         newSession.sessionStatusId !== pendingStatusId
       ) {
-        throw new UnauthorizedException('Sesión inválida o expirada');
+        throw new UnauthorizedException(SECURITY_MESSAGES.INVALID_SESSION);
       }
 
       const existingSession =
@@ -101,7 +102,7 @@ export class SessionConflictService {
       );
 
       if (!lockedExisting) {
-        throw new UnauthorizedException('Sesión inválida o expirada');
+        throw new UnauthorizedException(SECURITY_MESSAGES.INVALID_SESSION);
       }
 
       if (params.decision === CONCURRENT_DECISIONS.KEEP_NEW) {

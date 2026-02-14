@@ -11,6 +11,9 @@ import { User } from '@modules/users/domain/user.entity';
 import { Evaluation } from '@modules/evaluations/domain/evaluation.entity';
 import { Enrollment } from '@modules/enrollments/domain/enrollment.entity';
 import { EnrollmentEvaluation } from '@modules/enrollments/domain/enrollment-evaluation.entity';
+import { ROLE_CODES } from '@common/constants/role-codes.constants';
+import { ENROLLMENT_TYPE_CODES } from '@modules/enrollments/domain/enrollment.constants';
+import { EVALUATION_TYPE_CODES } from '@modules/evaluations/domain/evaluation.constants';
 
 jest.setTimeout(60000);
 
@@ -85,7 +88,7 @@ describe('E2E: Acceso Histórico y Ciclos Pasados', () => {
 
     pastPC1 = await seeder.createEvaluation(
       pastCourseCycle.id,
-      'PC',
+      EVALUATION_TYPE_CODES.PC,
       1,
       formatDate(pastPCStart),
       formatDate(pastPCEnd),
@@ -98,7 +101,7 @@ describe('E2E: Acceso Histórico y Ciclos Pasados', () => {
 
     currentPC1 = await seeder.createEvaluation(
       currentCourseCycle.id,
-      'PC',
+      EVALUATION_TYPE_CODES.PC,
       1,
       formatDate(currentPCStart),
       formatDate(currentPCEnd),
@@ -108,7 +111,7 @@ describe('E2E: Acceso Histórico y Ciclos Pasados', () => {
     const userFullEmail = TestSeeder.generateUniqueEmail('full_hist');
     const userPartialEmail = TestSeeder.generateUniqueEmail('partial_hist');
 
-    const admin = await seeder.createAuthenticatedUser(adminEmail, ['ADMIN']);
+    const admin = await seeder.createAuthenticatedUser(adminEmail, [ROLE_CODES.ADMIN]);
     userFull = await seeder.createUser(userFullEmail);
     userPartial = await seeder.createUser(userPartialEmail);
 
@@ -118,7 +121,7 @@ describe('E2E: Acceso Histórico y Ciclos Pasados', () => {
       .send({
         userId: userFull.id,
         courseCycleId: currentCourseCycle.id,
-        enrollmentTypeCode: 'FULL',
+        enrollmentTypeCode: ENROLLMENT_TYPE_CODES.FULL,
         historicalCourseCycleIds: [pastCourseCycle.id],
       })
       .expect(201);
@@ -129,7 +132,7 @@ describe('E2E: Acceso Histórico y Ciclos Pasados', () => {
       .send({
         userId: userPartial.id,
         courseCycleId: currentCourseCycle.id,
-        enrollmentTypeCode: 'PARTIAL',
+        enrollmentTypeCode: ENROLLMENT_TYPE_CODES.PARTIAL,
         evaluationIds: [pastPC1.id],
         historicalCourseCycleIds: [pastCourseCycle.id],
       })

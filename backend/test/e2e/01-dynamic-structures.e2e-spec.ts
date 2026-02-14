@@ -10,6 +10,9 @@ import { CourseCycle } from '@modules/courses/domain/course-cycle.entity';
 import { User } from '@modules/users/domain/user.entity';
 import { Evaluation } from '@modules/evaluations/domain/evaluation.entity';
 import { EnrollmentEvaluation } from '@modules/enrollments/domain/enrollment-evaluation.entity';
+import { ROLE_CODES } from '@common/constants/role-codes.constants';
+import { ENROLLMENT_TYPE_CODES } from '@modules/enrollments/domain/enrollment.constants';
+import { EVALUATION_TYPE_CODES } from '@modules/evaluations/domain/evaluation.constants';
 
 describe('E2E: Estructuras Dinámicas y Acceso Evolutivo', () => {
   let app: INestApplication;
@@ -64,7 +67,7 @@ describe('E2E: Estructuras Dinámicas y Acceso Evolutivo', () => {
 
     pc1 = await seeder.createEvaluation(
       courseCycle.id,
-      'PC',
+      EVALUATION_TYPE_CODES.PC,
       1,
       formatDate(yesterday),
       formatDate(nextMonth),
@@ -74,7 +77,7 @@ describe('E2E: Estructuras Dinámicas y Acceso Evolutivo', () => {
     const userFullEmail = TestSeeder.generateUniqueEmail('full_dyn');
     const userPartialEmail = TestSeeder.generateUniqueEmail('partial_dyn');
 
-    const admin = await seeder.createAuthenticatedUser(adminEmail, ['ADMIN']);
+    const admin = await seeder.createAuthenticatedUser(adminEmail, [ROLE_CODES.ADMIN]);
     userFull = await seeder.createUser(userFullEmail);
     userPartial = await seeder.createUser(userPartialEmail);
 
@@ -84,7 +87,7 @@ describe('E2E: Estructuras Dinámicas y Acceso Evolutivo', () => {
       .send({
         userId: userFull.id,
         courseCycleId: courseCycle.id,
-        enrollmentTypeCode: 'FULL',
+        enrollmentTypeCode: ENROLLMENT_TYPE_CODES.FULL,
       })
       .expect(201);
 
@@ -94,7 +97,7 @@ describe('E2E: Estructuras Dinámicas y Acceso Evolutivo', () => {
       .send({
         userId: userPartial.id,
         courseCycleId: courseCycle.id,
-        enrollmentTypeCode: 'PARTIAL',
+        enrollmentTypeCode: ENROLLMENT_TYPE_CODES.PARTIAL,
         evaluationIds: [pc1.id],
       })
       .expect(201);
@@ -107,7 +110,7 @@ describe('E2E: Estructuras Dinámicas y Acceso Evolutivo', () => {
   it('Caso 1: Creación tardía de PC2 - Usuario Full debe tener acceso automático', async () => {
     const pc2 = await seeder.createEvaluation(
       courseCycle.id,
-      'PC',
+      EVALUATION_TYPE_CODES.PC,
       2,
       formatDate(yesterday),
       formatDate(next2Months),
@@ -153,7 +156,7 @@ describe('E2E: Estructuras Dinámicas y Acceso Evolutivo', () => {
   it('Caso 4: Creación tardía de Banco de Enunciados - Todos deben tener acceso (con clamping)', async () => {
     const extraBank = await seeder.createEvaluation(
       courseCycle.id,
-      'BANCO_ENUNCIADOS',
+      EVALUATION_TYPE_CODES.BANCO_ENUNCIADOS,
       99,
       formatDate(now),
       formatDate(next2Months),

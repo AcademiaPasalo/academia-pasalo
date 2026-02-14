@@ -8,6 +8,11 @@ import { SecurityEventRepository } from '@modules/auth/infrastructure/security-e
 import { InternalServerErrorException } from '@nestjs/common';
 import { AuditAction } from '@modules/audit/domain/audit-action.entity';
 import { QUEUES } from '@infrastructure/queue/queue.constants';
+import {
+  AUDIT_ACTION_CODES,
+  AUDIT_ENTITY_TYPES,
+} from '../interfaces/audit.constants';
+import { SECURITY_EVENT_CODES } from '@modules/auth/interfaces/security.constants';
 
 describe('AuditService', () => {
   let service: AuditService;
@@ -18,8 +23,8 @@ describe('AuditService', () => {
 
   const mockAuditAction = {
     id: '1',
-    code: 'TEST_ACTION',
-    name: 'Test Action',
+    code: AUDIT_ACTION_CODES.FILE_UPLOAD,
+    name: 'File Upload',
   } as AuditAction;
 
   beforeEach(async () => {
@@ -64,20 +69,20 @@ describe('AuditService', () => {
     it('should create an audit log successfully', async () => {
       const result = await service.logAction(
         'user-1',
-        'TEST_ACTION',
-        'entity',
+        AUDIT_ACTION_CODES.FILE_UPLOAD,
+        AUDIT_ENTITY_TYPES.MATERIAL,
         '123',
       );
 
       expect(auditActionRepository.findByCode).toHaveBeenCalledWith(
-        'TEST_ACTION',
+        AUDIT_ACTION_CODES.FILE_UPLOAD,
         undefined,
       );
       expect(auditLogRepository.create).toHaveBeenCalledWith(
         expect.objectContaining({
           userId: 'user-1',
           auditActionId: '1',
-          entityType: 'entity',
+          entityType: AUDIT_ENTITY_TYPES.MATERIAL,
           entityId: '123',
         }),
         undefined,
@@ -105,7 +110,10 @@ describe('AuditService', () => {
           eventDatetime: now,
           userId: 'u1',
           user: { firstName: 'Admin' },
-          securityEventType: { code: 'LOGIN', name: 'Login' },
+          securityEventType: {
+            code: SECURITY_EVENT_CODES.LOGIN_SUCCESS,
+            name: 'Login',
+          },
           ipAddress: '127.0.0.1',
         },
       ];
@@ -116,8 +124,8 @@ describe('AuditService', () => {
           eventDatetime: past,
           userId: 'u1',
           user: { firstName: 'Admin' },
-          auditAction: { code: 'UPLOAD', name: 'Upload' },
-          entityType: 'file',
+          auditAction: { code: AUDIT_ACTION_CODES.FILE_UPLOAD, name: 'Upload' },
+          entityType: AUDIT_ENTITY_TYPES.MATERIAL,
           entityId: 'f1',
         },
       ];

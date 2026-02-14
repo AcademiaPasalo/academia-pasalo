@@ -8,11 +8,12 @@ import {
   JoinColumn,
 } from 'typeorm';
 import { Role } from './role.entity';
+import { PHOTO_SOURCES } from '@modules/auth/interfaces/security.constants';
 
 export enum PhotoSource {
-  GOOGLE = 'google',
-  UPLOADED = 'uploaded',
-  NONE = 'none',
+  GOOGLE = PHOTO_SOURCES.GOOGLE,
+  UPLOADED = PHOTO_SOURCES.UPLOADED,
+  NONE = PHOTO_SOURCES.NONE,
 }
 
 @Entity('user')

@@ -26,6 +26,11 @@ import {
 } from '@modules/courses/dto/course-content.dto';
 import { Evaluation } from '@modules/evaluations/domain/evaluation.entity';
 import { EnrollmentEvaluation } from '@modules/enrollments/domain/enrollment-evaluation.entity';
+import {
+  EVALUATION_ACCESS_STATUS_CODES,
+  EVALUATION_TYPE_CODES,
+} from '@modules/evaluations/domain/evaluation.constants';
+import { COURSE_CACHE_KEYS } from '@modules/courses/domain/course.constants';
 
 type EvaluationWithAccess = Evaluation & {
   enrollmentEvaluations?: EnrollmentEvaluation[];
@@ -122,13 +127,12 @@ export class CoursesService {
       );
 
       const bancoType = await this.evaluationRepository.findTypeByCode(
-        'BANCO_ENUNCIADOS',
+        EVALUATION_TYPE_CODES.BANCO_ENUNCIADOS,
         manager,
       );
       if (!bancoType) {
         this.logger.error({
-          message:
-            'Tipo de evaluación BANCO_ENUNCIADOS no configurado en el catálogo',
+          message: `Tipo de evaluación ${EVALUATION_TYPE_CODES.BANCO_ENUNCIADOS} no configurado en el catálogo`,
           timestamp: new Date().toISOString(),
         });
         throw new InternalServerErrorException(
@@ -220,7 +224,7 @@ export class CoursesService {
     courseCycleId: string,
     userId: string,
   ): Promise<CourseContentResponseDto> {
-    const cacheKey = `cache:content:cycle:${courseCycleId}:user:${userId}`;
+    const cacheKey = COURSE_CACHE_KEYS.COURSE_CONTENT(courseCycleId, userId);
 
     let rawData = await this.cacheService.get<{
       cycle: CourseCycle;
@@ -273,7 +277,7 @@ export class CoursesService {
         const statusDto = new EvaluationStatusDto();
 
         if (!access || !access.isActive) {
-          statusDto.status = 'LOCKED';
+          statusDto.status = EVALUATION_ACCESS_STATUS_CODES.LOCKED;
           statusDto.hasAccess = false;
           statusDto.accessStart = null;
           statusDto.accessEnd = null;
@@ -283,11 +287,11 @@ export class CoursesService {
           statusDto.accessEnd = new Date(access.accessEndDate);
 
           if (now > statusDto.accessEnd) {
-            statusDto.status = 'COMPLETED';
+            statusDto.status = EVALUATION_ACCESS_STATUS_CODES.COMPLETED;
           } else if (now < statusDto.accessStart) {
-            statusDto.status = 'UPCOMING';
+            statusDto.status = EVALUATION_ACCESS_STATUS_CODES.UPCOMING;
           } else {
-            statusDto.status = 'IN_PROGRESS';
+            statusDto.status = EVALUATION_ACCESS_STATUS_CODES.IN_PROGRESS;
           }
         }
 

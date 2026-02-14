@@ -10,6 +10,9 @@ import { User } from '@modules/users/domain/user.entity';
 import { Evaluation } from '@modules/evaluations/domain/evaluation.entity';
 import { RedisCacheService } from '@infrastructure/cache/redis-cache.service';
 import { EnrollmentEvaluation } from '@modules/enrollments/domain/enrollment-evaluation.entity';
+import { ROLE_CODES } from '@common/constants/role-codes.constants';
+import { ENROLLMENT_TYPE_CODES } from '@modules/enrollments/domain/enrollment.constants';
+import { EVALUATION_TYPE_CODES } from '@modules/evaluations/domain/evaluation.constants';
 
 interface EnrollmentResponse {
   id: string;
@@ -61,7 +64,7 @@ describe('E2E: Revocación Administrativa', () => {
     courseCycle = await seeder.linkCourseCycle(course.id, cycle.id);
     pc1 = await seeder.createEvaluation(
       courseCycle.id,
-      'PC',
+      EVALUATION_TYPE_CODES.PC,
       1,
       formatDate(yesterday),
       formatDate(nextMonth),
@@ -70,7 +73,7 @@ describe('E2E: Revocación Administrativa', () => {
     const adminEmail = TestSeeder.generateUniqueEmail('admin_rev');
     const userTargetEmail = TestSeeder.generateUniqueEmail('target_rev');
 
-    const admin = await seeder.createAuthenticatedUser(adminEmail, ['ADMIN']);
+    const admin = await seeder.createAuthenticatedUser(adminEmail, [ROLE_CODES.ADMIN]);
     userTarget = await seeder.createUser(userTargetEmail);
 
     const res = await request(app.getHttpServer())
@@ -79,7 +82,7 @@ describe('E2E: Revocación Administrativa', () => {
       .send({
         userId: userTarget.id,
         courseCycleId: courseCycle.id,
-        enrollmentTypeCode: 'PARTIAL',
+        enrollmentTypeCode: ENROLLMENT_TYPE_CODES.PARTIAL,
         evaluationIds: [pc1.id],
       });
 

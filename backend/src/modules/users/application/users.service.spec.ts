@@ -11,6 +11,7 @@ import { PhotoSource } from '@modules/users/domain/user.entity';
 import { IDENTITY_INVALIDATION_REASONS } from '@modules/auth/interfaces/security.constants';
 import type { DatabaseError } from '@common/interfaces/database-error.interface';
 import { MySqlErrorCode } from '@common/interfaces/database-error.interface';
+import { ROLE_CODES } from '@common/constants/role-codes.constants';
 
 describe('UsersService', () => {
   let usersService: UsersService;
@@ -79,7 +80,7 @@ describe('UsersService', () => {
     userRepositoryMock.findById.mockResolvedValue(user);
     roleRepositoryMock.findByCode.mockResolvedValue({
       id: '2',
-      code: 'ADMIN',
+      code: ROLE_CODES.ADMIN,
       name: 'Admin',
     });
 
@@ -88,8 +89,7 @@ describe('UsersService', () => {
     };
     userRepositoryMock.save.mockRejectedValue(error);
 
-    await expect(usersService.assignRole('1', 'ADMIN')).rejects.toBeInstanceOf(
-      ConflictException,
+          await expect(usersService.assignRole('1', ROLE_CODES.ADMIN)).rejects.toBeInstanceOf(      ConflictException,
     );
   });
 
@@ -109,7 +109,7 @@ describe('UsersService', () => {
       updatedAt: null,
       roles: [],
     };
-    const role = { id: '2', code: 'ADMIN', name: 'Admin' };
+    const role = { id: '2', code: ROLE_CODES.ADMIN, name: 'Admin' };
 
     userRepositoryMock.findById.mockResolvedValue(user);
     roleRepositoryMock.findByCode.mockResolvedValue(role);
@@ -118,7 +118,7 @@ describe('UsersService', () => {
       roles: [role],
     });
 
-    await usersService.assignRole('1', 'ADMIN');
+    await usersService.assignRole('1', ROLE_CODES.ADMIN);
 
     expect(
       identitySecurityServiceMock.invalidateUserIdentity,
@@ -241,7 +241,7 @@ describe('UsersService', () => {
   });
 
   it('removeRole: éxito invalida identidad por cambio de rol', async () => {
-    const role = { id: '2', code: 'ADMIN', name: 'Admin' };
+    const role = { id: '2', code: ROLE_CODES.ADMIN, name: 'Admin' };
     const user = {
       id: '1',
       email: 'a@test.com',
@@ -264,7 +264,7 @@ describe('UsersService', () => {
       roles: [],
     });
 
-    await usersService.removeRole('1', 'ADMIN');
+    await usersService.removeRole('1', ROLE_CODES.ADMIN);
 
     expect(
       identitySecurityServiceMock.invalidateUserIdentity,

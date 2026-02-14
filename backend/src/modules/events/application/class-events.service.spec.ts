@@ -372,6 +372,30 @@ describe('ClassEventsService', () => {
     });
   });
 
+  describe('Expiración de Acceso (Instant Revocation)', () => {
+    it('debe denegar acceso si la fecha actual es posterior a access_end_date', async () => {
+      userRepository.findById.mockResolvedValue(mockStudent);
+      enrollmentEvaluationRepository.checkAccess.mockResolvedValue(false);
+
+      const result = await service.checkUserAuthorization('student-1', 'eval-1');
+
+      expect(result).toBe(false);
+      expect(enrollmentEvaluationRepository.checkAccess).toHaveBeenCalledWith(
+        'student-1',
+        'eval-1',
+      );
+    });
+
+    it('debe denegar acceso si la fecha actual es anterior a access_start_date', async () => {
+      userRepository.findById.mockResolvedValue(mockStudent);
+      enrollmentEvaluationRepository.checkAccess.mockResolvedValue(false);
+
+      const result = await service.checkUserAuthorization('student-1', 'eval-1');
+
+      expect(result).toBe(false);
+    });
+  });
+
   describe('updateEvent', () => {
     it('debe setear recordingStatusId READY cuando se actualiza recordingUrl', async () => {
       const event = {

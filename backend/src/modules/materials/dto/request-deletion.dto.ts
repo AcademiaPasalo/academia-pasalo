@@ -5,12 +5,13 @@ import {
   MaxLength,
   IsIn,
 } from 'class-validator';
+import { AUDIT_ENTITY_TYPES } from '@modules/audit/interfaces/audit.constants';
 
 export class RequestDeletionDto {
   @IsNotEmpty()
   @IsString()
-  @IsIn(['material', 'folder'])
-  entityType: 'material' | 'folder';
+  @IsIn([AUDIT_ENTITY_TYPES.MATERIAL, AUDIT_ENTITY_TYPES.FOLDER])
+  entityType: string;
 
   @IsNotEmpty()
   @IsNumberString()

@@ -8,6 +8,20 @@ import { Evaluation } from '@modules/evaluations/domain/evaluation.entity';
 import { User, PhotoSource } from '@modules/users/domain/user.entity';
 import { Role } from '@modules/users/domain/role.entity';
 import { RedisCacheService } from '@infrastructure/cache/redis-cache.service';
+import {
+  ENROLLMENT_STATUS_CODES,
+  ENROLLMENT_TYPE_CODES,
+} from '@modules/enrollments/domain/enrollment.constants';
+import { EVALUATION_TYPE_CODES } from '@modules/evaluations/domain/evaluation.constants';
+import {
+  DELETION_REQUEST_STATUS_CODES,
+  FOLDER_STATUS_CODES,
+  MATERIAL_STATUS_CODES,
+} from '@modules/materials/domain/material.constants';
+import {
+  LOCATION_SOURCES,
+  SESSION_STATUS_CODES,
+} from '@modules/auth/interfaces/security.constants';
 
 interface BasicEntity {
   id: string;
@@ -108,11 +122,14 @@ export class TestSeeder {
     const typeRepo = this.dataSource.getRepository('EvaluationType');
 
     let bankType = (await typeRepo.findOne({
-      where: { code: 'BANCO_ENUNCIADOS' },
+      where: { code: EVALUATION_TYPE_CODES.BANCO_ENUNCIADOS },
     })) as BasicEntity | null;
     if (!bankType)
       bankType = (await typeRepo.save(
-        typeRepo.create({ code: 'BANCO_ENUNCIADOS', name: 'Banco' }),
+        typeRepo.create({
+          code: EVALUATION_TYPE_CODES.BANCO_ENUNCIADOS,
+          name: 'Banco',
+        }),
       )) as BasicEntity;
 
     const cycle = await this.dataSource
@@ -133,8 +150,8 @@ export class TestSeeder {
 
     const typeRepoEnroll = this.dataSource.getRepository('EnrollmentType');
     const types = [
-      { code: 'FULL', name: 'Curso Completo' },
-      { code: 'PARTIAL', name: 'Por Evaluación' },
+      { code: ENROLLMENT_TYPE_CODES.FULL, name: 'Curso Completo' },
+      { code: ENROLLMENT_TYPE_CODES.PARTIAL, name: 'Por Evaluación' },
     ];
     for (const t of types) {
       const exists = await typeRepoEnroll.findOne({ where: { code: t.code } });
@@ -145,11 +162,14 @@ export class TestSeeder {
 
     const statusRepo = this.dataSource.getRepository('EnrollmentStatus');
     const activeStatus = await statusRepo.findOne({
-      where: { code: 'ACTIVE' },
+      where: { code: ENROLLMENT_STATUS_CODES.ACTIVE },
     });
     if (!activeStatus) {
       await statusRepo.save(
-        statusRepo.create({ code: 'ACTIVE', name: 'Matrícula Activa' }),
+        statusRepo.create({
+          code: ENROLLMENT_STATUS_CODES.ACTIVE,
+          name: 'Matrícula Activa',
+        }),
       );
     }
 
@@ -161,15 +181,30 @@ export class TestSeeder {
     const msRepo = this.dataSource.getRepository('MaterialStatus');
     const drsRepo = this.dataSource.getRepository('DeletionRequestStatus');
 
-    if (!(await fsRepo.findOne({ where: { code: 'ACTIVE' } })))
-      await fsRepo.save(fsRepo.create({ code: 'ACTIVE', name: 'Activa' }));
+    if (
+      !(await fsRepo.findOne({ where: { code: FOLDER_STATUS_CODES.ACTIVE } }))
+    )
+      await fsRepo.save(
+        fsRepo.create({ code: FOLDER_STATUS_CODES.ACTIVE, name: 'Activa' }),
+      );
 
-    if (!(await msRepo.findOne({ where: { code: 'ACTIVE' } })))
-      await msRepo.save(msRepo.create({ code: 'ACTIVE', name: 'Activo' }));
+    if (
+      !(await msRepo.findOne({ where: { code: MATERIAL_STATUS_CODES.ACTIVE } }))
+    )
+      await msRepo.save(
+        msRepo.create({ code: MATERIAL_STATUS_CODES.ACTIVE, name: 'Activo' }),
+      );
 
-    if (!(await drsRepo.findOne({ where: { code: 'PENDING' } })))
+    if (
+      !(await drsRepo.findOne({
+        where: { code: DELETION_REQUEST_STATUS_CODES.PENDING },
+      }))
+    )
       await drsRepo.save(
-        drsRepo.create({ code: 'PENDING', name: 'Pendiente' }),
+        drsRepo.create({
+          code: DELETION_REQUEST_STATUS_CODES.PENDING,
+          name: 'Pendiente',
+        }),
       );
   }
 
@@ -202,7 +237,7 @@ export class TestSeeder {
 
   async createAuthenticatedUser(
     email: string,
-    roles: string[] = ['STUDENT'],
+    roles: string[] = [ROLE_CODES.STUDENT],
   ): Promise<{ user: User; token: string }> {
     const userRepo = this.dataSource.getRepository(User);
     const roleRepo = this.dataSource.getRepository(Role);
@@ -244,11 +279,11 @@ export class TestSeeder {
 
     const statusRepo = this.dataSource.getRepository('SessionStatus');
     let activeStatus = (await statusRepo.findOne({
-      where: { code: 'ACTIVE' },
+      where: { code: SESSION_STATUS_CODES.ACTIVE },
     })) as BasicEntity | null;
     if (!activeStatus)
       activeStatus = (await statusRepo.save(
-        statusRepo.create({ code: 'ACTIVE', name: 'Active' }),
+        statusRepo.create({ code: SESSION_STATUS_CODES.ACTIVE, name: 'Active' }),
       )) as BasicEntity;
 
     const deviceId = 'device-' + Date.now();

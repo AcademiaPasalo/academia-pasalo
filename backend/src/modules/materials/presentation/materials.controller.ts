@@ -77,7 +77,7 @@ export class MaterialsController {
     @CurrentUser() user: User,
     @Param('evaluationId') evaluationId: string,
   ) {
-    return await this.materialsService.getRootFolders(user.id, evaluationId);
+    return await this.materialsService.getRootFolders(user, evaluationId);
   }
 
   @Get('folders/:folderId')

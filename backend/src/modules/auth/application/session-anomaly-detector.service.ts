@@ -8,6 +8,8 @@ import { RequestMetadata } from '@modules/auth/interfaces/request-metadata.inter
 import {
   AnomalyType,
   ANOMALY_TYPES,
+  LOCATION_SOURCES,
+  LocationSource,
 } from '@modules/auth/interfaces/security.constants';
 import { technicalSettings } from '@config/technical-settings';
 
@@ -23,7 +25,7 @@ export class SessionAnomalyDetectorService {
   async detectLocationAnomaly(
     userId: string,
     metadata: RequestMetadata,
-    locationSource: 'ip' | 'gps' | 'none',
+    locationSource: LocationSource,
     isNewDevice: boolean,
     manager?: EntityManager,
   ): Promise<{
@@ -54,7 +56,7 @@ export class SessionAnomalyDetectorService {
     const timeDifferenceMinutes = timeDifferenceMs / (1000 * 60);
 
     const timeWindowMinutes =
-      locationSource === 'gps'
+      locationSource === LOCATION_SOURCES.GPS
         ? await this.authSettingsService.getGeoGpsTimeWindowMinutes()
         : await this.authSettingsService.getGeoIpTimeWindowMinutes();
 
@@ -69,7 +71,7 @@ export class SessionAnomalyDetectorService {
     }
 
     if (
-      locationSource === 'none' ||
+      locationSource === LOCATION_SOURCES.NONE ||
       !this.isValidCoordinate(metadata.latitude, metadata.longitude) ||
       !this.isValidCoordinate(lastSession.latitude, lastSession.longitude)
     ) {
@@ -90,7 +92,7 @@ export class SessionAnomalyDetectorService {
     );
 
     const distanceThresholdKm =
-      locationSource === 'gps'
+      locationSource === LOCATION_SOURCES.GPS
         ? await this.authSettingsService.getGeoGpsDistanceKm()
         : await this.authSettingsService.getGeoIpDistanceKm();
 
@@ -137,19 +139,19 @@ export class SessionAnomalyDetectorService {
 
   async resolveCoordinates(metadata: RequestMetadata): Promise<{
     metadata: RequestMetadata;
-    locationSource: 'ip' | 'gps' | 'none';
+    locationSource: LocationSource;
   }> {
     const hasLatitude = typeof metadata.latitude === 'number';
     const hasLongitude = typeof metadata.longitude === 'number';
 
     if (hasLatitude && hasLongitude) {
-      return { metadata, locationSource: 'gps' };
+      return { metadata, locationSource: LOCATION_SOURCES.GPS };
     }
 
     const geo = this.geoProvider.resolve(metadata.ipAddress);
 
     if (!geo) {
-      return { metadata, locationSource: 'none' };
+      return { metadata, locationSource: LOCATION_SOURCES.NONE };
     }
 
     return {
@@ -160,7 +162,7 @@ export class SessionAnomalyDetectorService {
         city: geo.city || undefined,
         country: geo.country || undefined,
       },
-      locationSource: 'ip',
+      locationSource: LOCATION_SOURCES.IP,
     };
   }
 }

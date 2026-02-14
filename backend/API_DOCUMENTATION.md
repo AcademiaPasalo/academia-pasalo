@@ -103,7 +103,12 @@ Base URL: `/api/v1/auth`
   "user": { ... }
 }
 ```
-*Acción Front: Bloquear Dashboard y pedir re-login con Google para confirmar identidad.*
+
+> [!WARNING]
+> **Modo de Auditoría Pasiva (Fase Actual)**
+> Aunque el estado `BLOCKED_PENDING_REAUTH` y el endpoint de re-autenticación están implementados y operativos, la lógica de inicio de sesión actual **opera en modo pasivo**. 
+> Esto significa que las anomalías (viajes imposibles, etc.) se registran en el historial de seguridad pero **no bloquean la sesión del usuario** (la sesión se crea como `ACTIVE`).
+> El flujo de re-autenticación debe considerarse como una capacidad latente para activarse en futuras fases de endurecimiento de seguridad.
 
 ---
 
@@ -161,6 +166,17 @@ Base URL: `/api/v1/auth`
   "code": "string (Nuevo Auth Code obtenido de Google)",
   "refreshToken": "string (Token de la sesión bloqueada)",
   "deviceId": "string"
+}
+```
+
+**Response:**
+`data`: (Mismo objeto que Escenario A de Login)
+```json
+{
+  "accessToken": "JWT",
+  "refreshToken": "JWT",
+  "expiresIn": 10800,
+  "user": null
 }
 ```
 

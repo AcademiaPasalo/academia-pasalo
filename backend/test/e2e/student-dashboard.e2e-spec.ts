@@ -7,6 +7,8 @@ import { DataSource } from 'typeorm';
 import { TestSeeder } from './test-utils';
 import { TransformInterceptor } from '@common/interceptors/transform.interceptor';
 import { User } from '@modules/users/domain/user.entity';
+import { ROLE_CODES } from '@common/constants/role-codes.constants';
+import { ENROLLMENT_TYPE_CODES } from '@modules/enrollments/domain/enrollment.constants';
 
 interface EnrollmentDashboardItem {
   courseCycle: {
@@ -56,11 +58,11 @@ describe('E2E: Dashboard del Alumno (My Courses)', () => {
 
     admin = await seeder.createAuthenticatedUser(
       TestSeeder.generateUniqueEmail('admin_db'),
-      ['ADMIN'],
+      [ROLE_CODES.ADMIN],
     );
     student = await seeder.createAuthenticatedUser(
       TestSeeder.generateUniqueEmail('student_db'),
-      ['STUDENT'],
+      [ROLE_CODES.STUDENT],
     );
 
     const cycle = await seeder.createCycle(
@@ -77,11 +79,11 @@ describe('E2E: Dashboard del Alumno (My Courses)', () => {
 
     const prof1 = await seeder.createAuthenticatedUser(
       TestSeeder.generateUniqueEmail('p1'),
-      ['PROFESSOR'],
+      [ROLE_CODES.PROFESSOR],
     );
     const prof2 = await seeder.createAuthenticatedUser(
       TestSeeder.generateUniqueEmail('p2'),
-      ['PROFESSOR'],
+      [ROLE_CODES.PROFESSOR],
     );
 
     await dataSource.query(
@@ -99,7 +101,7 @@ describe('E2E: Dashboard del Alumno (My Courses)', () => {
       .send({
         userId: student.user.id,
         courseCycleId: cc1.id,
-        enrollmentTypeCode: 'FULL',
+        enrollmentTypeCode: ENROLLMENT_TYPE_CODES.FULL,
       });
 
     await request(app.getHttpServer())
@@ -108,7 +110,7 @@ describe('E2E: Dashboard del Alumno (My Courses)', () => {
       .send({
         userId: student.user.id,
         courseCycleId: cc2.id,
-        enrollmentTypeCode: 'FULL',
+        enrollmentTypeCode: ENROLLMENT_TYPE_CODES.FULL,
       });
   });
 

@@ -174,7 +174,7 @@ export class ClassEventRepository {
                 FROM enrollment_evaluation ee
                 INNER JOIN enrollment e
                   ON e.id = ee.enrollment_id
-                WHERE ee.evaluation_id = classEvent.evaluationId
+                WHERE ee.evaluation_id = classEvent.evaluation_id
                   AND ee.is_active = 1
                   AND ee.access_start_date <= UTC_TIMESTAMP()
                   AND ee.access_end_date >= UTC_TIMESTAMP()

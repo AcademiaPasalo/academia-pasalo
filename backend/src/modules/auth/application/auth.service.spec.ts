@@ -16,11 +16,13 @@ import {
   IDENTITY_DENY_REASONS,
   IDENTITY_SOURCE_FLOWS,
   SECURITY_EVENT_CODES,
+  SESSION_STATUS_CODES,
 } from '@modules/auth/interfaces/security.constants';
 import { UsersService } from '@modules/users/application/users.service';
 import { PhotoSource, User } from '@modules/users/domain/user.entity';
 import { RedisCacheService } from '@infrastructure/cache/redis-cache.service';
 import { UserSession } from '@modules/auth/domain/user-session.entity';
+import { ROLE_CODES } from '@common/constants/role-codes.constants';
 
 interface TokenPayload {
   sub: string;
@@ -117,7 +119,7 @@ describe('AuthService', () => {
     isActive: true,
     createdAt: new Date('2026-01-01T00:00:00.000Z'),
     updatedAt: null as Date | null,
-    roles: [{ id: '1', code: 'STUDENT', name: 'Student' }],
+    roles: [{ id: '1', code: ROLE_CODES.STUDENT, name: 'Student' }],
   };
 
   const dataSourceMock = {
@@ -209,7 +211,7 @@ describe('AuthService', () => {
     usersServiceMock.findByEmail.mockResolvedValue(baseUser);
     sessionServiceMock.createSession.mockResolvedValue({
       session: { id: '777' },
-      sessionStatus: 'ACTIVE',
+      sessionStatus: SESSION_STATUS_CODES.ACTIVE,
       concurrentSessionId: null,
     });
 
@@ -221,7 +223,7 @@ describe('AuthService', () => {
     expect(result.user.email).toBe(baseUser.email);
     expect(typeof result.accessToken).toBe('string');
     expect(typeof result.refreshToken).toBe('string');
-    expect(result.sessionStatus).toBe('ACTIVE');
+    expect(result.sessionStatus).toBe(SESSION_STATUS_CODES.ACTIVE);
     expect(result.concurrentSessionId).toBeNull();
 
     expect(sessionServiceMock.createSession).toHaveBeenCalledTimes(1);
@@ -237,7 +239,7 @@ describe('AuthService', () => {
     const decodedAccess = jwtService.verify(result.accessToken);
     expect(decodedAccess.sub).toBe(baseUser.id);
     expect(decodedAccess.email).toBe(baseUser.email);
-    expect(decodedAccess.roles).toEqual(['STUDENT']);
+    expect(decodedAccess.roles).toEqual([ROLE_CODES.STUDENT]);
     expect(decodedAccess.sessionId).toBe('777');
 
     const decodedRefresh = jwtService.verify(result.refreshToken);

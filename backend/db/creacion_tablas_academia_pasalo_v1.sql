@@ -278,7 +278,8 @@ CREATE TABLE file_resource (
   mime_type VARCHAR(100) NOT NULL,
   size_bytes BIGINT NOT NULL,
   storage_url VARCHAR(500) NOT NULL,
-  created_at DATETIME NOT NULL
+  created_at DATETIME NOT NULL,
+  CONSTRAINT uq_file_resource_hash UNIQUE (checksum_hash)
 );
 
 CREATE TABLE file_version (

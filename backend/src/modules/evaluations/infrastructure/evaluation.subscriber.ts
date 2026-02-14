@@ -12,6 +12,8 @@ import { EnrollmentType } from '@modules/enrollments/domain/enrollment-type.enti
 import { EvaluationType } from '@modules/evaluations/domain/evaluation-type.entity';
 import { Injectable } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
+import { ENROLLMENT_TYPE_CODES } from '@modules/enrollments/domain/enrollment.constants';
+import { EVALUATION_TYPE_CODES } from '@modules/evaluations/domain/evaluation.constants';
 
 @EventSubscriber()
 @Injectable()
@@ -45,7 +47,7 @@ export class EvaluationSubscriber implements EntitySubscriberInterface<Evaluatio
     }
 
     const fullType = await manager.findOne(EnrollmentType, {
-      where: { code: 'FULL' },
+      where: { code: ENROLLMENT_TYPE_CODES.FULL },
     });
 
     if (!fullType) {
@@ -62,7 +64,7 @@ export class EvaluationSubscriber implements EntitySubscriberInterface<Evaluatio
     let hasMore = true;
     let totalProcessed = 0;
 
-    if (evaluationType.code === 'BANCO_ENUNCIADOS') {
+    if (evaluationType.code === EVALUATION_TYPE_CODES.BANCO_ENUNCIADOS) {
       while (hasMore) {
         const enrollmentsBatch = await manager.find(Enrollment, {
           where: { courseCycleId: evaluation.courseCycleId },
@@ -83,7 +85,7 @@ export class EvaluationSubscriber implements EntitySubscriberInterface<Evaluatio
           .innerJoinAndSelect('ee.evaluation', 'ev')
           .innerJoinAndSelect('ev.evaluationType', 'et')
           .where('ee.enrollmentId IN (:...ids)', { ids: enrollmentIds })
-          .andWhere('et.code != :bancoCode', { bancoCode: 'BANCO_ENUNCIADOS' })
+          .andWhere('et.code != :bancoCode', { bancoCode: EVALUATION_TYPE_CODES.BANCO_ENUNCIADOS })
           .getMany();
 
         const accessMap = new Map<string, Evaluation[]>();

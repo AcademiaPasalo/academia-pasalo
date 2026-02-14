@@ -8,11 +8,12 @@ import {
 } from 'typeorm';
 import { User } from '@modules/users/domain/user.entity';
 import { CourseCycle } from '@modules/courses/domain/course-cycle.entity';
+import { PHOTO_SOURCES } from '@modules/auth/interfaces/security.constants';
 
 export enum PhotoSource {
-  PROFILE = 'profile',
-  UPLOADED = 'uploaded',
-  NONE = 'none',
+  PROFILE = PHOTO_SOURCES.PROFILE,
+  UPLOADED = PHOTO_SOURCES.UPLOADED,
+  NONE = PHOTO_SOURCES.NONE,
 }
 
 @Entity('course_testimony')

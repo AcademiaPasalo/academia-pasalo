@@ -10,6 +10,9 @@ import { User } from '@modules/users/domain/user.entity';
 import { CourseCycle } from '@modules/courses/domain/course-cycle.entity';
 import { Evaluation } from '@modules/evaluations/domain/evaluation.entity';
 import { RedisCacheService } from '@infrastructure/cache/redis-cache.service';
+import { ROLE_CODES } from '@common/constants/role-codes.constants';
+import { ENROLLMENT_TYPE_CODES } from '@modules/enrollments/domain/enrollment.constants';
+import { EVALUATION_TYPE_CODES } from '@modules/evaluations/domain/evaluation.constants';
 
 describe('E2E: Class Events (Eventos de Clase)', () => {
   let app: INestApplication;
@@ -88,7 +91,7 @@ describe('E2E: Class Events (Eventos de Clase)', () => {
     // Iniciar evaluación ayer para garantizar acceso activo hoy
     evaluation = await seeder.createEvaluation(
       courseCycle.id,
-      'PC',
+      EVALUATION_TYPE_CODES.PC,
       1,
       formatDate(yesterday),
       formatDate(nextWeek),
@@ -96,15 +99,15 @@ describe('E2E: Class Events (Eventos de Clase)', () => {
 
     admin = await seeder.createAuthenticatedUser(
       TestSeeder.generateUniqueEmail('admin_ev'),
-      ['ADMIN'],
+      [ROLE_CODES.ADMIN],
     );
     professor = await seeder.createAuthenticatedUser(
       TestSeeder.generateUniqueEmail('prof_ev'),
-      ['PROFESSOR'],
+      [ROLE_CODES.PROFESSOR],
     );
     student = await seeder.createAuthenticatedUser(
       TestSeeder.generateUniqueEmail('student_ev'),
-      ['STUDENT'],
+      [ROLE_CODES.STUDENT],
     );
 
     await dataSource.query(
@@ -119,7 +122,7 @@ describe('E2E: Class Events (Eventos de Clase)', () => {
       .send({
         userId: student.user.id,
         courseCycleId: courseCycle.id,
-        enrollmentTypeCode: 'FULL',
+        enrollmentTypeCode: ENROLLMENT_TYPE_CODES.FULL,
       })
       .expect(201);
 
@@ -143,7 +146,7 @@ describe('E2E: Class Events (Eventos de Clase)', () => {
           topic: 'Conceptos básicos',
           startDatetime: tomorrow.toISOString(),
           endDatetime: new Date(tomorrow.getTime() + 7200000).toISOString(),
-          meetingLink: 'https://zoom.us/j/123456789',
+          liveMeetingUrl: 'https://zoom.us/j/123456789',
         })
         .expect(201);
 
@@ -162,7 +165,7 @@ describe('E2E: Class Events (Eventos de Clase)', () => {
           topic: 'Test',
           startDatetime: tomorrow.toISOString(),
           endDatetime: new Date(tomorrow.getTime() + 7200000).toISOString(),
-          meetingLink: 'https://zoom.us/test',
+          liveMeetingUrl: 'https://zoom.us/test',
         })
         .expect(403);
     });
