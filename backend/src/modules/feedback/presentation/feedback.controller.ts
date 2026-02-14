@@ -24,6 +24,7 @@ import { CurrentUser } from '@common/decorators/current-user.decorator';
 import { ResponseMessage } from '@common/decorators/response-message.decorator';
 import { User } from '@modules/users/domain/user.entity';
 import { plainToInstance } from 'class-transformer';
+import { ROLE_CODES } from '@common/constants/role-codes.constants';
 
 @Controller('feedback')
 export class FeedbackController {
@@ -31,7 +32,7 @@ export class FeedbackController {
 
   @Post()
   @Auth()
-  @Roles('STUDENT')
+  @Roles(ROLE_CODES.STUDENT)
   @UseInterceptors(FileInterceptor('photo'))
   @HttpCode(HttpStatus.CREATED)
   @ResponseMessage('¡Gracias por tu opinión!')
@@ -58,7 +59,7 @@ export class FeedbackController {
 
   @Post('admin/:id/feature')
   @Auth()
-  @Roles('ADMIN', 'SUPER_ADMIN')
+  @Roles(ROLE_CODES.ADMIN, ROLE_CODES.SUPER_ADMIN)
   @HttpCode(HttpStatus.OK)
   @ResponseMessage('Visibilidad de testimonio actualizada')
   async feature(
@@ -88,7 +89,7 @@ export class FeedbackController {
 
   @Get('admin/course-cycle/:id')
   @Auth()
-  @Roles('ADMIN', 'SUPER_ADMIN')
+  @Roles(ROLE_CODES.ADMIN, ROLE_CODES.SUPER_ADMIN)
   @ResponseMessage('Listado completo de testimonios')
   async getAdmin(@Param('id') courseCycleId: string) {
     const testimonies =

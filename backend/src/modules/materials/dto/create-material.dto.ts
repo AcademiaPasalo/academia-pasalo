@@ -4,6 +4,7 @@ import {
   IsOptional,
   MaxLength,
   IsDefined,
+  IsNumberString,
 } from 'class-validator';
 
 export class CreateMaterialDto {
@@ -26,4 +27,8 @@ export class CreateMaterialDto {
   @IsString()
   @IsOptional()
   visibleUntil?: string;
+
+  @IsOptional()
+  @IsNumberString()
+  classEventId?: string;
 }

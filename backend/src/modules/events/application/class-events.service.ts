@@ -5,10 +5,12 @@ import {
   BadRequestException,
   ForbiddenException,
   Logger,
+  InternalServerErrorException,
 } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import { ClassEventRepository } from '@modules/events/infrastructure/class-event.repository';
 import { ClassEventProfessorRepository } from '@modules/events/infrastructure/class-event-professor.repository';
+import { ClassEventRecordingStatusRepository } from '@modules/events/infrastructure/class-event-recording-status.repository';
 import { EvaluationRepository } from '@modules/evaluations/infrastructure/evaluation.repository';
 import { EnrollmentEvaluationRepository } from '@modules/enrollments/infrastructure/enrollment-evaluation.repository';
 import { UserRepository } from '@modules/users/infrastructure/user.repository';
@@ -16,12 +18,13 @@ import { RedisCacheService } from '@infrastructure/cache/redis-cache.service';
 import { ClassEvent } from '@modules/events/domain/class-event.entity';
 import { User } from '@modules/users/domain/user.entity';
 import { technicalSettings } from '@config/technical-settings';
-
-export type ClassEventStatus =
-  | 'CANCELADA'
-  | 'PROGRAMADA'
-  | 'EN_CURSO'
-  | 'FINALIZADA';
+import {
+  ClassEventAccess,
+  ClassEventStatus,
+  CLASS_EVENT_RECORDING_STATUS_CODES,
+  CLASS_EVENT_STATUS,
+} from '@modules/events/domain/class-event.constants';
+import { ADMIN_ROLE_CODES, ROLE_CODES } from '@common/constants/role-codes.constants';
 
 @Injectable()
 export class ClassEventsService {
@@ -32,6 +35,8 @@ export class ClassEventsService {
     technicalSettings.cache.events.cycleActiveCacheTtlSeconds;
   private readonly PROFESSOR_ASSIGNMENT_CACHE_TTL =
     technicalSettings.cache.events.professorAssignmentCacheTtlSeconds;
+  private readonly RECORDING_STATUS_CACHE_TTL =
+    technicalSettings.cache.events.recordingStatusCatalogCacheTtlSeconds;
 
   private getProfessorAssignmentCacheKey(
     courseCycleId: string,
@@ -40,10 +45,15 @@ export class ClassEventsService {
     return `cache:cc-professor:cycle:${courseCycleId}:prof:${professorUserId}`;
   }
 
+  private getRecordingStatusCacheKey(code: string): string {
+    return `cache:class-event-recording-status:code:${code}`;
+  }
+
   constructor(
     private readonly dataSource: DataSource,
     private readonly classEventRepository: ClassEventRepository,
     private readonly classEventProfessorRepository: ClassEventProfessorRepository,
+    private readonly classEventRecordingStatusRepository: ClassEventRecordingStatusRepository,
     private readonly evaluationRepository: EvaluationRepository,
     private readonly enrollmentEvaluationRepository: EnrollmentEvaluationRepository,
     private readonly userRepository: UserRepository,
@@ -57,7 +67,7 @@ export class ClassEventsService {
     topic: string,
     startDatetime: Date,
     endDatetime: Date,
-    meetingLink: string,
+    liveMeetingUrl: string,
     creatorUser: User,
   ): Promise<ClassEvent> {
     const evaluation =
@@ -74,6 +84,11 @@ export class ClassEventsService {
     );
 
     return await this.dataSource.transaction(async (manager) => {
+      const notAvailableStatusId = await this.getRecordingStatusIdByCode(
+        CLASS_EVENT_RECORDING_STATUS_CODES.NOT_AVAILABLE,
+        manager,
+      );
+
       const existingSession =
         await this.classEventRepository.findByEvaluationAndSessionNumber(
           evaluationId,
@@ -95,7 +110,8 @@ export class ClassEventsService {
           topic,
           startDatetime,
           endDatetime,
-          meetingLink,
+          liveMeetingUrl,
+          recordingStatusId: notAvailableStatusId,
           isCancelled: false,
           createdBy: creatorUser.id,
           createdAt: new Date(),
@@ -167,7 +183,8 @@ export class ClassEventsService {
     topic?: string,
     startDatetime?: Date,
     endDatetime?: Date,
-    meetingLink?: string,
+    liveMeetingUrl?: string,
+    recordingUrl?: string,
   ): Promise<ClassEvent> {
     const event = await this.classEventRepository.findByIdSimple(eventId);
     if (!event) {
@@ -181,7 +198,8 @@ export class ClassEventsService {
     if (topic !== undefined) updateData.topic = topic;
     if (startDatetime !== undefined) updateData.startDatetime = startDatetime;
     if (endDatetime !== undefined) updateData.endDatetime = endDatetime;
-    if (meetingLink !== undefined) updateData.meetingLink = meetingLink;
+    if (liveMeetingUrl !== undefined) updateData.liveMeetingUrl = liveMeetingUrl;
+    if (recordingUrl !== undefined) updateData.recordingUrl = recordingUrl;
 
     if (startDatetime || endDatetime) {
       const finalStart = startDatetime || event.startDatetime;
@@ -198,6 +216,13 @@ export class ClassEventsService {
           evaluation.endDate,
         );
       }
+    }
+
+    if (recordingUrl !== undefined) {
+      const readyStatusId = await this.getRecordingStatusIdByCode(
+        CLASS_EVENT_RECORDING_STATUS_CODES.READY,
+      );
+      updateData.recordingStatusId = readyStatusId;
     }
 
     const updated = await this.classEventRepository.update(eventId, updateData);
@@ -275,30 +300,93 @@ export class ClassEventsService {
 
   calculateEventStatus(event: ClassEvent): ClassEventStatus {
     if (event.isCancelled) {
-      return 'CANCELADA';
+      return CLASS_EVENT_STATUS.CANCELADA;
     }
 
     const now = new Date();
     if (now < event.startDatetime) {
-      return 'PROGRAMADA';
+      return CLASS_EVENT_STATUS.PROGRAMADA;
     }
     if (now >= event.startDatetime && now < event.endDatetime) {
-      return 'EN_CURSO';
+      return CLASS_EVENT_STATUS.EN_CURSO;
     }
-    return 'FINALIZADA';
+    return CLASS_EVENT_STATUS.FINALIZADA;
   }
 
-  async canAccessMeetingLink(event: ClassEvent, user: User): Promise<boolean> {
-    if (!event.meetingLink) {
+  async canJoinLive(
+    event: ClassEvent,
+    user: User,
+    hasAuthorization?: boolean,
+  ): Promise<boolean> {
+    if (!event.liveMeetingUrl) {
       return false;
     }
 
     const status = this.calculateEventStatus(event);
-    if (status !== 'PROGRAMADA' && status !== 'EN_CURSO') {
+    if (
+      status !== CLASS_EVENT_STATUS.PROGRAMADA &&
+      status !== CLASS_EVENT_STATUS.EN_CURSO
+    ) {
       return false;
     }
 
+    if (hasAuthorization !== undefined) {
+      return hasAuthorization;
+    }
+
     return await this.checkUserAuthorizationWithUser(user, event.evaluationId);
+  }
+
+  async canWatchRecording(
+    event: ClassEvent,
+    user: User,
+    hasAuthorization?: boolean,
+  ): Promise<boolean> {
+    if (!event.recordingUrl) {
+      return false;
+    }
+
+    const status = this.calculateEventStatus(event);
+    if (status !== CLASS_EVENT_STATUS.FINALIZADA) {
+      return false;
+    }
+
+    if (hasAuthorization !== undefined) {
+      return hasAuthorization;
+    }
+
+    return await this.checkUserAuthorizationWithUser(user, event.evaluationId);
+  }
+
+  async getEventAccess(
+    event: ClassEvent,
+    user: User,
+    hasAuthorization?: boolean,
+  ): Promise<ClassEventAccess> {
+    const canJoinLive = await this.canJoinLive(event, user, hasAuthorization);
+    const canWatchRecording = await this.canWatchRecording(
+      event,
+      user,
+      hasAuthorization,
+    );
+
+    return {
+      canJoinLive,
+      canWatchRecording,
+      canCopyLiveLink: canJoinLive,
+      canCopyRecordingLink: canWatchRecording,
+    };
+  }
+
+  async canAccessMeetingLink(event: ClassEvent, user: User): Promise<boolean> {
+    return await this.canJoinLive(event, user);
+  }
+
+  async checkUserAuthorizationForUser(
+    user: User,
+    evaluationId: string,
+  ): Promise<boolean> {
+    return await this.checkUserAuthorizationWithUser(user, evaluationId);
   }
 
   private async checkUserAuthorizationWithUser(
@@ -307,11 +395,11 @@ export class ClassEventsService {
   ): Promise<boolean> {
     const roleCodes = (user.roles || []).map((r) => r.code);
 
-    if (roleCodes.some((r) => ['ADMIN', 'SUPER_ADMIN'].includes(r))) {
+    if (roleCodes.some((r) => ADMIN_ROLE_CODES.includes(r))) {
       return true;
     }
 
-    if (roleCodes.includes('PROFESSOR')) {
+    if (roleCodes.includes(ROLE_CODES.PROFESSOR)) {
       const evaluation =
         await this.evaluationRepository.findByIdWithCycle(evaluationId);
       if (!evaluation) return false;
@@ -354,11 +442,11 @@ export class ClassEventsService {
 
     const roleCodes = (user.roles || []).map((r) => r.code);
 
-    if (roleCodes.some((r) => ['ADMIN', 'SUPER_ADMIN'].includes(r))) {
+    if (roleCodes.some((r) => ADMIN_ROLE_CODES.includes(r))) {
       return true;
     }
 
-    if (roleCodes.includes('PROFESSOR')) {
+    if (roleCodes.includes(ROLE_CODES.PROFESSOR)) {
       const evaluation =
         await this.evaluationRepository.findByIdWithCycle(evaluationId);
       if (!evaluation) return false;
@@ -440,9 +528,39 @@ export class ClassEventsService {
     await this.cacheService.invalidateGroup('cache:my-schedule:*');
   }
 
+  private async getRecordingStatusIdByCode(
+    code: string,
+    manager?: import('typeorm').EntityManager,
+  ): Promise<string> {
+    const cacheKey = this.getRecordingStatusCacheKey(code);
+    const cached = await this.cacheService.get<string>(cacheKey);
+    if (cached) {
+      return cached;
+    }
+
+    const status = await this.classEventRecordingStatusRepository.findByCode(
+      code,
+      manager,
+    );
+    if (!status) {
+      throw new InternalServerErrorException(
+        `Estado de grabacion ${code} no configurado`,
+      );
+    }
+
+    await this.cacheService.set(
+      cacheKey,
+      status.id,
+      this.RECORDING_STATUS_CACHE_TTL,
+    );
+    return status.id;
+  }
+
   private validateEventOwnership(creatorId: string, user: User): void {
     const roles = (user.roles || []).map((r) => r.code);
-    const isAdmin = roles.includes('ADMIN') || roles.includes('SUPER_ADMIN');
+    const isAdmin = ADMIN_ROLE_CODES.some((roleCode) =>
+      roles.includes(roleCode),
+    );
 
     if (!isAdmin && creatorId !== user.id) {
       throw new ForbiddenException(

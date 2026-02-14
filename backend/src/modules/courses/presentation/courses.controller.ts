@@ -24,6 +24,7 @@ import { CurrentUser } from '@common/decorators/current-user.decorator';
 import { User } from '@modules/users/domain/user.entity';
 import { ResponseMessage } from '@common/decorators/response-message.decorator';
 import { plainToInstance } from 'class-transformer';
+import { ROLE_CODES } from '@common/constants/role-codes.constants';
 
 @Controller('courses')
 @Auth()
@@ -31,7 +32,12 @@ export class CoursesController {
   constructor(private readonly coursesService: CoursesService) {}
 
   @Get('cycle/:id/content')
-  @Roles('STUDENT', 'PROFESSOR', 'ADMIN', 'SUPER_ADMIN')
+  @Roles(
+    ROLE_CODES.STUDENT,
+    ROLE_CODES.PROFESSOR,
+    ROLE_CODES.ADMIN,
+    ROLE_CODES.SUPER_ADMIN,
+  )
   @ResponseMessage('Contenido del curso obtenido exitosamente')
   async getCourseContent(
     @Param('id') courseCycleId: string,
@@ -47,7 +53,7 @@ export class CoursesController {
   }
 
   @Post()
-  @Roles('ADMIN', 'SUPER_ADMIN')
+  @Roles(ROLE_CODES.ADMIN, ROLE_CODES.SUPER_ADMIN)
   @HttpCode(HttpStatus.CREATED)
   @ResponseMessage('Materia creada exitosamente')
   async create(@Body() createCourseDto: CreateCourseDto) {
@@ -58,7 +64,7 @@ export class CoursesController {
   }
 
   @Post('assign-cycle')
-  @Roles('ADMIN', 'SUPER_ADMIN')
+  @Roles(ROLE_CODES.ADMIN, ROLE_CODES.SUPER_ADMIN)
   @HttpCode(HttpStatus.CREATED)
   @ResponseMessage('Materia vinculada al ciclo exitosamente')
   async assignToCycle(@Body() dto: AssignCourseToCycleDto) {
@@ -71,7 +77,7 @@ export class CoursesController {
   }
 
   @Post('cycle/:id/professors')
-  @Roles('ADMIN', 'SUPER_ADMIN')
+  @Roles(ROLE_CODES.ADMIN, ROLE_CODES.SUPER_ADMIN)
   @HttpCode(HttpStatus.CREATED)
   @ResponseMessage('Profesor asignado al curso/ciclo exitosamente')
   async assignProfessorToCycle(
@@ -85,7 +91,7 @@ export class CoursesController {
   }
 
   @Delete('cycle/:id/professors/:professorUserId')
-  @Roles('ADMIN', 'SUPER_ADMIN')
+  @Roles(ROLE_CODES.ADMIN, ROLE_CODES.SUPER_ADMIN)
   @HttpCode(HttpStatus.NO_CONTENT)
   @ResponseMessage('Profesor removido del curso/ciclo exitosamente')
   async revokeProfessorFromCycle(
@@ -99,7 +105,7 @@ export class CoursesController {
   }
 
   @Get()
-  @Roles('ADMIN', 'SUPER_ADMIN')
+  @Roles(ROLE_CODES.ADMIN, ROLE_CODES.SUPER_ADMIN)
   @ResponseMessage('Materias obtenidas exitosamente')
   async findAll() {
     const courses = await this.coursesService.findAllCourses();
@@ -109,7 +115,7 @@ export class CoursesController {
   }
 
   @Get('types')
-  @Roles('ADMIN', 'SUPER_ADMIN')
+  @Roles(ROLE_CODES.ADMIN, ROLE_CODES.SUPER_ADMIN)
   @ResponseMessage('Tipos de curso obtenidos exitosamente')
   async findAllTypes() {
     const types = await this.coursesService.findAllTypes();
@@ -119,7 +125,7 @@ export class CoursesController {
   }
 
   @Get('levels')
-  @Roles('ADMIN', 'SUPER_ADMIN')
+  @Roles(ROLE_CODES.ADMIN, ROLE_CODES.SUPER_ADMIN)
   @ResponseMessage('Niveles académicos obtenidos exitosamente')
   async findAllLevels() {
     const levels = await this.coursesService.findAllLevels();
@@ -129,7 +135,7 @@ export class CoursesController {
   }
 
   @Get(':id')
-  @Roles('ADMIN', 'SUPER_ADMIN')
+  @Roles(ROLE_CODES.ADMIN, ROLE_CODES.SUPER_ADMIN)
   @ResponseMessage('Materia obtenida exitosamente')
   async findOne(@Param('id') id: string) {
     const course = await this.coursesService.findCourseById(id);

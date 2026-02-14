@@ -21,6 +21,7 @@ import { Roles } from '@common/decorators/roles.decorator';
 import { CurrentUser } from '@common/decorators/current-user.decorator';
 import { User } from '@modules/users/domain/user.entity';
 import { ResponseMessage } from '@common/decorators/response-message.decorator';
+import { ROLE_CODES } from '@common/constants/role-codes.constants';
 
 @Controller('materials')
 @Auth()
@@ -28,7 +29,7 @@ export class MaterialsController {
   constructor(private readonly materialsService: MaterialsService) {}
 
   @Post('folders')
-  @Roles('ADMIN', 'PROFESSOR', 'SUPER_ADMIN')
+  @Roles(ROLE_CODES.ADMIN, ROLE_CODES.PROFESSOR, ROLE_CODES.SUPER_ADMIN)
   @HttpCode(HttpStatus.CREATED)
   @ResponseMessage('Carpeta creada exitosamente')
   async createFolder(
@@ -39,7 +40,7 @@ export class MaterialsController {
   }
 
   @Post()
-  @Roles('ADMIN', 'PROFESSOR', 'SUPER_ADMIN')
+  @Roles(ROLE_CODES.ADMIN, ROLE_CODES.PROFESSOR, ROLE_CODES.SUPER_ADMIN)
   @UseInterceptors(FileInterceptor('file'))
   @HttpCode(HttpStatus.CREATED)
   @ResponseMessage('Material subido exitosamente')
@@ -52,7 +53,7 @@ export class MaterialsController {
   }
 
   @Post(':id/versions')
-  @Roles('ADMIN', 'PROFESSOR', 'SUPER_ADMIN')
+  @Roles(ROLE_CODES.ADMIN, ROLE_CODES.PROFESSOR, ROLE_CODES.SUPER_ADMIN)
   @UseInterceptors(FileInterceptor('file'))
   @HttpCode(HttpStatus.CREATED)
   @ResponseMessage('Nueva versión subida exitosamente')
@@ -65,7 +66,12 @@ export class MaterialsController {
   }
 
   @Get('folders/evaluation/:evaluationId')
-  @Roles('STUDENT', 'PROFESSOR', 'ADMIN', 'SUPER_ADMIN')
+  @Roles(
+    ROLE_CODES.STUDENT,
+    ROLE_CODES.PROFESSOR,
+    ROLE_CODES.ADMIN,
+    ROLE_CODES.SUPER_ADMIN,
+  )
   @ResponseMessage('Carpetas raíz obtenidas exitosamente')
   async getRootFolders(
     @CurrentUser() user: User,
@@ -75,7 +81,12 @@ export class MaterialsController {
   }
 
   @Get('folders/:folderId')
-  @Roles('STUDENT', 'PROFESSOR', 'ADMIN', 'SUPER_ADMIN')
+  @Roles(
+    ROLE_CODES.STUDENT,
+    ROLE_CODES.PROFESSOR,
+    ROLE_CODES.ADMIN,
+    ROLE_CODES.SUPER_ADMIN,
+  )
   @ResponseMessage('Contenido de carpeta obtenido exitosamente')
   async getFolderContents(
     @CurrentUser() user: User,
@@ -84,8 +95,28 @@ export class MaterialsController {
     return await this.materialsService.getFolderContents(user, folderId);
   }
 
+  @Get('class-event/:classEventId')
+  @Roles(
+    ROLE_CODES.STUDENT,
+    ROLE_CODES.PROFESSOR,
+    ROLE_CODES.ADMIN,
+    ROLE_CODES.SUPER_ADMIN,
+  )
+  @ResponseMessage('Materiales de sesion obtenidos exitosamente')
+  async getClassEventMaterials(
+    @CurrentUser() user: User,
+    @Param('classEventId') classEventId: string,
+  ) {
+    return await this.materialsService.getClassEventMaterials(user, classEventId);
+  }
+
   @Get(':id/download')
-  @Roles('STUDENT', 'ADMIN', 'PROFESSOR', 'SUPER_ADMIN')
+  @Roles(
+    ROLE_CODES.STUDENT,
+    ROLE_CODES.ADMIN,
+    ROLE_CODES.PROFESSOR,
+    ROLE_CODES.SUPER_ADMIN,
+  )
   async download(
     @CurrentUser() user: User,
     @Param('id') materialId: string,
@@ -105,7 +136,7 @@ export class MaterialsController {
   }
 
   @Post('request-deletion')
-  @Roles('PROFESSOR', 'ADMIN', 'SUPER_ADMIN')
+  @Roles(ROLE_CODES.PROFESSOR, ROLE_CODES.ADMIN, ROLE_CODES.SUPER_ADMIN)
   @HttpCode(HttpStatus.OK)
   @ResponseMessage('Solicitud de eliminación registrada')
   async requestDeletion(

@@ -12,6 +12,7 @@ import { MaterialCatalogRepository } from '@modules/materials/infrastructure/mat
 import { DeletionRequestRepository } from '@modules/materials/infrastructure/deletion-request.repository';
 import { UserRepository } from '@modules/users/infrastructure/user.repository';
 import { AuditService } from '@modules/audit/application/audit.service';
+import { ClassEventRepository } from '@modules/events/infrastructure/class-event.repository';
 import { MaterialFolder } from '@modules/materials/domain/material-folder.entity';
 import { User } from '@modules/users/domain/user.entity';
 import { MaterialStatus } from '@modules/materials/domain/material-status.entity';
@@ -53,6 +54,7 @@ describe('MaterialsService', () => {
   let userRepo: jest.Mocked<UserRepository>;
   let auditService: jest.Mocked<AuditService>;
   let cacheService: jest.Mocked<RedisCacheService>;
+  let classEventRepo: jest.Mocked<ClassEventRepository>;
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -97,6 +99,7 @@ describe('MaterialsService', () => {
             create: jest.fn(),
             findById: jest.fn(),
             findByFolderId: jest.fn(),
+            findByClassEventId: jest.fn(),
           },
         },
         {
@@ -127,6 +130,10 @@ describe('MaterialsService', () => {
           provide: AuditService,
           useValue: { logAction: jest.fn() },
         },
+        {
+          provide: ClassEventRepository,
+          useValue: { findByIdSimple: jest.fn() },
+        },
       ],
     }).compile();
 
@@ -142,6 +149,7 @@ describe('MaterialsService', () => {
     userRepo = module.get(UserRepository);
     auditService = module.get(AuditService);
     cacheService = module.get(RedisCacheService);
+    classEventRepo = module.get(ClassEventRepository);
 
     userRepo.findById.mockResolvedValue({
       id: 'user-1',
@@ -221,6 +229,32 @@ describe('MaterialsService', () => {
         'material',
         'saved-id',
         mockManager,
+      );
+    });
+
+    it('should reject upload when classEvent does not belong to folder evaluation', async () => {
+      const file = mockFile();
+      catalogRepo.findMaterialStatusByCode.mockResolvedValue({
+        id: '1',
+      } as MaterialStatus);
+      folderRepo.findById.mockResolvedValue(mockFolder('1', '100'));
+      classEventRepo.findByIdSimple.mockResolvedValue({
+        id: '55',
+        evaluationId: '999',
+      } as never);
+
+      await expect(
+        service.uploadMaterial(
+          'user1',
+          {
+            materialFolderId: '1',
+            displayName: 'Doc',
+            classEventId: '55',
+          },
+          file,
+        ),
+      ).rejects.toThrow(
+        'Inconsistencia: La sesion no pertenece a la misma evaluacion de la carpeta',
       );
     });
   });
@@ -305,6 +339,27 @@ describe('MaterialsService', () => {
       });
 
       expect(deletionRepo.create).toHaveBeenCalled();
+    });
+  });
+
+  describe('getClassEventMaterials', () => {
+    it('should return class event materials with access control', async () => {
+      classEventRepo.findByIdSimple.mockResolvedValue({
+        id: '55',
+        evaluationId: '100',
+      } as never);
+      accessEngine.hasAccess.mockResolvedValue(true);
+      materialRepo.findByClassEventId.mockResolvedValue([
+        { id: 'mat-1', displayName: 'Sesion 1' } as Material,
+      ]);
+
+      const result = await service.getClassEventMaterials(
+        { id: 'user-1', roles: [{ code: 'STUDENT' }] } as User,
+        '55',
+      );
+
+      expect(result).toHaveLength(1);
+      expect(materialRepo.findByClassEventId).toHaveBeenCalledWith('55');
     });
   });
 });

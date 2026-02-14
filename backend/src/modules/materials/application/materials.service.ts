@@ -26,8 +26,10 @@ import { FileResource } from '@modules/materials/domain/file-resource.entity';
 import { FileVersion } from '@modules/materials/domain/file-version.entity';
 import { User } from '@modules/users/domain/user.entity';
 import { AuditService } from '@modules/audit/application/audit.service';
+import { ClassEventRepository } from '@modules/events/infrastructure/class-event.repository';
 import * as fs from 'fs';
 import { technicalSettings } from '@config/technical-settings';
+import { ADMIN_ROLE_CODES, ROLE_CODES } from '@common/constants/role-codes.constants';
 
 @Injectable()
 export class MaterialsService {
@@ -48,6 +50,7 @@ export class MaterialsService {
     private readonly deletionRequestRepository: DeletionRequestRepository,
     private readonly userRepository: UserRepository,
     private readonly auditService: AuditService,
+    private readonly classEventRepository: ClassEventRepository,
   ) {}
 
   async createFolder(
@@ -112,6 +115,10 @@ export class MaterialsService {
     const activeStatus = await this.getActiveMaterialStatus();
     const folder = await this.folderRepository.findById(dto.materialFolderId);
     if (!folder) throw new NotFoundException('Carpeta destino no encontrada');
+
+    if (dto.classEventId) {
+      await this.validateClassEventAssociation(dto.classEventId, folder.evaluationId);
+    }
 
     const now = new Date();
     let storagePath = '';
@@ -178,6 +185,7 @@ export class MaterialsService {
 
         const materialEntity = manager.create(Material, {
           materialFolderId: folder.id,
+          classEventId: dto.classEventId || null,
           fileResourceId: finalResource.id,
           fileVersion: finalVersion,
           materialStatusId: activeStatus.id,
@@ -202,6 +210,9 @@ export class MaterialsService {
       });
 
       await this.invalidateFolderCache(dto.materialFolderId);
+      if (dto.classEventId) {
+        await this.invalidateClassEventMaterialsCache(dto.classEventId);
+      }
       return result;
     } catch (error) {
       if (isNewFile && storagePath) await this.rollbackFile(storagePath);
@@ -294,6 +305,9 @@ export class MaterialsService {
       });
 
       await this.invalidateFolderCache(result.materialFolderId);
+      if (result.classEventId) {
+        await this.invalidateClassEventMaterialsCache(result.classEventId);
+      }
       return result;
     } catch (error) {
       if (isNewFile && storagePath) await this.rollbackFile(storagePath);
@@ -351,6 +365,29 @@ export class MaterialsService {
     await this.cacheService.set(cacheKey, result, this.CACHE_TTL);
 
     return this.applyVisibilityFilter(user, result.folders, result.materials);
+  }
+
+  async getClassEventMaterials(
+    user: User,
+    classEventId: string,
+  ): Promise<Material[]> {
+    const classEvent = await this.classEventRepository.findByIdSimple(classEventId);
+    if (!classEvent) {
+      throw new NotFoundException('Sesion de clase no encontrada');
+    }
+
+    await this.checkAuthorizedAccess(user.id, classEvent.evaluationId);
+
+    const cacheKey = `cache:materials:class-event:${classEventId}`;
+    const cached = await this.cacheService.get<Material[]>(cacheKey);
+    if (cached) {
+      return this.applyVisibilityFilter(user, [], cached).materials;
+    }
+
+    const materials = await this.materialRepository.findByClassEventId(classEventId);
+    await this.cacheService.set(cacheKey, materials, this.CACHE_TTL);
+
+    return this.applyVisibilityFilter(user, [], materials).materials;
   }
 
   async download(
@@ -428,9 +465,9 @@ export class MaterialsService {
     materials: Material[],
   ) {
     const roleCodes = (user.roles || []).map((r) => r.code);
-    const hasPrivilegedAccess = roleCodes.some((r) =>
-      ['ADMIN', 'SUPER_ADMIN', 'PROFESSOR'].includes(r),
-    );
+    const hasPrivilegedAccess =
+      roleCodes.some((r) => ADMIN_ROLE_CODES.includes(r)) ||
+      roleCodes.includes(ROLE_CODES.PROFESSOR);
 
     if (hasPrivilegedAccess) {
       return { folders, materials };
@@ -463,11 +500,11 @@ export class MaterialsService {
 
     const roleCodes = (user.roles || []).map((r) => r.code);
 
-    if (roleCodes.some((r) => ['ADMIN', 'SUPER_ADMIN'].includes(r))) {
+    if (roleCodes.some((r) => ADMIN_ROLE_CODES.includes(r))) {
       return;
     }
 
-    if (roleCodes.includes('PROFESSOR')) {
+    if (roleCodes.includes(ROLE_CODES.PROFESSOR)) {
       const isAssigned = await this.dataSource.query(
         `SELECT 1 FROM course_cycle_professor ccp
          INNER JOIN evaluation e ON e.course_cycle_id = ccp.course_cycle_id
@@ -525,6 +562,24 @@ export class MaterialsService {
     return parent;
   }
 
+  private async validateClassEventAssociation(
+    classEventId: string,
+    evaluationId: string,
+  ) {
+    const classEvent = await this.classEventRepository.findByIdSimple(classEventId);
+    if (!classEvent) {
+      throw new NotFoundException('Sesion de clase no encontrada');
+    }
+
+    if (classEvent.evaluationId !== evaluationId) {
+      throw new BadRequestException(
+        'Inconsistencia: La sesion no pertenece a la misma evaluacion de la carpeta',
+      );
+    }
+
+    return classEvent;
+  }
+
   private async rollbackFile(path: string) {
     const fileName = path.split(/[\/]/).pop();
     if (fileName) await this.storageService.deleteFile(fileName);
@@ -536,5 +591,9 @@ export class MaterialsService {
 
   private async invalidateRootCache(evaluationId: string) {
     await this.cacheService.del(`cache:materials:roots:eval:${evaluationId}`);
+  }
+
+  private async invalidateClassEventMaterialsCache(classEventId: string) {
+    await this.cacheService.del(`cache:materials:class-event:${classEventId}`);
   }
 }

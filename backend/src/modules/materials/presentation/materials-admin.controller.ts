@@ -15,9 +15,10 @@ import { Roles } from '@common/decorators/roles.decorator';
 import { CurrentUser } from '@common/decorators/current-user.decorator';
 import { User } from '@modules/users/domain/user.entity';
 import { ResponseMessage } from '@common/decorators/response-message.decorator';
+import { ROLE_CODES } from '@common/constants/role-codes.constants';
 
 @Controller('admin/materials')
-@Auth('ADMIN', 'SUPER_ADMIN')
+@Auth(ROLE_CODES.ADMIN, ROLE_CODES.SUPER_ADMIN)
 export class MaterialsAdminController {
   constructor(private readonly adminService: MaterialsAdminService) {}
 
@@ -39,10 +40,11 @@ export class MaterialsAdminController {
   }
 
   @Delete(':id/hard-delete')
-  @Roles('SUPER_ADMIN') // Solo Super Admin para borrado físico
+  @Roles(ROLE_CODES.SUPER_ADMIN) // Solo Super Admin para borrado físico
   @HttpCode(HttpStatus.OK)
   @ResponseMessage('Material eliminado permanentemente')
   async hardDelete(@CurrentUser() user: User, @Param('id') materialId: string) {
     await this.adminService.hardDeleteMaterial(user.id, materialId);
   }
 }
+

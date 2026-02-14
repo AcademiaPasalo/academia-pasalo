@@ -10,6 +10,7 @@ import { FileResource } from '@modules/materials/domain/file-resource.entity';
 import { FileVersion } from '@modules/materials/domain/file-version.entity';
 import { User } from '@modules/users/domain/user.entity';
 import { MaterialStatus } from '@modules/materials/domain/material-status.entity';
+import { ClassEvent } from '@modules/events/domain/class-event.entity';
 
 @Entity('material')
 export class Material {
@@ -22,6 +23,13 @@ export class Material {
   @ManyToOne(() => MaterialFolder, (folder) => folder.materials)
   @JoinColumn({ name: 'material_folder_id' })
   materialFolder: MaterialFolder;
+
+  @Column({ name: 'class_event_id', type: 'bigint', nullable: true })
+  classEventId: string | null;
+
+  @ManyToOne(() => ClassEvent)
+  @JoinColumn({ name: 'class_event_id' })
+  classEvent: ClassEvent | null;
 
   @Column({ name: 'file_resource_id', type: 'bigint' })
   fileResourceId: string;

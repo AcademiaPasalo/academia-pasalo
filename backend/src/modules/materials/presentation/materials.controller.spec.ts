@@ -9,6 +9,7 @@ const mockMaterialsService = {
   createFolder: jest.fn(),
   getRootFolders: jest.fn(),
   getFolderContents: jest.fn(),
+  getClassEventMaterials: jest.fn(),
   addVersion: jest.fn(),
   download: jest.fn(),
   requestDeletion: jest.fn(),
@@ -93,6 +94,14 @@ describe('MaterialsController RBAC Security', () => {
 
     it('endpoint "download" should ALLOW STUDENT', () => {
       const roles = Reflect.getMetadata('roles', materialsController.download);
+      expect(roles).toContain('STUDENT');
+    });
+
+    it('endpoint "getClassEventMaterials" should ALLOW STUDENT', () => {
+      const roles = Reflect.getMetadata(
+        'roles',
+        materialsController.getClassEventMaterials,
+      );
       expect(roles).toContain('STUDENT');
     });
   });

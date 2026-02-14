@@ -20,14 +20,78 @@ import { Roles } from '@common/decorators/roles.decorator';
 import { CurrentUser } from '@common/decorators/current-user.decorator';
 import { ResponseMessage } from '@common/decorators/response-message.decorator';
 import { User } from '@modules/users/domain/user.entity';
+import { ClassEvent } from '@modules/events/domain/class-event.entity';
+import { ROLE_CODES } from '@common/constants/role-codes.constants';
 
 @Controller('class-events')
 @Auth()
 export class ClassEventsController {
   constructor(private readonly classEventsService: ClassEventsService) {}
 
+  private async mapEventsToResponse(
+    events: Awaited<ReturnType<ClassEventsService['getEventsByEvaluation']>>,
+    user: User,
+  ): Promise<ClassEventResponseDto[]> {
+    const authorizationByEvaluation = new Map<string, boolean>();
+
+    return Promise.all(
+      events.map(async (event) => {
+        const status = this.classEventsService.calculateEventStatus(event);
+        const needsAuthorization = Boolean(
+          event.liveMeetingUrl || event.recordingUrl,
+        );
+        let hasAuthorization = false;
+
+        if (needsAuthorization) {
+          const cachedAuthorization = authorizationByEvaluation.get(
+            event.evaluationId,
+          );
+          hasAuthorization =
+            cachedAuthorization !== undefined
+              ? cachedAuthorization
+              : await this.classEventsService.checkUserAuthorizationForUser(
+                  user,
+                  event.evaluationId,
+                );
+
+          authorizationByEvaluation.set(event.evaluationId, hasAuthorization);
+        }
+
+        const access = await this.classEventsService.getEventAccess(
+          event,
+          user,
+          hasAuthorization,
+        );
+
+        return ClassEventResponseDto.fromEntity(event, status, access);
+      }),
+    );
+  }
+
+  private async mapEventToResponse(
+    event: ClassEvent,
+    user: User,
+  ): Promise<ClassEventResponseDto> {
+    const status = this.classEventsService.calculateEventStatus(event);
+    const needsAuthorization = Boolean(event.liveMeetingUrl || event.recordingUrl);
+    const hasAuthorization = needsAuthorization
+      ? await this.classEventsService.checkUserAuthorizationForUser(
+          user,
+          event.evaluationId,
+        )
+      : false;
+
+    const access = await this.classEventsService.getEventAccess(
+      event,
+      user,
+      hasAuthorization,
+    );
+
+    return ClassEventResponseDto.fromEntity(event, status, access);
+  }
+
   @Post()
-  @Roles('PROFESSOR', 'ADMIN', 'SUPER_ADMIN')
+  @Roles(ROLE_CODES.PROFESSOR, ROLE_CODES.ADMIN, ROLE_CODES.SUPER_ADMIN)
   @HttpCode(HttpStatus.CREATED)
   @ResponseMessage('Evento de clase creado exitosamente')
   async create(
@@ -41,7 +105,7 @@ export class ClassEventsController {
       dto.topic,
       new Date(dto.startDatetime),
       new Date(dto.endDatetime),
-      dto.meetingLink,
+      dto.liveMeetingUrl,
       user,
     );
 
@@ -49,18 +113,16 @@ export class ClassEventsController {
       event.id,
       user.id,
     );
-    const status = this.classEventsService.calculateEventStatus(eventDetail);
-
-    const canAccess = await this.classEventsService.canAccessMeetingLink(
-      eventDetail,
-      user,
-    );
-
-    return ClassEventResponseDto.fromEntity(eventDetail, status, canAccess);
+    return await this.mapEventToResponse(eventDetail, user);
   }
 
   @Get('my-schedule')
-  @Roles('STUDENT', 'PROFESSOR', 'ADMIN', 'SUPER_ADMIN')
+  @Roles(
+    ROLE_CODES.STUDENT,
+    ROLE_CODES.PROFESSOR,
+    ROLE_CODES.ADMIN,
+    ROLE_CODES.SUPER_ADMIN,
+  )
   @ResponseMessage('Calendario obtenido exitosamente')
   async getMySchedule(
     @CurrentUser() user: User,
@@ -77,17 +139,7 @@ export class ClassEventsController {
       start,
       end,
     );
-
-    return Promise.all(
-      events.map(async (event) => {
-        const status = this.classEventsService.calculateEventStatus(event);
-        const canAccess = await this.classEventsService.canAccessMeetingLink(
-          event,
-          user,
-        );
-        return ClassEventResponseDto.fromEntity(event, status, canAccess);
-      }),
-    );
+    return await this.mapEventsToResponse(events, user);
   }
 
   @Get('evaluation/:evaluationId')
@@ -105,16 +157,7 @@ export class ClassEventsController {
       return [];
     }
 
-    return Promise.all(
-      events.map(async (event) => {
-        const status = this.classEventsService.calculateEventStatus(event);
-        const canAccess = await this.classEventsService.canAccessMeetingLink(
-          event,
-          user,
-        );
-        return ClassEventResponseDto.fromEntity(event, status, canAccess);
-      }),
-    );
+    return await this.mapEventsToResponse(events, user);
   }
 
   @Get(':id')
@@ -124,17 +167,11 @@ export class ClassEventsController {
     @CurrentUser() user: User,
   ): Promise<ClassEventResponseDto> {
     const event = await this.classEventsService.getEventDetail(id, user.id);
-    const status = this.classEventsService.calculateEventStatus(event);
-    const canAccess = await this.classEventsService.canAccessMeetingLink(
-      event,
-      user,
-    );
-
-    return ClassEventResponseDto.fromEntity(event, status, canAccess);
+    return await this.mapEventToResponse(event, user);
   }
 
   @Patch(':id')
-  @Roles('PROFESSOR', 'ADMIN', 'SUPER_ADMIN')
+  @Roles(ROLE_CODES.PROFESSOR, ROLE_CODES.ADMIN, ROLE_CODES.SUPER_ADMIN)
   @ResponseMessage('Evento actualizado exitosamente')
   async update(
     @Param('id') id: string,
@@ -148,24 +185,19 @@ export class ClassEventsController {
       dto.topic,
       dto.startDatetime ? new Date(dto.startDatetime) : undefined,
       dto.endDatetime ? new Date(dto.endDatetime) : undefined,
-      dto.meetingLink,
+      dto.liveMeetingUrl,
+      dto.recordingUrl,
     );
 
     const eventDetail = await this.classEventsService.getEventDetail(
       event.id,
       user.id,
     );
-    const status = this.classEventsService.calculateEventStatus(eventDetail);
-    const canAccess = await this.classEventsService.canAccessMeetingLink(
-      eventDetail,
-      user,
-    );
-
-    return ClassEventResponseDto.fromEntity(eventDetail, status, canAccess);
+    return await this.mapEventToResponse(eventDetail, user);
   }
 
   @Delete(':id/cancel')
-  @Roles('PROFESSOR', 'ADMIN', 'SUPER_ADMIN')
+  @Roles(ROLE_CODES.PROFESSOR, ROLE_CODES.ADMIN, ROLE_CODES.SUPER_ADMIN)
   @HttpCode(HttpStatus.NO_CONTENT)
   @ResponseMessage('Evento cancelado exitosamente')
   async cancel(
@@ -176,7 +208,7 @@ export class ClassEventsController {
   }
 
   @Post(':id/professors')
-  @Roles('ADMIN', 'SUPER_ADMIN')
+  @Roles(ROLE_CODES.ADMIN, ROLE_CODES.SUPER_ADMIN)
   @HttpCode(HttpStatus.CREATED)
   @ResponseMessage('Profesor asignado exitosamente')
   async assignProfessor(
@@ -187,7 +219,7 @@ export class ClassEventsController {
   }
 
   @Delete(':id/professors/:professorId')
-  @Roles('ADMIN', 'SUPER_ADMIN')
+  @Roles(ROLE_CODES.ADMIN, ROLE_CODES.SUPER_ADMIN)
   @HttpCode(HttpStatus.NO_CONTENT)
   @ResponseMessage('Profesor removido exitosamente')
   async removeProfessor(

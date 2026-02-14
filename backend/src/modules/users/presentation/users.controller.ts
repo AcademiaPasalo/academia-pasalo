@@ -20,6 +20,7 @@ import { Auth } from '@common/decorators/auth.decorator';
 import { Roles } from '@common/decorators/roles.decorator';
 import { CurrentUser } from '@common/decorators/current-user.decorator';
 import { User } from '@modules/users/domain/user.entity';
+import { ADMIN_ROLE_CODES, ROLE_CODES } from '@common/constants/role-codes.constants';
 
 @Controller('users')
 @Auth()
@@ -27,7 +28,7 @@ export class UsersController {
   constructor(private readonly usersService: UsersService) {}
 
   @Post()
-  @Roles('ADMIN', 'SUPER_ADMIN')
+  @Roles(ROLE_CODES.ADMIN, ROLE_CODES.SUPER_ADMIN)
   @HttpCode(HttpStatus.CREATED)
   @ResponseMessage('Usuario creado exitosamente')
   async create(@Body() createUserDto: CreateUserDto) {
@@ -38,7 +39,7 @@ export class UsersController {
   }
 
   @Get()
-  @Roles('ADMIN', 'SUPER_ADMIN')
+  @Roles(ROLE_CODES.ADMIN, ROLE_CODES.SUPER_ADMIN)
   @ResponseMessage('Usuarios obtenidos exitosamente')
   async findAll() {
     const users = await this.usersService.findAll();
@@ -53,7 +54,7 @@ export class UsersController {
   @ResponseMessage('Usuario obtenido exitosamente')
   async findOne(@Param('id') id: string, @CurrentUser() currentUser: User) {
     const isAdmin = currentUser.roles.some((r) =>
-      ['ADMIN', 'SUPER_ADMIN'].includes(r.code),
+      ADMIN_ROLE_CODES.includes(r.code),
     );
 
     if (!isAdmin && currentUser.id !== id) {
@@ -76,7 +77,7 @@ export class UsersController {
     @CurrentUser() currentUser: User,
   ) {
     const isAdmin = currentUser.roles.some((r) =>
-      ['ADMIN', 'SUPER_ADMIN'].includes(r.code),
+      ADMIN_ROLE_CODES.includes(r.code),
     );
 
     if (!isAdmin && currentUser.id !== id) {
@@ -101,7 +102,7 @@ export class UsersController {
   }
 
   @Patch(':id/ban')
-  @Roles('ADMIN', 'SUPER_ADMIN')
+  @Roles(ROLE_CODES.ADMIN, ROLE_CODES.SUPER_ADMIN)
   @ResponseMessage('Usuario baneado exitosamente')
   async banUser(@Param('id') id: string, @CurrentUser() currentUser: User) {
     if (currentUser.id === id) {
@@ -115,7 +116,7 @@ export class UsersController {
   }
 
   @Delete(':id')
-  @Roles('ADMIN', 'SUPER_ADMIN')
+  @Roles(ROLE_CODES.ADMIN, ROLE_CODES.SUPER_ADMIN)
   @HttpCode(HttpStatus.NO_CONTENT)
   @ResponseMessage('Usuario eliminado exitosamente')
   async remove(@Param('id') id: string) {
@@ -123,7 +124,7 @@ export class UsersController {
   }
 
   @Post(':id/roles/:roleCode')
-  @Roles('SUPER_ADMIN')
+  @Roles(ROLE_CODES.SUPER_ADMIN)
   @ResponseMessage('Rol asignado exitosamente')
   async assignRole(
     @Param('id') id: string,
@@ -136,7 +137,7 @@ export class UsersController {
   }
 
   @Delete(':id/roles/:roleCode')
-  @Roles('SUPER_ADMIN')
+  @Roles(ROLE_CODES.SUPER_ADMIN)
   @ResponseMessage('Rol removido exitosamente')
   async removeRole(
     @Param('id') id: string,

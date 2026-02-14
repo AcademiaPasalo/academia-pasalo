@@ -114,6 +114,12 @@ INSERT INTO session_status (code, name) VALUES
 ('BLOCKED_PENDING_REAUTH', 'Bloqueado por Anomalía (Requiere Re-autenticación)'),
 ('REVOKED', 'Sesión Revocada / Cerrada');
 
+INSERT INTO class_event_recording_status (code, name) VALUES
+('NOT_AVAILABLE', 'Grabación no disponible'),
+('PROCESSING', 'Grabación en procesamiento'),
+('READY', 'Grabación disponible'),
+('FAILED', 'Grabación con error de procesamiento');
+
 -- MI USUARIO DE PRUEBA
 INSERT INTO user (email, first_name, last_name_1, last_name_2, profile_photo_url, photo_source, created_at) 
 VALUES 

@@ -3,6 +3,7 @@ import { DataSource, EntityManager } from 'typeorm';
 import { ClassEventsService } from '@modules/events/application/class-events.service';
 import { ClassEventRepository } from '@modules/events/infrastructure/class-event.repository';
 import { ClassEventProfessorRepository } from '@modules/events/infrastructure/class-event-professor.repository';
+import { ClassEventRecordingStatusRepository } from '@modules/events/infrastructure/class-event-recording-status.repository';
 import { EvaluationRepository } from '@modules/evaluations/infrastructure/evaluation.repository';
 import { EnrollmentEvaluationRepository } from '@modules/enrollments/infrastructure/enrollment-evaluation.repository';
 import { UserRepository } from '@modules/users/infrastructure/user.repository';
@@ -10,11 +11,13 @@ import { RedisCacheService } from '@infrastructure/cache/redis-cache.service';
 import { User } from '@modules/users/domain/user.entity';
 import { ClassEvent } from '@modules/events/domain/class-event.entity';
 import { Evaluation } from '@modules/evaluations/domain/evaluation.entity';
+import { ROLE_CODES } from '@common/constants/role-codes.constants';
 
 describe('ClassEventsService', () => {
   let service: ClassEventsService;
   let classEventRepository: jest.Mocked<ClassEventRepository>;
   let evaluationRepository: jest.Mocked<EvaluationRepository>;
+  let classEventRecordingStatusRepository: jest.Mocked<ClassEventRecordingStatusRepository>;
   let enrollmentEvaluationRepository: jest.Mocked<EnrollmentEvaluationRepository>;
   let userRepository: jest.Mocked<UserRepository>;
   let cacheService: jest.Mocked<RedisCacheService>;
@@ -22,17 +25,17 @@ describe('ClassEventsService', () => {
 
   const mockAdmin = {
     id: 'admin-1',
-    roles: [{ code: 'ADMIN' }],
+    roles: [{ code: ROLE_CODES.ADMIN }],
   } as User;
 
   const mockProfessor = {
     id: 'prof-1',
-    roles: [{ code: 'PROFESSOR' }],
+    roles: [{ code: ROLE_CODES.PROFESSOR }],
   } as User;
 
   const mockStudent = {
     id: 'student-1',
-    roles: [{ code: 'STUDENT' }],
+    roles: [{ code: ROLE_CODES.STUDENT }],
   } as User;
 
   const mockEvent = {
@@ -43,7 +46,8 @@ describe('ClassEventsService', () => {
     topic: 'Intro',
     startDatetime: new Date('2026-02-01T08:00:00Z'),
     endDatetime: new Date('2026-02-01T10:00:00Z'),
-    meetingLink: 'http://link.com',
+    liveMeetingUrl: 'http://link.com',
+    recordingUrl: null,
     isCancelled: false,
     createdBy: 'prof-1',
   } as ClassEvent;
@@ -90,6 +94,16 @@ describe('ClassEventsService', () => {
           },
         },
         {
+          provide: ClassEventRecordingStatusRepository,
+          useValue: {
+            findByCode: jest.fn().mockResolvedValue({
+              id: '1',
+              code: 'NOT_AVAILABLE',
+              name: 'Grabación no disponible',
+            }),
+          },
+        },
+        {
           provide: EvaluationRepository,
           useValue: {
             findByIdWithCycle: jest.fn(),
@@ -122,6 +136,9 @@ describe('ClassEventsService', () => {
     service = module.get<ClassEventsService>(ClassEventsService);
     classEventRepository = module.get(ClassEventRepository);
     evaluationRepository = module.get(EvaluationRepository);
+    classEventRecordingStatusRepository = module.get(
+      ClassEventRecordingStatusRepository,
+    );
     enrollmentEvaluationRepository = module.get(EnrollmentEvaluationRepository);
     userRepository = module.get(UserRepository);
     cacheService = module.get(RedisCacheService);
@@ -148,6 +165,35 @@ describe('ClassEventsService', () => {
       );
 
       expect(classEventRepository.create).toHaveBeenCalled();
+      expect(classEventRecordingStatusRepository.findByCode).toHaveBeenCalled();
+    });
+
+    it('debe usar cache para estado de grabacion si ya existe', async () => {
+      cacheService.get.mockImplementation(async (key: string) => {
+        if (key === 'cache:class-event-recording-status:code:NOT_AVAILABLE') {
+          return '1';
+        }
+        return null;
+      });
+      evaluationRepository.findByIdWithCycle.mockResolvedValue(mockEvaluation);
+      classEventRepository.findByEvaluationAndSessionNumber.mockResolvedValue(
+        null,
+      );
+      classEventRepository.create.mockResolvedValue(mockEvent);
+
+      await service.createEvent(
+        'eval-1',
+        2,
+        'Clase 2',
+        'Topic',
+        new Date('2026-02-02T08:00:00Z'),
+        new Date('2026-02-02T10:00:00Z'),
+        'link',
+        mockProfessor,
+      );
+
+      expect(classEventRecordingStatusRepository.findByCode).not.toHaveBeenCalled();
+      cacheService.get.mockResolvedValue(null);
     });
   });
 
@@ -224,10 +270,10 @@ describe('ClassEventsService', () => {
       expect(userRepository.findById).not.toHaveBeenCalled();
     });
 
-    it('debe denegar si el evento no tiene meetingLink sin consultar repositorios', async () => {
+    it('debe denegar si el evento no tiene liveMeetingUrl sin consultar repositorios', async () => {
       const event = {
         ...mockEvent,
-        meetingLink: null,
+        liveMeetingUrl: null,
       } as unknown as ClassEvent;
 
       const result = await service.canAccessMeetingLink(event, mockAdmin);
@@ -277,6 +323,91 @@ describe('ClassEventsService', () => {
       );
       expect(dataSource.query).toHaveBeenCalled();
       expect(cacheService.set).toHaveBeenCalled();
+    });
+  });
+
+  describe('canWatchRecording', () => {
+    it('debe permitir ver grabacion finalizada con acceso', async () => {
+      const now = Date.now();
+      const event = {
+        ...mockEvent,
+        startDatetime: new Date(now - 2 * 60 * 60 * 1000),
+        endDatetime: new Date(now - 60 * 60 * 1000),
+        recordingUrl: 'https://video.example.com/rec-1',
+      } as ClassEvent;
+      enrollmentEvaluationRepository.checkAccess.mockResolvedValue(true);
+
+      const result = await service.canWatchRecording(event, mockStudent);
+
+      expect(result).toBe(true);
+      expect(enrollmentEvaluationRepository.checkAccess).toHaveBeenCalledWith(
+        'student-1',
+        'eval-1',
+      );
+    });
+  });
+
+  describe('getMySchedule (baseline actual)', () => {
+    it('debe retornar tal cual los eventos del repositorio sin filtro adicional por acceso fino', async () => {
+      const start = new Date('2026-02-01T00:00:00Z');
+      const end = new Date('2026-02-07T23:59:59Z');
+      const eventWithoutAccessFilter = {
+        ...mockEvent,
+        evaluationId: 'eval-no-access',
+      } as ClassEvent;
+
+      classEventRepository.findByUserAndRange.mockResolvedValue([
+        eventWithoutAccessFilter,
+      ]);
+
+      const result = await service.getMySchedule('student-1', start, end);
+
+      expect(result).toEqual([eventWithoutAccessFilter]);
+      expect(classEventRepository.findByUserAndRange).toHaveBeenCalledWith(
+        'student-1',
+        start,
+        end,
+      );
+      expect(enrollmentEvaluationRepository.checkAccess).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('updateEvent', () => {
+    it('debe setear recordingStatusId READY cuando se actualiza recordingUrl', async () => {
+      const event = {
+        ...mockEvent,
+        startDatetime: new Date('2026-02-01T08:00:00Z'),
+        endDatetime: new Date('2026-02-01T10:00:00Z'),
+      } as ClassEvent;
+      classEventRepository.findByIdSimple.mockResolvedValue(event);
+      classEventRecordingStatusRepository.findByCode.mockResolvedValue({
+        id: '3',
+        code: 'READY',
+        name: 'Grabación disponible',
+      });
+      classEventRepository.update.mockResolvedValue({
+        ...event,
+        recordingUrl: 'https://video.example.com/ready-1',
+      } as ClassEvent);
+
+      await service.updateEvent(
+        'event-1',
+        mockProfessor,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        'https://video.example.com/ready-1',
+      );
+
+      expect(classEventRepository.update).toHaveBeenCalledWith(
+        'event-1',
+        expect.objectContaining({
+          recordingUrl: 'https://video.example.com/ready-1',
+          recordingStatusId: '3',
+        }),
+      );
     });
   });
 });
