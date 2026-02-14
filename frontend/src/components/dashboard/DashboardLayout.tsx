@@ -135,6 +135,7 @@ export default function DashboardLayout({
                     items={breadcrumbItems} 
                     onToggleSidebar={toggleSidebar}
                     showToggle={showToggle && showSidebar}
+                    isSidebarOpen={!isCollapsed}
                   />
                 ) : title ? (
                   <h1 className="text-lg font-semibold text-primary truncate">

@@ -158,7 +158,7 @@ export default function RoleSwitcher({
       {/* Dropdown */}
       {open && (
         <div 
-          className="absolute top-full mt-2 left-0 w-60 bg-white rounded-xl shadow-xl z-50"
+          className="absolute top-full mt-[-28] left-8 w-60 bg-white rounded-xl shadow-xl z-50"
           onMouseDown={(e) => e.stopPropagation()}
         >
           {/* Header */}

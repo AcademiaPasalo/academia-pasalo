@@ -1,6 +1,7 @@
-'use client';
+"use client";
 
 import Icon from "../ui/Icon";
+import Image from "next/image";
 
 export interface BreadcrumbItem {
   icon?: string;
@@ -12,12 +13,14 @@ export interface BreadcrumbProps {
   items: BreadcrumbItem[];
   onToggleSidebar?: () => void;
   showToggle?: boolean;
+  isSidebarOpen: boolean;
 }
 
 export default function Breadcrumb({
   items,
   onToggleSidebar,
-  showToggle = true
+  showToggle = true,
+  isSidebarOpen,
 }: BreadcrumbProps) {
   return (
     <div className="flex items-center">
@@ -28,7 +31,16 @@ export default function Breadcrumb({
           className="flex items-center justify-center w-9 h-9 hover:bg-secondary-hover rounded-lg transition-colors mr-2"
           aria-label="Toggle Sidebar"
         >
-          <Icon name="view_sidebar" size={20} variant="outlined" className="text-tertiary" />
+          <Image
+            src={
+              isSidebarOpen
+                ? "/icons/sidebar_open.svg"
+                : "/icons/sidebar_close.svg"
+            }
+            alt="Toggle Sidebar"
+            width={20}
+            height={20}
+          />
         </button>
       )}
 
@@ -44,7 +56,9 @@ export default function Breadcrumb({
                 href={item.href}
                 className="flex items-center gap-1 hover:text-accent-solid transition-colors"
               >
-                <span className={`font-medium ${index === items.length - 1 ? 'text-accent-solid' : 'text-secondary'}`}>
+                <span
+                  className={`font-medium ${index === items.length - 1 ? "text-accent-solid" : "text-secondary"}`}
+                >
                   {item.label}
                 </span>
               </a>
