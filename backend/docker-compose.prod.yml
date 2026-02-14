@@ -96,8 +96,6 @@ services:
       MYSQL_DATABASE: ${DB_NAME}
     volumes:
       - mysql_data:/var/lib/mysql
-      - ./creacion_tablas_academia_pasalo_v1.sql:/docker-entrypoint-initdb.d/01-schema.sql
-      - ./datos_iniciales_academa_pasalo_v1.sql:/docker-entrypoint-initdb.d/02-data.sql
     networks:
       - academia-network
     healthcheck:

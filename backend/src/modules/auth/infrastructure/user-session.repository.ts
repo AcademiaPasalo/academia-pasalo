@@ -22,6 +22,7 @@ export class UserSessionRepository {
       | 'deviceId'
       | 'ipAddress'
       | 'refreshTokenHash'
+      | 'refreshTokenJti'
       | 'sessionStatusId'
       | 'expiresAt'
       | 'lastActivityAt'
@@ -32,6 +33,7 @@ export class UserSessionRepository {
       deviceId: string;
       ipAddress: string;
       refreshTokenHash: string;
+      refreshTokenJti: string | null;
       sessionStatusId: string;
       expiresAt: Date;
       lastActivityAt: Date;
@@ -45,14 +47,20 @@ export class UserSessionRepository {
     return await repo.save(session);
   }
 
-  async findById(id: string, manager?: EntityManager): Promise<UserSession | null> {
+  async findById(
+    id: string,
+    manager?: EntityManager,
+  ): Promise<UserSession | null> {
     const repo = this.getRepository(manager);
     return await repo.findOne({
       where: { id },
     });
   }
 
-  async findByIdWithUser(id: string, manager?: EntityManager): Promise<UserSession | null> {
+  async findByIdWithUser(
+    id: string,
+    manager?: EntityManager,
+  ): Promise<UserSession | null> {
     const repo = this.getRepository(manager);
     return await repo.findOne({
       where: { id },
@@ -60,7 +68,10 @@ export class UserSessionRepository {
     });
   }
 
-  async findActiveById(id: string, manager?: EntityManager): Promise<UserSession | null> {
+  async findActiveById(
+    id: string,
+    manager?: EntityManager,
+  ): Promise<UserSession | null> {
     const repo = this.getRepository(manager);
     return await repo.findOne({
       where: { id, isActive: true },
@@ -87,7 +98,20 @@ export class UserSessionRepository {
     });
   }
 
-  async findActiveSessionsByUserId(userId: string, manager?: EntityManager): Promise<UserSession[]> {
+  async findByRefreshTokenJti(
+    refreshTokenJti: string,
+    manager?: EntityManager,
+  ): Promise<UserSession | null> {
+    const repo = this.getRepository(manager);
+    return await repo.findOne({
+      where: { refreshTokenJti },
+    });
+  }
+
+  async findActiveSessionsByUserId(
+    userId: string,
+    manager?: EntityManager,
+  ): Promise<UserSession[]> {
     const repo = this.getRepository(manager);
     return await repo.find({
       where: { userId, isActive: true },
@@ -95,7 +119,22 @@ export class UserSessionRepository {
     });
   }
 
-  async findLatestSessionByUserId(userId: string, manager?: EntityManager): Promise<UserSession | null> {
+  async findSessionsByUserAndStatus(
+    userId: string,
+    statusId: string,
+    manager?: EntityManager,
+  ): Promise<UserSession[]> {
+    const repo = this.getRepository(manager);
+    return await repo.find({
+      where: { userId, sessionStatusId: statusId },
+      order: { createdAt: 'DESC' },
+    });
+  }
+
+  async findLatestSessionByUserId(
+    userId: string,
+    manager?: EntityManager,
+  ): Promise<UserSession | null> {
     const repo = this.getRepository(manager);
     return await repo.findOne({
       where: { userId },
@@ -120,7 +159,10 @@ export class UserSessionRepository {
       .getOne();
   }
 
-  async countActiveSessionsByUserId(userId: string, manager?: EntityManager): Promise<number> {
+  async countActiveSessionsByUserId(
+    userId: string,
+    manager?: EntityManager,
+  ): Promise<number> {
     const repo = this.getRepository(manager);
     return await repo.count({
       where: { userId, isActive: true },
@@ -136,7 +178,9 @@ export class UserSessionRepository {
     await repo.update(id, sessionData);
     const session = await this.findById(id, manager);
     if (!session) {
-      throw new InternalServerErrorException('Sesión no encontrada después de actualizar');
+      throw new InternalServerErrorException(
+        'Sesión no encontrada después de actualizar',
+      );
     }
     return session;
   }
@@ -146,7 +190,10 @@ export class UserSessionRepository {
     await repo.update(id, { isActive: false });
   }
 
-  async save(session: UserSession, manager?: EntityManager): Promise<UserSession> {
+  async save(
+    session: UserSession,
+    manager?: EntityManager,
+  ): Promise<UserSession> {
     const repo = this.getRepository(manager);
     return await repo.save(session);
   }
@@ -163,12 +210,39 @@ export class UserSessionRepository {
       .getOne();
   }
 
-  async findByIdForUpdate(id: string, manager: EntityManager): Promise<UserSession | null> {
+  async findByRefreshTokenJtiForUpdate(
+    refreshTokenJti: string,
+    manager: EntityManager,
+  ): Promise<UserSession | null> {
+    return await manager
+      .getRepository(UserSession)
+      .createQueryBuilder('s')
+      .setLock('pessimistic_write')
+      .where('s.refreshTokenJti = :refreshTokenJti', { refreshTokenJti })
+      .getOne();
+  }
+
+  async findByIdForUpdate(
+    id: string,
+    manager: EntityManager,
+  ): Promise<UserSession | null> {
     return await manager
       .getRepository(UserSession)
       .createQueryBuilder('s')
       .setLock('pessimistic_write')
       .where('s.id = :id', { id })
       .getOne();
+  }
+
+  async existsByUserIdAndDeviceId(
+    userId: string,
+    deviceId: string,
+    manager?: EntityManager,
+  ): Promise<boolean> {
+    const repo = this.getRepository(manager);
+    const count = await repo.count({
+      where: { userId, deviceId },
+    });
+    return count > 0;
   }
 }

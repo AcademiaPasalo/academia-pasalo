@@ -39,8 +39,10 @@ describe('E2E: Class Events (Eventos de Clase)', () => {
 
     app = moduleFixture.createNestApplication();
     app.setGlobalPrefix('api/v1');
-    app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
-    
+    app.useGlobalPipes(
+      new ValidationPipe({ whitelist: true, transform: true }),
+    );
+
     const reflector = app.get(Reflector);
     app.useGlobalInterceptors(new TransformInterceptor(reflector));
 
@@ -48,7 +50,7 @@ describe('E2E: Class Events (Eventos de Clase)', () => {
 
     dataSource = app.get(DataSource);
     const cacheService = app.get(RedisCacheService);
-    
+
     await cacheService.invalidateGroup('*');
     seeder = new TestSeeder(dataSource, app);
 
@@ -77,9 +79,12 @@ describe('E2E: Class Events (Eventos de Clase)', () => {
       formatDate(yesterday),
       formatDate(nextWeek),
     );
-    const course = await seeder.createCourse(`COURSE-EVENT-${Date.now()}`, 'Eventos 101');
+    const course = await seeder.createCourse(
+      `COURSE-EVENT-${Date.now()}`,
+      'Eventos 101',
+    );
     courseCycle = await seeder.linkCourseCycle(course.id, cycle.id);
-    
+
     // Iniciar evaluación ayer para garantizar acceso activo hoy
     evaluation = await seeder.createEvaluation(
       courseCycle.id,
@@ -104,7 +109,7 @@ describe('E2E: Class Events (Eventos de Clase)', () => {
 
     await dataSource.query(
       'INSERT INTO course_cycle_professor (course_cycle_id, professor_user_id, assigned_at) VALUES (?, ?, NOW())',
-      [courseCycle.id, professor.user.id]
+      [courseCycle.id, professor.user.id],
     );
 
     // Matricular alumno y forzar limpieza de caché
@@ -117,7 +122,7 @@ describe('E2E: Class Events (Eventos de Clase)', () => {
         enrollmentTypeCode: 'FULL',
       })
       .expect(201);
-    
+
     const cacheSvc = app.get(RedisCacheService);
     await cacheSvc.invalidateGroup('*');
   });

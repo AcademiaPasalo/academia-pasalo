@@ -23,7 +23,11 @@ describe('Courses Content Logic (Integration)', () => {
   const mockFullCycle = {
     id: mockCycleId,
     course: { name: 'Física I', code: 'FIS101' },
-    academicCycle: { code: '2026-1', startDate: new Date('2026-01-01'), endDate: new Date('2026-07-01') },
+    academicCycle: {
+      code: '2026-1',
+      startDate: new Date('2026-01-01'),
+      endDate: new Date('2026-07-01'),
+    },
   };
 
   const mockEvaluations = [
@@ -46,7 +50,7 @@ describe('Courses Content Logic (Integration)', () => {
           isActive: true,
           accessStartDate: new Date('2026-06-01'),
           accessEndDate: new Date('2026-06-02'),
-        }
+        },
       ],
     },
   ];
@@ -57,19 +61,19 @@ describe('Courses Content Logic (Integration)', () => {
         CoursesService,
         {
           provide: DataSource,
-          useValue: { transaction: jest.fn() }
+          useValue: { transaction: jest.fn() },
         },
         {
           provide: CourseRepository,
-          useValue: {}
+          useValue: {},
         },
         {
           provide: CourseTypeRepository,
-          useValue: {}
+          useValue: {},
         },
         {
           provide: CycleLevelRepository,
-          useValue: {}
+          useValue: {},
         },
         {
           provide: CourseCycleRepository,
@@ -80,7 +84,7 @@ describe('Courses Content Logic (Integration)', () => {
         },
         {
           provide: CourseCycleProfessorRepository,
-          useValue: {}
+          useValue: {},
         },
         {
           provide: EvaluationRepository,
@@ -90,7 +94,7 @@ describe('Courses Content Logic (Integration)', () => {
         },
         {
           provide: CyclesService,
-          useValue: {}
+          useValue: {},
         },
         {
           provide: RedisCacheService,
@@ -104,15 +108,21 @@ describe('Courses Content Logic (Integration)', () => {
 
     coursesService = moduleRef.get<CoursesService>(CoursesService);
     cacheService = moduleRef.get<RedisCacheService>(RedisCacheService);
-    courseCycleRepository = moduleRef.get<CourseCycleRepository>(CourseCycleRepository);
-    evaluationRepository = moduleRef.get<EvaluationRepository>(EvaluationRepository);
+    courseCycleRepository = moduleRef.get<CourseCycleRepository>(
+      CourseCycleRepository,
+    );
+    evaluationRepository =
+      moduleRef.get<EvaluationRepository>(EvaluationRepository);
   });
 
   describe('getCourseContent', () => {
     it('should calculate LOCKED status correctly when user has no access', async () => {
-      const result = await coursesService.getCourseContent(mockCycleId, mockUserId);
-      const parcial = result.evaluations.find(e => e.id === 'ev-1');
-      
+      const result = await coursesService.getCourseContent(
+        mockCycleId,
+        mockUserId,
+      );
+      const parcial = result.evaluations.find((e) => e.id === 'ev-1');
+
       expect(parcial).toBeDefined();
       expect(parcial.userStatus.status).toBe('LOCKED');
       expect(parcial.userStatus.hasAccess).toBe(false);
@@ -121,22 +131,35 @@ describe('Courses Content Logic (Integration)', () => {
     it('should calculate STATUS based on current time vs access dates', async () => {
       jest.useFakeTimers().setSystemTime(new Date('2026-05-01'));
 
-      const result = await coursesService.getCourseContent(mockCycleId, mockUserId);
-      const finalExam = result.evaluations.find(e => e.id === 'ev-2');
+      const result = await coursesService.getCourseContent(
+        mockCycleId,
+        mockUserId,
+      );
+      const finalExam = result.evaluations.find((e) => e.id === 'ev-2');
 
       expect(finalExam.userStatus.hasAccess).toBe(true);
       expect(finalExam.userStatus.status).toBe('UPCOMING');
 
       jest.useFakeTimers().setSystemTime(new Date('2026-06-01T12:00:00'));
-      const resultInProgres = await coursesService.getCourseContent(mockCycleId, mockUserId);
-      const finalInProgress = resultInProgres.evaluations.find(e => e.id === 'ev-2');
+      const resultInProgres = await coursesService.getCourseContent(
+        mockCycleId,
+        mockUserId,
+      );
+      const finalInProgress = resultInProgres.evaluations.find(
+        (e) => e.id === 'ev-2',
+      );
       expect(finalInProgress.userStatus.status).toBe('IN_PROGRESS');
 
       jest.useFakeTimers().setSystemTime(new Date('2026-07-01'));
-      const resultExpired = await coursesService.getCourseContent(mockCycleId, mockUserId);
-      const finalExpired = resultExpired.evaluations.find(e => e.id === 'ev-2');
+      const resultExpired = await coursesService.getCourseContent(
+        mockCycleId,
+        mockUserId,
+      );
+      const finalExpired = resultExpired.evaluations.find(
+        (e) => e.id === 'ev-2',
+      );
       expect(finalExpired.userStatus.status).toBe('COMPLETED');
-      
+
       jest.useRealTimers();
     });
 
@@ -155,8 +178,9 @@ describe('Courses Content Logic (Integration)', () => {
 
     it('should throw NotFoundException if cycle does not exist', async () => {
       (courseCycleRepository.findById as jest.Mock).mockResolvedValue(null);
-      await expect(coursesService.getCourseContent('invalid-id', mockUserId))
-        .rejects.toThrow(NotFoundException);
+      await expect(
+        coursesService.getCourseContent('invalid-id', mockUserId),
+      ).rejects.toThrow(NotFoundException);
     });
   });
 });

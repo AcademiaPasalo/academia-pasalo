@@ -24,7 +24,9 @@ export class MaterialCatalogRepository {
     return await this.materialStatusRepo.findOne({ where: { code } });
   }
 
-  async findDeletionRequestStatusByCode(code: string): Promise<DeletionRequestStatus | null> {
+  async findDeletionRequestStatusByCode(
+    code: string,
+  ): Promise<DeletionRequestStatus | null> {
     return await this.deletionRequestStatusRepo.findOne({ where: { code } });
   }
 }

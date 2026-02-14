@@ -7,10 +7,7 @@ import { CyclesController } from '@modules/cycles/presentation/cycles.controller
 import { AuthModule } from '@modules/auth/auth.module';
 
 @Module({
-  imports: [
-    TypeOrmModule.forFeature([AcademicCycle]),
-    AuthModule,
-  ],
+  imports: [TypeOrmModule.forFeature([AcademicCycle]), AuthModule],
   controllers: [CyclesController],
   providers: [AcademicCycleRepository, CyclesService],
   exports: [AcademicCycleRepository, CyclesService],

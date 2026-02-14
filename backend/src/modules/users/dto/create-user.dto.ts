@@ -53,7 +53,9 @@ export class CreateUserDto {
 
   @IsOptional()
   @IsString()
-  @MaxLength(500, { message: 'La URL de foto excede el tamaño máximo permitido' })
+  @MaxLength(500, {
+    message: 'La URL de foto excede el tamaño máximo permitido',
+  })
   profilePhotoUrl?: string;
 
   @IsOptional()

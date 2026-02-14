@@ -212,12 +212,45 @@ Base URL: `/api/v1/users`
 *   **Endpoint:** `PATCH /:id`
 *   **Roles:** `ADMIN`, `SUPER_ADMIN` o el **Propietario** de la cuenta.
 *   **Request Body:** Similar a `POST /` (todos los campos son opcionales).
+*   **Campo adicional de seguridad:** `isActive?: boolean`
+    *   `false` = cuenta inactiva (baneada)
+    *   `true` = cuenta activa
 
-### 5. Eliminar Usuario
+### 5. Banear Usuario (Admin Action)
+*   **Endpoint:** `PATCH /:id/ban`
+*   **Roles:** `ADMIN`, `SUPER_ADMIN`
+*   **Request Body:** No requiere body.
+*   **Purpose:** Desactivar una cuenta de usuario de forma inmediata por razones operativas o de seguridad.
+*   **Reglas de negocio:**
+    *   El administrador **no puede banearse a sí mismo** (`403`).
+    *   El baneo marca `user.isActive = false`.
+    *   Se invalidan identidades en caché y se revocan sesiones activas del usuario.
+    *   El usuario baneado queda bloqueado en `login`, `refresh` y validación de sesión con respuesta `403`.
+*   **Response (`data`):** Objeto `User` actualizado.
+*   **Errores esperados:**
+    *   `403` si intenta auto-banearse.
+    *   `404` si el usuario no existe.
+
+#### Ejemplo de Response
+```json
+{
+  "statusCode": 200,
+  "message": "Usuario baneado exitosamente",
+  "data": {
+    "id": "25",
+    "email": "estudiante@academia.com",
+    "isActive": false,
+    "roles": [{ "code": "STUDENT", "name": "Alumno" }]
+  },
+  "timestamp": "2026-02-12T23:50:00.000Z"
+}
+```
+
+### 6. Eliminar Usuario
 *   **Endpoint:** `DELETE /:id`
 *   **Roles:** `ADMIN`, `SUPER_ADMIN`
 
-### 6. Gestión de Roles
+### 7. Gestión de Roles
 *   **Asignar:** `POST /:id/roles/:roleCode`
     *   **Roles:** `SUPER_ADMIN`
 *   **Remover:** `DELETE /:id/roles/:roleCode`
@@ -261,6 +294,11 @@ Base URL: `/api/v1/cycles` | `/api/v1/courses`
 #### Listar Materias
 *   **Endpoint:** `GET /`
 *   **Roles:** `ADMIN`, `SUPER_ADMIN`
+
+#### Obtener Materia por ID
+*   **Endpoint:** `GET /:id`
+*   **Roles:** `ADMIN`, `SUPER_ADMIN`
+*   **Response:** Objeto Course con su tipo y nivel.
 
 #### Listar Tipos y Niveles
 *   **GET /types**: Tipos de cursos (Ciencias, Letras, etc.).
@@ -323,10 +361,61 @@ Base URL: `/api/v1/enrollments`
       "userId": "string",
       "courseCycleId": "string",
       "enrollmentTypeCode": "FULL | PARTIAL",
-      "evaluationIds": ["string"] (Opcional, para PARTIAL),
-      "historicalCourseCycleIds": ["string"] (Opcional, para acceso histórico)
+      "evaluationIds": ["string"],
+      "historicalCourseCycleIds": ["string"]
     }
     ```
+
+#### Tipos de Matrícula:
+
+| Tipo | `evaluationIds` | `historicalCourseCycleIds` | Comportamiento |
+|------|-----------------|---------------------------|----------------|
+| **FULL** | Ignorado | Opcional | Acceso a TODAS las evaluaciones del ciclo actual + ciclos históricos |
+| **PARTIAL** | **Requerido** | Opcional | Acceso SOLO a evaluaciones específicas (pueden ser de ciclos pasados) |
+
+> [!IMPORTANT]
+> **Manejo de Fechas en Evaluaciones Históricas (PARTIAL)**
+> Si un alumno se matricula en una evaluación pasada (ej. PC1 2025-1) bajo modalidad `PARTIAL`:
+> 1. El sistema intentará igualar la fecha de acceso con su **símil del ciclo actual** (ej. PC1 2026-1).
+> 2. Si NO encuentra un símil, usará la **fecha fin del ciclo actual** como fallback.
+> 
+> **Para el Frontend:** Si observan que `accessEndDate` de la matrícula es posterior a `evaluation.endDate` (fecha original del examen), significa que el sistema extendió automáticamente el acceso (fallback). Se recomienda mostrar una advertencia al usuario indicando la fecha límite de su acceso y que no encontró su símil actual (caso muy extraño).
+
+#### Ejemplos de Uso:
+
+**1. FULL con acceso histórico:**
+```json
+{
+  "userId": "123",
+  "courseCycleId": "ciclo-2026-1",
+  "enrollmentTypeCode": "FULL",
+  "historicalCourseCycleIds": ["ciclo-2025-2", "ciclo-2025-1"]
+}
+```
+*Resultado: Acceso a todas las evaluaciones del ciclo actual + todos los exámenes de los 2 ciclos anteriores.*
+
+**2. PARTIAL solo ciclo actual:**
+```json
+{
+  "userId": "456",
+  "courseCycleId": "ciclo-2026-1",
+  "enrollmentTypeCode": "PARTIAL",
+  "evaluationIds": ["pc1-id", "pc2-id"]
+}
+```
+*Resultado: Acceso solo a PC1 y PC2 del ciclo actual.*
+
+**3. PARTIAL con evaluación de ciclo histórico:**
+```json
+{
+  "userId": "789",
+  "courseCycleId": "ciclo-2026-1",
+  "enrollmentTypeCode": "PARTIAL",
+  "evaluationIds": ["ex-final-2025-2"],
+  "historicalCourseCycleIds": ["ciclo-2025-2"]
+}
+```
+*Resultado: Acceso solo al examen final del ciclo 2025-2 para práctica.*
 
 ### 2. Cancelar Matrícula
 *   **Endpoint:** `DELETE /:id`
@@ -344,3 +433,57 @@ Base URL: `/api/v1`
 *   **Roles:** Público.
 *   **Descripción:** Verifica el estado de la API, conexión a BD y Redis.
 *   **Response:** `{ "status": "ok", "info": { ... } }`
+
+---
+
+## 🔍 ÉPICA 7: Auditoría y Trazabilidad (Audit)
+
+Base URL: `/api/v1/audit`
+*Requiere Authorization: Bearer <accessToken>.*
+
+### 1. Obtener Historial Unificado
+`GET /history`
+
+**Purpose:** Obtiene una vista cronológica consolidada de eventos de seguridad (logins, anomalías) y acciones de negocio (subida de archivos, gestión de usuarios).
+
+**Query Parameters:**
+*   `startDate` (ISO Date, opcional): Filtrar desde esta fecha.
+*   `endDate` (ISO Date, opcional): Filtrar hasta esta fecha.
+*   `userId` (string, opcional): Filtrar acciones de un usuario específico.
+*   `limit` (number, opcional): Máximo de registros (Default: 50, Max Backend: 100).
+
+**Response:**
+`data` (Array de objetos):
+```json
+[
+  {
+    "id": "aud-123 | sec-456",
+    "datetime": "2026-02-07T15:00:00.000Z",
+    "userId": "10",
+    "userName": "Joseph Pasalo",
+    "actionCode": "MATERIAL_UPLOAD | LOGIN_SUCCESS",
+    "actionName": "Subida de Archivo | Inicio de Sesión",
+    "source": "AUDIT | SECURITY",
+    "entityType": "material (solo en AUDIT)",
+    "entityId": "50 (solo en AUDIT)",
+    "ipAddress": "192.168.1.1",
+    "userAgent": "Mozilla/5.0... (solo en SECURITY)",
+    "metadata": { ... }
+  }
+]
+```
+
+---
+
+### 2. Exportar Historial a Excel
+`GET /export`
+
+**Purpose:** Descarga un reporte profesional en formato `.xlsx` con el historial filtrado. Soporta hasta 1000 registros por descarga.
+
+**Query Parameters:**
+*   `startDate`, `endDate`, `userId` (Mismos filtros que el historial).
+
+**Response:**
+*   **Content-Type:** `application/vnd.openxmlformats-officedocument.spreadsheetml.sheet`
+*   **Content-Disposition:** `attachment; filename=reporte-auditoria-YYYY-MM-DD.xlsx`
+*   **Body:** Stream binario del archivo Excel.

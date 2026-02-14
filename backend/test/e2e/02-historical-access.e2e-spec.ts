@@ -38,42 +38,59 @@ describe('E2E: Acceso Histórico y Ciclos Pasados', () => {
     }).compile();
 
     app = moduleFixture.createNestApplication();
-    app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
+    app.useGlobalPipes(
+      new ValidationPipe({ whitelist: true, transform: true }),
+    );
     await app.init();
 
     dataSource = app.get(DataSource);
     accessEngine = app.get(AccessEngineService);
     seeder = new TestSeeder(dataSource, app);
 
-    // 1. Ciclos
     const uniqueSuffix = Date.now().toString();
-    pastCycle = await seeder.createCycle(`2025-HIST-${uniqueSuffix}`, formatDate(pastDateStart), formatDate(pastDateEnd));
+    pastCycle = await seeder.createCycle(
+      `2025-HIST-${uniqueSuffix}`,
+      formatDate(pastDateStart),
+      formatDate(pastDateEnd),
+    );
     const nextYear = new Date();
     nextYear.setFullYear(now.getFullYear() + 1);
-    currentCycle = await seeder.createCycle(`2026-HIST-${uniqueSuffix}`, formatDate(now), formatDate(nextYear));
+    currentCycle = await seeder.createCycle(
+      `2026-HIST-${uniqueSuffix}`,
+      formatDate(now),
+      formatDate(nextYear),
+    );
 
-    // 2. Curso (Mismo código FIS101_HIST)
-    const course = await seeder.createCourse(`FIS101_HIST_${uniqueSuffix}`, 'Física I Histórica');
+    const course = await seeder.createCourse(
+      `FIS101_HIST_${uniqueSuffix}`,
+      'Física I Histórica',
+    );
 
-    // 3. Vincular a ambos ciclos
     pastCourseCycle = await seeder.linkCourseCycle(course.id, pastCycle.id);
-    currentCourseCycle = await seeder.linkCourseCycle(course.id, currentCycle.id);
+    currentCourseCycle = await seeder.linkCourseCycle(
+      course.id,
+      currentCycle.id,
+    );
 
-    // 4. Crear Contenido Histórico (PC1 del pasado)
     const pastPCStart = new Date(pastDateStart);
     pastPCStart.setMonth(pastPCStart.getMonth() + 1);
     const pastPCEnd = new Date(pastPCStart);
     pastPCEnd.setMonth(pastPCEnd.getMonth() + 1);
-    
-    pastPC1 = await seeder.createEvaluation(pastCourseCycle.id, 'PC', 1, formatDate(pastPCStart), formatDate(pastPCEnd));
 
-    // 5. Usuario Full Actual
+    pastPC1 = await seeder.createEvaluation(
+      pastCourseCycle.id,
+      'PC',
+      1,
+      formatDate(pastPCStart),
+      formatDate(pastPCEnd),
+    );
+
     const adminEmail = TestSeeder.generateUniqueEmail('admin_hist');
     const userFullEmail = TestSeeder.generateUniqueEmail('full_hist');
 
     const admin = await seeder.createAuthenticatedUser(adminEmail, ['ADMIN']);
     userFull = await seeder.createUser(userFullEmail);
-    
+
     await request(app.getHttpServer())
       .post('/enrollments')
       .set('Authorization', `Bearer ${admin.token}`)
@@ -81,18 +98,17 @@ describe('E2E: Acceso Histórico y Ciclos Pasados', () => {
         userId: userFull.id,
         courseCycleId: currentCourseCycle.id,
         enrollmentTypeCode: 'FULL',
-        historicalCourseCycleIds: [pastCourseCycle.id] // Nuevo requerimiento: Explicito
+        historicalCourseCycleIds: [pastCourseCycle.id],
       })
       .expect(201);
   });
 
   afterAll(async () => {
-    await app.close();
+    if (app) await app.close();
   });
 
   it('Caso 1: Acceso a Ciclo Pasado - Usuario Full debería ver contenido histórico', async () => {
-    // Al haber enviado explícitamente el pastCourseCycle.id, el servicio debe haber creado el acceso
     const hasAccess = await accessEngine.hasAccess(userFull.id, pastPC1.id);
-    expect(hasAccess).toBe(true); 
+    expect(hasAccess).toBe(true);
   });
 });

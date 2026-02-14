@@ -13,6 +13,9 @@ import { SecurityEventService } from './application/security-event.service';
 import { AuthSettingsService } from './application/auth-settings.service';
 import { GeolocationService } from './application/geolocation.service';
 import { SessionAnomalyDetectorService } from './application/session-anomaly-detector.service';
+import { SessionValidatorService } from './application/session-validator.service';
+import { SessionConflictService } from './application/session-conflict.service';
+import { SessionSecurityService } from './application/session-security.service';
 import { JwtStrategy } from './strategies/jwt.strategy';
 import { User } from '@modules/users/domain/user.entity';
 import { UserSession } from './domain/user-session.entity';
@@ -43,7 +46,10 @@ import { technicalSettings } from '@config/technical-settings';
       inject: [ConfigService],
       useFactory: (configService: ConfigService) => ({
         secret: configService.get<string>('JWT_SECRET'),
-        signOptions: { expiresIn: technicalSettings.auth.tokens.jwtModuleDefaultAccessTokenExpiresIn },
+        signOptions: {
+          expiresIn:
+            technicalSettings.auth.tokens.jwtModuleDefaultAccessTokenExpiresIn,
+        },
       }),
     }),
     UsersModule,
@@ -61,12 +67,25 @@ import { technicalSettings } from '@config/technical-settings';
     AuthSettingsService,
     GeolocationService,
     SessionAnomalyDetectorService,
+    SessionValidatorService,
+    SessionConflictService,
+    SessionSecurityService,
     JwtStrategy,
     UserSessionRepository,
     SecurityEventRepository,
     SecurityEventTypeRepository,
     SessionStatusRepository,
   ],
-  exports: [AuthService, SessionService, AuthSettingsService, SessionStatusRepository],
+  exports: [
+    AuthService,
+    SessionService,
+    AuthSettingsService,
+    SessionStatusRepository,
+    SecurityEventService,
+    SecurityEventRepository,
+    SessionValidatorService,
+    SessionConflictService,
+    SessionSecurityService,
+  ],
 })
 export class AuthModule {}

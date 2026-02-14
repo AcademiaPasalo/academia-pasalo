@@ -16,8 +16,8 @@ Implementamos un sistema híbrido que combina una transacción inicial con un pa
 1. **Intención de Compra:** Se recibe `enrollmentTypeCode` ('FULL' o 'PARTIAL').
 2. **Transacción ACID:** Todo ocurre dentro de `dataSource.transaction`.
 3. **Lógica de Selección:**
-   - Si es **FULL**: Se buscan todas las evaluaciones del ciclo actual Y ciclos pasados del mismo curso (`CourseCycleRepository`).
-   - Si es **PARTIAL**: Se validan estrictamente los IDs de evaluaciones enviados por el cliente.
+   - Si es **FULL**: Se buscan todas las evaluaciones del ciclo actual Y ciclos históricos especificados.
+   - Si es **PARTIAL**: Se validan los IDs de evaluaciones enviados, que pueden pertenecer al ciclo actual O a ciclos históricos especificados en `historicalCourseCycleIds`.
 4. **Cálculo de Vigencia (Clamping):**
    - Para el **Banco de Enunciados** (que dura todo el ciclo), si la matrícula es PARTIAL, el sistema calcula la fecha de fin de la evaluación académica más tardía comprada y fuerza la fecha de fin del Banco a esa fecha.
    - **Query Implícita (Lógica):** `MAX(evaluation.end_date)` de las evaluaciones compradas.
@@ -42,15 +42,19 @@ Implementamos un sistema híbrido que combina una transacción inicial con un pa
 ## 2. Acceso Histórico (Valor Agregado)
 
 ### Lógica
-Permitir que un alumno matriculado en el ciclo actual (ej. 2026-1) acceda a exámenes de ciclos anteriores (ej. 2025-2) para practicar.
+Permitir que un alumno matriculado acceda a evaluaciones de ciclos anteriores (ej. 2025-2) para practicar.
 
 **Archivos:** `src/modules/enrollments/application/enrollments.service.ts`
 
-1. **Búsqueda de Ciclos:** Al procesar una matrícula `FULL`, el servicio busca en `course_cycle` otros ciclos que compartan el mismo `course_id` pero cuya `start_date` sea menor a la actual.
-2. **Extensión de Vigencia:**
+1. **Aplicación:** Funciona tanto para matrículas **FULL** como **PARTIAL** mediante el campo `historicalCourseCycleIds`.
+2. **Búsqueda de Ciclos:** El servicio busca en `course_cycle` los ciclos especificados que compartan el mismo `course_id` y cuya `start_date` sea menor a la actual.
+3. **Diferencia por Tipo:**
+   - **FULL**: Accede a TODAS las evaluaciones de los ciclos históricos.
+   - **PARTIAL**: Accede SOLO a las evaluaciones específicas indicadas en `evaluationIds` (pueden ser de ciclos pasados).
+4. **Extensión de Vigencia:**
    - Las evaluaciones pasadas ya vencieron (su `end_date` es antigua).
    - El sistema sobrescribe la `access_end_date` en la tabla `enrollment_evaluation` usando la `end_date` del **ciclo académico actual**.
-3. **Resultado:** El alumno ve material antiguo habilitado hasta que termine su ciclo actual.
+5. **Resultado:** El alumno ve material antiguo habilitado hasta que termine su ciclo actual.
 
 ---
 
@@ -104,3 +108,33 @@ El uso de IP (GeoIP) tiene un margen de error de ciudad (10-40km). No sirve para
 **Tablas Afectadas:**
 - `user_session`: Almacena coordenadas, IP, device_id y estado.
 - `security_event`: Registra el historial de intentos y motivos de bloqueo.
+
+### D. Refresh Token Rotation con `jti` (Fortalecimiento de Identidad)
+
+Para evitar ambiguedades en renovacion de sesion y mejorar trazabilidad, el backend ahora usa `jti` (JWT ID) en refresh tokens.
+
+**Archivos:** `src/modules/auth/application/token.service.ts`, `src/modules/auth/application/auth.service.ts`, `src/modules/auth/application/session.service.ts`, `src/modules/auth/infrastructure/user-session.repository.ts`
+
+1. **Emision de refresh token:**
+   - Se genera `jti` unico por token de refresh.
+   - Ese `jti` viaja dentro del JWT (claim `jti`).
+2. **Persistencia de sesion:**
+   - La tabla `user_session` guarda `refresh_token_jti`.
+   - El lookup de sesion para refresh y reauth usa `refresh_token_jti` con lock pesimista.
+3. **Rotacion segura:**
+   - En cada refresh se emite nuevo token con nuevo `jti`.
+   - Se actualiza la sesion en transaccion.
+   - Se invalida cache de sesion y se blacklistea hash del refresh anterior.
+4. **Contrato API:**
+   - No cambia el contrato con frontend.
+   - El frontend sigue enviando/recibiendo `refreshToken` como antes.
+   - `jti` es control interno del backend.
+
+### E. IP Confiable (Pendiente de Cierre con DevOps)
+
+La deteccion de anomalias basada en IP depende de una cadena de proxies confiable.
+
+Estado actual:
+- Pendiente de coordinacion con DevOps para cerrar configuracion final de IP confiable.
+- Objetivo tecnico: usar IP resuelta por la plataforma (`request.ip`) con `trust proxy` correctamente definido segun topologia real de despliegue.
+- Riesgo si no se cierra: posibilidad de contaminar auditoria de seguridad con headers de IP manipulados.

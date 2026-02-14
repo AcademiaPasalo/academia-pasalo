@@ -10,18 +10,25 @@ export class EnrollmentRepository {
     private readonly ormRepository: Repository<Enrollment>,
   ) {}
 
-  async create(data: Partial<Enrollment>, manager?: EntityManager): Promise<Enrollment> {
-    const repo = manager ? manager.getRepository(Enrollment) : this.ormRepository;
+  async create(
+    data: Partial<Enrollment>,
+    manager?: EntityManager,
+  ): Promise<Enrollment> {
+    const repo = manager
+      ? manager.getRepository(Enrollment)
+      : this.ormRepository;
     const enrollment = repo.create(data);
     return await repo.save(enrollment);
   }
 
   async findActiveByUserAndCourseCycle(
-    userId: string, 
-    courseCycleId: string, 
-    manager?: EntityManager
+    userId: string,
+    courseCycleId: string,
+    manager?: EntityManager,
   ): Promise<Enrollment | null> {
-    const repo = manager ? manager.getRepository(Enrollment) : this.ormRepository;
+    const repo = manager
+      ? manager.getRepository(Enrollment)
+      : this.ormRepository;
     return await repo.findOne({
       where: {
         userId,
@@ -32,13 +39,18 @@ export class EnrollmentRepository {
   }
 
   async findMyEnrollments(userId: string): Promise<Enrollment[]> {
-    return await this.ormRepository.createQueryBuilder('enrollment')
+    return await this.ormRepository
+      .createQueryBuilder('enrollment')
       .innerJoinAndSelect('enrollment.courseCycle', 'courseCycle')
       .innerJoinAndSelect('courseCycle.course', 'course')
       .innerJoinAndSelect('course.courseType', 'courseType')
       .innerJoinAndSelect('course.cycleLevel', 'cycleLevel')
       .innerJoinAndSelect('courseCycle.academicCycle', 'academicCycle')
-      .leftJoinAndSelect('courseCycle.professors', 'courseCycleProfessor', 'courseCycleProfessor.revokedAt IS NULL')
+      .leftJoinAndSelect(
+        'courseCycle.professors',
+        'courseCycleProfessor',
+        'courseCycleProfessor.revokedAt IS NULL',
+      )
       .leftJoinAndSelect('courseCycleProfessor.professor', 'professor')
       .where('enrollment.userId = :userId', { userId })
       .andWhere('enrollment.cancelledAt IS NULL')

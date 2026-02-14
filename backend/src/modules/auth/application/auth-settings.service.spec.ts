@@ -43,7 +43,9 @@ describe('AuthSettingsService', () => {
 
     it('debe propagar error si el setting no existe', async () => {
       settingsService.getString.mockRejectedValue(
-        new InternalServerErrorException('Configuración del sistema incompleta'),
+        new InternalServerErrorException(
+          'Configuración del sistema incompleta',
+        ),
       );
 
       await expect(service.getActiveCycleId()).rejects.toThrow(

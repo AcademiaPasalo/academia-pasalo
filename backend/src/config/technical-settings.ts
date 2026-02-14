@@ -3,7 +3,7 @@ export const technicalSettings = {
     // src/app.module.ts
     ttlMs: 60000, // 60s
     // src/app.module.ts
-    limit: 1000,
+    limit: 500000,
   },
 
   http: {
@@ -16,7 +16,15 @@ export const technicalSettings = {
     // src/main.ts
     corsOptionsSuccessStatus: 204,
     // src/main.ts
-    corsAllowedMethods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE', 'OPTIONS'],
+    corsAllowedMethods: [
+      'GET',
+      'HEAD',
+      'PUT',
+      'PATCH',
+      'POST',
+      'DELETE',
+      'OPTIONS',
+    ],
     // src/main.ts
     corsAllowedHeaders: ['Content-Type', 'Authorization'],
   },
@@ -48,6 +56,18 @@ export const technicalSettings = {
     oauth: {
       // src/modules/auth/application/google-provider.service.ts
       googleRedirectUriFallback: 'postmessage',
+    },
+
+    security: {
+      // src/modules/auth/application/session.service.ts
+      anomalyStrikeThreshold: 2,
+      maxPendingSessionsPerUser: 5,
+      coordinates: {
+        minLat: -90,
+        maxLat: 90,
+        minLon: -180,
+        maxLon: 180,
+      },
     },
   },
 
@@ -165,8 +185,8 @@ export const technicalSettings = {
     earthRadiusKm: 6371,
 
     // src/infrastructure/geo/geoip-lite.service.ts
+    mockGeoEnabled: process.env.MOCK_GEO_ENABLED === 'true',
     mockGeoDefaultLat: '0',
-    // src/infrastructure/geo/geoip-lite.service.ts
     mockGeoDefaultLon: '0',
   },
 
@@ -175,6 +195,33 @@ export const technicalSettings = {
     defaultSuccessMessage: 'Operación exitosa',
 
     // src/common/filters/all-exceptions.filter.ts
-    defaultInternalServerErrorMessage: 'Error Interno del Servidor. Por favor contacte con la academia.',
+    defaultInternalServerErrorMessage:
+      'Error Interno del Servidor. Por favor contacte con la academia.',
+  },
+
+  queue: {
+    // src/infrastructure/queue/queue.module.ts
+    defaultAttempts: 3,
+    // src/infrastructure/queue/queue.module.ts
+    backoffDelayMs: 5000,
+    // src/infrastructure/queue/queue.module.ts
+    backoffType: 'exponential' as const,
+    // src/infrastructure/queue/queue.module.ts
+    removeOnComplete: true,
+    // src/infrastructure/queue/queue.module.ts
+    removeOnFail: false,
+  },
+
+  audit: {
+    // src/modules/audit/application/audit.service.ts
+    cleanupCronPattern: '0 0 3 1 * *',
+    // src/modules/audit/infrastructure/processors/audit-cleanup.processor.ts
+    retentionDefaultDays: 30,
+    // src/modules/audit/infrastructure/processors/audit-cleanup.processor.ts
+    retentionMinSafeDays: 7,
+    // src/modules/audit/infrastructure/audit-log.repository.ts
+    cleanupBatchSize: 5000,
+    // src/modules/audit/infrastructure/audit-log.repository.ts
+    maxCleanupBatchesPerRun: 100,
   },
 } as const;

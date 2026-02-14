@@ -1,4 +1,10 @@
-import { IsNotEmpty, IsString, IsOptional, IsNumberString, MaxLength } from 'class-validator';
+import {
+  IsNotEmpty,
+  IsString,
+  IsOptional,
+  IsNumberString,
+  MaxLength,
+} from 'class-validator';
 
 export class UploadMaterialDto {
   @IsNotEmpty()

@@ -36,10 +36,12 @@ export class CyclesService {
     } catch (error) {
       this.logger.error({
         message: 'Error al determinar el ciclo activo',
-        error: error instanceof Error ? error.message : 'Unknown error',
+        error: error instanceof Error ? error.message : 'Error desconocido',
         timestamp: new Date().toISOString(),
       });
-      throw new NotFoundException('No se ha podido identificar el ciclo activo del sistema.');
+      throw new NotFoundException(
+        'No se ha podido identificar el ciclo activo del sistema.',
+      );
     }
   }
 }

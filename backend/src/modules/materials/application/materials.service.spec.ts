@@ -1,6 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { DataSource } from 'typeorm';
-import { BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
+import { DataSource, EntityManager } from 'typeorm';
 import { MaterialsService } from '@modules/materials/application/materials.service';
 import { StorageService } from '@infrastructure/storage/storage.service';
 import { AccessEngineService } from '@modules/enrollments/application/access-engine.service';
@@ -12,20 +11,34 @@ import { FileVersionRepository } from '@modules/materials/infrastructure/file-ve
 import { MaterialCatalogRepository } from '@modules/materials/infrastructure/material-catalog.repository';
 import { DeletionRequestRepository } from '@modules/materials/infrastructure/deletion-request.repository';
 import { UserRepository } from '@modules/users/infrastructure/user.repository';
+import { AuditService } from '@modules/audit/application/audit.service';
+import { MaterialFolder } from '@modules/materials/domain/material-folder.entity';
+import { User } from '@modules/users/domain/user.entity';
+import { MaterialStatus } from '@modules/materials/domain/material-status.entity';
+import { FolderStatus } from '@modules/materials/domain/folder-status.entity';
+import { DeletionRequestStatus } from '@modules/materials/domain/deletion-request-status.entity';
+import { Material } from '@modules/materials/domain/material.entity';
+import { FileResource } from '@modules/materials/domain/file-resource.entity';
 
-const mockFolder = (id = '1', evaluationId = '100', parentId: string | null = null) => ({
-  id,
-  evaluationId,
-  parentFolderId: parentId,
-  name: 'Test Folder',
-} as any);
+const mockFolder = (
+  id = '1',
+  evaluationId = '100',
+  parentId: string | null = null,
+) =>
+  ({
+    id,
+    evaluationId,
+    parentFolderId: parentId,
+    name: 'Test Folder',
+  }) as MaterialFolder;
 
-const mockFile = () => ({
-  originalname: 'test.pdf',
-  mimetype: 'application/pdf',
-  size: 1024,
-  buffer: Buffer.from('%PDF-1.4 content'),
-} as Express.Multer.File);
+const mockFile = () =>
+  ({
+    originalname: 'test.pdf',
+    mimetype: 'application/pdf',
+    size: 1024,
+    buffer: Buffer.from('%PDF-1.4 content'),
+  }) as Express.Multer.File;
 
 describe('MaterialsService', () => {
   let service: MaterialsService;
@@ -37,8 +50,9 @@ describe('MaterialsService', () => {
   let catalogRepo: jest.Mocked<MaterialCatalogRepository>;
   let deletionRepo: jest.Mocked<DeletionRequestRepository>;
   let accessEngine: jest.Mocked<AccessEngineService>;
-  let cacheService: jest.Mocked<RedisCacheService>;
   let userRepo: jest.Mocked<UserRepository>;
+  let auditService: jest.Mocked<AuditService>;
+  let cacheService: jest.Mocked<RedisCacheService>;
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -50,7 +64,11 @@ describe('MaterialsService', () => {
         },
         {
           provide: StorageService,
-          useValue: { calculateHash: jest.fn(), saveFile: jest.fn(), deleteFile: jest.fn() },
+          useValue: {
+            calculateHash: jest.fn(),
+            saveFile: jest.fn(),
+            deleteFile: jest.fn(),
+          },
         },
         {
           provide: AccessEngineService,
@@ -66,11 +84,20 @@ describe('MaterialsService', () => {
         },
         {
           provide: MaterialFolderRepository,
-          useValue: { create: jest.fn(), findById: jest.fn(), findRootsByEvaluation: jest.fn(), findSubFolders: jest.fn() },
+          useValue: {
+            create: jest.fn(),
+            findById: jest.fn(),
+            findRootsByEvaluation: jest.fn(),
+            findSubFolders: jest.fn(),
+          },
         },
         {
           provide: MaterialRepository,
-          useValue: { create: jest.fn(), findById: jest.fn(), findByFolderId: jest.fn() },
+          useValue: {
+            create: jest.fn(),
+            findById: jest.fn(),
+            findByFolderId: jest.fn(),
+          },
         },
         {
           provide: FileResourceRepository,
@@ -82,7 +109,11 @@ describe('MaterialsService', () => {
         },
         {
           provide: MaterialCatalogRepository,
-          useValue: { findFolderStatusByCode: jest.fn(), findMaterialStatusByCode: jest.fn(), findDeletionRequestStatusByCode: jest.fn() },
+          useValue: {
+            findFolderStatusByCode: jest.fn(),
+            findMaterialStatusByCode: jest.fn(),
+            findDeletionRequestStatusByCode: jest.fn(),
+          },
         },
         {
           provide: DeletionRequestRepository,
@@ -91,6 +122,10 @@ describe('MaterialsService', () => {
         {
           provide: UserRepository,
           useValue: { findById: jest.fn() },
+        },
+        {
+          provide: AuditService,
+          useValue: { logAction: jest.fn() },
         },
       ],
     }).compile();
@@ -104,18 +139,21 @@ describe('MaterialsService', () => {
     catalogRepo = module.get(MaterialCatalogRepository);
     deletionRepo = module.get(DeletionRequestRepository);
     accessEngine = module.get(AccessEngineService);
-    cacheService = module.get(RedisCacheService);
     userRepo = module.get(UserRepository);
+    auditService = module.get(AuditService);
+    cacheService = module.get(RedisCacheService);
 
     userRepo.findById.mockResolvedValue({
       id: 'user-1',
-      roles: [{ code: 'STUDENT' }]
-    } as any);
+      roles: [{ code: 'STUDENT' }],
+    } as User);
   });
 
   describe('createFolder', () => {
     it('should create a root folder successfully', async () => {
-      catalogRepo.findFolderStatusByCode.mockResolvedValue({ id: '1' } as any);
+      catalogRepo.findFolderStatusByCode.mockResolvedValue({
+        id: '1',
+      } as FolderStatus);
       folderRepo.create.mockResolvedValue(mockFolder('1'));
 
       const result = await service.createFolder('user1', {
@@ -131,31 +169,120 @@ describe('MaterialsService', () => {
   describe('uploadMaterial', () => {
     it('should upload a new file successfully', async () => {
       const file = mockFile();
-      const mockManager = { 
-        save: jest.fn((entity) => Promise.resolve({ ...entity, id: 'saved-id' })),
-        create: jest.fn((entity, data) => ({ ...data, id: 'created-id' })),
+      const mockManager = {
+        save: jest.fn((entity: unknown) =>
+          Promise.resolve({ ...(entity as object), id: 'saved-id' }),
+        ),
+        create: jest.fn((entity: unknown, data: object) => ({
+          ...data,
+          id: 'created-id',
+        })),
         findOne: jest.fn(),
-        getRepository: jest.fn()
-      };
-      
-      catalogRepo.findMaterialStatusByCode.mockResolvedValue({ id: '1' } as any);
+        getRepository: jest.fn(),
+      } as unknown as EntityManager;
+
+      catalogRepo.findMaterialStatusByCode.mockResolvedValue({
+        id: '1',
+      } as MaterialStatus);
       folderRepo.findById.mockResolvedValue(mockFolder());
-      dataSource.transaction.mockImplementation(async (cb: any) => await cb(mockManager));
+
+      dataSource.transaction.mockImplementation(
+        (
+          cbOrIsolation:
+            | string
+            | ((manager: EntityManager) => Promise<unknown>),
+          cb?: (manager: EntityManager) => Promise<unknown>,
+        ) => {
+          if (typeof cbOrIsolation === 'function') {
+            return cbOrIsolation(mockManager);
+          }
+          if (cb) {
+            return cb(mockManager);
+          }
+          return Promise.resolve();
+        },
+      );
+
       storageService.calculateHash.mockResolvedValue('hash123');
       resourceRepo.findByHash.mockResolvedValue(null);
       storageService.saveFile.mockResolvedValue('/path/to/file');
 
-      const result = await service.uploadMaterial('user1', { materialFolderId: '1', displayName: 'Doc' }, file);
+      const result = await service.uploadMaterial(
+        'user1',
+        { materialFolderId: '1', displayName: 'Doc' },
+        file,
+      );
 
       expect(storageService.saveFile).toHaveBeenCalled();
       expect(result).toBeDefined();
+      expect(auditService.logAction).toHaveBeenCalledWith(
+        'user1',
+        'FILE_UPLOAD',
+        'material',
+        'saved-id',
+        mockManager,
+      );
+    });
+  });
+
+  describe('addVersion', () => {
+    it('should invalidate folder cache using materialFolderId', async () => {
+      const file = mockFile();
+      const persistedMaterial = {
+        id: 'mat-1',
+        materialFolderId: 'folder-77',
+        fileVersionId: 'ver-1',
+      } as Material;
+
+      const mockManager = {
+        findOne: jest
+          .fn()
+          .mockResolvedValueOnce(persistedMaterial)
+          .mockResolvedValueOnce({ id: 'ver-1', versionNumber: 1 }),
+        create: jest.fn((_: unknown, data: object) => data),
+        save: jest
+          .fn()
+          .mockResolvedValueOnce({ id: 'ver-2', versionNumber: 2 })
+          .mockResolvedValueOnce(persistedMaterial),
+      } as unknown as EntityManager;
+
+      dataSource.transaction.mockImplementation(
+        (
+          cbOrIsolation:
+            | string
+            | ((manager: EntityManager) => Promise<unknown>),
+          cb?: (manager: EntityManager) => Promise<unknown>,
+        ) => {
+          if (typeof cbOrIsolation === 'function') {
+            return cbOrIsolation(mockManager);
+          }
+          if (cb) {
+            return cb(mockManager);
+          }
+          return Promise.resolve();
+        },
+      );
+
+      storageService.calculateHash.mockResolvedValue('hash-v2');
+      resourceRepo.findByHash.mockResolvedValue({
+        id: 'resource-1',
+        storageUrl: '/path/file.pdf',
+      } as FileResource);
+
+      await service.addVersion('user1', 'mat-1', file);
+
+      expect(cacheService.del).toHaveBeenCalledWith(
+        'cache:materials:contents:folder:folder-77',
+      );
     });
   });
 
   describe('Access Control', () => {
     it('getRootFolders should check access and return folders', async () => {
       accessEngine.hasAccess.mockResolvedValue(true);
-      catalogRepo.findFolderStatusByCode.mockResolvedValue({ id: '1' } as any);
+      catalogRepo.findFolderStatusByCode.mockResolvedValue({
+        id: '1',
+      } as FolderStatus);
       folderRepo.findRootsByEvaluation.mockResolvedValue([mockFolder()]);
 
       const result = await service.getRootFolders('user1', '100');
@@ -166,10 +293,16 @@ describe('MaterialsService', () => {
 
   describe('requestDeletion', () => {
     it('should create deletion request for material', async () => {
-      catalogRepo.findDeletionRequestStatusByCode.mockResolvedValue({ id: '1' } as any);
-      materialRepo.findById.mockResolvedValue({ id: 'mat1' } as any);
+      catalogRepo.findDeletionRequestStatusByCode.mockResolvedValue({
+        id: '1',
+      } as DeletionRequestStatus);
+      materialRepo.findById.mockResolvedValue({ id: 'mat1' } as Material);
 
-      await service.requestDeletion('user1', { entityType: 'material', entityId: 'mat1', reason: 'bad' });
+      await service.requestDeletion('user1', {
+        entityType: 'material',
+        entityId: 'mat1',
+        reason: 'bad',
+      });
 
       expect(deletionRepo.create).toHaveBeenCalled();
     });

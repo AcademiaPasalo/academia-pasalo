@@ -54,6 +54,14 @@ export class UserSession {
   @Column({ type: 'varchar', length: 255, name: 'refresh_token_hash' })
   refreshTokenHash: string;
 
+  @Column({
+    type: 'varchar',
+    length: 36,
+    name: 'refresh_token_jti',
+    nullable: true,
+  })
+  refreshTokenJti: string | null;
+
   @Column({ type: 'bigint', name: 'session_status_id' })
   sessionStatusId: string;
 

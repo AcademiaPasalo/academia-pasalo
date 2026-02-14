@@ -1,4 +1,9 @@
-import { Injectable, OnModuleDestroy, OnModuleInit, Logger } from '@nestjs/common';
+import {
+  Injectable,
+  OnModuleDestroy,
+  OnModuleInit,
+  Logger,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import Redis from 'ioredis';
 import { technicalSettings } from '@config/technical-settings';
@@ -11,8 +16,14 @@ export class RedisCacheService implements OnModuleInit, OnModuleDestroy {
   constructor(private readonly configService: ConfigService) {}
 
   onModuleInit() {
-    const host = this.configService.get<string>('REDIS_HOST', technicalSettings.cache.redis.defaultHost);
-    const port = this.configService.get<number>('REDIS_PORT', technicalSettings.cache.redis.defaultPort);
+    const host = this.configService.get<string>(
+      'REDIS_HOST',
+      technicalSettings.cache.redis.defaultHost,
+    );
+    const port = this.configService.get<number>(
+      'REDIS_PORT',
+      technicalSettings.cache.redis.defaultPort,
+    );
 
     this.redisClient = new Redis({
       host,
@@ -20,7 +31,7 @@ export class RedisCacheService implements OnModuleInit, OnModuleDestroy {
       lazyConnect: true,
     });
 
-    this.redisClient.on('error', (error) => {
+    this.redisClient.on('error', (error: Error) => {
       this.logger.error({
         message: 'Error en la conexión a Redis',
         error: error.message,
@@ -35,7 +46,7 @@ export class RedisCacheService implements OnModuleInit, OnModuleDestroy {
       });
     });
 
-    this.redisClient.connect().catch((error) => {
+    this.redisClient.connect().catch((error: Error) => {
       this.logger.error({
         message: 'Fallo al inicializar la conexión a Redis',
         error: error.message,
@@ -57,7 +68,7 @@ export class RedisCacheService implements OnModuleInit, OnModuleDestroy {
       this.logger.error({
         message: 'Error al obtener dato de caché',
         key,
-        error: error instanceof Error ? error.message : 'Unknown error',
+        error: error instanceof Error ? error.message : 'Error desconocido',
         timestamp: new Date().toISOString(),
       });
       return null;
@@ -76,7 +87,7 @@ export class RedisCacheService implements OnModuleInit, OnModuleDestroy {
       this.logger.error({
         message: 'Error al guardar dato en caché',
         key,
-        error: error instanceof Error ? error.message : 'Unknown error',
+        error: error instanceof Error ? error.message : 'Error desconocido',
         timestamp: new Date().toISOString(),
       });
     }
@@ -89,7 +100,7 @@ export class RedisCacheService implements OnModuleInit, OnModuleDestroy {
       this.logger.error({
         message: 'Error al eliminar dato de caché',
         key,
-        error: error instanceof Error ? error.message : 'Unknown error',
+        error: error instanceof Error ? error.message : 'Error desconocido',
         timestamp: new Date().toISOString(),
       });
     }
@@ -110,31 +121,45 @@ export class RedisCacheService implements OnModuleInit, OnModuleDestroy {
         }
       });
 
-      stream.on('end', async () => {
-        try {
-          if (keysToDelete.length > 0) {
-            await this.redisClient.del(...keysToDelete);
-          }
+      stream.on('end', () => {
+        if (keysToDelete.length === 0) {
           this.logger.log({
-            message: 'Invalidación de grupo completada',
+            message:
+              'Invalidación de grupo completada (sin llaves encontradas)',
             pattern,
-            keysDeleted: keysToDelete.length,
+            keysDeleted: 0,
             timestamp: new Date().toISOString(),
           });
           resolve();
-        } catch (error) {
-          reject(error);
+          return;
         }
+
+        this.redisClient
+          .del(...keysToDelete)
+          .then(() => {
+            this.logger.log({
+              message: 'Invalidación de grupo completada',
+              pattern,
+              keysDeleted: keysToDelete.length,
+              timestamp: new Date().toISOString(),
+            });
+            resolve();
+          })
+          .catch((error: Error) => {
+            reject(error);
+          });
       });
 
-      stream.on('error', (error) => {
+      stream.on('error', (error: unknown) => {
+        const errObject =
+          error instanceof Error ? error : new Error(String(error));
         this.logger.error({
           message: 'Error durante la invalidación de grupo',
           pattern,
-          error: error.message,
+          error: errObject.message,
           timestamp: new Date().toISOString(),
         });
-        reject(error);
+        reject(errObject);
       });
     });
   }

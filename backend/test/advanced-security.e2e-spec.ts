@@ -1,7 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication, UnauthorizedException } from '@nestjs/common';
-import { JwtModule, JwtService } from '@nestjs/jwt';
-import { DataSource } from 'typeorm';
+import { JwtModule } from '@nestjs/jwt';
+import { DataSource, EntityManager } from 'typeorm';
 import { AuthService } from '../src/modules/auth/application/auth.service';
 import { SessionService } from '../src/modules/auth/application/session.service';
 import { SecurityEventService } from '../src/modules/auth/application/security-event.service';
@@ -9,6 +9,9 @@ import { SessionStatusService } from '../src/modules/auth/application/session-st
 import { AuthSettingsService } from '../src/modules/auth/application/auth-settings.service';
 import { GeolocationService } from '../src/modules/auth/application/geolocation.service';
 import { SessionAnomalyDetectorService } from '../src/modules/auth/application/session-anomaly-detector.service';
+import { SessionValidatorService } from '../src/modules/auth/application/session-validator.service';
+import { SessionConflictService } from '../src/modules/auth/application/session-conflict.service';
+import { SessionSecurityService } from '../src/modules/auth/application/session-security.service';
 import { UsersService } from '../src/modules/users/application/users.service';
 import { UserSessionRepository } from '../src/modules/auth/infrastructure/user-session.repository';
 import { SecurityEventRepository } from '../src/modules/auth/infrastructure/security-event.repository';
@@ -24,15 +27,13 @@ import { ConfigService } from '@nestjs/config';
 import { JwtStrategy } from '../src/modules/auth/strategies/jwt.strategy';
 
 describe('Advanced Security Scenarios (Offensive Testing)', () => {
-  let app: INestApplication;
   let authService: AuthService;
-  let jwtService: JwtService;
 
-  // Mock Data
   const mockUser = {
     id: '100',
     email: 'victim@test.com',
     roles: [{ code: 'STUDENT' }],
+    isActive: true,
   };
 
   const mockMetadataBase: RequestMetadata = {
@@ -43,10 +44,11 @@ describe('Advanced Security Scenarios (Offensive Testing)', () => {
     longitude: 10.0,
   };
 
-  // Mocks
   const mockDataSource = {
-    transaction: jest.fn((cb) => cb(mockDataSource.manager)),
-    manager: {},
+    transaction: jest.fn((cb: (manager: EntityManager) => Promise<unknown>) =>
+      cb(mockDataSource.manager as EntityManager),
+    ),
+    manager: {} as Partial<EntityManager>,
   };
 
   const mockUsersService = {
@@ -60,6 +62,8 @@ describe('Advanced Security Scenarios (Offensive Testing)', () => {
     findLatestSessionByUserId: jest.fn(),
     findByRefreshTokenHash: jest.fn(),
     findByRefreshTokenHashForUpdate: jest.fn(),
+    findByRefreshTokenJti: jest.fn(),
+    findByRefreshTokenJtiForUpdate: jest.fn(),
     findById: jest.fn(),
     findByIdWithUser: jest.fn().mockResolvedValue({
       id: '100',
@@ -70,16 +74,21 @@ describe('Advanced Security Scenarios (Offensive Testing)', () => {
     }),
     update: jest.fn(),
     deactivateSession: jest.fn(),
+    existsByUserIdAndDeviceId: jest.fn().mockResolvedValue(true),
+    findSessionsByUserAndStatus: jest.fn().mockResolvedValue([]),
   };
 
-  // ... (otros mocks)
-
   const mockAnomalyDetector = {
-    resolveCoordinates: jest.fn().mockImplementation((meta) => Promise.resolve({
-      metadata: meta,
-      locationSource: (meta.latitude && meta.longitude) ? 'gps' : 'ip'
-    })),
-    detectLocationAnomaly: jest.fn().mockResolvedValue({ isAnomalous: false })
+    resolveCoordinates: jest.fn().mockImplementation((meta: RequestMetadata) =>
+      Promise.resolve({
+        metadata: meta,
+        locationSource: meta.latitude && meta.longitude ? 'gps' : 'ip',
+      }),
+    ),
+    detectLocationAnomaly: jest.fn().mockResolvedValue({
+      isAnomalous: false,
+      anomalyType: 'NONE',
+    }),
   };
 
   beforeEach(async () => {
@@ -90,6 +99,9 @@ describe('Advanced Security Scenarios (Offensive Testing)', () => {
       providers: [
         AuthService,
         SessionService,
+        SessionValidatorService,
+        SessionConflictService,
+        SessionSecurityService,
         SecurityEventService,
         SessionStatusService,
         AuthSettingsService,
@@ -99,14 +111,33 @@ describe('Advanced Security Scenarios (Offensive Testing)', () => {
         { provide: ConfigService, useValue: { get: () => 'secret' } },
         { provide: UsersService, useValue: mockUsersService },
         { provide: UserSessionRepository, useValue: mockUserSessionRepository },
-        { provide: SecurityEventRepository, useValue: { create: jest.fn().mockResolvedValue({ id: '999' }) } },
-        { provide: SecurityEventTypeRepository, useValue: { findByCode: jest.fn().mockResolvedValue({ id: 1 }) } },
-        { provide: SessionStatusRepository, useValue: { findByCode: jest.fn((code) => Promise.resolve({ id: code === 'ACTIVE' ? '1' : '2', code })) } },
-        { provide: SessionAnomalyDetectorService, useValue: mockAnomalyDetector },
-        { provide: SettingsService, useValue: {
-          getPositiveInt: jest.fn().mockResolvedValue(100),
-          getString: jest.fn().mockResolvedValue('CYCLE_X'),
-        } },
+        {
+          provide: SecurityEventRepository,
+          useValue: { create: jest.fn().mockResolvedValue({ id: '999' }) },
+        },
+        {
+          provide: SecurityEventTypeRepository,
+          useValue: { findByCode: jest.fn().mockResolvedValue({ id: 1 }) },
+        },
+        {
+          provide: SessionStatusRepository,
+          useValue: {
+            findByCode: jest.fn((code: string) =>
+              Promise.resolve({ id: code === 'ACTIVE' ? '1' : '2', code }),
+            ),
+          },
+        },
+        {
+          provide: SessionAnomalyDetectorService,
+          useValue: mockAnomalyDetector,
+        },
+        {
+          provide: SettingsService,
+          useValue: {
+            getPositiveInt: jest.fn().mockResolvedValue(100),
+            getString: jest.fn().mockResolvedValue('CYCLE_X'),
+          },
+        },
         { provide: GeoProvider, useValue: { resolve: jest.fn() } },
         {
           provide: RedisCacheService,
@@ -120,84 +151,106 @@ describe('Advanced Security Scenarios (Offensive Testing)', () => {
         {
           provide: TokenService,
           useValue: {
-            generateRefreshToken: jest.fn().mockResolvedValue({ token: 'new_rt', expiresAt: new Date() }),
+            generateRefreshToken: jest.fn().mockResolvedValue({
+              token: 'new_rt',
+              refreshTokenJti: 'jti-new-rt',
+              expiresAt: new Date(),
+            }),
             generateAccessToken: jest.fn().mockResolvedValue('new_at'),
-            verifyRefreshToken: jest.fn((token) => {
-                if (token === 'zombie_token') return { sub: '100', deviceId: 'device-zombie' };
-                return { sub: '100', deviceId: 'device-original' };
+            verifyRefreshToken: jest.fn((token: string) => {
+              if (token === 'zombie_token')
+                return {
+                  sub: '100',
+                  deviceId: 'device-zombie',
+                  jti: 'jti-zombie',
+                  type: 'refresh',
+                };
+              return {
+                sub: '100',
+                deviceId: 'device-original',
+                jti: 'jti-original',
+                type: 'refresh',
+              };
             }),
           },
         },
         {
           provide: GoogleProviderService,
-          useValue: { verifyCodeAndGetEmail: jest.fn().mockResolvedValue('victim@test.com') },
+          useValue: {
+            verifyCodeAndGetEmail: jest
+              .fn()
+              .mockResolvedValue({ email: 'victim@test.com' }),
+          },
         },
       ],
     }).compile();
 
-    app = moduleFixture.createNestApplication();
     authService = moduleFixture.get<AuthService>(AuthService);
-    jwtService = moduleFixture.get<JwtService>(JwtService);
   });
 
   describe('Scenario 1: The Roommate Attack (Same IP, Different Device)', () => {
     it('should DETECT CONCURRENCY even if IP and Location are identical', async () => {
-      // Setup: Existing active session on Device A
       mockUserSessionRepository.findOtherActiveSession.mockResolvedValue({
         id: 'session-A',
         deviceId: 'device-original',
       });
-      mockUserSessionRepository.create.mockResolvedValue({ id: 'session-B', sessionStatusId: '2' }); // 2 = PENDING
+      mockUserSessionRepository.create.mockResolvedValue({
+        id: 'session-B',
+        sessionStatusId: '2',
+      });
 
-      // Action: Login attempt from Device B (Roommate/Attacker) with SAME metadata
-      const attackMetadata = { ...mockMetadataBase, deviceId: 'device-roommate' };
-      const result = await authService.loginWithGoogle('auth-code', attackMetadata);
+      const attackMetadata: RequestMetadata = {
+        ...mockMetadataBase,
+        deviceId: 'device-roommate',
+      };
+      const result = await authService.loginWithGoogle(
+        'auth-code',
+        attackMetadata,
+      );
 
-      // Assert: Must prompt for resolution, NOT block as anomalous travel
       expect(result.sessionStatus).toBe('PENDING_CONCURRENT_RESOLUTION');
       expect(result.concurrentSessionId).toBe('session-A');
-      // Ensure we didn't trigger anomaly logic implies we didn't get BLOCKED status
     });
   });
 
   describe('Scenario 2: The Zombie Token Attack', () => {
     it('should REJECT refresh attempt with a token from a revoked session', async () => {
-        // Setup: A session that was valid but revoked in DB (e.g. by concurrency resolution)
-        const zombieRefreshToken = 'zombie_token';
-        
-        // Mock Session Service logic manually since we are testing AuthService flow interacting with it
-        // Or better, mock the `SessionService.validateRefreshTokenSession` to fail
-        // Since AuthService calls SessionService, let's look at how AuthService is built.
-        // It injects SessionService. We are using the REAL SessionService in this test module (unless overridden).
-        // Real SessionService calls UserSessionRepository.findByRefreshTokenHash.
-        
-        // Simulate DB returning NO session for this token (or is_active = false)
-        mockUserSessionRepository.findByRefreshTokenHash = jest.fn().mockResolvedValue(null); 
-        
-        // Assert
-        await expect(authService.refreshAccessToken(zombieRefreshToken, 'device-zombie'))
-            .rejects.toThrow(UnauthorizedException);
+      const zombieRefreshToken = 'zombie_token';
+
+      mockUserSessionRepository.findByRefreshTokenJtiForUpdate = jest
+        .fn()
+        .mockResolvedValue(null);
+
+      await expect(
+        authService.refreshAccessToken(zombieRefreshToken, 'device-zombie'),
+      ).rejects.toThrow(UnauthorizedException);
     });
   });
 
   describe('Scenario 3: Ghost Location (Null GPS)', () => {
     it('should FALLBACK to IP-based check and allow login if IP is safe', async () => {
-      // Setup: No other active session
       mockUserSessionRepository.findOtherActiveSession.mockResolvedValue(null);
-      // Setup: Previous session was close (simulated by finding latest session)
       mockUserSessionRepository.findLatestSessionByUserId.mockResolvedValue({
-         id: 'prev-session',
-         ipAddress: '200.200.200.1', // Same IP
-         createdAt: new Date(),
+        id: 'prev-session',
+        ipAddress: '200.200.200.1',
+        createdAt: new Date(),
       });
-      
-      mockUserSessionRepository.create.mockResolvedValue({ id: 'new-session', sessionStatusId: '1' });
 
-      // Action: Login with NULL coordinates
-      const ghostMetadata = { ...mockMetadataBase, latitude: null, longitude: null };
-      const result = await authService.loginWithGoogle('auth-code', ghostMetadata);
+      mockUserSessionRepository.create.mockResolvedValue({
+        id: 'new-session',
+        sessionStatusId: '1',
+      });
 
-      // Assert: Should proceed to ACTIVE (not crashed, not blocked)
+      const ghostMetadata: RequestMetadata = {
+        ...mockMetadataBase,
+        latitude: null,
+        longitude: null,
+      };
+      const result = await authService.loginWithGoogle(
+        'auth-code',
+        ghostMetadata,
+      );
+
       expect(result.sessionStatus).toBe('ACTIVE');
     });
   });

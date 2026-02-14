@@ -15,7 +15,10 @@ export class CourseTestimonyRepository {
     return await this.ormRepository.save(newTestimony);
   }
 
-  async findByUserAndCycle(userId: string, courseCycleId: string): Promise<CourseTestimony | null> {
+  async findByUserAndCycle(
+    userId: string,
+    courseCycleId: string,
+  ): Promise<CourseTestimony | null> {
     return await this.ormRepository.findOne({
       where: { userId, courseCycleId },
     });
@@ -31,8 +34,8 @@ export class CourseTestimonyRepository {
 
   async findById(id: string): Promise<CourseTestimony | null> {
     return await this.ormRepository.findOne({
-        where: { id },
-        relations: { user: true }
+      where: { id },
+      relations: { user: true },
     });
   }
 }
