@@ -25,11 +25,15 @@ export interface ClassEvent {
   topic: string;
   startDatetime: string;
   endDatetime: string;
-  meetingLink: string;
+  liveMeetingUrl: string | null;
+  recordingUrl: string | null;
+  recordingStatus: 'NOT_AVAILABLE' | 'PROCESSING' | 'READY' | 'FAILED';
   isCancelled: boolean;
   status: ClassEventStatus;
-  canJoinMeeting: boolean;
-  canCopyLink: boolean;
+  canJoinLive: boolean;
+  canWatchRecording: boolean;
+  canCopyLiveLink: boolean;
+  canCopyRecordingLink: boolean;
   courseName: string;
   courseCode: string;
   creator: ClassEventCreator;

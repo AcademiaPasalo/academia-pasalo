@@ -42,6 +42,11 @@ export const routeAccessConfig: Record<string, RouteAccess> = {
     component: 'UsuariosContent',
     redirectOnDenied: '/plataforma/inicio'
   },
+  '/plataforma/admin/auditoria': {
+    allowedRoles: ['ADMIN', 'SUPER_ADMIN'],
+    component: 'AuditoriaContent',
+    redirectOnDenied: '/plataforma/inicio'
+  },
   '/plataforma/admin/configuracion': {
     allowedRoles: ['SUPER_ADMIN'],
     component: 'ConfiguracionContent',
@@ -75,6 +80,10 @@ export const roleBasedComponents: Record<string, Partial<Record<UserRole, string
     TEACHER: 'teacher/NotificacionesContent',
     ADMIN: 'admin/NotificacionesContent',
     SUPER_ADMIN: 'admin/NotificacionesContent'
+  },
+  '/plataforma/admin/auditoria': {
+    ADMIN: 'admin/AuditoriaContent',
+    SUPER_ADMIN: 'admin/AuditoriaContent'
   }
 };
 

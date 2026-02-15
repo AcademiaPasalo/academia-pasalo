@@ -11,7 +11,7 @@ import Icon from "@/components/ui/Icon";
 
 export default function PlataformaPage() {
   const router = useRouter();
-  const { loginWithGoogle, resolveConcurrentSession, isAuthenticated, isLoading, sessionStatus } = useAuth();
+  const { loginWithGoogle, resolveConcurrentSession, cancelPendingSession, isAuthenticated, isLoading, sessionStatus } = useAuth();
 
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -40,10 +40,10 @@ export default function PlataformaPage() {
         console.error('Error en login:', err);
         // Map backend/SDK errors to friendly Spanish messages
         let message = 'Error al iniciar sesión';
-        
+
         if (err instanceof Error) {
           const errorMsg = err.message.toLowerCase();
-          
+
           // Detectar usuario no registrado
           if (
             errorMsg.includes('usuario no registrado') ||
@@ -63,10 +63,10 @@ export default function PlataformaPage() {
           const errorObj = err as Record<string, unknown>;
           const response = errorObj.response as Record<string, unknown> | undefined;
           const data = response?.data as Record<string, unknown> | undefined;
-          
-          const serverMsg = 
-            data?.message || 
-            data?.error || 
+
+          const serverMsg =
+            data?.message ||
+            data?.error ||
             errorObj.message;
 
           if (serverMsg && typeof serverMsg === 'string') {
@@ -77,7 +77,7 @@ export default function PlataformaPage() {
         // Forzar que el estado se actualice y se mantenga
         setIsLoggingIn(false);
         setError(message);
-        
+
         // Prevenir cualquier navegación después de un error
         return;
       }
@@ -141,11 +141,17 @@ export default function PlataformaPage() {
           </div>
 
           {/* Right Section - Login Form */}
-          <div className="w-full lg:w-1/2 flex flex-col items-end justify-center gap-6 px-6 sm:px-12 lg:px-[120px] py-20 lg:py-[200px] bg-gray-50">
-            {/* School Icon */} 
+          <div className="w-full lg:w-1/2 flex flex-col items-end justify-center gap-6 px-6 sm:px-12 lg:px-[120px] py-20 lg:py-[200px] bg-gray-50 relative overflow-hidden">
+            {/* Decorative Ellipses */}
+            <div className="lg:hidden visible absolute w-[200px] h-[200px] rounded-full bg-muted-indigo-100 -left-[-10px] bottom-[-100px]" />
+            <div className="lg:hidden visible absolute w-[200px] h-[200px] rounded-full bg-muted-indigo-100 right-[-120px] top-[-50px]" />
+            <div className="lg:hidden visible absolute w-[100px] h-[100px] rounded-full bg-muted-indigo-100 right-[90px] -top-[40px]" />
+            <div className="lg:hidden visible absolute w-[100px] h-[100px] rounded-full bg-muted-indigo-100 -left-[50px] bottom-[80px]" />
+
+            {/* School Icon */}
             <div className="p-4 bg-bg-accent-light rounded-full inline-flex justify-start items-center mx-auto">
-              <Icon name="school" size={48} variant="rounded" className="text-deep-blue-700"/>
-            </div>     
+              <Icon name="school" size={48} variant="rounded" className="text-deep-blue-700" />
+            </div>
 
             {/* Title */}
             <h5 className="text-gray-900 text-[28px] font-bold leading-[1.14em] tracking-[-0.007em] text-center w-full">
@@ -257,9 +263,10 @@ export default function PlataformaPage() {
                     </button>
                     <button
                       onClick={() => {
-                        // Cancelar el login y limpiar el error
-                        setError('Inicio de sesión cancelado. Por favor, intenta nuevamente.');
+                        cancelPendingSession();
                         setIsResolvingSession(false);
+                        setIsLoggingIn(false);
+                        setError(null);
                       }}
                       disabled={isResolvingSession}
                       className="flex-1 px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
@@ -271,21 +278,36 @@ export default function PlataformaPage() {
               </div>
             )}
 
-            {/* Reauth Modal */}
+            {/* Reauth Modal - Verificación de seguridad */}
             {showReauthModal && (
               <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-                <div className="bg-white rounded-lg p-6 max-w-md w-full">
-                  <h3 className="text-xl font-bold text-gray-900 mb-4">
-                    Verificación de seguridad requerida
+                <div className="bg-white rounded-2xl p-6 max-w-md w-full shadow-xl">
+                  {/* Icono */}
+                  <div className="flex justify-center mb-4">
+                    <div className="w-14 h-14 rounded-full bg-amber-50 flex items-center justify-center">
+                      <Icon name="shield" size={28} className="text-amber-500" />
+                    </div>
+                  </div>
+
+                  <h3 className="text-xl font-bold text-gray-900 mb-3 text-center">
+                    Verificación de identidad
                   </h3>
-                  <p className="text-gray-600 mb-6">
-                    Detectamos actividad inusual. Por favor, vuelve a autenticarte con Google para continuar.
+
+                  <p className="text-gray-600 mb-2 text-center text-sm">
+                    Hemos detectado un inicio de sesión desde una ubicación diferente a la habitual.
+                    Por tu seguridad, necesitamos verificar tu identidad.
                   </p>
+
+                  <p className="text-gray-500 mb-6 text-center text-xs">
+                    Si no reconoces este intento de acceso, te recomendamos cambiar tu contraseña
+                    de Google después de verificarte.
+                  </p>
+
                   <button
                     onClick={() => handleGoogleLogin()}
-                    className="w-full px-4 py-2 bg-deep-blue-700 text-white rounded-lg hover:bg-deep-blue-800 transition-colors"
+                    className="w-full px-4 py-3 bg-deep-blue-700 text-white rounded-lg hover:bg-deep-blue-800 transition-colors font-medium"
                   >
-                    Re-autenticar con Google
+                    Verificar con Google
                   </button>
                 </div>
               </div>

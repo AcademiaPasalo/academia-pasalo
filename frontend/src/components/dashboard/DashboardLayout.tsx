@@ -1,13 +1,19 @@
-'use client';
+"use client";
 
-import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { useAuth } from '@/contexts/AuthContext';
-import { useNavigation } from '@/hooks/useNavigation';
-import { useSidebar } from '@/contexts/SidebarContext';
-import Sidebar, { type SidebarNavItem, type SidebarUser } from '@/components/dashboard/Sidebar';
-import Breadcrumb, { type BreadcrumbItem } from '@/components/dashboard/Breadcrumb';
-import Icon from '@/components/ui/Icon';
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useAuth } from "@/contexts/AuthContext";
+import { useNavigation } from "@/hooks/useNavigation";
+import { useSidebar } from "@/contexts/SidebarContext";
+import Sidebar, {
+  type SidebarNavItem,
+  type SidebarUser,
+} from "@/components/dashboard/Sidebar";
+import Breadcrumb, {
+  type BreadcrumbItem,
+} from "@/components/dashboard/Breadcrumb";
+import Icon from "@/components/ui/Icon";
+import SecurityWarningBanner from "@/components/dashboard/SecurityWarningBanner";
 
 export interface DashboardLayoutProps {
   children: React.ReactNode;
@@ -37,15 +43,34 @@ export default function DashboardLayout({
   const router = useRouter();
   const navigation = useNavigation();
   const { isCollapsed, toggleSidebar } = useSidebar();
-  
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isDesktop, setIsDesktop] = useState(false);
+
+  // Detectar desktop
+  useEffect(() => {
+    const mq = window.matchMedia("(min-width: 1024px)"); // lg
+    const update = () => setIsDesktop(mq.matches);
+
+    update();
+    mq.addEventListener("change", update);
+    return () => mq.removeEventListener("change", update);
+  }, []);
 
   // Proteger la ruta
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
-      router.push('/plataforma');
+      router.push("/plataforma");
     }
   }, [isLoading, isAuthenticated, router]);
+
+  const handleToggleSidebar = () => {
+    if (isDesktop) {
+      toggleSidebar(); // colapsa/expande (desktop)
+    } else {
+      setIsMobileMenuOpen((v) => !v); // abre/cierra drawer (mobile)
+    }
+  };
+
 
   // Loading state
   if (isLoading) {
@@ -78,7 +103,7 @@ export default function DashboardLayout({
       {/* Sidebar - Desktop */}
       {showSidebar && (
         <div className="hidden lg:block fixed left-0 top-0 h-screen z-40">
-          <Sidebar 
+          <Sidebar
             user={sidebarUser}
             navItems={navItems}
             isCollapsed={isCollapsed}
@@ -99,42 +124,30 @@ export default function DashboardLayout({
       {showSidebar && (
         <div
           className={`lg:hidden fixed top-0 left-0 h-screen w-[240px] bg-white border-r border-stroke-secondary z-50 transform transition-transform duration-300 ${
-            isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'
+            isMobileMenuOpen ? "translate-x-0" : "-translate-x-full"
           }`}
         >
-          <Sidebar 
-            user={sidebarUser}
-            navItems={navItems}
-            isCollapsed={false}
-          />
+          <Sidebar user={sidebarUser} navItems={navItems} isCollapsed={false} />
         </div>
       )}
 
       {/* Main Content */}
-      <div className={`flex-1 flex flex-col h-screen ${showSidebar ? (isCollapsed ? 'lg:ml-[72px]' : 'lg:ml-[240px]') : ''}`}>
+      <div
+        className={`flex-1 flex flex-col h-screen ${showSidebar ? (isCollapsed ? "lg:ml-[68px]" : "lg:ml-[240px]") : ""}`}
+      >
         {/* Top Bar */}
         {showTopBar && (
           <header className="h-14 bg-white border-b border-stroke-secondary flex items-center justify-between px-4 flex-shrink-0 z-30">
             {/* Left Side */}
             <div className="flex items-center gap-4 flex-1 min-w-0">
-              {/* Mobile Menu Button */}
-              {showSidebar && (
-                <button
-                  onClick={() => setIsMobileMenuOpen(true)}
-                  className="lg:hidden flex items-center justify-center w-9 h-9 hover:bg-secondary-hover rounded-lg transition-colors"
-                  aria-label="Abrir menú"
-                >
-                  <Icon name="menu" size={24} className="text-secondary" />
-                </button>
-              )}
-
               {/* Breadcrumb/Title */}
               <div className="flex-1 min-w-0">
                 {showBreadcrumb && breadcrumbItems ? (
-                  <Breadcrumb 
-                    items={breadcrumbItems} 
-                    onToggleSidebar={toggleSidebar}
+                  <Breadcrumb
+                    items={breadcrumbItems}
+                    onToggleSidebar={handleToggleSidebar}
                     showToggle={showToggle && showSidebar}
+                    isSidebarOpen={isDesktop ? !isCollapsed : isMobileMenuOpen}
                   />
                 ) : title ? (
                   <h1 className="text-lg font-semibold text-primary truncate">
@@ -159,8 +172,11 @@ export default function DashboardLayout({
         )}
 
         {/* Page Content */}
-        <main className="flex-1 p-12 bg-bg-secondary overflow-y-auto">
-          {children}
+        <main className="flex-1 bg-bg-secondary overflow-y-auto">
+          <SecurityWarningBanner />
+          <div className="p-12">
+            {children}
+          </div>
         </main>
       </div>
     </div>

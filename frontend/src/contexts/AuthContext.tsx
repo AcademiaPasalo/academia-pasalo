@@ -22,6 +22,7 @@ interface AuthContextType {
   switchProfile: (roleId: string) => Promise<void>;
   resolveConcurrentSession: (decision: 'KEEP_NEW' | 'KEEP_EXISTING') => Promise<void>;
   reauthAnomalousSession: (code: string) => Promise<void>;
+  cancelPendingSession: () => void;
   logout: () => Promise<void>;
   checkSession: () => void;
 }
@@ -237,6 +238,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       // Redirigir al dashboard
       if (authData.sessionStatus === 'ACTIVE') {
+        // Guardar flag para mostrar banner de advertencia de seguridad en el dashboard
+        if (typeof window !== 'undefined') {
+          sessionStorage.setItem('pasalo_security_warning', 'true');
+        }
         window.location.href = '/plataforma/inicio';
       }
     } catch (error) {
@@ -246,6 +251,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setIsLoading(false);
     }
   }, [pendingRefreshToken, processAuthResponse]);
+
+  /**
+   * Cancelar sesión pendiente (concurrent/reauth) sin hacer logout
+   */
+  const cancelPendingSession = useCallback(() => {
+    setUser(null);
+    setSessionStatus(null);
+    setConcurrentSessionId(null);
+    setPendingRefreshToken(null);
+    setIsLoading(false);
+    clearAuth();
+  }, []);
 
   /**
    * Cerrar sesión
@@ -321,6 +338,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     switchProfile,
     resolveConcurrentSession,
     reauthAnomalousSession,
+    cancelPendingSession,
     logout,
     checkSession,
   };

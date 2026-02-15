@@ -13,6 +13,7 @@ import { Enrollment } from '@/types/enrollment';
 import { ClassEvent } from '@/types/classEvent';
 import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { getCourseColor } from '@/lib/courseColors';
 
 export default function InicioContent() {
   // Estado para controlar la vista activa
@@ -40,8 +41,6 @@ export default function InicioContent() {
       setError(null);
       try {
         const response = await enrollmentService.getMyCourses();
-        console.log('✅ Response completa:', response);
-        console.log('✅ Tipo de response:', typeof response, Array.isArray(response));
         
         // HOTFIX: El servicio está retornando el array directamente en lugar del objeto ApiResponse
         // Verificar si response es un array o un objeto con data
@@ -80,9 +79,6 @@ export default function InicioContent() {
         const end = nextWeek.toISOString().split('T')[0];
         
         const response = await classEventService.getMySchedule({ start, end });
-        
-        console.log('📅 Response de eventos:', response);
-        console.log('📅 Tipo:', typeof response, Array.isArray(response));
         
         // Manejar respuesta que puede ser array o ApiResponse
         let events: ClassEvent[] = [];
@@ -178,13 +174,6 @@ export default function InicioContent() {
     return `${prof.firstName} ${prof.lastName1}`;
   };
 
-  // Obtener color consistente para un curso
-  const getCourseColor = (courseCode: string): string => {
-    const hash = courseCode.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
-    const colors = ['#68d391', '#cd45e8', '#42a5f5', '#ffa726', '#ef5350'];
-    return colors[hash % colors.length];
-  };
-
   if (loading) {
     console.log('🔄 Estado: LOADING');
     return (
@@ -215,13 +204,10 @@ export default function InicioContent() {
     );
   }
 
-  console.log('✅ Estado: RENDER - Enrollments:', enrollments.length);
-  console.log('📋 Enrollments completos:', enrollments);
-
   return (
-    <div className="grid grid-cols-1 xl:grid-cols-[1fr_400px] gap-6">
+    <div className="grid grid-cols-1 xl:grid-cols-[1fr_400px] gap-12">
       {/* Columna Izquierda: Cursos */}
-      <div className="space-y-6">
+      <div className="space-y-9">
         {/* Header: Mis Cursos con toggles */}
         <div className="flex justify-between items-center">
           <div className="flex items-center gap-2">
@@ -271,7 +257,7 @@ export default function InicioContent() {
         </div>
 
         {/* Grid de Cursos */}
-        <div className={viewMode === 'grid' ? 'grid grid-cols-1 md:grid-cols-2 gap-6' : 'flex flex-col gap-6'}>
+        <div className={viewMode === 'grid' ? 'grid grid-cols-1 md:grid-cols-2 gap-6' : 'flex flex-col gap-6'} style={viewMode === 'grid' ? { gridAutoRows: '1fr' } : undefined}>
           {enrollments.length === 0 ? (
             <div className="col-span-2 text-center py-12">
               <Icon name="school" size={64} className="text-secondary mx-auto mb-4" />
@@ -284,121 +270,34 @@ export default function InicioContent() {
               const courseEvents = eventsByCourse[courseCode] || [];
               const nextEvent = courseEvents[0]; // Próximo evento de este curso
 
+              const courseColor = getCourseColor(courseCode);
+
               console.log('🎓 Renderizando curso:', {
                 id: enrollment.id,
                 courseCode,
                 courseName: enrollment.courseCycle.course.name,
                 professorName: getProfessorName(enrollment),
                 cycle: enrollment.courseCycle.course.cycleLevel.name,
-                color: getCourseColor(courseCode)
+                color: courseColor.name
               });
 
               return (
-                <div key={enrollment.id} className="space-y-3">
+                <div key={enrollment.id} className="flex flex-col gap-3 h-full">
                   <CourseCard
-                    headerColor={getCourseColor(courseCode)}
+                    headerColor={courseColor.primary}
                     category="CIENCIAS"
                     cycle={enrollment.courseCycle.course.cycleLevel.name}
                     title={enrollment.courseCycle.course.name}
                     teachers={[
-                      { 
-                        initials: getProfessorInitials(enrollment), 
-                        name: getProfessorName(enrollment), 
-                        avatarColor: getCourseColor(courseCode)
+                      {
+                        initials: getProfessorInitials(enrollment),
+                        name: getProfessorName(enrollment),
+                        avatarColor: courseColor.primary
                       }
                     ]}
                     onViewCourse={() => router.push(`/plataforma/curso/${enrollment.courseCycle.id}`)}
                     variant={viewMode}
                   />
-                  
-                  {/* Mostrar próximo evento si existe */}
-                  {!loadingEvents && nextEvent && (
-                    <div className="bg-white rounded-xl border border-stroke-primary p-4 space-y-3">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <Icon name="event" size={18} className="text-info-primary-solid" />
-                          <span className="text-sm font-semibold text-primary">Próxima Clase</span>
-                        </div>
-                        {classEventService.isLive(nextEvent) && (
-                          <span className="px-2 py-1 bg-error-solid text-white text-xs font-bold rounded-full animate-pulse">
-                            EN VIVO
-                          </span>
-                        )}
-                        {classEventService.isUpcoming(nextEvent) && (
-                          <span className="px-2 py-1 bg-warning-solid text-white text-xs font-bold rounded-full">
-                            PRÓXIMAMENTE
-                          </span>
-                        )}
-                      </div>
-
-                      <div className="space-y-2">
-                        <h4 className="text-sm font-medium text-primary">{nextEvent.title}</h4>
-                        {nextEvent.topic && (
-                          <div className="flex items-center gap-1.5">
-                            <Icon name="topic" size={14} className="text-tertiary" />
-                            <span className="text-xs text-secondary">{nextEvent.topic}</span>
-                          </div>
-                        )}
-                        <div className="flex items-center gap-1.5">
-                          <Icon name="schedule" size={14} className="text-tertiary" />
-                          <span className="text-xs text-secondary">
-                            {formatEventDateTime(nextEvent.startDatetime, nextEvent.endDatetime)}
-                          </span>
-                        </div>
-                      </div>
-
-                      <div className="flex items-center gap-2">
-                        {(() => {
-                          // Verificar si puede unirse (30 min antes del inicio hasta el fin)
-                          const now = new Date();
-                          const startTime = parseISO(nextEvent.startDatetime);
-                          const endTime = parseISO(nextEvent.endDatetime);
-                          const thirtyMinutesBefore = new Date(startTime.getTime() - 30 * 60 * 1000);
-                          
-                          const canJoinNow = nextEvent.canJoinMeeting && 
-                                             now >= thirtyMinutesBefore && 
-                                             now <= endTime &&
-                                             !nextEvent.isCancelled;
-                          
-                          return canJoinNow ? (
-                            <button
-                              onClick={() => handleJoinMeeting(nextEvent)}
-                              className="flex-1 px-4 py-2 bg-accent-solid hover:bg-accent-solid-hover text-white text-sm font-medium rounded-lg transition-colors flex items-center justify-center gap-2"
-                            >
-                              <Icon name="video_call" size={16} className="text-white" />
-                              Unirse
-                            </button>
-                          ) : null;
-                        })()}
-                        {nextEvent.canCopyLink && (
-                          <button
-                            onClick={() => handleCopyMeetingLink(nextEvent)}
-                            disabled={copyingLink === nextEvent.id}
-                            className="px-4 py-2 bg-white border border-stroke-primary hover:bg-secondary-hover text-primary text-sm font-medium rounded-lg transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
-                            title="Copiar link de la reunión"
-                          >
-                            <Icon 
-                              name={copyingLink === nextEvent.id ? "check" : "content_copy"} 
-                              size={16} 
-                              className={copyingLink === nextEvent.id ? "text-success-solid" : "text-primary"}
-                            />
-                          </button>
-                        )}
-                      </div>
-
-                      {/* Mostrar eventos adicionales si hay */}
-                      {courseEvents.length > 1 && (
-                        <div className="pt-2 border-t border-stroke-primary">
-                          <button
-                            className="text-xs text-accent-primary hover:underline font-medium"
-                            onClick={() => router.push(`/plataforma/curso/${enrollment.courseCycle.id}`)}
-                          >
-                            Ver {courseEvents.length - 1} evento{courseEvents.length > 2 ? 's' : ''} más →
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  )}
                 </div>
               );
             })
@@ -433,7 +332,7 @@ export default function InicioContent() {
             <div className="relative z-10 flex justify-end">
             <button
               onClick={() => setIsModalOpen(true)}
-              className="px-6 py-4 bg-magenta-violet-50 rounded-lg border border-magenta-violet-700 text-base font-medium text-magenta-violet-700 transition-colors hover:bg-magenta-violet-100"
+              className="w-full px-4 py-3 bg-magenta-violet-50 rounded-lg border border-magenta-violet-700 text-sm font-medium text-magenta-violet-700 transition-colors hover:bg-magenta-violet-100"
             >
               Agendar Tutoría
             </button>
