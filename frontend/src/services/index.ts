@@ -9,3 +9,4 @@ export { cyclesService } from './cycles.service';
 export { evaluationsService } from './evaluations.service';
 export { enrollmentsService } from './enrollments.service';
 export { getCursoDetalle, getCursoNombre } from './cursoService';
+export { auditService } from './audit.service';

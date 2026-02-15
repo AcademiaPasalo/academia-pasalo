@@ -84,7 +84,12 @@ export const navigationConfig: Record<UserRole, SidebarNavItem[]> = {
       icon: 'notifications',
       label: 'Notificaciones',
       href: '/plataforma/notificaciones'
-    }    
+    },
+    {
+      icon: 'shield',
+      label: 'Auditoría',
+      href: '/plataforma/admin/auditoria'
+    }
   ],
 
   SUPER_ADMIN: [
@@ -93,6 +98,11 @@ export const navigationConfig: Record<UserRole, SidebarNavItem[]> = {
       label: 'Inicio',
       href: '/plataforma/inicio'
     },
+    {
+      icon: 'shield',
+      label: 'Auditoría',
+      href: '/plataforma/admin/auditoria'
+    }
   ]
 };
 

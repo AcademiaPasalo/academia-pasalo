@@ -18,6 +18,7 @@ import TeacherInicioContent from '@/components/pages/teacher/InicioContent';
 
 // Importar componentes de admin
 import AdminInicioContent from '@/components/pages/admin/InicioContent';
+import AdminAuditoriaContent from '@/components/pages/admin/AuditoriaContent';
 
 /**
  * Mapa de componentes disponibles
@@ -35,6 +36,7 @@ const componentMap: Record<string, React.ComponentType<any>> = {
   
   // Admin
   'admin/InicioContent': AdminInicioContent,
+  'admin/AuditoriaContent': AdminAuditoriaContent,
 };
 
 interface RoleBasedContentProps {

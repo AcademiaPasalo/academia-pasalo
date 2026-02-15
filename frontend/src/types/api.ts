@@ -235,3 +235,31 @@ export interface Notification {
   isRead: boolean;
   createdAt: string;
 }
+
+// ============================================
+// AUDIT & SECURITY
+// ============================================
+
+export type AuditSource = 'AUDIT' | 'SECURITY';
+
+export interface AuditEntry {
+  id: string;
+  datetime: string;
+  userId: string;
+  userName: string;
+  actionCode: string;
+  actionName: string;
+  source: AuditSource;
+  entityType?: string;
+  entityId?: string;
+  ipAddress?: string;
+  userAgent?: string;
+  metadata?: Record<string, unknown>;
+}
+
+export interface AuditHistoryParams {
+  startDate?: string;
+  endDate?: string;
+  userId?: string;
+  limit?: number;
+}

@@ -13,6 +13,7 @@ import Breadcrumb, {
   type BreadcrumbItem,
 } from "@/components/dashboard/Breadcrumb";
 import Icon from "@/components/ui/Icon";
+import SecurityWarningBanner from "@/components/dashboard/SecurityWarningBanner";
 
 export interface DashboardLayoutProps {
   children: React.ReactNode;
@@ -171,8 +172,11 @@ export default function DashboardLayout({
         )}
 
         {/* Page Content */}
-        <main className="flex-1 p-12 bg-bg-secondary overflow-y-auto">
-          {children}
+        <main className="flex-1 bg-bg-secondary overflow-y-auto">
+          <SecurityWarningBanner />
+          <div className="p-12">
+            {children}
+          </div>
         </main>
       </div>
     </div>
