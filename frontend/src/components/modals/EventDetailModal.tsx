@@ -2,14 +2,15 @@
 // EVENT DETAIL MODAL - Tooltip de Detalle de Evento de Clase
 // ============================================
 
-'use client';
+"use client";
 
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { format } from 'date-fns';
-import { es } from 'date-fns/locale';
-import type { ClassEvent } from '@/types/classEvent';
-import { getCourseColor } from '@/lib/courseColors';
-import { MdClose, MdCalendarToday, MdLink } from 'react-icons/md';
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { format } from "date-fns";
+import { es } from "date-fns/locale";
+import type { ClassEvent } from "@/types/classEvent";
+import { getCourseColor } from "@/lib/courseColors";
+import { MdClose, MdCalendarToday, MdLink } from "react-icons/md";
+import Icon from "../ui/Icon";
 
 interface EventDetailModalProps {
   event: ClassEvent | null;
@@ -22,7 +23,7 @@ export default function EventDetailModal({
   event,
   isOpen,
   onClose,
-  anchorPosition
+  anchorPosition,
 }: EventDetailModalProps) {
   const tooltipRef = useRef<HTMLDivElement>(null);
   const [position, setPosition] = useState({ top: 0, left: 0 });
@@ -60,28 +61,30 @@ export default function EventDetailModal({
     if (isOpen) {
       // Bloquear scroll del body
       const scrollY = window.scrollY;
-      document.body.style.position = 'fixed';
+      document.body.style.position = "fixed";
       document.body.style.top = `-${scrollY}px`;
-      document.body.style.width = '100%';
-      document.body.style.overflow = 'hidden';
+      document.body.style.width = "100%";
+      document.body.style.overflow = "hidden";
 
       // Bloquear scroll del calendario específicamente
-      const calendarContainer = document.getElementById('calendar-scroll-container');
+      const calendarContainer = document.getElementById(
+        "calendar-scroll-container",
+      );
       if (calendarContainer) {
-        calendarContainer.style.overflow = 'hidden';
+        calendarContainer.style.overflow = "hidden";
       }
 
       return () => {
         // Restaurar scroll cuando se cierra
-        document.body.style.position = '';
-        document.body.style.top = '';
-        document.body.style.width = '';
-        document.body.style.overflow = '';
+        document.body.style.position = "";
+        document.body.style.top = "";
+        document.body.style.width = "";
+        document.body.style.overflow = "";
         window.scrollTo(0, scrollY);
 
         // Restaurar scroll del calendario
         if (calendarContainer) {
-          calendarContainer.style.overflow = '';
+          calendarContainer.style.overflow = "";
         }
       };
     }
@@ -90,30 +93,34 @@ export default function EventDetailModal({
   // Cerrar al hacer clic fuera
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
-      if (tooltipRef.current && !tooltipRef.current.contains(e.target as Node)) {
+      if (
+        tooltipRef.current &&
+        !tooltipRef.current.contains(e.target as Node)
+      ) {
         onClose();
       }
     };
 
     if (isOpen) {
-      document.addEventListener('mousedown', handleClickOutside);
-      return () => document.removeEventListener('mousedown', handleClickOutside);
+      document.addEventListener("mousedown", handleClickOutside);
+      return () =>
+        document.removeEventListener("mousedown", handleClickOutside);
     }
   }, [isOpen, onClose]);
 
   if (!isOpen || !event) return null;
 
-  console.log('🔍 [EventDetailModal] Event:', event);
-  console.log('🔍 [EventDetailModal] liveMeetingUrl:', event.liveMeetingUrl);
-  console.log('🔍 [EventDetailModal] topic:', event.topic);
+  console.log("🔍 [EventDetailModal] Event:", event);
+  console.log("🔍 [EventDetailModal] liveMeetingUrl:", event.liveMeetingUrl);
+  console.log("🔍 [EventDetailModal] topic:", event.topic);
 
   const colors = getCourseColor(event.courseCode);
 
   const formatDate = () => {
     const date = new Date(event.startDatetime);
-    const day = format(date, 'EEEE', { locale: es });
-    const dayNum = format(date, 'd');
-    const month = format(date, 'MMMM', { locale: es });
+    const day = format(date, "EEEE", { locale: es });
+    const dayNum = format(date, "d");
+    const month = format(date, "MMMM", { locale: es });
 
     return `${day.charAt(0).toUpperCase() + day.slice(1)}, ${dayNum} de ${month}`;
   };
@@ -129,21 +136,21 @@ export default function EventDetailModal({
 
     const formatTimeStr = (hour: number, min: number) => {
       const h = hour > 12 ? hour - 12 : hour === 0 ? 12 : hour;
-      return min > 0 ? `${h}:${min.toString().padStart(2, '0')}` : `${h}`;
+      return min > 0 ? `${h}:${min.toString().padStart(2, "0")}` : `${h}`;
     };
 
-    const period = endHour >= 12 ? 'pm' : 'am';
+    const period = endHour >= 12 ? "pm" : "am";
 
     return `${formatTimeStr(startHour, startMin)} - ${formatTimeStr(endHour, endMin)}${period}`;
   };
 
   const getTeacherInitials = () => {
-    if (!event.creator) return 'XX';
+    if (!event.creator) return "XX";
     return `${event.creator.firstName[0]}${event.creator.lastName1[0]}`.toUpperCase();
   };
 
   const getTeacherName = () => {
-    if (!event.creator) return 'Sin asignar';
+    if (!event.creator) return "Sin asignar";
     return `${event.creator.firstName} ${event.creator.lastName1}`;
   };
 
@@ -184,7 +191,7 @@ export default function EventDetailModal({
             <div className="self-stretch flex justify-start items-start gap-0.5">
               <div className="flex justify-start items-center">
                 <div className="text-text-primary text-base font-normal font-['Poppins'] leading-5 line-clamp-1">
-                  {event.sessionNumber}° Clase - {event.title}
+                  {event.sessionNumber}° Clase
                 </div>
               </div>
             </div>
@@ -249,7 +256,12 @@ export default function EventDetailModal({
         {/* Topic */}
         {event.topic && (
           <div className="self-stretch p-0.5 flex justify-start items-start gap-2.5">
-            <MdCalendarToday className="w-4 h-4 text-icon-secondary" />
+            <Icon
+              name="topic"
+              size={16}
+              variant="outlined"
+              className="text-icon-secondary"
+            />
             <div className="flex-1 text-text-primary text-base font-normal font-['Poppins'] leading-4">
               {event.topic}
             </div>

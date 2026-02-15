@@ -46,15 +46,15 @@ export default function CalendarioContent() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [currentTime, setCurrentTime] = useState(new Date());
-  const [anchorPosition, setAnchorPosition] = useState<{ x: number; y: number } | undefined>();
+  const [anchorPosition, setAnchorPosition] = useState<
+    { x: number; y: number } | undefined
+  >();
 
   const weekDays = getWeekDays();
 
   // Configurar breadcrumb
   useEffect(() => {
-    setBreadcrumbItems([
-      { icon: 'event', label: 'Calendario' }
-    ]);
+    setBreadcrumbItems([{ icon: "event", label: "Calendario" }]);
   }, [setBreadcrumbItems]);
 
   console.log("📊 [CalendarioContent] Renderizando con:", {
@@ -221,7 +221,7 @@ export default function CalendarioContent() {
     : "Filtrar por Curso";
 
   return (
-    <div className="flex flex-col gap-8 max-h-[calc(100vh-120px)] overflow-hidden">
+    <div className="flex flex-col gap-8 max-h-[calc(100vh-152px)] overflow-hidden">
       <div className="flex justify-between items-center flex-shrink-0">
         <h1 className="text-3xl font-semibold text-text-primary">
           Calendario de Clases
@@ -363,15 +363,16 @@ export default function CalendarioContent() {
                     isToday(day) ? "bg-info-primary-solid text-text-white" : ""
                   }`}
                 >
-                  <span className="text-xl font-medium">
-                    {day.getDate()}
-                  </span>
+                  <span className="text-xl font-medium">{day.getDate()}</span>
                 </div>
               </div>
             ))}
           </div>
 
-          <div id="calendar-scroll-container" className="flex-1 overflow-y-auto overflow-x-hidden min-h-0 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+          <div
+            id="calendar-scroll-container"
+            className="flex-1 overflow-y-auto overflow-x-hidden min-h-0 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]"
+          >
             <div className="flex min-w-full">
               <div className="w-16 flex flex-col flex-shrink-0 bg-bg-primary sticky left-0 z-10">
                 {HOURS.map((hour) => {
@@ -395,75 +396,78 @@ export default function CalendarioContent() {
               </div>
 
               <div className="flex-1 flex">
-              {weekDays.map((day, dayIndex) => {
-              const dayEvents = getEventsByDay(day);
-              const isTodayColumn = isToday(day);
-              const currentTimePos = getCurrentTimePosition();
+                {weekDays.map((day, dayIndex) => {
+                  const dayEvents = getEventsByDay(day);
+                  const isTodayColumn = isToday(day);
+                  const currentTimePos = getCurrentTimePosition();
 
-              return (
-                <div
-                  key={dayIndex}
-                  className={`flex-1 relative ${dayIndex < 6 ? "border-r border-stroke-secondary" : ""}`}
-                  style={{ minWidth: "140px" }}
-                >
-                  {HOURS.map((hour, hourIndex) => (
+                  return (
                     <div
-                      key={hour}
-                      className={`h-20 pr-4 ${hourIndex < HOURS.length - 1 ? "border-b border-stroke-secondary" : ""}`}
-                    />
-                  ))}
-
-                  {/* Marca de hora actual */}
-                  {isTodayColumn && currentTimePos > 0 && (
-                    <div
-                      className="absolute left-0 right-0 flex items-center z-10"
-                      style={{ top: `${currentTimePos}px` }}
+                      key={dayIndex}
+                      className={`flex-1 relative ${dayIndex < 6 ? "border-r border-stroke-secondary" : ""}`}
+                      style={{ minWidth: "140px" }}
                     >
-                      <div className="w-2 h-2 bg-info-secondary-solid rounded-full" />
-                      <div className="flex-1 h-0 border-t border-stroke-info-secondary" />
-                    </div>
-                  )}
-
-                  {dayEvents.map((event) => {
-                    const position = getEventPosition(event);
-                    const layout = getEventLayout(event, dayEvents);
-                    const colors = getCourseColor(event.courseCode);
-
-                    return (
-                      <div
-                        key={event.id}
-                        className="absolute rounded-lg overflow-hidden cursor-pointer hover:opacity-90 transition-opacity shadow-sm"
-                        style={{
-                          top: `${position.top}px`,
-                          height: `${position.height}px`,
-                          left: layout.left,
-                          width: layout.width,
-                          backgroundColor: colors.secondary,
-                        }}
-                        onClick={(e) => handleEventClick(event, e)}
-                      >
+                      {HOURS.map((hour, hourIndex) => (
                         <div
-                          className="h-full px-2.5 py-1.5 rounded-l-lg border-l-4 flex flex-col gap-1"
-                          style={{ borderLeftColor: colors.primary }}
+                          key={hour}
+                          className={`h-20 pr-4 ${hourIndex < HOURS.length - 1 ? "border-b border-stroke-secondary" : ""}`}
+                        />
+                      ))}
+
+                      {/* Marca de hora actual */}
+                      {isTodayColumn && currentTimePos > 0 && (
+                        <div
+                          className="absolute left-0 right-0 flex items-center z-10"
+                          style={{ top: `${currentTimePos}px` }}
                         >
-                          <span className="text-[10px] font-medium text-text-primary line-clamp-1">
-                            {event.title}
-                          </span>
-                          <div className="flex-1 min-h-0">
-                            <p className="text-xs font-medium text-text-primary line-clamp-3">
-                              {event.courseName}
-                            </p>
-                          </div>
-                          <div className="text-xs text-text-secondary">
-                            {formatTimeRange(event.startDatetime, event.endDatetime)}
-                          </div>
+                          <div className="w-2 h-2 bg-info-secondary-solid rounded-full" />
+                          <div className="flex-1 h-0 border-t border-stroke-info-secondary" />
                         </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              );
-            })}
+                      )}
+
+                      {dayEvents.map((event) => {
+                        const position = getEventPosition(event);
+                        const layout = getEventLayout(event, dayEvents);
+                        const colors = getCourseColor(event.courseCode);
+
+                        return (
+                          <div
+                            key={event.id}
+                            className="absolute rounded-lg overflow-hidden cursor-pointer hover:opacity-90 transition-opacity shadow-sm"
+                            style={{
+                              top: `${position.top}px`,
+                              height: `${position.height}px`,
+                              left: layout.left,
+                              width: layout.width,
+                              backgroundColor: colors.secondary,
+                            }}
+                            onClick={(e) => handleEventClick(event, e)}
+                          >
+                            <div
+                              className="h-full px-2.5 py-1.5 rounded-l-lg border-l-4 flex flex-col gap-1"
+                              style={{ borderLeftColor: colors.primary }}
+                            >
+                              <span className="text-[10px] font-medium text-text-primary line-clamp-1">
+                                {event.title}
+                              </span>
+                              <div className="flex-1 min-h-0">
+                                <p className="text-xs font-medium text-text-primary line-clamp-3">
+                                  {event.courseName}
+                                </p>
+                              </div>
+                              <div className="text-xs text-text-secondary">
+                                {formatTimeRange(
+                                  event.startDatetime,
+                                  event.endDatetime,
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  );
+                })}
               </div>
             </div>
           </div>
