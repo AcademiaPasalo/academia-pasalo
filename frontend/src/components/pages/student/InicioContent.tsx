@@ -78,16 +78,8 @@ export default function InicioContent() {
         const start = today.toISOString().split('T')[0];
         const end = nextWeek.toISOString().split('T')[0];
         
-        const response = await classEventService.getMySchedule({ start, end });
-        
-        // Manejar respuesta que puede ser array o ApiResponse
-        let events: ClassEvent[] = [];
-        if (Array.isArray(response)) {
-          events = response;
-        } else if (response && 'data' in response) {
-          events = response.data || [];
-        }
-        
+        const events = await classEventService.getMySchedule({ start, end });
+
         // Filtrar solo eventos futuros o en curso, ordenados por fecha
         const futureEvents = events
           .filter(event => !event.isCancelled && event.status !== 'FINALIZADA')
