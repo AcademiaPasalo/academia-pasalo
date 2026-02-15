@@ -61,6 +61,7 @@ Obtiene todas las sesiones programadas para el usuario (alumno o profesor) dentr
         "canCopyRecordingLink": boolean, // true si puede copiar el link de grabacion
         "courseName": string,
         "courseCode": string,
+        "evaluationName": string, // e.g. "PC1"
         "creator": { "id": string, "firstName": string, "lastName1": string, "profilePhotoUrl": string | null },
         "professors": [ { "id": string, "firstName": string, "lastName1": string, "profilePhotoUrl": string | null } ]
       }
