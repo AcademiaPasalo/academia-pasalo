@@ -11,12 +11,14 @@ import Icon from '@/components/ui/Icon';
 // Importar componentes de estudiante
 import StudentInicioContent from '@/components/pages/student/InicioContent';
 import StudentCursoContent from '@/components/pages/student/CursoContent';
+import StudentCalendarioContent from '@/components/pages/student/CalendarioContent';
 
 // Importar componentes de docente
 import TeacherInicioContent from '@/components/pages/teacher/InicioContent';
 
 // Importar componentes de admin
 import AdminInicioContent from '@/components/pages/admin/InicioContent';
+import AdminAuditoriaContent from '@/components/pages/admin/AuditoriaContent';
 
 /**
  * Mapa de componentes disponibles
@@ -27,12 +29,14 @@ const componentMap: Record<string, React.ComponentType<any>> = {
   // Estudiante
   'student/InicioContent': StudentInicioContent,
   'student/CursoContent': StudentCursoContent,
+  'student/CalendarioContent': StudentCalendarioContent,
   
   // Docente
   'teacher/InicioContent': TeacherInicioContent,
   
   // Admin
   'admin/InicioContent': AdminInicioContent,
+  'admin/AuditoriaContent': AdminAuditoriaContent,
 };
 
 interface RoleBasedContentProps {

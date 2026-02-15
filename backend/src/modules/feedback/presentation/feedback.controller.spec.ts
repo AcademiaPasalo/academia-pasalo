@@ -3,6 +3,7 @@ import { FeedbackController } from './feedback.controller';
 import { FeedbackService } from '@modules/feedback/application/feedback.service';
 import { Reflector } from '@nestjs/core';
 import { JwtAuthGuard } from '@common/guards/jwt-auth.guard';
+import { ROLE_CODES } from '@common/constants/role-codes.constants';
 
 // Mock simple
 const mockFeedbackService = {
@@ -33,23 +34,23 @@ describe('FeedbackController RBAC Security', () => {
   it('endpoint "create" should be restricted to STUDENT only', () => {
     const roles = Reflect.getMetadata('roles', controller.create);
     expect(roles).toBeDefined();
-    expect(roles).toContain('STUDENT');
-    expect(roles).not.toContain('ADMIN'); // Admin no opina
-    expect(roles).not.toContain('PROFESSOR'); // Profesor no opina
+    expect(roles).toContain(ROLE_CODES.STUDENT);
+    expect(roles).not.toContain(ROLE_CODES.ADMIN); // Admin no opina
+    expect(roles).not.toContain(ROLE_CODES.PROFESSOR); // Profesor no opina
   });
 
   it('endpoint "feature" should be restricted to ADMIN, SUPER_ADMIN', () => {
     const roles = Reflect.getMetadata('roles', controller.feature);
     expect(roles).toBeDefined();
-    expect(roles).toContain('ADMIN');
-    expect(roles).toContain('SUPER_ADMIN');
-    expect(roles).not.toContain('STUDENT'); // Alumno no modera
+    expect(roles).toContain(ROLE_CODES.ADMIN);
+    expect(roles).toContain(ROLE_CODES.SUPER_ADMIN);
+    expect(roles).not.toContain(ROLE_CODES.STUDENT); // Alumno no modera
   });
 
   it('endpoint "getAdmin" should be restricted to ADMIN, SUPER_ADMIN', () => {
     const roles = Reflect.getMetadata('roles', controller.getAdmin);
-    expect(roles).toContain('ADMIN');
-    expect(roles).not.toContain('STUDENT');
+    expect(roles).toContain(ROLE_CODES.ADMIN);
+    expect(roles).not.toContain(ROLE_CODES.STUDENT);
   });
 
   it('endpoint "getPublic" should NOT have Role restrictions (Public Access)', () => {

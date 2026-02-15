@@ -19,11 +19,13 @@ import { EnrollmentRepository } from '@modules/enrollments/infrastructure/enroll
 import { StorageService } from '@infrastructure/storage/storage.service';
 import { UsersService } from '@modules/users/application/users.service';
 import { RedisCacheService } from '@infrastructure/cache/redis-cache.service';
+import { technicalSettings } from '@config/technical-settings';
 
 @Injectable()
 export class FeedbackService {
   private readonly logger = new Logger(FeedbackService.name);
-  private readonly CACHE_TTL = 600;
+  private readonly CACHE_TTL =
+    technicalSettings.cache.feedback.publicFeaturedTestimoniesCacheTtlSeconds;
 
   constructor(
     private readonly testimonyRepo: CourseTestimonyRepository,

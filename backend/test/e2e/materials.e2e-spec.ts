@@ -15,6 +15,9 @@ import { CourseCycle } from '@modules/courses/domain/course-cycle.entity';
 import { Evaluation } from '@modules/evaluations/domain/evaluation.entity';
 import { RedisCacheService } from '@infrastructure/cache/redis-cache.service';
 import { Enrollment } from '@modules/enrollments/domain/enrollment.entity';
+import { ROLE_CODES } from '@common/constants/role-codes.constants';
+import { ENROLLMENT_TYPE_CODES } from '@modules/enrollments/domain/enrollment.constants';
+import { EVALUATION_TYPE_CODES } from '@modules/evaluations/domain/evaluation.constants';
 
 interface MaterialFolderResponse {
   data: {
@@ -118,7 +121,7 @@ describe('E2E: Gestión de Materiales y Seguridad', () => {
     courseCycle = await seeder.linkCourseCycle(course.id, cycle.id);
     evaluation = await seeder.createEvaluation(
       courseCycle.id,
-      'PC',
+      EVALUATION_TYPE_CODES.PC,
       1,
       formatDate(yesterday),
       formatDate(nextMonth),
@@ -126,11 +129,11 @@ describe('E2E: Gestión de Materiales y Seguridad', () => {
 
     admin = await seeder.createAuthenticatedUser(
       TestSeeder.generateUniqueEmail('admin_mat'),
-      ['ADMIN'],
+      [ROLE_CODES.ADMIN],
     );
     professor = await seeder.createAuthenticatedUser(
       TestSeeder.generateUniqueEmail('prof_mat'),
-      ['PROFESSOR'],
+      [ROLE_CODES.PROFESSOR],
     );
 
     await dataSource.query(
@@ -140,7 +143,7 @@ describe('E2E: Gestión de Materiales y Seguridad', () => {
 
     const s1 = await seeder.createAuthenticatedUser(
       TestSeeder.generateUniqueEmail('student_ok'),
-      ['STUDENT'],
+      [ROLE_CODES.STUDENT],
     );
     studentWithAccess = s1;
     await request(app.getHttpServer())
@@ -149,7 +152,7 @@ describe('E2E: Gestión de Materiales y Seguridad', () => {
       .send({
         userId: s1.user.id,
         courseCycleId: courseCycle.id,
-        enrollmentTypeCode: 'FULL',
+        enrollmentTypeCode: ENROLLMENT_TYPE_CODES.FULL,
       })
       .expect(201);
   });
@@ -203,7 +206,7 @@ describe('E2E: Gestión de Materiales y Seguridad', () => {
       );
       otherCourseEvaluation = await seeder.createEvaluation(
         otherCC.id,
-        'PC',
+        EVALUATION_TYPE_CODES.PC,
         1,
         formatDate(yesterday),
         formatDate(nextMonth),

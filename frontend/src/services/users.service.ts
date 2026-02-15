@@ -91,4 +91,14 @@ export const usersService = {
     const response = await apiClient.get<ApiResponse<User>>('/users/me');
     return response.data.data;
   },
+
+  /**
+   * Banear/desactivar un usuario (ADMIN/SUPER_ADMIN)
+   * Marca al usuario como inactivo y revoca todas sus sesiones
+   * Endpoint: PATCH /users/:id/ban
+   */
+  async ban(userId: string): Promise<User> {
+    const response = await apiClient.patch<ApiResponse<User>>(`/users/${userId}/ban`);
+    return response.data.data;
+  },
 };

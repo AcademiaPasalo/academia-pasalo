@@ -17,7 +17,7 @@ export type BackendRoleCode = 'STUDENT' | 'PROFESSOR' | 'ADMIN' | 'SUPER_ADMIN';
 export function mapBackendRoleToUserRole(backendCode: string): UserRole {
   const mapping: Record<string, UserRole> = {
     'STUDENT': 'STUDENT',
-    'PROFESSOR': 'TEACHER', // ⚠️ Backend usa PROFESSOR, frontend usa TEACHER
+    'PROFESSOR': 'TEACHER',
     'ADMIN': 'ADMIN',
     'SUPER_ADMIN': 'SUPER_ADMIN'
   };
@@ -84,7 +84,12 @@ export const navigationConfig: Record<UserRole, SidebarNavItem[]> = {
       icon: 'notifications',
       label: 'Notificaciones',
       href: '/plataforma/notificaciones'
-    }    
+    },
+    {
+      icon: 'shield',
+      label: 'Auditoría',
+      href: '/plataforma/admin/auditoria'
+    }
   ],
 
   SUPER_ADMIN: [
@@ -93,6 +98,11 @@ export const navigationConfig: Record<UserRole, SidebarNavItem[]> = {
       label: 'Inicio',
       href: '/plataforma/inicio'
     },
+    {
+      icon: 'shield',
+      label: 'Auditoría',
+      href: '/plataforma/admin/auditoria'
+    }
   ]
 };
 

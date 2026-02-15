@@ -14,6 +14,9 @@ const poppins = Poppins({
 export const metadata: Metadata = {
   title: "Pásalo - Academia Universitaria",
   description: "Plataforma educativa para estudiantes PUCP",
+  icons: {
+    icon: "/favicon.svg",
+  },
 };
 
 const googleClientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || '';

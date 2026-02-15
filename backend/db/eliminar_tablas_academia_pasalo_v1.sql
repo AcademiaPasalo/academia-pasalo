@@ -48,6 +48,7 @@ DROP TABLE IF EXISTS system_setting;
 -- Tablas de tipos y estados (diccionarios)
 DROP TABLE IF EXISTS security_event_type;
 DROP TABLE IF EXISTS enrollment_type;
+DROP TABLE IF EXISTS class_event_recording_status;
 DROP TABLE IF EXISTS session_status;
 DROP TABLE IF EXISTS audit_action;
 DROP TABLE IF EXISTS deletion_request_status;

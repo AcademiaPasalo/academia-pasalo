@@ -9,7 +9,11 @@ import { SessionValidatorService } from '@modules/auth/application/session-valid
 import { SessionConflictService } from '@modules/auth/application/session-conflict.service';
 import { SessionSecurityService } from '@modules/auth/application/session-security.service';
 import { RequestMetadata } from '@modules/auth/interfaces/request-metadata.interface';
-import { ANOMALY_TYPES } from '@modules/auth/interfaces/security.constants';
+import {
+  ANOMALY_TYPES,
+  LOCATION_SOURCES,
+  SESSION_STATUS_CODES,
+} from '@modules/auth/interfaces/security.constants';
 
 describe('SessionService', () => {
   let service: SessionService;
@@ -90,7 +94,7 @@ describe('SessionService', () => {
     it('debe crear sesión ACTIVE incluso con anomalía (modo pasivo)', async () => {
       (anomalyDetector.resolveCoordinates as jest.Mock).mockResolvedValue({
         metadata,
-        locationSource: 'gps',
+        locationSource: LOCATION_SOURCES.GPS,
       });
       (
         userSessionRepository.existsByUserIdAndDeviceId as jest.Mock
@@ -117,7 +121,7 @@ describe('SessionService', () => {
         new Date(),
       );
 
-      expect(result.sessionStatus).toBe('ACTIVE');
+      expect(result.sessionStatus).toBe(SESSION_STATUS_CODES.ACTIVE);
       expect(
         sessionSecurityService.logSessionCreationEvents,
       ).toHaveBeenCalled();
@@ -126,7 +130,7 @@ describe('SessionService', () => {
     it('debe dar prioridad a Concurrencia (PENDING_CONCURRENT_RESOLUTION) sobre Anomalía', async () => {
       (anomalyDetector.resolveCoordinates as jest.Mock).mockResolvedValue({
         metadata,
-        locationSource: 'none',
+        locationSource: LOCATION_SOURCES.NONE,
       });
       (anomalyDetector.detectLocationAnomaly as jest.Mock).mockResolvedValue({
         isAnomalous: true,
@@ -137,7 +141,8 @@ describe('SessionService', () => {
       ).mockResolvedValue({ id: 'existing' });
       (sessionStatusService.getIdByCode as jest.Mock).mockImplementation(
         (code) => {
-          if (code === 'PENDING_CONCURRENT_RESOLUTION') return 'pending-id';
+          if (code === SESSION_STATUS_CODES.PENDING_CONCURRENT_RESOLUTION)
+            return 'pending-id';
           return 'other';
         },
       );
@@ -153,7 +158,9 @@ describe('SessionService', () => {
         new Date(),
       );
 
-      expect(result.sessionStatus).toBe('PENDING_CONCURRENT_RESOLUTION');
+      expect(result.sessionStatus).toBe(
+        SESSION_STATUS_CODES.PENDING_CONCURRENT_RESOLUTION,
+      );
       expect(result.concurrentSessionId).toBe('existing');
       expect(
         sessionSecurityService.logSessionCreationEvents,
@@ -163,7 +170,7 @@ describe('SessionService', () => {
     it('debe limpiar sesiones pendientes antiguas al alcanzar el límite (protección contra agotamiento)', async () => {
       (anomalyDetector.resolveCoordinates as jest.Mock).mockResolvedValue({
         metadata,
-        locationSource: 'none',
+        locationSource: LOCATION_SOURCES.NONE,
       });
       (anomalyDetector.detectLocationAnomaly as jest.Mock).mockResolvedValue({
         isAnomalous: false,
@@ -171,7 +178,7 @@ describe('SessionService', () => {
       });
       (
         userSessionRepository.findOtherActiveSession as jest.Mock
-      ).mockResolvedValue({ id: 'active' });
+      ).mockResolvedValue({ id: 'active-session-id' });
 
       (sessionStatusService.getIdByCode as jest.Mock).mockResolvedValue(
         'status-id',

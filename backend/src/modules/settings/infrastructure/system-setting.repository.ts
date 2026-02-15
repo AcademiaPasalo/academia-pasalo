@@ -3,11 +3,13 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { SystemSetting } from '@modules/settings/domain/system-setting.entity';
 import { RedisCacheService } from '@infrastructure/cache/redis-cache.service';
+import { technicalSettings } from '@config/technical-settings';
 
 @Injectable()
 export class SystemSettingRepository {
   private static readonly CACHE_PREFIX = 'cache:setting:';
-  private static readonly CACHE_TTL_SECONDS = 3600;
+  private static readonly CACHE_TTL_SECONDS =
+    technicalSettings.cache.settings.systemSettingCacheTtlSeconds;
 
   constructor(
     @InjectRepository(SystemSetting)
