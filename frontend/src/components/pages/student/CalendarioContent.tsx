@@ -227,25 +227,19 @@ export default function CalendarioContent() {
     const startDay = firstDayOfMonth.getDay(); // 0 = domingo
     const daysInMonth = lastDayOfMonth.getDate();
 
+    // Calcular número de semanas necesarias dinámicamente
+    const totalDays = startDay + daysInMonth;
+    const weeksNeeded = Math.ceil(totalDays / 7);
+
     const days: Date[] = [];
 
-    // Días del mes anterior para completar la primera semana
-    for (let i = startDay - 1; i >= 0; i--) {
-      const prevMonthDay = new Date(year, month, -i);
-      days.push(prevMonthDay);
-    }
+    // Empezamos desde el domingo de la semana que contiene el primer día del mes
+    const startDate = new Date(year, month, 1 - startDay);
 
-    // Días del mes actual
-    for (let day = 1; day <= daysInMonth; day++) {
-      days.push(new Date(year, month, day));
-    }
-
-    // Días del mes siguiente para completar la última semana
-    const remainingDays = 7 - (days.length % 7);
-    if (remainingDays < 7) {
-      for (let day = 1; day <= remainingDays; day++) {
-        days.push(new Date(year, month + 1, day));
-      }
+    for (let i = 0; i < weeksNeeded * 7; i++) {
+      const day = new Date(startDate);
+      day.setDate(startDate.getDate() + i);
+      days.push(day);
     }
 
     return days;
@@ -522,7 +516,7 @@ export default function CalendarioContent() {
           </div>
         </div>
       ) : (
-        <div className="bg-bg-primary rounded-2xl border border-stroke-primary flex-1 flex flex-col min-h-0">
+        <div className="bg-bg-primary rounded-2xl border border-stroke-primary overflow-hidden flex-1 flex flex-col min-h-0">
           {/* Header días de la semana */}
           <div className="flex border-b border-stroke-primary flex-shrink-0">
             {DAY_NAMES.map((dayName, index) => (
@@ -538,15 +532,20 @@ export default function CalendarioContent() {
           </div>
 
           {/* Grid de días */}
-          <div className="flex flex-col h-full max-h-[calc(100vh-152px)]">
-            {Array.from({ length: Math.ceil(getMonthDays().length / 7) }, (_, weekIndex) => {
-              const weekDays = getMonthDays().slice(weekIndex * 7, (weekIndex + 1) * 7);
+          <div className="flex-1 overflow-y-auto overflow-x-hidden min-h-0 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+            <div className="flex flex-col min-h-0">
+              {(() => {
+                const monthDays = getMonthDays();
+                const weeksCount = monthDays.length / 7;
 
-              return (
-                <div
-                  key={weekIndex}
-                  className="flex-1 flex border-b border-stroke-secondary"
-                >
+                return Array.from({ length: weeksCount }, (_, weekIndex) => {
+                  const weekDays = monthDays.slice(weekIndex * 7, (weekIndex + 1) * 7);
+
+                  return (
+                    <div
+                      key={weekIndex}
+                      className="flex min-h-[200px] border-b border-stroke-secondary"
+                    >
                   {weekDays.map((day, dayIndex) => {
                     const dayEvents = getEventsForDay(day);
                     const isTodayDay = isToday(day);
@@ -555,7 +554,7 @@ export default function CalendarioContent() {
                     return (
                       <div
                         key={`${day.getTime()}-${dayIndex}`}
-                        className={`flex-1 self-stretch py-2 flex flex-col items-center gap-2 overflow-hidden ${
+                        className={`flex-1 h-full min-h-0 py-2 flex flex-col items-center gap-2 overflow-hidden ${
                           dayIndex < 6 ? "border-r border-stroke-secondary" : ""
                         }`}
                       >
@@ -570,7 +569,7 @@ export default function CalendarioContent() {
                           <div
                             className={`text-sm font-medium text-center ${
                               isTodayDay
-                                ? "text-text-white font-semibold"
+                                ? "text-text-white"
                                 : isCurrentMonth
                                   ? "text-text-primary"
                                   : "text-text-tertiary"
@@ -581,8 +580,8 @@ export default function CalendarioContent() {
                         </div>
 
                         {/* Eventos del día */}
-                        <div className="self-stretch pr-2 flex flex-col items-start gap-0.5">
-                          {dayEvents.slice(0, 3).map((event) => {
+                        <div className="self-stretch pr-2 flex flex-col items-start gap-0.5 flex-1 min-h-0 overflow-hidden">
+                          {dayEvents.slice(0, 2).map((event) => {
                             const colors = getCourseColor(event.courseCode);
 
                             return (
@@ -603,18 +602,20 @@ export default function CalendarioContent() {
                               </div>
                             );
                           })}
-                          {dayEvents.length > 3 && (
+                          {dayEvents.length > 2 && (
                             <div className="self-stretch px-2.5 text-[10px] font-medium text-text-tertiary">
-                              +{dayEvents.length - 3} más
+                              +{dayEvents.length - 2} más
                             </div>
                           )}
                         </div>
                       </div>
                     );
                   })}
-                </div>
-              );
-            })}
+                  </div>
+                );
+                });
+              })()}
+            </div>
           </div>
         </div>
       )}
