@@ -44,6 +44,7 @@ export default function CalendarioContent() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [currentTime, setCurrentTime] = useState(new Date());
+  const [anchorPosition, setAnchorPosition] = useState<{ x: number; y: number } | undefined>();
 
   const weekDays = getWeekDays();
 
@@ -112,6 +113,48 @@ export default function CalendarioContent() {
     };
   };
 
+  /**
+   * Calcula el layout (ancho y posición) de un evento cuando hay solapamientos
+   * Similar a Google Calendar / Notion
+   */
+  const getEventLayout = (event: ClassEvent, dayEvents: ClassEvent[]) => {
+    // Filtrar eventos que se solapan temporalmente con este evento
+    const overlappingEvents = dayEvents
+      .filter((e) => {
+        const start1 = new Date(event.startDatetime);
+        const end1 = new Date(event.endDatetime);
+        const start2 = new Date(e.startDatetime);
+        const end2 = new Date(e.endDatetime);
+        // Dos eventos se solapan si: start1 < end2 && start2 < end1
+        return start1 < end2 && start2 < end1;
+      })
+      .sort((a, b) => {
+        // Ordenar por hora de inicio, luego por ID para consistencia
+        const startA = new Date(a.startDatetime).getTime();
+        const startB = new Date(b.startDatetime).getTime();
+        if (startA !== startB) return startA - startB;
+        return a.id.localeCompare(b.id);
+      });
+
+    const totalColumns = overlappingEvents.length;
+    const columnIndex = overlappingEvents.findIndex((e) => e.id === event.id);
+
+    if (totalColumns === 1) {
+      return {
+        width: "calc(100% - 16px)", // 16px = right-4
+        left: "0",
+      };
+    }
+
+    const widthPercent = 100 / totalColumns;
+    const leftPercent = widthPercent * columnIndex;
+
+    return {
+      width: `calc(${widthPercent}% - ${columnIndex === totalColumns - 1 ? 16 : 4}px)`,
+      left: `${leftPercent}%`,
+    };
+  };
+
   const getCurrentTimePosition = () => {
     const now = currentTime;
     const hours = now.getHours();
@@ -120,26 +163,6 @@ export default function CalendarioContent() {
     // Posición relativa desde la 1 AM (hora 0 en nuestro array es 1 AM)
     const position = (hours - 1) * 80 + (minutes / 60) * 80;
     return position;
-  };
-
-  const formatEventTime = (event: ClassEvent) => {
-    const start = new Date(event.startDatetime);
-    const end = new Date(event.endDatetime);
-
-    const startHour = start.getHours();
-    const startMin = start.getMinutes();
-    const endHour = end.getHours();
-    const endMin = end.getMinutes();
-
-    const formatHour = (hour: number, min: number) => {
-      const period = hour >= 12 ? "pm" : "am";
-      const displayHour = hour > 12 ? hour - 12 : hour === 0 ? 12 : hour;
-      return min > 0
-        ? `${displayHour}:${min.toString().padStart(2, "0")}${period}`
-        : `${displayHour}${period}`;
-    };
-
-    return `${formatHour(startHour, startMin)} - ${formatHour(endHour, endMin)}`;
   };
 
   const formatTimeRange = (start: string, end: string) => {
@@ -173,7 +196,12 @@ export default function CalendarioContent() {
     return `${startTime} - ${endTime}`;
   };
 
-  const handleEventClick = (event: ClassEvent) => {
+  const handleEventClick = (event: ClassEvent, e: React.MouseEvent) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    setAnchorPosition({
+      x: rect.right,
+      y: rect.top,
+    });
     setSelectedEvent(event);
     setIsModalOpen(true);
   };
@@ -184,7 +212,7 @@ export default function CalendarioContent() {
     : "Filtrar por Curso";
 
   return (
-    <div className="flex flex-col gap-12">
+    <div className="flex flex-col gap-8">
       <div className="flex justify-between items-center">
         <h1 className="text-3xl font-semibold text-text-primary">
           Calendario de Clases
@@ -280,8 +308,8 @@ export default function CalendarioContent() {
               onClick={() => changeView("weekly")}
               className={`px-2.5 py-2 rounded flex items-center gap-1 text-sm font-medium transition-colors ${
                 view === "weekly"
-                  ? "bg-bg-accent-primary-solid text-text-white"
-                  : "bg-bg-primary text-text-accent-primary border border-stroke-accent-primary hover:bg-accent-light"
+                  ? "bg-deep-blue-700 text-white"
+                  : "bg-bg-primary text-text-accent-primary border border-sroke-accent-primary hover:bg-accent-light"
               }`}
             >
               <MdCalendarViewWeek className="w-4 h-4" />
@@ -291,7 +319,7 @@ export default function CalendarioContent() {
               onClick={() => changeView("monthly")}
               className={`px-2.5 py-2 rounded flex items-center gap-1 text-sm font-medium transition-colors ${
                 view === "monthly"
-                  ? "bg-bg-accent-primary-solid text-text-white"
+                  ? "bg-deep-blue-700 text-white"
                   : "bg-bg-primary text-text-accent-primary border border-stroke-accent-primary hover:bg-accent-light"
               }`}
             >
@@ -326,7 +354,7 @@ export default function CalendarioContent() {
                     isToday(day) ? "bg-info-primary-solid text-text-white" : ""
                   }`}
                 >
-                  <span className="text-xl font-medium text-text-primary">
+                  <span className="text-xl font-medium">
                     {day.getDate()}
                   </span>
                 </div>
@@ -377,28 +405,31 @@ export default function CalendarioContent() {
                   {/* Marca de hora actual */}
                   {isTodayColumn && currentTimePos > 0 && (
                     <div
-                      className="absolute left-0 right-4 flex items-center z-10"
+                      className="absolute left-0 right-0 flex items-center z-10"
                       style={{ top: `${currentTimePos}px` }}
                     >
                       <div className="w-2 h-2 bg-info-secondary-solid rounded-full" />
-                      <div className="flex-1 h-0 border-t border-stroke-info-tertiary" />
+                      <div className="flex-1 h-0 border-t border-stroke-info-secondary" />
                     </div>
                   )}
 
                   {dayEvents.map((event) => {
                     const position = getEventPosition(event);
+                    const layout = getEventLayout(event, dayEvents);
                     const colors = getCourseColor(event.courseCode);
 
                     return (
                       <div
                         key={event.id}
-                        className="absolute left-0 right-4 rounded-lg overflow-hidden cursor-pointer hover:opacity-90 transition-opacity shadow-sm"
+                        className="absolute rounded-lg overflow-hidden cursor-pointer hover:opacity-90 transition-opacity shadow-sm"
                         style={{
                           top: `${position.top}px`,
                           height: `${position.height}px`,
+                          left: layout.left,
+                          width: layout.width,
                           backgroundColor: colors.secondary,
                         }}
-                        onClick={() => handleEventClick(event)}
+                        onClick={(e) => handleEventClick(event, e)}
                       >
                         <div
                           className="h-full px-2.5 py-1.5 rounded-l-lg border-l-4 flex flex-col gap-1"
@@ -433,9 +464,11 @@ export default function CalendarioContent() {
       <EventDetailModal
         event={selectedEvent}
         isOpen={isModalOpen}
+        anchorPosition={anchorPosition}
         onClose={() => {
           setIsModalOpen(false);
           setSelectedEvent(null);
+          setAnchorPosition(undefined);
         }}
       />
     </div>

@@ -1,228 +1,243 @@
 // ============================================
-// EVENT DETAIL MODAL - Modal de Detalle de Evento de Clase
+// EVENT DETAIL MODAL - Tooltip de Detalle de Evento de Clase
 // ============================================
 
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import type { ClassEvent } from '@/types/classEvent';
-import { classEventService } from '@/services/classEvent.service';
-import { MdClose, MdVideocam, MdContentCopy, MdCheckCircle, MdCancel, MdSchedule, MdPerson } from 'react-icons/md';
+import { getCourseColor } from '@/lib/courseColors';
+import { MdClose, MdCalendarToday, MdLink } from 'react-icons/md';
 
 interface EventDetailModalProps {
   event: ClassEvent | null;
   isOpen: boolean;
   onClose: () => void;
+  anchorPosition?: { x: number; y: number }; // Posición del evento clickeado
 }
 
-export default function EventDetailModal({ event, isOpen, onClose }: EventDetailModalProps) {
-  const [copySuccess, setCopySuccess] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+export default function EventDetailModal({
+  event,
+  isOpen,
+  onClose,
+  anchorPosition
+}: EventDetailModalProps) {
+  const tooltipRef = useRef<HTMLDivElement>(null);
+  const [position, setPosition] = useState({ top: 0, left: 0 });
+
+  useEffect(() => {
+    if (!isOpen || !event || !anchorPosition || !tooltipRef.current) return;
+
+    const tooltip = tooltipRef.current;
+    const tooltipRect = tooltip.getBoundingClientRect();
+    const padding = 8; // Espacio desde el borde de la pantalla
+
+    let top = anchorPosition.y;
+    let left = anchorPosition.x + 16; // 16px a la derecha del evento
+
+    // Ajustar si se sale por la derecha
+    if (left + tooltipRect.width > window.innerWidth - padding) {
+      left = anchorPosition.x - tooltipRect.width - 16; // Mostrar a la izquierda
+    }
+
+    // Ajustar si se sale por abajo
+    if (top + tooltipRect.height > window.innerHeight - padding) {
+      top = window.innerHeight - tooltipRect.height - padding;
+    }
+
+    // Ajustar si se sale por arriba
+    if (top < padding) {
+      top = padding;
+    }
+
+    setPosition({ top, left });
+  }, [isOpen, event, anchorPosition]);
+
+  // Cerrar al hacer clic fuera
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (tooltipRef.current && !tooltipRef.current.contains(e.target as Node)) {
+        onClose();
+      }
+    };
+
+    if (isOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [isOpen, onClose]);
 
   if (!isOpen || !event) return null;
 
-  const handleJoinMeeting = () => {
-    try {
-      classEventService.joinMeeting(event);
-      setError(null);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Error al unirse a la reunión');
-    }
+  const colors = getCourseColor(event.courseCode);
+
+  const formatDate = () => {
+    const date = new Date(event.startDatetime);
+    const day = format(date, 'EEEE', { locale: es });
+    const dayNum = format(date, 'd');
+    const month = format(date, 'MMMM', { locale: es });
+
+    return `${day.charAt(0).toUpperCase() + day.slice(1)}, ${dayNum} de ${month}`;
   };
 
-  const handleCopyLink = async () => {
-    try {
-      await classEventService.copyMeetingLink(event);
-      setCopySuccess(true);
-      setError(null);
-      setTimeout(() => setCopySuccess(false), 2000);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Error al copiar el link');
-    }
-  };
-
-  const getStatusBadge = () => {
-    if (event.isCancelled) {
-      return (
-        <div className="inline-flex items-center gap-1 px-3 py-1 bg-error-light rounded-full">
-          <MdCancel className="w-4 h-4 text-text-error-primary" />
-          <span className="text-sm font-medium text-text-error-primary">Cancelada</span>
-        </div>
-      );
-    }
-
-    switch (event.status) {
-      case 'EN_CURSO':
-        return (
-          <div className="inline-flex items-center gap-1 px-3 py-1 bg-success-light rounded-full">
-            <div className="w-2 h-2 bg-success-solid rounded-full animate-pulse" />
-            <span className="text-sm font-medium text-success-primary">En vivo</span>
-          </div>
-        );
-      case 'FINALIZADA':
-        return (
-          <div className="inline-flex items-center gap-1 px-3 py-1 bg-bg-secondary rounded-full">
-            <MdCheckCircle className="w-4 h-4 text-text-tertiary" />
-            <span className="text-sm font-medium text-text-tertiary">Finalizada</span>
-          </div>
-        );
-      case 'PROGRAMADA':
-        return (
-          <div className="inline-flex items-center gap-1 px-3 py-1 bg-info-secondary-solid rounded-full">
-            <MdSchedule className="w-4 h-4 text-text-white" />
-            <span className="text-sm font-medium text-text-white">Programada</span>
-          </div>
-        );
-      default:
-        return null;
-    }
-  };
-
-  const formatDateTime = (dateString: string) => {
-    const date = new Date(dateString);
-    return format(date, "d 'de' MMMM, yyyy 'a las' h:mm a", { locale: es });
-  };
-
-  const formatTimeRange = () => {
+  const formatTime = () => {
     const start = new Date(event.startDatetime);
     const end = new Date(event.endDatetime);
-    return `${format(start, 'h:mm a', { locale: es })} - ${format(end, 'h:mm a', { locale: es })}`;
+
+    const startHour = start.getHours();
+    const startMin = start.getMinutes();
+    const endHour = end.getHours();
+    const endMin = end.getMinutes();
+
+    const formatTimeStr = (hour: number, min: number) => {
+      const h = hour > 12 ? hour - 12 : hour === 0 ? 12 : hour;
+      return min > 0 ? `${h}:${min.toString().padStart(2, '0')}` : `${h}`;
+    };
+
+    const period = endHour >= 12 ? 'pm' : 'am';
+
+    return `${formatTimeStr(startHour, startMin)} - ${formatTimeStr(endHour, endMin)}${period}`;
+  };
+
+  const getTeacherInitials = () => {
+    if (!event.creator) return 'XX';
+    return `${event.creator.firstName[0]}${event.creator.lastName1[0]}`.toUpperCase();
+  };
+
+  const getTeacherName = () => {
+    if (!event.creator) return 'Sin asignar';
+    return `${event.creator.firstName} ${event.creator.lastName1}`;
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-base-black/50 backdrop-blur-sm">
-      <div className="relative w-full max-w-2xl mx-4 bg-bg-primary rounded-2xl shadow-2xl max-h-[90vh] overflow-y-auto">
-        <div className="sticky top-0 z-10 flex items-center justify-between p-6 bg-bg-primary border-b border-stroke-primary">
-          <h2 className="text-2xl font-semibold text-text-primary">Detalle del Evento</h2>
-          <button
-            onClick={onClose}
-            className="p-2 rounded-lg hover:bg-bg-secondary transition-colors"
-            aria-label="Cerrar"
-          >
-            <MdClose className="w-6 h-6 text-icon-primary" />
-          </button>
-        </div>
+    <div
+      ref={tooltipRef}
+      className="fixed z-50 w-96 bg-bg-primary rounded-2xl shadow-[2px_4px_4px_0px_rgba(0,0,0,0.05)] border border-stroke-primary"
+      style={{
+        top: `${position.top}px`,
+        left: `${position.left}px`,
+      }}
+    >
+      {/* Header con botón cerrar */}
+      <div className="self-stretch px-2 pt-3 pb-2 flex justify-end items-center gap-4">
+        <button
+          onClick={onClose}
+          className="p-1 rounded-full flex justify-center items-center gap-1 hover:bg-bg-secondary transition-colors"
+        >
+          <MdClose className="w-5 h-5 text-icon-tertiary" />
+        </button>
+      </div>
 
-        <div className="p-6 space-y-6">
-          <div className="flex items-start justify-between gap-4">
-            <div className="flex-1">
-              <div className="flex items-center gap-2 mb-2">
-                <span className="px-2 py-0.5 text-xs font-medium text-text-accent-primary bg-accent-light rounded">
-                  Clase {event.sessionNumber}
-                </span>
-                <span className="text-xs text-text-tertiary">•</span>
-                <span className="text-xs font-medium text-text-tertiary">{event.courseCode}</span>
-              </div>
-              <h3 className="text-xl font-semibold text-text-primary mb-1">{event.title}</h3>
-              <p className="text-base text-text-secondary">{event.courseName}</p>
-            </div>
-            {getStatusBadge()}
+      {/* Contenido principal */}
+      <div className="self-stretch px-6 pb-6 flex flex-col justify-start items-start gap-3">
+        {/* Color + Info del curso */}
+        <div className="self-stretch p-0.5 flex justify-start items-start gap-2.5">
+          {/* Cuadrado de color */}
+          <div className="py-0.5 flex justify-start items-center gap-2.5">
+            <div
+              className="w-4 h-4 rounded"
+              style={{ backgroundColor: colors.primary }}
+            />
           </div>
 
-          <div className="p-4 bg-bg-secondary rounded-xl space-y-3">
-            <div className="flex items-start gap-3">
-              <MdSchedule className="w-5 h-5 text-icon-accent-primary mt-0.5" />
-              <div>
-                <p className="text-sm font-medium text-text-primary">Horario</p>
-                <p className="text-sm text-text-secondary">{formatTimeRange()}</p>
-                <p className="text-xs text-text-tertiary mt-1">{formatDateTime(event.startDatetime)}</p>
-              </div>
-            </div>
-
-            {event.topic && (
-              <div className="pt-3 border-t border-stroke-primary">
-                <p className="text-sm font-medium text-text-primary mb-1">Tema</p>
-                <p className="text-sm text-text-secondary">{event.topic}</p>
-              </div>
-            )}
-          </div>
-
-          {event.creator && (
-            <div className="space-y-3">
-              <h4 className="text-sm font-semibold text-text-primary">Creado por</h4>
-              <div className="flex items-center gap-3">
-                {event.creator.profilePhotoUrl ? (
-                  <img
-                    src={event.creator.profilePhotoUrl}
-                    alt={`${event.creator.firstName} ${event.creator.lastName1}`}
-                    className="w-10 h-10 rounded-full object-cover"
-                  />
-                ) : (
-                  <div className="w-10 h-10 rounded-full bg-accent-light flex items-center justify-center">
-                    <MdPerson className="w-6 h-6 text-icon-accent-primary" />
-                  </div>
-                )}
-                <div>
-                  <p className="text-sm font-medium text-text-primary">
-                    {event.creator.firstName} {event.creator.lastName1}
-                  </p>
-                  <p className="text-xs text-text-tertiary">Profesor</p>
+          {/* Título y detalles */}
+          <div className="flex-1 flex flex-col justify-start items-start gap-1">
+            {/* Clase # - Título */}
+            <div className="self-stretch flex justify-start items-start gap-0.5">
+              <div className="flex justify-start items-center">
+                <div className="text-text-primary text-base font-normal font-['Poppins'] leading-5 line-clamp-1">
+                  {event.sessionNumber}° Clase - {event.title}
                 </div>
               </div>
             </div>
-          )}
 
-          {event.professors && event.professors.length > 0 && (
-            <div className="space-y-3">
-              <h4 className="text-sm font-semibold text-text-primary">Profesores invitados</h4>
-              <div className="flex flex-wrap gap-2">
-                {event.professors.map((professor) => (
-                  <div key={professor.id} className="flex items-center gap-2 px-3 py-2 bg-bg-secondary rounded-lg">
-                    {professor.profilePhotoUrl ? (
-                      <img
-                        src={professor.profilePhotoUrl}
-                        alt={`${professor.firstName} ${professor.lastName1}`}
-                        className="w-8 h-8 rounded-full object-cover"
-                      />
-                    ) : (
-                      <div className="w-8 h-8 rounded-full bg-accent-light flex items-center justify-center">
-                        <MdPerson className="w-5 h-5 text-icon-accent-primary" />
-                      </div>
-                    )}
-                    <span className="text-sm text-text-primary">
-                      {professor.firstName} {professor.lastName1}
-                    </span>
-                  </div>
-                ))}
+            {/* Nombre del curso */}
+            <div className="self-stretch flex justify-start items-center">
+              <div className="flex-1 text-text-primary text-xl font-medium font-['Poppins'] leading-6 line-clamp-3">
+                {event.courseName}
+              </div>
+            </div>
+
+            {/* Fecha y hora */}
+            <div className="self-stretch flex justify-start items-start gap-1.5">
+              <div className="flex justify-start items-center gap-0.5">
+                <div className="text-text-secondary text-sm font-normal font-['Poppins'] leading-4">
+                  {formatDate()}
+                </div>
+              </div>
+              <div className="text-text-secondary text-sm font-normal font-['Poppins'] leading-4">
+                •
+              </div>
+              <div className="flex-1 flex justify-start items-center gap-0.5">
+                <div className="text-text-secondary text-sm font-normal font-['Poppins'] leading-4">
+                  {formatTime()}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Asesor */}
+        <div className="self-stretch flex justify-start items-center gap-2">
+          {/* Avatar */}
+          {event.creator?.profilePhotoUrl ? (
+            <img
+              src={event.creator.profilePhotoUrl}
+              alt={getTeacherName()}
+              className="w-5 h-5 rounded-full object-cover"
+            />
+          ) : (
+            <div
+              className="w-5 h-5 p-1 rounded-full flex justify-center items-center gap-2"
+              style={{ backgroundColor: colors.primary }}
+            >
+              <div className="text-text-white text-[8px] font-medium font-['Poppins'] leading-[10px]">
+                {getTeacherInitials()}
               </div>
             </div>
           )}
 
-          {error && (
-            <div className="p-4 bg-error-light rounded-lg">
-              <p className="text-sm text-text-error-primary">{error}</p>
+          {/* Nombre */}
+          <div className="flex-1 flex justify-start items-start gap-1">
+            <div className="text-text-secondary text-sm font-medium font-['Poppins'] leading-4">
+              Asesor:
             </div>
-          )}
-
-          {copySuccess && (
-            <div className="p-4 bg-success-light rounded-lg flex items-center gap-2">
-              <MdCheckCircle className="w-5 h-5 text-success-primary" />
-              <p className="text-sm text-success-primary">Link copiado al portapapeles</p>
+            <div className="flex-1 text-text-secondary text-sm font-normal font-['Poppins'] leading-4 line-clamp-1">
+              {getTeacherName()}
             </div>
-          )}
-
-          <div className="flex gap-3 pt-4">
-            {event.canJoinLive && !event.isCancelled && (
-              <button
-                onClick={handleJoinMeeting}
-                className="flex-1 flex items-center justify-center gap-2 px-6 py-3 bg-accent-solid text-text-white rounded-lg font-medium hover:bg-accent-solid-hover transition-colors"
-              >
-                <MdVideocam className="w-5 h-5" />
-                Unirse a la reunión
-              </button>
-            )}
-            {event.canCopyLiveLink && !event.isCancelled && (
-              <button
-                onClick={handleCopyLink}
-                className="flex-1 flex items-center justify-center gap-2 px-6 py-3 bg-bg-secondary text-text-accent-primary rounded-lg font-medium hover:bg-bg-secondary-hover border border-stroke-accent-primary transition-colors"
-              >
-                <MdContentCopy className="w-5 h-5" />
-                Copiar link
-              </button>
-            )}
           </div>
+        </div>
+
+        {/* Topic y Link */}
+        <div className="self-stretch flex flex-col justify-start items-start gap-1">
+          {/* Topic */}
+          {event.topic && (
+            <div className="self-stretch p-0.5 flex justify-start items-start gap-2.5">
+              <MdCalendarToday className="w-4 h-4 text-icon-secondary" />
+              <div className="flex-1 text-text-primary text-base font-normal font-['Poppins'] leading-4">
+                {event.topic}
+              </div>
+            </div>
+          )}
+
+          {/* Link de reunión */}
+          {event.liveMeetingUrl && event.canCopyLiveLink && (
+            <div className="self-stretch p-0.5 flex justify-start items-center gap-2.5 overflow-hidden">
+              <MdLink className="w-4 h-4 text-icon-secondary flex-shrink-0" />
+              <div className="flex-1 flex justify-start items-center overflow-hidden">
+                <a
+                  href={event.liveMeetingUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex-1 text-text-primary text-base font-normal font-['Poppins'] leading-4 line-clamp-1 hover:text-text-accent-primary transition-colors"
+                >
+                  {event.liveMeetingUrl}
+                </a>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>
