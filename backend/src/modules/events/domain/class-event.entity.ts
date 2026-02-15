@@ -9,6 +9,7 @@ import {
 import { Evaluation } from '@modules/evaluations/domain/evaluation.entity';
 import { User } from '@modules/users/domain/user.entity';
 import { ClassEventProfessor } from '@modules/events/domain/class-event-professor.entity';
+import { ClassEventRecordingStatus } from '@modules/events/domain/class-event-recording-status.entity';
 
 @Entity('class_event')
 export class ClassEvent {
@@ -33,8 +34,19 @@ export class ClassEvent {
   @Column({ name: 'end_datetime', type: 'datetime' })
   endDatetime: Date;
 
-  @Column({ name: 'meeting_link', type: 'varchar', length: 500 })
-  meetingLink: string;
+  @Column({ name: 'live_meeting_url', type: 'varchar', length: 500 })
+  liveMeetingUrl: string;
+
+  @Column({
+    name: 'recording_url',
+    type: 'varchar',
+    length: 500,
+    nullable: true,
+  })
+  recordingUrl: string | null;
+
+  @Column({ name: 'recording_status_id', type: 'bigint' })
+  recordingStatusId: string;
 
   @Column({ name: 'is_cancelled', type: 'boolean', default: false })
   isCancelled: boolean;
@@ -55,6 +67,10 @@ export class ClassEvent {
   @ManyToOne(() => User)
   @JoinColumn({ name: 'created_by' })
   creator: User;
+
+  @ManyToOne(() => ClassEventRecordingStatus)
+  @JoinColumn({ name: 'recording_status_id' })
+  recordingStatus: ClassEventRecordingStatus;
 
   @OneToMany(() => ClassEventProfessor, (cep) => cep.classEvent)
   professors: ClassEventProfessor[];

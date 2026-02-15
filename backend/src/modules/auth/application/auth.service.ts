@@ -126,7 +126,7 @@ export class AuthService {
     const payload = this.tokenService.verifyRefreshToken(refreshToken);
 
     if (payload.deviceId !== deviceId) {
-      throw new UnauthorizedException('Dispositivo no autorizado');
+      throw new UnauthorizedException(SECURITY_MESSAGES.UNAUTHORIZED_DEVICE);
     }
 
     const oldTokenHash = createHash('sha256')
@@ -136,7 +136,7 @@ export class AuthService {
       `blacklist:refresh:${oldTokenHash}`,
     );
     if (isBlacklisted) {
-      throw new UnauthorizedException('Token revocado');
+      throw new UnauthorizedException(SECURITY_MESSAGES.REVOKED_TOKEN);
     }
 
     const user = await this.usersService.findOne(payload.sub);
@@ -157,11 +157,13 @@ export class AuthService {
           );
 
         if (!lockedSession || lockedSession.userId !== payload.sub) {
-          throw new UnauthorizedException('Sesión inválida o expirada');
+          throw new UnauthorizedException(SECURITY_MESSAGES.INVALID_SESSION);
         }
 
         if (lockedSession.deviceId !== deviceId) {
-          throw new UnauthorizedException('Dispositivo no autorizado');
+          throw new UnauthorizedException(
+            SECURITY_MESSAGES.UNAUTHORIZED_DEVICE,
+          );
         }
 
         const activeStatusId = await this.sessionStatusService.getIdByCode(
@@ -172,7 +174,7 @@ export class AuthService {
           !lockedSession.isActive ||
           lockedSession.sessionStatusId !== activeStatusId
         ) {
-          throw new UnauthorizedException('Sesión inválida o expirada');
+          throw new UnauthorizedException(SECURITY_MESSAGES.INVALID_SESSION);
         }
 
         if (lockedSession.expiresAt < new Date()) {
@@ -180,7 +182,7 @@ export class AuthService {
             lockedSession.id,
             manager,
           );
-          throw new UnauthorizedException('Sesión inválida o expirada');
+          throw new UnauthorizedException(SECURITY_MESSAGES.INVALID_SESSION);
         }
 
         const { token, expiresAt, refreshTokenJti } =
@@ -330,7 +332,7 @@ export class AuthService {
   }> {
     const payload = this.tokenService.verifyRefreshToken(refreshToken);
     if (payload.deviceId !== deviceId) {
-      throw new UnauthorizedException('Dispositivo no autorizado');
+      throw new UnauthorizedException(SECURITY_MESSAGES.UNAUTHORIZED_DEVICE);
     }
 
     const { keptSessionId } =
@@ -398,7 +400,7 @@ export class AuthService {
   ): Promise<{ accessToken: string; refreshToken: string; expiresIn: number }> {
     const payload = this.tokenService.verifyRefreshToken(refreshToken);
     if (payload.deviceId !== deviceId) {
-      throw new UnauthorizedException('Dispositivo no autorizado');
+      throw new UnauthorizedException(SECURITY_MESSAGES.UNAUTHORIZED_DEVICE);
     }
 
     const session = await this.sessionService.findSessionByRefreshToken(
@@ -409,14 +411,14 @@ export class AuthService {
       session.userId !== payload.sub ||
       session.deviceId !== deviceId
     ) {
-      throw new UnauthorizedException('Sesión inválida o expirada');
+      throw new UnauthorizedException(SECURITY_MESSAGES.INVALID_SESSION);
     }
 
     const blockedStatusId = await this.sessionStatusService.getIdByCode(
       SESSION_STATUS_CODES.BLOCKED_PENDING_REAUTH,
     );
     if (session.sessionStatusId !== blockedStatusId) {
-      throw new UnauthorizedException('Sesión inválida o expirada');
+      throw new UnauthorizedException(SECURITY_MESSAGES.INVALID_SESSION);
     }
 
     const user = await this.usersService.findOne(payload.sub);
@@ -500,7 +502,7 @@ export class AuthService {
         lockedSession.userId !== payload.sub ||
         lockedSession.deviceId !== deviceId
       ) {
-        throw new UnauthorizedException('Sesión inválida o expirada');
+        throw new UnauthorizedException(SECURITY_MESSAGES.INVALID_SESSION);
       }
 
       const blockedStatusIdInTx = await this.sessionStatusService.getIdByCode(
@@ -508,7 +510,7 @@ export class AuthService {
         manager,
       );
       if (lockedSession.sessionStatusId !== blockedStatusIdInTx) {
-        throw new UnauthorizedException('Sesión inválida o expirada');
+        throw new UnauthorizedException(SECURITY_MESSAGES.INVALID_SESSION);
       }
 
       await this.sessionService.activateBlockedSession(

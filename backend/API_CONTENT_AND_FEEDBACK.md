@@ -19,27 +19,27 @@ Esta API gestiona el núcleo de la experiencia académica: cursos, materiales ed
     }
     ```
 
+### Convencion de IDs en ejemplos
+Los IDs mostrados en ejemplos (`"123"`, `"pc1-id"`, `"courseCycleId"`) son referenciales.
+No son valores literales para copiar/pegar.
+
+Flujo esperado para frontend:
+
+1. Consultar primero recursos base para obtener IDs reales.
+2. Reutilizar esos IDs en operaciones de escritura.
+3. Validar que cada `...Id` pertenezca al contexto correcto (curso/ciclo/evaluacion).
+
 ---
 
 ## 📅 ÉPICA: CALENDARIO Y CLASES EN VIVO (`/class-events`)
 
-Gestión de sesiones sincrónicas (Zoom/Google Meet) vinculadas a evaluaciones. Incluye lógica de acceso dinámico según el rol y estado de la clase.
+Gestión de sesiones sincrónicas vinculadas a evaluaciones. Incluye lógica de acceso dinámico diferenciando entre clase en vivo y grabaciones.
 
 ### 1. Calendario Unificado (Mi Horario)
-Obtiene todas las sesiones programadas para el usuario (alumno o profesor) dentro de un rango de fechas específico. Diseñado para manejar la navegación por semanas o meses mediante flechas.
+Obtiene todas las sesiones programadas para el usuario (alumno o profesor) dentro de un rango de fechas específico.
 *   **Endpoint:** `GET /class-events/my-schedule`
-*   **Query Params (Obligatorios para navegación):**
-    *   `start`: Fecha de inicio del rango (ISO-8601, ej: `2026-02-01`).
-    *   `end`: Fecha de fin del rango (ISO-8601, ej: `2026-02-07`).
-*   **Casos de Uso (Paginación):**
-    *   **Gadget Semanal:** El frontend debe calcular el domingo inicial y sábado final de la semana que desea mostrar y enviarlos como `start` y `end`.
-    *   **Calendario Mensual:** El frontend envía el primer y último día del mes.
+*   **Query Params (Obligatorios):** `start` (ISO), `end` (ISO).
 *   **Roles:** `STUDENT`, `PROFESSOR`, `ADMIN`, `SUPER_ADMIN`
-*   **Caché:** 30 minutos (basado en el rango de fechas). Si el usuario regresa a una semana/mes anterior, la respuesta será instantánea.
-*   **Lógica de Negocio:**
-    *   **Alumnos:** Trae eventos de todos sus cursos con matrícula activa y no cancelada.
-    *   **Profesores:** Trae eventos donde el usuario es el creador o ha sido invitado como profesor.
-    *   **Bypass:** El staff (Admin/Profesor) tiene `canJoinMeeting: true` siempre para sus propios eventos.
 *   **Data (Response):** 
     ```json
     [
@@ -50,67 +50,33 @@ Obtiene todas las sesiones programadas para el usuario (alumno o profesor) dentr
         "topic": string,
         "startDatetime": "ISO-8601",
         "endDatetime": "ISO-8601",
-        "meetingLink": string, // URL de Zoom/Meet. Enmascarada si canJoinMeeting es false.
+        "liveMeetingUrl": string | null, // URL de Zoom/Meet. Enmascarada si canJoinLive es false.
+        "recordingUrl": string | null,   // URL de grabación. Enmascarada si canWatchRecording es false.
+        "recordingStatus": "NOT_AVAILABLE" | "PROCESSING" | "READY" | "FAILED",
         "isCancelled": boolean,
         "status": "PROGRAMADA" | "EN_CURSO" | "FINALIZADA" | "CANCELADA",
-        "canJoinMeeting": boolean, // true si la clase está activa y el usuario tiene acceso
-        "canCopyLink": boolean,    // true si el usuario puede copiar el link
-        "courseName": string,      // e.g. "Física I"
-        "courseCode": string,      // e.g. "FIS101"
-        "creator": {
-          "id": string,
-          "firstName": string,
-          "lastName1": string,
-          "profilePhotoUrl": string | null
-        },
-        "professors": [
-          {
-            "id": string,
-            "firstName": string,
-            "lastName1": string,
-            "profilePhotoUrl": string | null
-          }
-        ],
-        "createdAt": "ISO-8601",
-        "updatedAt": "ISO-8601" | null
+        "canJoinLive": boolean,       // true si la clase está activa y el usuario tiene acceso
+        "canWatchRecording": boolean, // true si hay grabación disponible y el usuario tiene acceso
+        "canCopyLiveLink": boolean,   // true si el usuario puede copiar el link de vivo
+        "canCopyRecordingLink": boolean, // true si puede copiar el link de grabacion
+        "courseName": string,
+        "courseCode": string,
+        "creator": { "id": string, "firstName": string, "lastName1": string, "profilePhotoUrl": string | null },
+        "professors": [ { "id": string, "firstName": string, "lastName1": string, "profilePhotoUrl": string | null } ]
       }
     ]
     ```
 
 ### 2. Listar Eventos de una Evaluación
-Obtiene todas las sesiones programadas para un examen o unidad específica.
 *   **Endpoint:** `GET /class-events/evaluation/:evaluationId`
 *   **Roles:** `STUDENT`, `PROFESSOR`, `ADMIN`, `SUPER_ADMIN`
-*   **Lógica de Acceso:** 
-    *   Staff: Acceso total.
-    *   Alumnos: Requiere matrícula activa en la evaluación.
 *   **Data (Response):** `[ { ...ClassEventResponseDto } ]` (Ver estructura arriba).
 
 ### 3. Detalle de un Evento
 *   **Endpoint:** `GET /class-events/:id`
-*   **Roles:** `STUDENT`, `PROFESSOR`, `ADMIN`, `SUPER_ADMIN`
-*   **Data (Response):**
-    ```json
-    {
-      "id": string,
-      "sessionNumber": number,
-      "title": string,
-      "topic": string,
-      "startDatetime": "ISO-8601",
-      "endDatetime": "ISO-8601",
-      "meetingLink": string, // Enmascarado si canJoinMeeting es false
-      "isCancelled": boolean,
-      "status": "PROGRAMADA" | "EN_CURSO" | "FINALIZADA" | "CANCELADA",
-      "canJoinMeeting": boolean, // true si la clase es hoy/ahora y tienes permiso
-      "canCopyLink": boolean,
-      "courseName": string,
-      "courseCode": string,
-      "creator": { "id": string, "firstName": string, "lastName1": string, "profilePhotoUrl": string | null },
-      "professors": [ { "id": string, "firstName": string, "lastName1": string, "profilePhotoUrl": string | null } ]
-    }
-    ```
+*   **Data (Response):** Mismo objeto que en Calendario Unificado.
 
-### 3. Crear Nuevo Evento (Docente/Admin)
+### 4. Crear Nuevo Evento (Docente/Admin)
 *   **Endpoint:** `POST /class-events`
 *   **Roles:** `PROFESSOR`, `ADMIN`, `SUPER_ADMIN`
 *   **Request Body:**
@@ -122,14 +88,14 @@ Obtiene todas las sesiones programadas para un examen o unidad específica.
       "topic": string,
       "startDatetime": "ISO-8601",
       "endDatetime": "ISO-8601",
-      "meetingLink": string // URL válida de Zoom/Meet/Teams
+      "liveMeetingUrl": string // URL válida de Zoom/Meet/Teams
     }
     ```
 
-### 4. Actualizar / Cancelar Evento
+### 5. Actualizar / Cancelar Evento
 *   **Patch:** `PATCH /class-events/:id` (Actualiza campos opcionales).
+    *   **Fields:** `title`, `topic`, `startDatetime`, `endDatetime`, `liveMeetingUrl`, `recordingUrl`.
 *   **Cancel:** `DELETE /class-events/:id/cancel` (Marca como cancelada).
-*   **Roles:** `PROFESSOR` (solo si es el creador), `ADMIN`, `SUPER_ADMIN`.
 
 ### 5. Gestión de Profesores Invitados (Admin)
 Permite que otros profesores también sean anfitriones del evento.
@@ -139,75 +105,70 @@ Permite que otros profesores también sean anfitriones del evento.
 
 ---
 
-## 📚 ÉPICA: CURSOS Y NAVEGACIÓN ACADÉMICA (`/courses`, `/enrollments`)
+## 📅 ÉPICA: GESTIÓN ACADÉMICA CORE (`/cycles`, `/courses`)
 
-### 1. Dashboard: Mis Cursos Matriculados
+### 1. Ciclos Académicos (`/cycles`)
+*   **GET /api/v1/cycles**: Listar todos los ciclos. (Roles: `ADMIN`, `SUPER_ADMIN`).
+*   **GET /api/v1/cycles/active**: Obtener el ciclo activo actual. (Roles: Público/Auth).
+*   **GET /api/v1/cycles/:id**: Detalle de un ciclo. (Roles: `ADMIN`).
+*   **Data (Response):**
+    ```json
+    {
+      "id": "string",
+      "code": "2026-1",
+      "startDate": "2026-01-01T00:00:00Z",
+      "endDate": "2026-06-30T23:59:59Z"
+    }
+    ```
+
+### 2. Cursos y Materias (`/courses`)
+
+#### Dashboard: Mis Cursos Matriculados
 Obtiene el listado de cursos donde el alumno tiene una matrícula activa.
 *   **Endpoint:** `GET /enrollments/my-courses`
 *   **Roles:** `STUDENT`, `PROFESSOR`, `ADMIN`, `SUPER_ADMIN`
 *   **Caché:** 1 hora.
-*   **Data (Response):**
-    ```json
-    [
-      {
-        "id": string, // ID de la matrícula
-        "enrolledAt": string, // Fecha ISO
-        "courseCycle": {
-          "id": string, // ID para usar en detalle de curso
-          "course": {
-            "id": string,
-            "code": string,
-            "name": string,
-            "courseType": { "code": string, "name": string }, // e.g. CIENCIAS
-            "cycleLevel": { "name": string } // e.g. Ciclo 1
-          },
-          "academicCycle": {
-            "id": string,
-            "code": string, // e.g. 2026-1
-            "isCurrent": boolean
-          },
-          "professors": [
-            {
-              "id": string,
-              "firstName": string,
-              "lastName1": string,
-              "profilePhotoUrl": string | null
-            }
-          ]
-        }
-      }
-    ]
-    ```
+*   **Data (Response):** (Ver estructura actual en Dashboard Alumno)
 
-### 2. Detalle de Curso: Estructura y Estados de Acceso
-Obtiene todas las evaluaciones del curso y calcula dinámicamente si el usuario puede entrar.
+#### Detalle de Curso: Estructura y Estados de Acceso
 *   **Endpoint:** `GET /courses/cycle/:courseCycleId/content`
-*   **Roles:** `STUDENT`, `PROFESSOR`, `ADMIN`
-*   **Data (Response):**
+*   **Roles:** `STUDENT`, `PROFESSOR`, `ADMIN` (Ver estructura actual)
+
+#### Operaciones Administrativas (Admin/SuperAdmin)
+*   **POST /courses**: Crear materia base.
+    *   `body: { "code": "string", "name": "string", "courseTypeId": "ID", "cycleLevelId": "ID" }`
+*   **POST /courses/assign-cycle**: Aperturar materia en un ciclo (Crea CourseCycle).
+    *   `body: { "courseId": "ID", "academicCycleId": "ID" }`
+*   **POST /courses/cycle/:id/professors**: Asignar profesor a la plana del curso.
+    *   `body: { "professorUserId": "ID" }`
+*   **DELETE /courses/cycle/:id/professors/:professorUserId**: Remover profesor del curso.
+
+---
+
+## 📝 ÉPICA: EVALUACIONES ACADÉMICAS (`/evaluations`)
+
+Gestión de los hitos evaluativos (PC, EX, etc.) a los que se vinculan las sesiones y materiales.
+
+### 1. Crear Evaluación (Admin)
+Define una nueva evaluación dentro de un curso/ciclo.
+*   **Endpoint:** `POST /evaluations`
+*   **Roles:** `ADMIN`, `SUPER_ADMIN`
+*   **Request Body:**
     ```json
     {
-      "courseCycleId": string,
-      "courseName": string,
-      "courseCode": string,
-      "cycleCode": string,
-      "isCurrentCycle": boolean,
-      "evaluations": [
-        {
-          "id": string,
-          "name": string,
-          "evaluationType": string, // e.g. "PRÁCTICA CALIFICADA"
-          "startDate": string,
-          "endDate": string,
-          "userStatus": {
-            "status": "LOCKED" | "UPCOMING" | "IN_PROGRESS" | "COMPLETED",
-            "hasAccess": boolean, // true si pagó por esta evaluación
-            "accessStart": string | null,
-            "accessEnd": string | null
-          }
-        }
-      ]
+      "courseCycleId": "string",
+      "evaluationTypeId": "string (ID obtenido de /courses/types)",
+      "number": number, // e.g. 1 para PC1
+      "startDate": "ISO-8601",
+      "endDate": "ISO-8601"
     }
     ```
+*   **Automatización:** Al crearla, todos los alumnos con matrícula `FULL` reciben acceso automáticamente.
+
+### 2. Listar Evaluaciones de un Curso
+*   **Endpoint:** `GET /evaluations/course-cycle/:courseCycleId`
+*   **Roles:** `ADMIN`, `SUPER_ADMIN`
+*   **Data (Response):** Array de evaluaciones con su tipo y fechas.
 
 ---
 
@@ -218,6 +179,7 @@ Permite navegar la jerarquía de una evaluación. Requiere matrícula en la eval
 *   **Endpoints:**
     *   `GET /materials/folders/evaluation/:evaluationId` (Carpetas raíz)
     *   `GET /materials/folders/:folderId` (Contenido de una carpeta)
+*   **GET /materials/class-event/:classEventId**: Obtiene materiales vinculados a una sesión específica.
 *   **Roles:** `STUDENT`, `PROFESSOR`, `ADMIN`
 *   **Data (Response de Contenido):**
     ```json
@@ -228,7 +190,8 @@ Permite navegar la jerarquía de una evaluación. Requiere matrícula en la eval
           "id": string,
           "displayName": string,
           "fileVersionId": string,
-          "createdAt": string
+          "createdAt": string,
+          "classEventId": string | null
         }
       ]
     }
@@ -244,7 +207,7 @@ Permite navegar la jerarquía de una evaluación. Requiere matrícula en la eval
     *   `body: { evaluationId: string, parentFolderId?: string, name: string, visibleFrom?: string }`
 *   **POST /materials:** Subir archivo nuevo.
     *   `Content-Type: multipart/form-data`
-    *   `body: { file: Buffer, materialFolderId: string, displayName: string }`
+    *   `body: { file: Buffer, materialFolderId: string, displayName: string, classEventId?: string }`
 *   **POST /materials/:id/versions:** Actualizar versión de archivo existente.
     *   `body: { file: Buffer }`
 *   **POST /materials/request-deletion:** Flujo seguro de borrado.

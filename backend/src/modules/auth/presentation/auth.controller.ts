@@ -23,6 +23,7 @@ import { CurrentUser } from '@common/decorators/current-user.decorator';
 import type { UserWithSession } from '@modules/auth/strategies/jwt.strategy';
 import { RequestMetadata } from '@modules/auth/interfaces/request-metadata.interface';
 import { technicalSettings } from '@config/technical-settings';
+import { normalizeIpAddress } from '@common/utils/ip.util';
 
 @Controller('auth')
 export class AuthController {
@@ -181,12 +182,10 @@ export class AuthController {
     request: express.Request,
     deviceId: string,
   ): RequestMetadata {
-    const ipAddress =
-      (request.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() ||
-      request.socket.remoteAddress ||
-      '0.0.0.0';
-
-    const userAgent = request.headers['user-agent'] || 'Desconocido';
+    const ipAddress = normalizeIpAddress(request.ip);
+    const userAgentHeader = request.headers['user-agent'];
+    const userAgent =
+      typeof userAgentHeader === 'string' ? userAgentHeader : 'Desconocido';
 
     return {
       ipAddress,

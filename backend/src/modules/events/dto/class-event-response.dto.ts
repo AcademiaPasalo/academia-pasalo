@@ -1,5 +1,8 @@
 import { ClassEvent } from '@modules/events/domain/class-event.entity';
-import { ClassEventStatus } from '@modules/events/application/class-events.service';
+import {
+  ClassEventAccess,
+  ClassEventStatus,
+} from '@modules/events/domain/class-event.constants';
 
 export class ClassEventResponseDto {
   id: string;
@@ -8,11 +11,14 @@ export class ClassEventResponseDto {
   topic: string;
   startDatetime: Date;
   endDatetime: Date;
-  meetingLink: string;
+  liveMeetingUrl: string | null;
+  recordingUrl: string | null;
   isCancelled: boolean;
   status: ClassEventStatus;
-  canJoinMeeting: boolean;
-  canCopyLink: boolean;
+  canJoinLive: boolean;
+  canWatchRecording: boolean;
+  canCopyLiveLink: boolean;
+  canCopyRecordingLink: boolean;
   courseName: string;
   courseCode: string;
   creator: {
@@ -35,7 +41,7 @@ export class ClassEventResponseDto {
   static fromEntity(
     event: ClassEvent,
     status: ClassEventStatus,
-    canAccess: boolean,
+    access: ClassEventAccess,
   ): ClassEventResponseDto {
     return {
       id: event.id,
@@ -44,11 +50,14 @@ export class ClassEventResponseDto {
       topic: event.topic,
       startDatetime: event.startDatetime,
       endDatetime: event.endDatetime,
-      meetingLink: event.meetingLink,
+      liveMeetingUrl: access.canJoinLive ? event.liveMeetingUrl : null,
+      recordingUrl: access.canWatchRecording ? event.recordingUrl : null,
       isCancelled: event.isCancelled,
       status,
-      canJoinMeeting: canAccess,
-      canCopyLink: canAccess,
+      canJoinLive: access.canJoinLive,
+      canWatchRecording: access.canWatchRecording,
+      canCopyLiveLink: access.canCopyLiveLink,
+      canCopyRecordingLink: access.canCopyRecordingLink,
       courseName: event.evaluation?.courseCycle?.course?.name || '',
       courseCode: event.evaluation?.courseCycle?.course?.code || '',
       creator: {

@@ -1,25 +1,25 @@
 import { NestFactory, HttpAdapterHost, Reflector } from '@nestjs/core';
 import { ValidationPipe, Logger } from '@nestjs/common';
+import { NestExpressApplication } from '@nestjs/platform-express';
 import { ConfigService } from '@nestjs/config';
 import { AppModule } from './app.module';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 import { TransformInterceptor } from './common/interceptors/transform.interceptor';
+import { technicalSettings } from './config/technical-settings';
 
 async function bootstrap() {
   const logger = new Logger('Bootstrap');
   try {
-    const app = await NestFactory.create(AppModule);
+    const app = await NestFactory.create<NestExpressApplication>(AppModule);
     const configService = app.get(ConfigService);
     const httpAdapter = app.get(HttpAdapterHost);
     const reflector = app.get(Reflector);
+    app.set('trust proxy', 1);
 
     const corsOrigins = configService
       .get<string>('CORS_ORIGINS')
       ?.split(',')
-      .map((o) => o.trim()) ?? [
-      'http://localhost:3000',
-      'http://127.0.0.1:3000',
-    ];
+      .map((o) => o.trim()) ?? [...technicalSettings.http.defaultCorsOrigins];
 
     if (corsOrigins.length === 0) {
       throw new Error(
@@ -29,10 +29,10 @@ async function bootstrap() {
 
     app.enableCors({
       origin: corsOrigins,
-      methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE', 'OPTIONS'],
-      allowedHeaders: ['Content-Type', 'Authorization'],
+      methods: [...technicalSettings.http.corsAllowedMethods],
+      allowedHeaders: [...technicalSettings.http.corsAllowedHeaders],
       credentials: true,
-      optionsSuccessStatus: 204,
+      optionsSuccessStatus: technicalSettings.http.corsOptionsSuccessStatus,
     });
 
     const apiPrefix = configService.get<string>('API_PREFIX') || 'api/v1';

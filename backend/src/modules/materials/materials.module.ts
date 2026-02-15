@@ -24,6 +24,7 @@ import { MaterialCatalogRepository } from './infrastructure/material-catalog.rep
 import { StorageModule } from '@infrastructure/storage/storage.module';
 import { EnrollmentsModule } from '@modules/enrollments/enrollments.module';
 import { UsersModule } from '@modules/users/users.module';
+import { ClassEventsModule } from '@modules/events/class-events.module';
 
 @Module({
   imports: [
@@ -40,6 +41,7 @@ import { UsersModule } from '@modules/users/users.module';
     StorageModule,
     EnrollmentsModule,
     UsersModule,
+    ClassEventsModule,
     AuditModule,
   ],
   controllers: [MaterialsController, MaterialsAdminController],

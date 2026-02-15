@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { EnrollmentEvaluationRepository } from '@modules/enrollments/infrastructure/enrollment-evaluation.repository';
 import { RedisCacheService } from '@infrastructure/cache/redis-cache.service';
 import { technicalSettings } from '@config/technical-settings';
+import { ENROLLMENT_CACHE_KEYS } from '@modules/enrollments/domain/enrollment.constants';
 
 @Injectable()
 export class AccessEngineService {
@@ -13,7 +14,7 @@ export class AccessEngineService {
   ) {}
 
   async hasAccess(userId: string, evaluationId: string): Promise<boolean> {
-    const cacheKey = `cache:access:user:${userId}:eval:${evaluationId}`;
+    const cacheKey = ENROLLMENT_CACHE_KEYS.ACCESS_CHECK(userId, evaluationId);
 
     const cachedAccess = await this.cacheService.get<boolean>(cacheKey);
     if (cachedAccess !== null) {

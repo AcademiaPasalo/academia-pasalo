@@ -33,7 +33,12 @@ export type SecurityEventCode =
   | 'ACCESS_DENIED'
   | 'PROFILE_SWITCH'
   | 'LOGOUT_SUCCESS'
+  | 'LOGIN_SUCCESS'
+  | 'LOGIN_FAILED'
+  | 'NEW_DEVICE_DETECTED'
+  | 'CONCURRENT_SESSION_DETECTED'
   | 'CONCURRENT_SESSION_RESOLVED'
+  | 'ANOMALOUS_LOGIN_DETECTED'
   | 'ANOMALOUS_LOGIN_REAUTH_FAILED'
   | 'ANOMALOUS_LOGIN_REAUTH_SUCCESS';
 
@@ -41,10 +46,34 @@ export const SECURITY_EVENT_CODES: Record<string, SecurityEventCode> = {
   ACCESS_DENIED: 'ACCESS_DENIED',
   PROFILE_SWITCH: 'PROFILE_SWITCH',
   LOGOUT_SUCCESS: 'LOGOUT_SUCCESS',
+  LOGIN_SUCCESS: 'LOGIN_SUCCESS',
+  LOGIN_FAILED: 'LOGIN_FAILED',
+  NEW_DEVICE_DETECTED: 'NEW_DEVICE_DETECTED',
+  CONCURRENT_SESSION_DETECTED: 'CONCURRENT_SESSION_DETECTED',
   CONCURRENT_SESSION_RESOLVED: 'CONCURRENT_SESSION_RESOLVED',
+  ANOMALOUS_LOGIN_DETECTED: 'ANOMALOUS_LOGIN_DETECTED',
   ANOMALOUS_LOGIN_REAUTH_FAILED: 'ANOMALOUS_LOGIN_REAUTH_FAILED',
   ANOMALOUS_LOGIN_REAUTH_SUCCESS: 'ANOMALOUS_LOGIN_REAUTH_SUCCESS',
 };
+
+export const LOCATION_SOURCES = {
+  IP: 'ip',
+  GPS: 'gps',
+  NONE: 'none',
+} as const;
+
+export type LocationSource =
+  (typeof LOCATION_SOURCES)[keyof typeof LOCATION_SOURCES];
+
+export const PHOTO_SOURCES = {
+  GOOGLE: 'google',
+  UPLOADED: 'uploaded',
+  PROFILE: 'profile',
+  NONE: 'none',
+} as const;
+
+export type PhotoSourceValue =
+  (typeof PHOTO_SOURCES)[keyof typeof PHOTO_SOURCES];
 
 export type IdentityDenyReason = 'INACTIVE_ACCOUNT';
 
@@ -84,4 +113,7 @@ export const SESSION_STATUS_CODES: Record<string, SessionStatusCodeValue> = {
 export const SECURITY_MESSAGES = {
   INACTIVE_ACCOUNT:
     'Tu cuenta se encuentra inactiva. Contacta a administracion.',
+  INVALID_SESSION: 'Sesión inválida o expirada',
+  REVOKED_TOKEN: 'Token revocado',
+  UNAUTHORIZED_DEVICE: 'Dispositivo no autorizado',
 } as const;

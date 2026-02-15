@@ -16,11 +16,20 @@ import { CourseCycle } from '@modules/courses/domain/course-cycle.entity';
 import { Evaluation } from '@modules/evaluations/domain/evaluation.entity';
 import { RedisCacheService } from '@infrastructure/cache/redis-cache.service';
 import { MyEnrollmentsResponseDto } from '@modules/enrollments/dto/my-enrollments-response.dto';
+import { technicalSettings } from '@config/technical-settings';
+import {
+  ENROLLMENT_CACHE_KEYS,
+  ENROLLMENT_STATUS_CODES,
+  ENROLLMENT_TYPE_CODES,
+} from '@modules/enrollments/domain/enrollment.constants';
+import { EVALUATION_TYPE_CODES } from '@modules/evaluations/domain/evaluation.constants';
+import { CLASS_EVENT_CACHE_KEYS } from '@modules/events/domain/class-event.constants';
 
 @Injectable()
 export class EnrollmentsService {
   private readonly logger = new Logger(EnrollmentsService.name);
-  private readonly DASHBOARD_CACHE_TTL = 3600;
+  private readonly DASHBOARD_CACHE_TTL =
+    technicalSettings.cache.enrollments.myEnrollmentsDashboardCacheTtlSeconds;
 
   constructor(
     private readonly dataSource: DataSource,
@@ -32,7 +41,7 @@ export class EnrollmentsService {
   ) {}
 
   async findMyEnrollments(userId: string): Promise<MyEnrollmentsResponseDto[]> {
-    const cacheKey = `cache:enrollment:user:${userId}:dashboard`;
+    const cacheKey = ENROLLMENT_CACHE_KEYS.DASHBOARD(userId);
 
     const cachedData =
       await this.cacheService.get<MyEnrollmentsResponseDto[]>(cacheKey);
@@ -118,7 +127,7 @@ export class EnrollmentsService {
       }
 
       if (
-        type.code === 'PARTIAL' &&
+        type.code === ENROLLMENT_TYPE_CODES.PARTIAL &&
         (!dto.evaluationIds || dto.evaluationIds.length === 0)
       ) {
         throw new BadRequestException(
@@ -127,7 +136,7 @@ export class EnrollmentsService {
       }
 
       const status = await this.enrollmentStatusRepository.findByCode(
-        'ACTIVE',
+        ENROLLMENT_STATUS_CODES.ACTIVE,
         manager,
       );
       if (!status) {
@@ -212,7 +221,7 @@ export class EnrollmentsService {
         let evaluationsToGrant: Evaluation[] = [];
         let bankAccessLimitDate: Date | null = null;
 
-        if (type.code === 'FULL') {
+        if (type.code === ENROLLMENT_TYPE_CODES.FULL) {
           evaluationsToGrant = allEvaluations;
         } else {
           const requestedIds = dto.evaluationIds || [];
@@ -220,7 +229,8 @@ export class EnrollmentsService {
             requestedIds.includes(e.id),
           );
           const bankEvaluation = allEvaluations.find(
-            (e) => e.evaluationType.code === 'BANCO_ENUNCIADOS',
+            (e) =>
+              e.evaluationType.code === EVALUATION_TYPE_CODES.BANCO_ENUNCIADOS,
           );
 
           if (academicEvaluations.length === 0) {
@@ -251,11 +261,12 @@ export class EnrollmentsService {
           const isHistorical = evaluation.courseCycleId !== dto.courseCycleId;
 
           if (
-            evaluation.evaluationType.code === 'BANCO_ENUNCIADOS' &&
+            evaluation.evaluationType.code ===
+              EVALUATION_TYPE_CODES.BANCO_ENUNCIADOS &&
             bankAccessLimitDate
           ) {
             accessEnd = bankAccessLimitDate;
-          } else if (type.code === 'FULL') {
+          } else if (type.code === ENROLLMENT_TYPE_CODES.FULL) {
             const cycleEnd = new Date(courseCycle.academicCycle.endDate);
             accessEnd = accessEnd > cycleEnd ? accessEnd : cycleEnd;
           } else if (isHistorical) {
@@ -289,22 +300,21 @@ export class EnrollmentsService {
         );
       }
 
-      await this.cacheService.del(
-        `cache:enrollment:user:${dto.userId}:dashboard`,
+      await this.cacheService.del(ENROLLMENT_CACHE_KEYS.DASHBOARD(dto.userId));
+      await this.cacheService.invalidateGroup(
+        ENROLLMENT_CACHE_KEYS.USER_ACCESS_GROUP(dto.userId),
       );
       await this.cacheService.invalidateGroup(
-        `cache:access:user:${dto.userId}:*`,
+        CLASS_EVENT_CACHE_KEYS.USER_SCHEDULE_GROUP(dto.userId),
       );
 
-      this.logger.log(
-        JSON.stringify({
-          message: 'Matrícula procesada exitosamente',
-          userId: dto.userId,
-          courseCycleId: dto.courseCycleId,
-          enrollmentId: enrollment.id,
-          timestamp: new Date().toISOString(),
-        }),
-      );
+      this.logger.log({
+        message: 'Matrícula procesada exitosamente',
+        userId: dto.userId,
+        courseCycleId: dto.courseCycleId,
+        enrollmentId: enrollment.id,
+        timestamp: new Date().toISOString(),
+      });
 
       return enrollment;
     });
@@ -321,19 +331,20 @@ export class EnrollmentsService {
     });
 
     await this.cacheService.del(
-      `cache:enrollment:user:${enrollment.userId}:dashboard`,
+      ENROLLMENT_CACHE_KEYS.DASHBOARD(enrollment.userId),
     );
     await this.cacheService.invalidateGroup(
-      `cache:access:user:${enrollment.userId}:*`,
+      ENROLLMENT_CACHE_KEYS.USER_ACCESS_GROUP(enrollment.userId),
+    );
+    await this.cacheService.invalidateGroup(
+      CLASS_EVENT_CACHE_KEYS.USER_SCHEDULE_GROUP(enrollment.userId),
     );
 
-    this.logger.log(
-      JSON.stringify({
-        message: 'Matrícula cancelada e invalidación de caché procesada',
-        userId: enrollment.userId,
-        enrollmentId,
-        timestamp: new Date().toISOString(),
-      }),
-    );
+    this.logger.log({
+      message: 'Matrícula cancelada e invalidación de caché procesada',
+      userId: enrollment.userId,
+      enrollmentId,
+      timestamp: new Date().toISOString(),
+    });
   }
 }

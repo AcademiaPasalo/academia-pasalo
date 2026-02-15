@@ -23,4 +23,8 @@ export class UploadMaterialDto {
   @IsOptional()
   @IsString()
   visibleUntil?: string;
+
+  @IsOptional()
+  @IsNumberString()
+  classEventId?: string;
 }

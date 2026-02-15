@@ -5,6 +5,7 @@ import { Auth } from '@common/decorators/auth.decorator';
 import { Roles } from '@common/decorators/roles.decorator';
 import { ResponseMessage } from '@common/decorators/response-message.decorator';
 import { plainToInstance } from 'class-transformer';
+import { ROLE_CODES } from '@common/constants/role-codes.constants';
 
 @Controller('cycles')
 @Auth()
@@ -12,7 +13,7 @@ export class CyclesController {
   constructor(private readonly cyclesService: CyclesService) {}
 
   @Get()
-  @Roles('ADMIN', 'SUPER_ADMIN')
+  @Roles(ROLE_CODES.ADMIN, ROLE_CODES.SUPER_ADMIN)
   @ResponseMessage('Ciclos académicos obtenidos exitosamente')
   async findAll() {
     const cycles = await this.cyclesService.findAll();
@@ -31,7 +32,7 @@ export class CyclesController {
   }
 
   @Get(':id')
-  @Roles('ADMIN', 'SUPER_ADMIN')
+  @Roles(ROLE_CODES.ADMIN, ROLE_CODES.SUPER_ADMIN)
   @ResponseMessage('Ciclo académico obtenido exitosamente')
   async findOne(@Param('id') id: string) {
     const cycle = await this.cyclesService.findOne(id);
