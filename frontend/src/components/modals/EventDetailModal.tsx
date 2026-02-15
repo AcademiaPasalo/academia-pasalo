@@ -4,7 +4,7 @@
 
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import type { ClassEvent } from '@/types/classEvent';
@@ -27,7 +27,7 @@ export default function EventDetailModal({
   const tooltipRef = useRef<HTMLDivElement>(null);
   const [position, setPosition] = useState({ top: 0, left: 0 });
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!isOpen || !event || !anchorPosition || !tooltipRef.current) return;
 
     const tooltip = tooltipRef.current;
@@ -55,6 +55,25 @@ export default function EventDetailModal({
     setPosition({ top, left });
   }, [isOpen, event, anchorPosition]);
 
+  // Bloquear scroll del body cuando el tooltip está abierto
+  useEffect(() => {
+    if (isOpen) {
+      // Guardar el scroll actual y bloquear
+      const scrollY = window.scrollY;
+      document.body.style.position = 'fixed';
+      document.body.style.top = `-${scrollY}px`;
+      document.body.style.width = '100%';
+
+      return () => {
+        // Restaurar scroll cuando se cierra
+        document.body.style.position = '';
+        document.body.style.top = '';
+        document.body.style.width = '';
+        window.scrollTo(0, scrollY);
+      };
+    }
+  }, [isOpen]);
+
   // Cerrar al hacer clic fuera
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -70,6 +89,10 @@ export default function EventDetailModal({
   }, [isOpen, onClose]);
 
   if (!isOpen || !event) return null;
+
+  console.log('🔍 [EventDetailModal] Event:', event);
+  console.log('🔍 [EventDetailModal] liveMeetingUrl:', event.liveMeetingUrl);
+  console.log('🔍 [EventDetailModal] topic:', event.topic);
 
   const colors = getCourseColor(event.courseCode);
 
@@ -210,35 +233,32 @@ export default function EventDetailModal({
           </div>
         </div>
 
-        {/* Topic y Link */}
-        <div className="self-stretch flex flex-col justify-start items-start gap-1">
-          {/* Topic */}
-          {event.topic && (
-            <div className="self-stretch p-0.5 flex justify-start items-start gap-2.5">
-              <MdCalendarToday className="w-4 h-4 text-icon-secondary" />
-              <div className="flex-1 text-text-primary text-base font-normal font-['Poppins'] leading-4">
-                {event.topic}
-              </div>
+        {/* Topic */}
+        {event.topic && (
+          <div className="self-stretch p-0.5 flex justify-start items-start gap-2.5">
+            <MdCalendarToday className="w-4 h-4 text-icon-secondary" />
+            <div className="flex-1 text-text-primary text-base font-normal font-['Poppins'] leading-4">
+              {event.topic}
             </div>
-          )}
+          </div>
+        )}
 
-          {/* Link de reunión */}
-          {event.liveMeetingUrl && event.canCopyLiveLink && (
-            <div className="self-stretch p-0.5 flex justify-start items-center gap-2.5 overflow-hidden">
-              <MdLink className="w-4 h-4 text-icon-secondary flex-shrink-0" />
-              <div className="flex-1 flex justify-start items-center overflow-hidden">
-                <a
-                  href={event.liveMeetingUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex-1 text-text-primary text-base font-normal font-['Poppins'] leading-4 line-clamp-1 hover:text-text-accent-primary transition-colors"
-                >
-                  {event.liveMeetingUrl}
-                </a>
-              </div>
+        {/* Link de reunión */}
+        {event.liveMeetingUrl && (
+          <div className="self-stretch p-0.5 flex justify-start items-center gap-2.5 overflow-hidden">
+            <MdLink className="w-4 h-4 text-icon-secondary flex-shrink-0" />
+            <div className="flex-1 flex justify-start items-center overflow-hidden">
+              <a
+                href={event.liveMeetingUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex-1 text-text-primary text-base font-normal font-['Poppins'] leading-4 line-clamp-1 hover:text-text-accent-primary transition-colors"
+              >
+                {event.liveMeetingUrl}
+              </a>
             </div>
-          )}
-        </div>
+          </div>
+        )}
       </div>
     </div>
   );

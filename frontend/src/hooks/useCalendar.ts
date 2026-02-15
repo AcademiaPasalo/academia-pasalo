@@ -26,10 +26,7 @@ export function useCalendar() {
         start: format(start, 'yyyy-MM-dd'),
         end: format(end, 'yyyy-MM-dd'),
       };
-      console.log('📅 [useCalendar] Cargando eventos desde:', params.start, 'hasta:', params.end);
       const events = await classEventService.getMySchedule(params);
-      console.log('📅 [useCalendar] Eventos recibidos:', events.length, 'eventos');
-      console.log('📅 [useCalendar] Primeros 3 eventos:', events.slice(0, 3));
       setEvents(events);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error al cargar eventos');

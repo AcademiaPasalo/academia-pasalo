@@ -14,8 +14,8 @@ export const enrollmentsService = {
    * Cache: 1 hora (gestionado por backend)
    */
   async getMyEnrollments(): Promise<MyEnrollment[]> {
-    const response = await apiClient.get<ApiResponse<MyEnrollment[]>>('/enrollments/my-courses');
-    return response.data.data;
+    const response = await apiClient.get<MyEnrollment[]>('/enrollments/my-courses');
+    return response.data;
   },
 
   /**

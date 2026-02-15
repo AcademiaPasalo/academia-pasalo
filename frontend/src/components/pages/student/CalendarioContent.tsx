@@ -7,6 +7,7 @@
 import { useState, useEffect } from "react";
 import { useCalendar } from "@/hooks/useCalendar";
 import { useEnrollments } from "@/hooks/useEnrollments";
+import { useBreadcrumb } from "@/contexts/BreadcrumbContext";
 import type { ClassEvent } from "@/types/classEvent";
 import EventDetailModal from "@/components/modals/EventDetailModal";
 import {
@@ -40,6 +41,7 @@ export default function CalendarioContent() {
   } = useCalendar();
 
   const { uniqueCourses, loading: loadingCourses } = useEnrollments();
+  const { setBreadcrumbItems } = useBreadcrumb();
   const [selectedEvent, setSelectedEvent] = useState<ClassEvent | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isFilterOpen, setIsFilterOpen] = useState(false);
@@ -47,6 +49,13 @@ export default function CalendarioContent() {
   const [anchorPosition, setAnchorPosition] = useState<{ x: number; y: number } | undefined>();
 
   const weekDays = getWeekDays();
+
+  // Configurar breadcrumb
+  useEffect(() => {
+    setBreadcrumbItems([
+      { icon: 'event', label: 'Calendario' }
+    ]);
+  }, [setBreadcrumbItems]);
 
   console.log("📊 [CalendarioContent] Renderizando con:", {
     eventos: events?.length || 0,
@@ -212,8 +221,8 @@ export default function CalendarioContent() {
     : "Filtrar por Curso";
 
   return (
-    <div className="flex flex-col gap-8">
-      <div className="flex justify-between items-center">
+    <div className="flex flex-col gap-8 max-h-[calc(100vh-120px)] overflow-hidden">
+      <div className="flex justify-between items-center flex-shrink-0">
         <h1 className="text-3xl font-semibold text-text-primary">
           Calendario de Clases
         </h1>
@@ -267,7 +276,7 @@ export default function CalendarioContent() {
         </div>
       </div>
 
-      <div className="p-4 bg-bg-primary rounded-xl border border-stroke-primary">
+      <div className="p-4 bg-bg-primary rounded-xl border border-stroke-primary flex-shrink-0">
         <div className="flex justify-between items-center">
           <div className="flex items-center gap-5">
             <button
@@ -331,15 +340,15 @@ export default function CalendarioContent() {
       </div>
 
       {loading ? (
-        <div className="flex items-center justify-center h-96">
+        <div className="flex items-center justify-center h-96 flex-shrink-0">
           <div className="text-center">
             <div className="w-12 h-12 border-4 border-accent-light border-t-accent-solid rounded-full animate-spin mx-auto mb-4" />
             <p className="text-text-secondary">Cargando eventos...</p>
           </div>
         </div>
       ) : view === "weekly" ? (
-        <div className="bg-bg-primary rounded-2xl border border-stroke-primary overflow-hidden">
-          <div className="flex border-b border-stroke-primary">
+        <div className="bg-bg-primary rounded-2xl border border-stroke-primary overflow-hidden flex-1 flex flex-col min-h-0">
+          <div className="flex border-b border-stroke-primary flex-shrink-0">
             <div className="w-16" />
             {weekDays.map((day, index) => (
               <div
@@ -362,29 +371,31 @@ export default function CalendarioContent() {
             ))}
           </div>
 
-          <div className="flex overflow-x-auto">
-            <div className="w-16 flex flex-col">
-              {HOURS.map((hour) => {
-                const period = hour >= 12 ? "PM" : "AM";
-                const displayHour =
-                  hour > 12 ? hour - 12 : hour === 12 ? 12 : hour;
-                return (
-                  <div
-                    key={hour}
-                    className="h-20 px-4 py-3 border-b border-stroke-primary flex justify-end items-start gap-1"
-                  >
-                    <span className="text-xs font-medium text-text-tertiary">
-                      {displayHour}
-                    </span>
-                    <span className="text-xs font-medium text-text-tertiary">
-                      {period}
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
+          <div className="flex-1 overflow-y-auto overflow-x-hidden min-h-0 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+            <div className="flex min-w-full">
+              <div className="w-16 flex flex-col flex-shrink-0 bg-bg-primary sticky left-0 z-10">
+                {HOURS.map((hour) => {
+                  const period = hour >= 12 ? "PM" : "AM";
+                  const displayHour =
+                    hour > 12 ? hour - 12 : hour === 12 ? 12 : hour;
+                  return (
+                    <div
+                      key={hour}
+                      className="h-20 px-4 py-3 border-b border-stroke-primary flex justify-end items-start gap-1 flex-shrink-0"
+                    >
+                      <span className="text-xs font-medium text-text-tertiary">
+                        {displayHour}
+                      </span>
+                      <span className="text-xs font-medium text-text-tertiary">
+                        {period}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
 
-            {weekDays.map((day, dayIndex) => {
+              <div className="flex-1 flex">
+              {weekDays.map((day, dayIndex) => {
               const dayEvents = getEventsByDay(day);
               const isTodayColumn = isToday(day);
               const currentTimePos = getCurrentTimePosition();
@@ -453,10 +464,12 @@ export default function CalendarioContent() {
                 </div>
               );
             })}
+              </div>
+            </div>
           </div>
         </div>
       ) : (
-        <div className="bg-bg-primary rounded-2xl border border-stroke-primary p-12 text-center">
+        <div className="bg-bg-primary rounded-2xl border border-stroke-primary p-12 text-center flex-shrink-0">
           <p className="text-text-tertiary">Vista mensual en desarrollo</p>
         </div>
       )}
