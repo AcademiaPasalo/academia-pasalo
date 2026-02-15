@@ -1,4 +1,4 @@
-import { Logger } from '@nestjs/common';
+import { Logger, InternalServerErrorException } from '@nestjs/common';
 import {
   EntitySubscriberInterface,
   EventSubscriber,
@@ -38,13 +38,15 @@ export class EvaluationSubscriber implements EntitySubscriberInterface<Evaluatio
     });
 
     if (!evaluationType) {
-      this.logger.warn({
+      this.logger.error({
         message:
-          'Tipo de evaluación no encontrado, omitiendo lógica del subscriber',
+          'Error de integridad: Tipo de evaluación no encontrado en subscriber',
         evaluationTypeId: evaluation.evaluationTypeId,
         evaluationId: evaluation.id,
       });
-      return;
+      throw new InternalServerErrorException(
+        'Error de integridad al procesar la evaluación',
+      );
     }
 
     const fullType = await manager.findOne(EnrollmentType, {
@@ -52,12 +54,14 @@ export class EvaluationSubscriber implements EntitySubscriberInterface<Evaluatio
     });
 
     if (!fullType) {
-      this.logger.warn({
+      this.logger.error({
         message:
-          'Tipo de matrícula FULL no encontrado, omitiendo lógica del subscriber',
+          'Error de integridad: Tipo de matrícula FULL no encontrado en subscriber',
         evaluationId: evaluation.id,
       });
-      return;
+      throw new InternalServerErrorException(
+        'Configuración de sistema incompleta (FULL_TYPE)',
+      );
     }
 
     const BATCH_SIZE = 100;
