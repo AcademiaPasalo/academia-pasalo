@@ -41,39 +41,9 @@ export default function DaySchedule() {
       const start = format(weekStart, "yyyy-MM-dd");
       const end = format(weekEnd, "yyyy-MM-dd");
 
-      const today = format(new Date(), "yyyy-MM-dd");
-      console.log("📅 DaySchedule - Hoy es:", today);
-      console.log("📅 DaySchedule - Cargando eventos del:", start, "al", end);
-      console.log("📅 DaySchedule - WeekStart:", weekStart);
-      console.log("📅 DaySchedule - WeekEnd:", weekEnd);
-
-      const response = await classEventService.getMySchedule({ start, end });
-
-      console.log("📅 DaySchedule - Response completa:", response);
-      console.log(
-        "📅 DaySchedule - Tipo:",
-        typeof response,
-        Array.isArray(response),
-      );
-
-      // Manejar respuesta que puede ser array o ApiResponse
-      let eventsData: ClassEvent[] = [];
-      if (Array.isArray(response)) {
-        console.log("✅ Response es array directo");
-        eventsData = response;
-      } else if (response && "data" in response) {
-        console.log("✅ Response es ApiResponse con data");
-        eventsData = response.data || [];
-      }
-
-      console.log(
-        "📅 DaySchedule - Eventos recibidos:",
-        eventsData.length,
-        eventsData,
-      );
+      const eventsData = await classEventService.getMySchedule({ start, end });
       setEvents(eventsData);
-    } catch (err) {
-      console.error("❌ Error al cargar la agenda:", err);
+    } catch {
       setError("Error al cargar los eventos");
     } finally {
       setLoading(false);
