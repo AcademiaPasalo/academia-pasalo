@@ -132,7 +132,7 @@ export default function DashboardLayout({
 
       {/* Main Content */}
       <div
-        className={`flex-1 flex flex-col h-screen ${showSidebar ? (isCollapsed ? "lg:ml-[72px]" : "lg:ml-[240px]") : ""}`}
+        className={`flex-1 flex flex-col h-screen ${showSidebar ? (isCollapsed ? "lg:ml-[68px]" : "lg:ml-[240px]") : ""}`}
       >
         {/* Top Bar */}
         {showTopBar && (

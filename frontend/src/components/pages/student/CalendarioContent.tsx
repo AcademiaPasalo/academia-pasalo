@@ -30,6 +30,7 @@ export default function CalendarioContent() {
     loading,
     view,
     selectedCourseId,
+    currentDate,
     goToNext,
     goToPrevious,
     goToToday,
@@ -213,6 +214,54 @@ export default function CalendarioContent() {
     });
     setSelectedEvent(event);
     setIsModalOpen(true);
+  };
+
+  // Funciones para vista mensual
+  const getMonthDays = () => {
+    const year = currentDate.getFullYear();
+    const month = currentDate.getMonth();
+
+    const firstDayOfMonth = new Date(year, month, 1);
+    const lastDayOfMonth = new Date(year, month + 1, 0);
+
+    const startDay = firstDayOfMonth.getDay(); // 0 = domingo
+    const daysInMonth = lastDayOfMonth.getDate();
+
+    const days: Date[] = [];
+
+    // Días del mes anterior para completar la primera semana
+    for (let i = startDay - 1; i >= 0; i--) {
+      const prevMonthDay = new Date(year, month, -i);
+      days.push(prevMonthDay);
+    }
+
+    // Días del mes actual
+    for (let day = 1; day <= daysInMonth; day++) {
+      days.push(new Date(year, month, day));
+    }
+
+    // Días del mes siguiente para completar la última semana
+    const remainingDays = 7 - (days.length % 7);
+    if (remainingDays < 7) {
+      for (let day = 1; day <= remainingDays; day++) {
+        days.push(new Date(year, month + 1, day));
+      }
+    }
+
+    return days;
+  };
+
+  const getEventsForDay = (day: Date) => {
+    if (!events || events.length === 0) return [];
+
+    return events.filter((event) => {
+      const eventDate = parseISO(event.startDatetime);
+      return (
+        eventDate.getDate() === day.getDate() &&
+        eventDate.getMonth() === day.getMonth() &&
+        eventDate.getFullYear() === day.getFullYear()
+      );
+    });
   };
 
   const selectedCourseName = selectedCourseId
@@ -473,8 +522,100 @@ export default function CalendarioContent() {
           </div>
         </div>
       ) : (
-        <div className="bg-bg-primary rounded-2xl border border-stroke-primary p-12 text-center flex-shrink-0">
-          <p className="text-text-tertiary">Vista mensual en desarrollo</p>
+        <div className="bg-bg-primary rounded-2xl border border-stroke-primary flex-1 flex flex-col min-h-0">
+          {/* Header días de la semana */}
+          <div className="flex border-b border-stroke-primary flex-shrink-0">
+            {DAY_NAMES.map((dayName, index) => (
+              <div
+                key={dayName}
+                className={`flex-1 p-4 flex flex-col items-center ${index === 6 ? "rounded-tr-2xl" : ""}`}
+              >
+                <div className="text-sm font-medium text-text-tertiary">
+                  {dayName}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Grid de días */}
+          <div className="flex flex-col h-full max-h-[calc(100vh-152px)]">
+            {Array.from({ length: Math.ceil(getMonthDays().length / 7) }, (_, weekIndex) => {
+              const weekDays = getMonthDays().slice(weekIndex * 7, (weekIndex + 1) * 7);
+
+              return (
+                <div
+                  key={weekIndex}
+                  className="flex-1 flex border-b border-stroke-secondary"
+                >
+                  {weekDays.map((day, dayIndex) => {
+                    const dayEvents = getEventsForDay(day);
+                    const isTodayDay = isToday(day);
+                    const isCurrentMonth = day.getMonth() === currentDate.getMonth();
+
+                    return (
+                      <div
+                        key={`${day.getTime()}-${dayIndex}`}
+                        className={`flex-1 self-stretch py-2 flex flex-col items-center gap-2 overflow-hidden ${
+                          dayIndex < 6 ? "border-r border-stroke-secondary" : ""
+                        }`}
+                      >
+                        {/* Número del día */}
+                        <div
+                          className={`w-6 h-6 p-0.5 rounded-full flex items-center justify-center ${
+                            isTodayDay
+                              ? "bg-info-primary-solid"
+                              : ""
+                          }`}
+                        >
+                          <div
+                            className={`text-sm font-medium text-center ${
+                              isTodayDay
+                                ? "text-text-white font-semibold"
+                                : isCurrentMonth
+                                  ? "text-text-primary"
+                                  : "text-text-tertiary"
+                            }`}
+                          >
+                            {day.getDate()}
+                          </div>
+                        </div>
+
+                        {/* Eventos del día */}
+                        <div className="self-stretch pr-2 flex flex-col items-start gap-0.5">
+                          {dayEvents.slice(0, 3).map((event) => {
+                            const colors = getCourseColor(event.courseCode);
+
+                            return (
+                              <div
+                                key={event.id}
+                                className="self-stretch rounded-lg flex items-center overflow-hidden cursor-pointer hover:opacity-80 transition-opacity"
+                                style={{ backgroundColor: colors.secondary }}
+                                onClick={(e) => handleEventClick(event, e)}
+                              >
+                                <div
+                                  className="self-stretch px-2.5 py-1.5 rounded-l-lg border-l-4 flex items-center"
+                                  style={{ borderLeftColor: colors.primary }}
+                                >
+                                  <div className="flex-1 text-xs font-medium text-text-primary line-clamp-1">
+                                    {event.courseCode}
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })}
+                          {dayEvents.length > 3 && (
+                            <div className="self-stretch px-2.5 text-[10px] font-medium text-text-tertiary">
+                              +{dayEvents.length - 3} más
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })}
+          </div>
         </div>
       )}
 
