@@ -14,6 +14,7 @@ import { Injectable } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { ENROLLMENT_TYPE_CODES } from '@modules/enrollments/domain/enrollment.constants';
 import { EVALUATION_TYPE_CODES } from '@modules/evaluations/domain/evaluation.constants';
+import { getEpoch } from '@common/utils/date.util';
 
 @EventSubscriber()
 @Injectable()
@@ -109,7 +110,9 @@ export class EvaluationSubscriber implements EntitySubscriberInterface<Evaluatio
             if (academicEvaluations.length > 0) {
               const maxAcademicEndDate = academicEvaluations.reduce(
                 (max, current) => {
-                  return current.endDate > max ? current.endDate : max;
+                  return getEpoch(current.endDate) > getEpoch(max)
+                    ? current.endDate
+                    : max;
                 },
                 new Date(0),
               );

@@ -12,7 +12,10 @@ import { User } from '@modules/users/domain/user.entity';
 import { ClassEvent } from '@modules/events/domain/class-event.entity';
 import { Evaluation } from '@modules/evaluations/domain/evaluation.entity';
 import { ROLE_CODES } from '@common/constants/role-codes.constants';
-import { CLASS_EVENT_CACHE_KEYS } from '@modules/events/domain/class-event.constants';
+import {
+  CLASS_EVENT_CACHE_KEYS,
+  CLASS_EVENT_STATUS,
+} from '@modules/events/domain/class-event.constants';
 
 describe('ClassEventsService', () => {
   let service: ClassEventsService;
@@ -408,6 +411,22 @@ describe('ClassEventsService', () => {
       );
 
       expect(result).toBe(false);
+    });
+  });
+
+  describe('Integridad de Tipos de Fecha (Regresión)', () => {
+    it('debe calcular PROGRAMADA aunque la BD devuelva fechas como STRINGS (Protección getEpoch)', () => {
+      // Mock de evento con fechas en formato STRING (comportamiento real de drivers SQL)
+      const eventWithStrings = {
+        startDatetime: '2026-12-01T10:00:00.000Z',
+        endDatetime: '2026-12-01T12:00:00.000Z',
+        isCancelled: false,
+      } as unknown as ClassEvent;
+
+      const status = service.calculateEventStatus(eventWithStrings);
+      
+      // Si getEpoch no funcionara, esto devolvería FINALIZADA por error de comparación alfabética
+      expect(status).toBe(CLASS_EVENT_STATUS.PROGRAMADA);
     });
   });
 

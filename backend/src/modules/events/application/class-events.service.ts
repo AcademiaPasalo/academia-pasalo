@@ -18,6 +18,7 @@ import { RedisCacheService } from '@infrastructure/cache/redis-cache.service';
 import { ClassEvent } from '@modules/events/domain/class-event.entity';
 import { User } from '@modules/users/domain/user.entity';
 import { technicalSettings } from '@config/technical-settings';
+import { getEpoch } from '@common/utils/date.util';
 import {
   ClassEventAccess,
   ClassEventStatus,
@@ -308,11 +309,14 @@ export class ClassEventsService {
       return CLASS_EVENT_STATUS.CANCELADA;
     }
 
-    const now = new Date();
-    if (now < event.startDatetime) {
+    const nowTime = getEpoch(new Date());
+    const startTime = getEpoch(event.startDatetime);
+    const endTime = getEpoch(event.endDatetime);
+
+    if (nowTime < startTime) {
       return CLASS_EVENT_STATUS.PROGRAMADA;
     }
-    if (now >= event.startDatetime && now < event.endDatetime) {
+    if (nowTime >= startTime && nowTime < endTime) {
       return CLASS_EVENT_STATUS.EN_CURSO;
     }
     return CLASS_EVENT_STATUS.FINALIZADA;
@@ -586,19 +590,24 @@ export class ClassEventsService {
     evaluationStart: Date,
     evaluationEnd: Date,
   ): void {
-    if (endDatetime <= startDatetime) {
+    const startTime = getEpoch(startDatetime);
+    const endTime = getEpoch(endDatetime);
+    const evalStartTime = getEpoch(evaluationStart);
+    const evalEndTime = getEpoch(evaluationEnd);
+
+    if (endTime <= startTime) {
       throw new BadRequestException(
         'La fecha de fin debe ser posterior a la fecha de inicio',
       );
     }
 
-    if (startDatetime < evaluationStart || startDatetime > evaluationEnd) {
+    if (startTime < evalStartTime || startTime > evalEndTime) {
       throw new BadRequestException(
         'La fecha de inicio debe estar dentro del rango de la evaluación',
       );
     }
 
-    if (endDatetime < evaluationStart || endDatetime > evaluationEnd) {
+    if (endTime < evalStartTime || endTime > evalEndTime) {
       throw new BadRequestException(
         'La fecha de fin debe estar dentro del rango de la evaluación',
       );

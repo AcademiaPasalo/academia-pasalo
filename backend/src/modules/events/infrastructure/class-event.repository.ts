@@ -25,6 +25,7 @@ export class ClassEventRepository {
     return await this.ormRepository
       .createQueryBuilder('classEvent')
       .leftJoinAndSelect('classEvent.evaluation', 'evaluation')
+      .leftJoinAndSelect('evaluation.evaluationType', 'evaluationType')
       .leftJoinAndSelect('evaluation.courseCycle', 'courseCycle')
       .leftJoinAndSelect('courseCycle.course', 'course')
       .leftJoinAndSelect('courseCycle.academicCycle', 'academicCycle')
@@ -53,6 +54,7 @@ export class ClassEventRepository {
     return await this.ormRepository
       .createQueryBuilder('classEvent')
       .leftJoinAndSelect('classEvent.evaluation', 'evaluation')
+      .leftJoinAndSelect('evaluation.evaluationType', 'evaluationType')
       .leftJoinAndSelect('evaluation.courseCycle', 'courseCycle')
       .leftJoinAndSelect('courseCycle.course', 'course')
       .leftJoinAndSelect('classEvent.creator', 'creator')
@@ -89,6 +91,7 @@ export class ClassEventRepository {
     return await this.ormRepository
       .createQueryBuilder('classEvent')
       .leftJoinAndSelect('classEvent.evaluation', 'evaluation')
+      .leftJoinAndSelect('evaluation.evaluationType', 'evaluationType')
       .leftJoinAndSelect('evaluation.courseCycle', 'courseCycle')
       .leftJoinAndSelect('courseCycle.course', 'course')
       .leftJoinAndSelect('classEvent.creator', 'creator')
@@ -139,6 +142,7 @@ export class ClassEventRepository {
     const qb = this.ormRepository
       .createQueryBuilder('classEvent')
       .leftJoinAndSelect('classEvent.evaluation', 'evaluation')
+      .leftJoinAndSelect('evaluation.evaluationType', 'evaluationType')
       .leftJoinAndSelect('evaluation.courseCycle', 'courseCycle')
       .leftJoinAndSelect('courseCycle.course', 'course')
       .leftJoinAndSelect('classEvent.creator', 'creator')
