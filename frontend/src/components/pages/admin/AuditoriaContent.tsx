@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, Fragment } from 'react';
 import { useBreadcrumb } from '@/contexts/BreadcrumbContext';
 import { useAudit } from '@/hooks/useAudit';
 import { usersService } from '@/services/users.service';
@@ -66,12 +66,8 @@ export default function AuditoriaContent() {
     const params: AuditHistoryParams = {
       limit: 100,
     };
-    if (startDate) params.startDate = new Date(startDate).toISOString();
-    if (endDate) {
-      const end = new Date(endDate);
-      end.setHours(23, 59, 59, 999);
-      params.endDate = end.toISOString();
-    }
+    if (startDate) params.startDate = new Date(`${startDate}T00:00:00`).toISOString();
+    if (endDate) params.endDate = new Date(`${endDate}T23:59:59.999`).toISOString();
     loadHistory(params);
   }, [startDate, endDate, loadHistory]);
 
@@ -82,12 +78,8 @@ export default function AuditoriaContent() {
 
   const handleExport = () => {
     const params: AuditHistoryParams = {};
-    if (startDate) params.startDate = new Date(startDate).toISOString();
-    if (endDate) {
-      const end = new Date(endDate);
-      end.setHours(23, 59, 59, 999);
-      params.endDate = end.toISOString();
-    }
+    if (startDate) params.startDate = new Date(`${startDate}T00:00:00`).toISOString();
+    if (endDate) params.endDate = new Date(`${endDate}T23:59:59.999`).toISOString();
     exportToExcel(params);
   };
 
@@ -204,68 +196,66 @@ export default function AuditoriaContent() {
                   const isAnomaly = entry.actionCode === 'ANOMALOUS_LOGIN_DETECTED';
 
                   return (
-                    <tr key={entry.id} className="border-b border-stroke-secondary last:border-b-0">
-                      <td className="px-4 py-3 text-text-primary whitespace-nowrap">
-                        {formatDateTime(entry.datetime)}
-                      </td>
-                      <td className="px-4 py-3 text-text-primary">
-                        {entry.userName}
-                      </td>
-                      <td className="px-4 py-3">
-                        <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${badge.bg} ${badge.text}`}>
-                          {entry.actionName}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-text-secondary">
-                        {entry.source === 'SECURITY' ? 'Seguridad' : 'Auditoría'}
-                      </td>
-                      <td className="px-4 py-3 text-text-secondary font-mono text-xs">
-                        {entry.ipAddress || '-'}
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-2">
-                          <button
-                            onClick={() => setExpandedId(isExpanded ? null : entry.id)}
-                            className="p-1 rounded hover:bg-bg-secondary transition-colors"
-                            title="Ver detalles"
-                          >
-                            <Icon name={isExpanded ? 'expand_less' : 'expand_more'} size={18} className="text-text-tertiary" />
-                          </button>
-                          {isAnomaly && (
+                    <Fragment key={entry.id}>
+                      <tr className={`border-b border-stroke-secondary last:border-b-0 ${isExpanded ? 'bg-bg-secondary/50' : ''}`}>
+                        <td className="px-4 py-3 text-text-primary whitespace-nowrap">
+                          {formatDateTime(entry.datetime)}
+                        </td>
+                        <td className="px-4 py-3 text-text-primary">
+                          {entry.userName}
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${badge.bg} ${badge.text}`}>
+                            {entry.actionName}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-text-secondary">
+                          {entry.source === 'SECURITY' ? 'Seguridad' : 'Auditoría'}
+                        </td>
+                        <td className="px-4 py-3 text-text-secondary font-mono text-xs">
+                          {entry.ipAddress || '-'}
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="flex items-center gap-2">
                             <button
-                              onClick={() => setBanTarget({ userId: entry.userId, userName: entry.userName })}
-                              className="px-2 py-1 rounded text-xs font-medium text-error-solid hover:bg-error-secondary transition-colors"
-                              title="Desactivar cuenta"
+                              onClick={() => setExpandedId(isExpanded ? null : entry.id)}
+                              className="p-1 rounded hover:bg-bg-secondary transition-colors"
+                              title="Ver detalles"
                             >
-                              Desactivar
+                              <Icon name={isExpanded ? 'expand_less' : 'expand_more'} size={18} className="text-text-tertiary" />
                             </button>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
+                            {isAnomaly && (
+                              <button
+                                onClick={() => setBanTarget({ userId: entry.userId, userName: entry.userName })}
+                                className="px-2.5 py-1 rounded-lg text-xs font-medium text-error-solid bg-error-secondary border border-error-solid/20 hover:bg-error-solid hover:text-white transition-colors"
+                                title="Desactivar cuenta"
+                              >
+                                Desactivar
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                      {isExpanded && entry.metadata && (
+                        <tr className="border-b border-stroke-secondary">
+                          <td colSpan={6} className="px-4 py-3 bg-bg-secondary">
+                            <p className="text-xs font-medium text-text-secondary mb-2">Metadata del evento:</p>
+                            <pre className="text-xs text-text-primary bg-bg-primary p-3 rounded-lg overflow-x-auto border border-stroke-primary">
+                              {JSON.stringify(entry.metadata, null, 2)}
+                            </pre>
+                            {entry.userAgent && (
+                              <p className="text-xs text-text-tertiary mt-2">
+                                User-Agent: {entry.userAgent}
+                              </p>
+                            )}
+                          </td>
+                        </tr>
+                      )}
+                    </Fragment>
                   );
                 })}
               </tbody>
             </table>
-
-            {/* Detalles expandidos */}
-            {expandedId && (() => {
-              const entry = filteredEntries.find((e) => e.id === expandedId);
-              if (!entry?.metadata) return null;
-              return (
-                <div className="px-4 py-3 bg-bg-secondary border-t border-stroke-secondary">
-                  <p className="text-xs font-medium text-text-secondary mb-2">Metadata del evento:</p>
-                  <pre className="text-xs text-text-primary bg-bg-primary p-3 rounded-lg overflow-x-auto border border-stroke-primary">
-                    {JSON.stringify(entry.metadata, null, 2)}
-                  </pre>
-                  {entry.userAgent && (
-                    <p className="text-xs text-text-tertiary mt-2">
-                      User-Agent: {entry.userAgent}
-                    </p>
-                  )}
-                </div>
-              );
-            })()}
           </div>
         )}
       </div>

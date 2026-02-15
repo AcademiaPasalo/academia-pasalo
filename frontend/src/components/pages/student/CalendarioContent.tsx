@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useCalendar } from "@/hooks/useCalendar";
 import { useEnrollments } from "@/hooks/useEnrollments";
 import { useBreadcrumb } from "@/contexts/BreadcrumbContext";
@@ -46,6 +46,7 @@ export default function CalendarioContent() {
   const [anchorPosition, setAnchorPosition] = useState<
     { x: number; y: number } | undefined
   >();
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   const weekDays = getWeekDays();
 
@@ -58,10 +59,36 @@ export default function CalendarioContent() {
   useEffect(() => {
     const timer = setInterval(() => {
       setCurrentTime(new Date());
-    }, 60000); // Actualizar cada minuto
+    }, 60000);
 
     return () => clearInterval(timer);
   }, []);
+
+  // Auto-scroll a la hora actual o al primer evento cuando carga la vista semanal
+  useEffect(() => {
+    if (view !== "weekly" || loading || !scrollContainerRef.current) return;
+
+    const container = scrollContainerRef.current;
+    const todayInWeek = weekDays.some((day) => isToday(day));
+
+    let targetHour: number;
+
+    if (todayInWeek) {
+      targetHour = new Date().getHours();
+    } else if (events.length > 0) {
+      const earliestHour = Math.min(
+        ...events.map((e) => new Date(e.startDatetime).getHours()),
+      );
+      targetHour = earliestHour;
+    } else {
+      targetHour = 7;
+    }
+
+    // Posicionar 1 hora antes del target para dar contexto
+    const scrollTarget = Math.max(0, (targetHour - 2) * 80);
+    container.scrollTo({ top: scrollTarget });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [view, loading, currentDate]);
 
   const getEventsByDay = (day: Date) => {
     if (!events || events.length === 0) return [];
@@ -394,7 +421,7 @@ export default function CalendarioContent() {
           </div>
 
           <div
-            id="calendar-scroll-container"
+            ref={scrollContainerRef}
             className="flex-1 overflow-y-auto overflow-x-hidden min-h-0 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]"
           >
             <div className="flex min-w-full">
