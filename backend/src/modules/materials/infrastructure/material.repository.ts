@@ -35,4 +35,15 @@ export class MaterialRepository {
       order: { displayName: 'ASC' },
     });
   }
+
+  async findByClassEventId(classEventId: string): Promise<Material[]> {
+    return await this.ormRepository.find({
+      where: { classEventId },
+      relations: {
+        fileResource: true,
+        fileVersion: true,
+      },
+      order: { displayName: 'ASC' },
+    });
+  }
 }

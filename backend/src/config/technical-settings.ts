@@ -93,6 +93,8 @@ export const technicalSettings = {
       cycleActiveCacheTtlSeconds: 3600, // 60m
       // src/modules/events/application/class-events.service.ts
       professorAssignmentCacheTtlSeconds: 3600, // 60m
+      // src/modules/events/application/class-events.service.ts
+      recordingStatusCatalogCacheTtlSeconds: 21600, // 6h
 
       // src/modules/events/presentation/class-events.controller.ts
       myScheduleDefaultRangeDays: 7, // 7d

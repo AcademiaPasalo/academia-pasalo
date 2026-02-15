@@ -29,5 +29,11 @@ export class UpdateClassEventDto {
   @IsOptional()
   @IsUrl()
   @MaxLength(500)
-  meetingLink?: string;
+  liveMeetingUrl?: string;
+
+  @IsString()
+  @IsOptional()
+  @IsUrl()
+  @MaxLength(500)
+  recordingUrl?: string;
 }

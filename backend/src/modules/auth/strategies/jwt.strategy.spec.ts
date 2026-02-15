@@ -7,6 +7,7 @@ import { RedisCacheService } from '@infrastructure/cache/redis-cache.service';
 import { JwtPayload } from '@modules/auth/interfaces/jwt-payload.interface';
 import { PhotoSource, User } from '@modules/users/domain/user.entity';
 import { technicalSettings } from '@config/technical-settings';
+import { ROLE_CODES } from '@common/constants/role-codes.constants';
 
 describe('JwtStrategy', () => {
   let strategy: JwtStrategy;
@@ -33,8 +34,8 @@ describe('JwtStrategy', () => {
   const payload: JwtPayload = {
     sub: '10',
     email: 'user@test.com',
-    roles: ['STUDENT'],
-    activeRole: 'STUDENT',
+    roles: [ROLE_CODES.STUDENT],
+    activeRole: ROLE_CODES.STUDENT,
     sessionId: '777',
     deviceId: 'device-1',
   };

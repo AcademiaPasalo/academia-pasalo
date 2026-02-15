@@ -3,7 +3,10 @@ import { UserSessionRepository } from '@modules/auth/infrastructure/user-session
 import { RedisCacheService } from '@infrastructure/cache/redis-cache.service';
 import { SessionStatusService } from '@modules/auth/application/session-status.service';
 import { UserSession } from '@modules/auth/domain/user-session.entity';
-import { SESSION_STATUS_CODES } from '@modules/auth/interfaces/security.constants';
+import {
+  SECURITY_MESSAGES,
+  SESSION_STATUS_CODES,
+} from '@modules/auth/interfaces/security.constants';
 import { createHash } from 'crypto';
 
 @Injectable()
@@ -34,18 +37,18 @@ export class SessionValidatorService {
         userId,
         deviceId,
       });
-      throw new UnauthorizedException('Token revocado');
+      throw new UnauthorizedException(SECURITY_MESSAGES.REVOKED_TOKEN);
     }
 
     const session =
       await this.userSessionRepository.findByRefreshTokenHash(refreshTokenHash);
 
     if (!session || session.userId !== userId) {
-      throw new UnauthorizedException('Sesión inválida o expirada');
+      throw new UnauthorizedException(SECURITY_MESSAGES.INVALID_SESSION);
     }
 
     if (session.deviceId !== deviceId) {
-      throw new UnauthorizedException('Dispositivo no autorizado');
+      throw new UnauthorizedException(SECURITY_MESSAGES.UNAUTHORIZED_DEVICE);
     }
 
     if (session.expiresAt < new Date()) {
@@ -56,14 +59,14 @@ export class SessionValidatorService {
         isActive: false,
         sessionStatusId: revokedStatusId,
       });
-      throw new UnauthorizedException('Sesión inválida o expirada');
+      throw new UnauthorizedException(SECURITY_MESSAGES.INVALID_SESSION);
     }
 
     const activeStatusId = await this.sessionStatusService.getIdByCode(
       SESSION_STATUS_CODES.ACTIVE,
     );
     if (session.sessionStatusId !== activeStatusId || !session.isActive) {
-      throw new UnauthorizedException('Sesión inválida o expirada');
+      throw new UnauthorizedException(SECURITY_MESSAGES.INVALID_SESSION);
     }
 
     await this.userSessionRepository.update(session.id, {
@@ -82,7 +85,7 @@ export class SessionValidatorService {
       await this.userSessionRepository.findByIdWithUser(sessionId);
 
     if (!session || session.userId !== userId) {
-      throw new UnauthorizedException('Sesión inválida o expirada');
+      throw new UnauthorizedException(SECURITY_MESSAGES.INVALID_SESSION);
     }
 
     const activeStatusId = await this.sessionStatusService.getIdByCode(
@@ -94,7 +97,7 @@ export class SessionValidatorService {
       session.sessionStatusId !== activeStatusId ||
       session.expiresAt < new Date()
     ) {
-      throw new UnauthorizedException('Sesión inválida o expirada');
+      throw new UnauthorizedException(SECURITY_MESSAGES.INVALID_SESSION);
     }
 
     if (session.deviceId !== deviceId) {
@@ -106,7 +109,7 @@ export class SessionValidatorService {
         expectedDeviceId: session.deviceId,
         providedDeviceId: deviceId,
       });
-      throw new UnauthorizedException('Dispositivo no autorizado');
+      throw new UnauthorizedException(SECURITY_MESSAGES.UNAUTHORIZED_DEVICE);
     }
 
     await this.userSessionRepository.update(session.id, {

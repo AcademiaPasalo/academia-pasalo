@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, EntityManager } from 'typeorm';
+import { Repository, EntityManager, Brackets } from 'typeorm';
 import { ClassEvent } from '@modules/events/domain/class-event.entity';
 
 @Injectable()
@@ -116,7 +116,7 @@ export class ClassEventRepository {
     await repo.update(id, { ...data, updatedAt: new Date() });
     const updated = await repo.findOne({ where: { id } });
     if (!updated) {
-      throw new Error('Evento de clase no encontrado despu�s de actualizar');
+      throw new Error('Evento de clase no encontrado despues de actualizar');
     }
     return updated;
   }
@@ -147,17 +147,7 @@ export class ClassEventRepository {
         'professors',
         'professors.revokedAt IS NULL',
       )
-      .leftJoinAndSelect('professors.professor', 'professor')
-      // Join con matrículas para estudiantes
-      .leftJoin('evaluation.courseCycle', 'cc_enroll')
-      .leftJoin(
-        'cc_enroll.enrollments',
-        'enrollment',
-        'enrollment.userId = :userId AND enrollment.cancelledAt IS NULL',
-        { userId },
-      )
-      // Join con tabla de profesores asignados
-      .leftJoin('classEvent.professors', 'p_check');
+      .leftJoinAndSelect('professors.professor', 'professor');
 
     return await qb
       .where('classEvent.startDatetime BETWEEN :startDate AND :endDate', {
@@ -165,8 +155,35 @@ export class ClassEventRepository {
         endDate,
       })
       .andWhere(
-        '(enrollment.id IS NOT NULL OR classEvent.createdBy = :userId OR p_check.professorUserId = :userId)',
-        { userId },
+        new Brackets((where) => {
+          where
+            .where('classEvent.createdBy = :userId', { userId })
+            .orWhere(
+              `EXISTS (
+                SELECT 1
+                FROM class_event_professor cep
+                WHERE cep.class_event_id = classEvent.id
+                  AND cep.professor_user_id = :userId
+                  AND cep.revoked_at IS NULL
+              )`,
+              { userId },
+            )
+            .orWhere(
+              `EXISTS (
+                SELECT 1
+                FROM enrollment_evaluation ee
+                INNER JOIN enrollment e
+                  ON e.id = ee.enrollment_id
+                WHERE ee.evaluation_id = classEvent.evaluation_id
+                  AND ee.is_active = 1
+                  AND ee.access_start_date <= UTC_TIMESTAMP()
+                  AND ee.access_end_date >= UTC_TIMESTAMP()
+                  AND e.user_id = :userId
+                  AND e.cancelled_at IS NULL
+              )`,
+              { userId },
+            );
+        }),
       )
       .orderBy('classEvent.startDatetime', 'ASC')
       .getMany();

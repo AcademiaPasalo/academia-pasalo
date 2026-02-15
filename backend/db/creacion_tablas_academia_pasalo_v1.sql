@@ -7,13 +7,15 @@ USE academia_pasalo;
 CREATE TABLE role (
   id BIGINT PRIMARY KEY AUTO_INCREMENT,
   code VARCHAR(30) NOT NULL,
-  name VARCHAR(30) NOT NULL
+  name VARCHAR(30) NOT NULL,
+  CONSTRAINT uq_role_code UNIQUE (code)
 );
 
 CREATE TABLE course_type (
   id BIGINT PRIMARY KEY AUTO_INCREMENT,
   code VARCHAR(30) NOT NULL,
-  name VARCHAR(60) NOT NULL
+  name VARCHAR(60) NOT NULL,
+  CONSTRAINT uq_course_type_code UNIQUE (code)
 );
 
 CREATE TABLE cycle_level (
@@ -25,50 +27,65 @@ CREATE TABLE cycle_level (
 CREATE TABLE enrollment_status (
   id BIGINT PRIMARY KEY AUTO_INCREMENT,
   code VARCHAR(50) NOT NULL,
-  name VARCHAR(100) NOT NULL
+  name VARCHAR(100) NOT NULL,
+  CONSTRAINT uq_enrollment_status_code UNIQUE (code)
 );
 
 CREATE TABLE evaluation_type (
   id BIGINT PRIMARY KEY AUTO_INCREMENT,
   code VARCHAR(50) NOT NULL,
-  name VARCHAR(100) NOT NULL
+  name VARCHAR(100) NOT NULL,
+  CONSTRAINT uq_evaluation_type_code UNIQUE (code)
 );
 
 CREATE TABLE folder_status (
   id BIGINT PRIMARY KEY AUTO_INCREMENT,
   code VARCHAR(50) NOT NULL,
-  name VARCHAR(100) NOT NULL
+  name VARCHAR(100) NOT NULL,
+  CONSTRAINT uq_folder_status_code UNIQUE (code)
 );
 
 CREATE TABLE material_status (
   id BIGINT PRIMARY KEY AUTO_INCREMENT,
   code VARCHAR(50) NOT NULL,
-  name VARCHAR(100) NOT NULL
+  name VARCHAR(100) NOT NULL,
+  CONSTRAINT uq_material_status_code UNIQUE (code)
 );
 
 CREATE TABLE deletion_request_status (
   id BIGINT PRIMARY KEY AUTO_INCREMENT,
   code VARCHAR(50) NOT NULL,
-  name VARCHAR(100) NOT NULL
+  name VARCHAR(100) NOT NULL,
+  CONSTRAINT uq_deletion_request_status_code UNIQUE (code)
 );
 
 CREATE TABLE audit_action (
   id BIGINT PRIMARY KEY AUTO_INCREMENT,
   code VARCHAR(100) NOT NULL,
-  name VARCHAR(200) NOT NULL
+  name VARCHAR(200) NOT NULL,
+  CONSTRAINT uq_audit_action_code UNIQUE (code)
 );
 
 CREATE TABLE session_status (
   id BIGINT PRIMARY KEY AUTO_INCREMENT,
   code VARCHAR(50) NOT NULL,
-  name VARCHAR(100) NOT NULL
+  name VARCHAR(100) NOT NULL,
+  CONSTRAINT uq_session_status_code UNIQUE (code)
+);
+
+CREATE TABLE class_event_recording_status (
+  id BIGINT PRIMARY KEY AUTO_INCREMENT,
+  code VARCHAR(50) NOT NULL,
+  name VARCHAR(100) NOT NULL,
+  CONSTRAINT uq_class_event_recording_status_code UNIQUE (code)
 );
 
 
 CREATE TABLE security_event_type (
   id BIGINT PRIMARY KEY AUTO_INCREMENT,
   code VARCHAR(100) NOT NULL,
-  name VARCHAR(200) NOT NULL
+  name VARCHAR(200) NOT NULL,
+  CONSTRAINT uq_security_event_type_code UNIQUE (code)
 );
 
 CREATE TABLE enrollment_type (
@@ -205,6 +222,38 @@ CREATE TABLE enrollment_evaluation (
   FOREIGN KEY (revoked_by) REFERENCES user(id)
 );
 
+CREATE TABLE class_event (
+  id BIGINT PRIMARY KEY AUTO_INCREMENT,
+  evaluation_id BIGINT NOT NULL,
+  session_number INT NOT NULL,
+  title VARCHAR(255) NOT NULL,
+  topic VARCHAR(120) NOT NULL,
+  start_datetime DATETIME NOT NULL,
+  end_datetime DATETIME NOT NULL,
+  live_meeting_url VARCHAR(500) NOT NULL,
+  recording_url VARCHAR(500) NULL,
+  recording_status_id BIGINT NOT NULL,
+  is_cancelled BOOLEAN NOT NULL DEFAULT FALSE,
+  created_by BIGINT NOT NULL,
+  created_at DATETIME NOT NULL,
+  updated_at DATETIME,
+  CONSTRAINT fk_class_event_evaluation FOREIGN KEY (evaluation_id) REFERENCES evaluation(id) ON DELETE CASCADE,
+  CONSTRAINT fk_class_event_recording_status FOREIGN KEY (recording_status_id) REFERENCES class_event_recording_status(id),
+  CONSTRAINT fk_class_event_creator FOREIGN KEY (created_by) REFERENCES user(id),
+  CONSTRAINT uq_evaluation_session_number UNIQUE (evaluation_id, session_number),
+  CONSTRAINT chk_datetime_order CHECK (end_datetime > start_datetime)
+);
+
+CREATE TABLE class_event_professor (
+  class_event_id BIGINT NOT NULL,
+  professor_user_id BIGINT NOT NULL,
+  assigned_at DATETIME NOT NULL,
+  revoked_at DATETIME,
+  PRIMARY KEY (class_event_id, professor_user_id),
+  CONSTRAINT fk_class_event_professor_event FOREIGN KEY (class_event_id) REFERENCES class_event(id) ON DELETE CASCADE,
+  CONSTRAINT fk_class_event_professor_user FOREIGN KEY (professor_user_id) REFERENCES user(id)
+);
+
 CREATE TABLE material_folder (
   id BIGINT PRIMARY KEY AUTO_INCREMENT,
   evaluation_id BIGINT NOT NULL,
@@ -229,7 +278,8 @@ CREATE TABLE file_resource (
   mime_type VARCHAR(100) NOT NULL,
   size_bytes BIGINT NOT NULL,
   storage_url VARCHAR(500) NOT NULL,
-  created_at DATETIME NOT NULL
+  created_at DATETIME NOT NULL,
+  CONSTRAINT uq_file_resource_hash UNIQUE (checksum_hash)
 );
 
 CREATE TABLE file_version (
@@ -247,6 +297,7 @@ CREATE TABLE file_version (
 CREATE TABLE material (
   id BIGINT PRIMARY KEY AUTO_INCREMENT,
   material_folder_id BIGINT NOT NULL,
+  class_event_id BIGINT NULL,
   file_resource_id BIGINT NOT NULL,
   file_version_id BIGINT NOT NULL,
   material_status_id BIGINT NOT NULL,
@@ -257,6 +308,7 @@ CREATE TABLE material (
   created_at DATETIME NOT NULL,
   updated_at DATETIME,
   FOREIGN KEY (material_folder_id) REFERENCES material_folder(id),
+  FOREIGN KEY (class_event_id) REFERENCES class_event(id),
   FOREIGN KEY (file_resource_id) REFERENCES file_resource(id),
   FOREIGN KEY (file_version_id) REFERENCES file_version(id),
   FOREIGN KEY (material_status_id) REFERENCES material_status(id),
@@ -367,36 +419,6 @@ CREATE TABLE featured_testimony (
   CONSTRAINT uq_featured_testimony_course_cycle_testimony UNIQUE (course_cycle_id, course_testimony_id)
 );
 
-   CREATE TABLE class_event (
-     id BIGINT PRIMARY KEY AUTO_INCREMENT,
-     evaluation_id BIGINT NOT NULL,
-     session_number INT NOT NULL,
-     title VARCHAR(255) NOT NULL,
-     topic VARCHAR(120) NOT NULL,
-     start_datetime DATETIME NOT NULL,
-     end_datetime DATETIME NOT NULL,
-     meeting_link VARCHAR(500) NOT NULL,
-     is_cancelled BOOLEAN NOT NULL DEFAULT FALSE,
-     created_by BIGINT NOT NULL,
-     created_at DATETIME NOT NULL,
-     updated_at DATETIME,
-
-     CONSTRAINT fk_class_event_evaluation FOREIGN KEY (evaluation_id) REFERENCES evaluation(id) ON DELETE CASCADE,
-     CONSTRAINT fk_class_event_creator FOREIGN KEY (created_by) REFERENCES user(id),
-     CONSTRAINT uq_evaluation_session_number UNIQUE (evaluation_id, session_number),
-     CONSTRAINT chk_datetime_order CHECK (end_datetime > start_datetime)
- );
-
-   CREATE TABLE class_event_professor (
-     class_event_id BIGINT NOT NULL,
-     professor_user_id BIGINT NOT NULL,
-     assigned_at DATETIME NOT NULL,
-     revoked_at DATETIME,
-     PRIMARY KEY (class_event_id, professor_user_id),
-     CONSTRAINT fk_class_event_professor_event FOREIGN KEY (class_event_id) REFERENCES class_event(id) ON DELETE CASCADE,
-     CONSTRAINT fk_class_event_professor_user FOREIGN KEY (professor_user_id) REFERENCES user(id)
-   );
-
 CREATE UNIQUE INDEX idx_user_email ON user(email);
 
 CREATE INDEX idx_user_session_user_active
@@ -440,6 +462,9 @@ ON material_folder(visible_from, visible_until);
 
 CREATE INDEX idx_material_folder
 ON material(material_folder_id);
+
+CREATE INDEX idx_material_class_event
+ON material(class_event_id);
 
 CREATE INDEX idx_material_status
 ON material(material_status_id);
@@ -497,6 +522,7 @@ CREATE INDEX idx_class_event_evaluation ON class_event(evaluation_id);
 CREATE INDEX idx_class_event_datetime ON class_event(start_datetime, end_datetime);
 CREATE INDEX idx_class_event_cancelled ON class_event(is_cancelled);
 CREATE INDEX idx_class_event_creator ON class_event(created_by);
+CREATE INDEX idx_class_event_recording_status ON class_event(recording_status_id);
 
 CREATE INDEX idx_class_event_professor_event ON class_event_professor(class_event_id);
 CREATE INDEX idx_class_event_professor_user ON class_event_professor(professor_user_id);

@@ -5,7 +5,10 @@ import { AuthSettingsService } from './auth-settings.service';
 import { GeoProvider } from '@common/interfaces/geo-provider.interface';
 import { UserSessionRepository } from '@modules/auth/infrastructure/user-session.repository';
 import { RequestMetadata } from '@modules/auth/interfaces/request-metadata.interface';
-import { ANOMALY_TYPES } from '@modules/auth/interfaces/security.constants';
+import {
+  ANOMALY_TYPES,
+  LOCATION_SOURCES,
+} from '@modules/auth/interfaces/security.constants';
 import { UserSession } from '@modules/auth/domain/user-session.entity';
 
 describe('SessionAnomalyDetectorService', () => {
@@ -74,7 +77,7 @@ describe('SessionAnomalyDetectorService', () => {
       const result = await detector.detectLocationAnomaly(
         'u1',
         metadata,
-        'gps',
+        LOCATION_SOURCES.GPS,
         true,
       );
 
@@ -90,7 +93,7 @@ describe('SessionAnomalyDetectorService', () => {
       const result = await detector.detectLocationAnomaly(
         'u1',
         metadata,
-        'gps',
+        LOCATION_SOURCES.GPS,
         true,
       );
 
@@ -112,7 +115,7 @@ describe('SessionAnomalyDetectorService', () => {
       const result = await detector.detectLocationAnomaly(
         'u1',
         metadata,
-        'gps',
+        LOCATION_SOURCES.GPS,
         true,
       );
 
@@ -129,7 +132,7 @@ describe('SessionAnomalyDetectorService', () => {
       const result = await detector.detectLocationAnomaly(
         'u1',
         metadata,
-        'gps',
+        LOCATION_SOURCES.GPS,
         false,
       );
 
@@ -147,7 +150,7 @@ describe('SessionAnomalyDetectorService', () => {
       const result = await detector.detectLocationAnomaly(
         'u1',
         metadata,
-        'gps',
+        LOCATION_SOURCES.GPS,
         false,
       );
 
@@ -164,7 +167,7 @@ describe('SessionAnomalyDetectorService', () => {
       const result = await detector.detectLocationAnomaly(
         'u1',
         badMeta,
-        'gps',
+        LOCATION_SOURCES.GPS,
         false,
       );
 
@@ -177,7 +180,7 @@ describe('SessionAnomalyDetectorService', () => {
   describe('resolveCoordinates', () => {
     it('debe usar GPS si la metadata tiene coordenadas', async () => {
       const result = await detector.resolveCoordinates(metadata);
-      expect(result.locationSource).toBe('gps');
+      expect(result.locationSource).toBe(LOCATION_SOURCES.GPS);
       expect(result.metadata.latitude).toBe(metadata.latitude);
     });
 
@@ -195,7 +198,7 @@ describe('SessionAnomalyDetectorService', () => {
       });
 
       const result = await detector.resolveCoordinates(metaNoGps);
-      expect(result.locationSource).toBe('ip');
+      expect(result.locationSource).toBe(LOCATION_SOURCES.IP);
       expect(result.metadata.latitude).toBe(-12);
       expect(result.metadata.city).toBe('Lima');
     });
@@ -209,7 +212,7 @@ describe('SessionAnomalyDetectorService', () => {
       (geoProvider.resolve as jest.Mock).mockReturnValue(null);
 
       const result = await detector.resolveCoordinates(metaNoGps);
-      expect(result.locationSource).toBe('none');
+      expect(result.locationSource).toBe(LOCATION_SOURCES.NONE);
     });
   });
 });

@@ -4,7 +4,13 @@ import { SecurityEventService } from '@modules/auth/application/security-event.s
 import { technicalSettings } from '@config/technical-settings';
 import { UserSession } from '@modules/auth/domain/user-session.entity';
 import { RequestMetadata } from '@modules/auth/interfaces/request-metadata.interface';
-import { AnomalyType } from '@modules/auth/interfaces/security.constants';
+import {
+  AnomalyType,
+  LOCATION_SOURCES,
+  LocationSource,
+  SECURITY_EVENT_CODES,
+  SecurityEventCode,
+} from '@modules/auth/interfaces/security.constants';
 
 @Injectable()
 export class SessionSecurityService {
@@ -16,7 +22,7 @@ export class SessionSecurityService {
     userId: string;
     metadata: RequestMetadata;
     session: UserSession;
-    locationSource: 'ip' | 'gps' | 'none';
+    locationSource: LocationSource;
     isNewDevice: boolean;
     anomaly: {
       isAnomalous: boolean;
@@ -42,7 +48,7 @@ export class SessionSecurityService {
     if (isConcurrent && existingSession) {
       await this.securityEventService.logEvent(
         userId,
-        'CONCURRENT_SESSION_DETECTED',
+        SECURITY_EVENT_CODES.CONCURRENT_SESSION_DETECTED as SecurityEventCode,
         {
           ipAddress: metadata.ipAddress,
           userAgent: metadata.userAgent,
@@ -61,7 +67,7 @@ export class SessionSecurityService {
     if (anomaly.isAnomalous) {
       await this.securityEventService.logEvent(
         userId,
-        'ANOMALOUS_LOGIN_DETECTED',
+        SECURITY_EVENT_CODES.ANOMALOUS_LOGIN_DETECTED as SecurityEventCode,
         {
           ipAddress: metadata.ipAddress,
           userAgent: metadata.userAgent,
@@ -85,7 +91,7 @@ export class SessionSecurityService {
       if (params.isNewDevice) {
         await this.securityEventService.logEvent(
           userId,
-          'NEW_DEVICE_DETECTED',
+          SECURITY_EVENT_CODES.NEW_DEVICE_DETECTED as SecurityEventCode,
           {
             ipAddress: metadata.ipAddress,
             userAgent: metadata.userAgent,
@@ -101,7 +107,7 @@ export class SessionSecurityService {
 
       await this.securityEventService.logEvent(
         userId,
-        'LOGIN_SUCCESS',
+        SECURITY_EVENT_CODES.LOGIN_SUCCESS as SecurityEventCode,
         {
           ipAddress: metadata.ipAddress,
           userAgent: metadata.userAgent,
@@ -119,7 +125,7 @@ export class SessionSecurityService {
   ): Promise<void> {
     const strikeCount = await this.securityEventService.countEventsByCode(
       userId,
-      'ANOMALOUS_LOGIN_DETECTED',
+      SECURITY_EVENT_CODES.ANOMALOUS_LOGIN_DETECTED as SecurityEventCode,
       manager,
     );
 
@@ -134,10 +140,6 @@ export class SessionSecurityService {
         userId,
         strikes: strikeCount,
       });
-
-      /**
-       * TODO: Implementar integración con NotificationModule cuando esté disponible.
-       */
     }
   }
 }

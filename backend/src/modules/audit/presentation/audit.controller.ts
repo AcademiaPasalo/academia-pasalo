@@ -5,6 +5,7 @@ import { JwtAuthGuard } from '@common/guards/jwt-auth.guard';
 import { RolesGuard } from '@common/guards/roles.guard';
 import { Roles } from '@common/decorators/roles.decorator';
 import { ResponseMessage } from '@common/decorators/response-message.decorator';
+import { ROLE_CODES } from '@common/constants/role-codes.constants';
 
 @Controller('audit')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -12,7 +13,7 @@ export class AuditController {
   constructor(private readonly auditService: AuditService) {}
 
   @Get('history')
-  @Roles('SUPER_ADMIN', 'ADMIN')
+  @Roles(ROLE_CODES.SUPER_ADMIN, ROLE_CODES.ADMIN)
   @ResponseMessage('Historial de auditoría recuperado exitosamente')
   async getHistory(
     @Query('startDate') startDate?: string,
@@ -29,7 +30,7 @@ export class AuditController {
   }
 
   @Get('export')
-  @Roles('SUPER_ADMIN', 'ADMIN')
+  @Roles(ROLE_CODES.SUPER_ADMIN, ROLE_CODES.ADMIN)
   async exportHistory(
     @Res() res: express.Response,
     @Query('startDate') startDate?: string,

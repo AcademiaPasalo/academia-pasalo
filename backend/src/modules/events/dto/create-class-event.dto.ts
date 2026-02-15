@@ -46,5 +46,5 @@ export class CreateClassEventDto {
   @IsUrl()
   @MaxLength(500)
   @IsDefined()
-  meetingLink: string;
+  liveMeetingUrl: string;
 }

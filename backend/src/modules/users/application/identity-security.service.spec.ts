@@ -73,10 +73,11 @@ describe('IdentitySecurityService', () => {
   });
 
   it('baneo revoca sesiones activas y limpia caché', async () => {
+    const revokedId = 'revoked-status-id';
     userSessionRepositoryMock.findActiveSessionsByUserId.mockResolvedValue([
       { id: 's1' },
     ]);
-    sessionStatusRepositoryMock.findByCode.mockResolvedValue({ id: 'revoked' });
+    sessionStatusRepositoryMock.findByCode.mockResolvedValue({ id: revokedId });
 
     await service.invalidateUserIdentity('10', {
       revokeSessions: true,
@@ -90,7 +91,7 @@ describe('IdentitySecurityService', () => {
     expect(userSessionRepositoryMock.update).toHaveBeenCalledWith(
       's1',
       {
-        sessionStatusId: 'revoked',
+        sessionStatusId: revokedId,
         isActive: false,
       },
       undefined,
