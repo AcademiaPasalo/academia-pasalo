@@ -1,218 +1,340 @@
+// ============================================
+// CALENDARIO CONTENT - Página de Calendario de Clases del Estudiante
+// ============================================
+
 'use client';
 
-import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
-import Icon from '@/components/ui/Icon';
-import CourseCard from '@/components/courses/CourseCard';
-import AgendarTutoriaModal from '@/components/modals/AgendarTutoriaModal';
-import DaySchedule from '@/components/dashboard/DaySchedule';
-import { useBreadcrumb } from '@/contexts/BreadcrumbContext';
-import { enrollmentService } from '@/services/enrollment.service';
-import { classEventService } from '@/services/classEvent.service';
-import { Enrollment } from '@/types/enrollment';
-import { ClassEvent } from '@/types/classEvent';
-import { format, parseISO } from 'date-fns';
-import { es } from 'date-fns/locale';
+import { useState, useMemo } from 'react';
+import { useCalendar } from '@/hooks/useCalendar';
+import { useEnrollments } from '@/hooks/useEnrollments';
+import type { ClassEvent } from '@/types/classEvent';
+import EventDetailModal from '@/components/modals/EventDetailModal';
+import { MdChevronLeft, MdChevronRight, MdExpandMore, MdCalendarViewWeek, MdCalendarViewMonth } from 'react-icons/md';
+
+const HOURS = Array.from({ length: 23 }, (_, i) => i + 1);
+const DAY_NAMES = ['DOM', 'LUN', 'MAR', 'MIÉ', 'JUE', 'VIE', 'SÁB'];
+
+const COURSE_COLORS = [
+  { bg: 'bg-[#E0F2FE]', border: 'border-[#0891B2]' },
+  { bg: 'bg-[#FCE7F3]', border: 'border-[#EC4899]' },
+  { bg: 'bg-[#DCFCE7]', border: 'border-[#10B981]' },
+  { bg: 'bg-[#FEF3C7]', border: 'border-[#F59E0B]' },
+  { bg: 'bg-[#E9D5FF]', border: 'border-[#A855F7]' },
+  { bg: 'bg-[#DBEAFE]', border: 'border-[#3B82F6]' },
+];
 
 export default function CalendarioContent() {
-  // Estado para controlar la vista activa
-  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
-  const [enrollments, setEnrollments] = useState<Enrollment[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const {
+    events,
+    loading,
+    view,
+    selectedCourseId,
+    goToNext,
+    goToPrevious,
+    goToToday,
+    changeView,
+    filterByCourse,
+    getCurrentMonthYear,
+    getWeekDays,
+    isToday,
+  } = useCalendar();
+
+  const { uniqueCourses, loading: loadingCourses } = useEnrollments();
+  const [selectedEvent, setSelectedEvent] = useState<ClassEvent | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [upcomingEvents, setUpcomingEvents] = useState<ClassEvent[]>([]);
-  const [loadingEvents, setLoadingEvents] = useState(true);
-  const [copyingLink, setCopyingLink] = useState<string | null>(null);
-  const router = useRouter();
-  
-  // Configurar breadcrumb
-  const { setBreadcrumbItems } = useBreadcrumb();
+  const [isFilterOpen, setIsFilterOpen] = useState(false);
 
-  useEffect(() => {
-    setBreadcrumbItems([{ icon: 'calendar', label: 'Calendario' }]);
-  }, [setBreadcrumbItems]);
+  const weekDays = getWeekDays();
 
-  // Cargar cursos matriculados
-  useEffect(() => {
-    async function loadEnrollments() {
-      setLoading(true);
-      setError(null);
-      try {
-        const response = await enrollmentService.getMyCourses();
-        
-        // HOTFIX: El servicio está retornando el array directamente en lugar del objeto ApiResponse
-        // Verificar si response es un array o un objeto con data
-        if (Array.isArray(response)) {
-          console.log('⚠️ Response es un array, usando directamente');
-          setEnrollments(response);
-        } else if (response && 'data' in response) {
-          console.log('✅ Response es ApiResponse, usando response.data');
-          setEnrollments(response.data || []);
-        } else {
-          console.error('❌ Response tiene formato inesperado:', response);
-          setEnrollments([]);
-        }
-      } catch (err) {
-        console.error('❌ Error al cargar matrículas:', err);
-        const errorMessage = err instanceof Error ? err.message : 'Error al cargar los cursos';
-        setError(errorMessage);
-      } finally {
-        setLoading(false);
-      }
-    }
+  const courseColorMap = useMemo(() => {
+    const map = new Map<string, typeof COURSE_COLORS[0]>();
+    uniqueCourses.forEach((course: { id: string; code: string; name: string }, index: number) => {
+      map.set(course.code, COURSE_COLORS[index % COURSE_COLORS.length]);
+    });
+    return map;
+  }, [uniqueCourses]);
 
-    loadEnrollments();
-  }, []);
+  const getEventsByDay = (day: Date) => {
+    if (!events || events.length === 0) return [];
 
-  // Cargar próximos eventos (próximos 7 días)
-  useEffect(() => {
-    async function loadUpcomingEvents() {
-      setLoadingEvents(true);
-      try {
-        const today = new Date();
-        const nextWeek = new Date();
-        nextWeek.setDate(today.getDate() + 7);
-        
-        const start = today.toISOString().split('T')[0];
-        const end = nextWeek.toISOString().split('T')[0];
-        
-        const response = await classEventService.getMySchedule({ start, end });
-        
-        // Manejar respuesta que puede ser array o ApiResponse
-        let events: ClassEvent[] = [];
-        if (Array.isArray(response)) {
-          events = response;
-        } else if (response && 'data' in response) {
-          events = response.data || [];
-        }
-        
-        // Filtrar solo eventos futuros o en curso, ordenados por fecha
-        const futureEvents = events
-          .filter(event => !event.isCancelled && event.status !== 'FINALIZADA')
-          .sort((a, b) => new Date(a.startDatetime).getTime() - new Date(b.startDatetime).getTime())
-          .slice(0, 10); // Mostrar máximo 10 eventos próximos
-        
-        setUpcomingEvents(futureEvents);
-      } catch (err) {
-        console.error('Error al cargar eventos próximos:', err);
-      } finally {
-        setLoadingEvents(false);
-      }
-    }
-
-    loadUpcomingEvents();
-  }, []);
-
-  const handleAgendarTutoria = (curso: string, tema: string) => {
-    const mensaje = `¡Hola! Quisiera agendar una tutoría de ${curso} para la evaluación o tema ${tema}`;
-    const url = `https://wa.me/903006775?text=${encodeURIComponent(mensaje)}`;
-    window.open(url, '_blank');
+    return events.filter((event) => {
+      const eventDate = new Date(event.startDatetime);
+      return (
+        eventDate.getDate() === day.getDate() &&
+        eventDate.getMonth() === day.getMonth() &&
+        eventDate.getFullYear() === day.getFullYear()
+      );
+    });
   };
 
-  // Manejar unirse a reunión
-  const handleJoinMeeting = (event: ClassEvent) => {
-    try {
-      classEventService.joinMeeting(event);
-    } catch (err) {
-      console.error('Error al unirse a la reunión:', err);
-      alert(err instanceof Error ? err.message : 'Error al abrir la reunión');
-    }
+  const getEventPosition = (event: ClassEvent) => {
+    const start = new Date(event.startDatetime);
+    const end = new Date(event.endDatetime);
+
+    const startHour = start.getHours();
+    const startMinutes = start.getMinutes();
+    const endHour = end.getHours();
+    const endMinutes = end.getMinutes();
+
+    const startPosition = (startHour - 1) * 80 + (startMinutes / 60) * 80;
+    const duration = (endHour - startHour) * 80 + ((endMinutes - startMinutes) / 60) * 80;
+
+    return {
+      top: startPosition,
+      height: Math.max(duration, 40),
+    };
   };
 
-  // Manejar copiar link de reunión
-  const handleCopyMeetingLink = async (event: ClassEvent) => {
-    setCopyingLink(event.id);
-    try {
-      await classEventService.copyMeetingLink(event);
-      // Feedback visual temporal (puedes usar un toast aquí si lo tienes configurado)
-      setTimeout(() => setCopyingLink(null), 2000);
-    } catch (err) {
-      console.error('Error al copiar link:', err);
-      alert(err instanceof Error ? err.message : 'Error al copiar el link');
-      setCopyingLink(null);
-    }
+  const formatEventTime = (event: ClassEvent) => {
+    const start = new Date(event.startDatetime);
+    const end = new Date(event.endDatetime);
+
+    const startHour = start.getHours();
+    const startMin = start.getMinutes();
+    const endHour = end.getHours();
+    const endMin = end.getMinutes();
+
+    const formatHour = (hour: number, min: number) => {
+      const period = hour >= 12 ? 'pm' : 'am';
+      const displayHour = hour > 12 ? hour - 12 : hour === 0 ? 12 : hour;
+      return min > 0 ? `${displayHour}:${min.toString().padStart(2, '0')}${period}` : `${displayHour}${period}`;
+    };
+
+    return `${formatHour(startHour, startMin)} - ${formatHour(endHour, endMin)}`;
   };
 
-  // Formatear fecha y hora del evento
-  const formatEventDateTime = (startDatetime: string, endDatetime: string): string => {
-    const start = parseISO(startDatetime);
-    const end = parseISO(endDatetime);
-    
-    const dayName = format(start, 'EEEE', { locale: es });
-    const day = format(start, 'd', { locale: es });
-    const month = format(start, 'MMM', { locale: es });
-    const startTime = format(start, 'h:mm a', { locale: es });
-    const endTime = format(end, 'h:mm a', { locale: es });
-    
-    return `${dayName.charAt(0).toUpperCase() + dayName.slice(1)} ${day} ${month} • ${startTime} - ${endTime}`;
+  const handleEventClick = (event: ClassEvent) => {
+    setSelectedEvent(event);
+    setIsModalOpen(true);
   };
 
-  // Agrupar eventos por curso
-  const eventsByCourse = upcomingEvents.reduce<Record<string, ClassEvent[]>>((acc, event) => {
-    if (!acc[event.courseCode]) {
-      acc[event.courseCode] = [];
-    }
-    acc[event.courseCode].push(event);
-    return acc;
-  }, {});
-
-  // Obtener iniciales del profesor
-  const getProfessorInitials = (enrollment: Enrollment): string => {
-    const professors = enrollment.courseCycle.professors;
-    if (professors.length === 0) return 'XX';
-    const prof = professors[0];
-    return `${prof.firstName[0]}${prof.lastName1[0]}`.toUpperCase();
-  };
-
-  // Obtener nombre completo del profesor
-  const getProfessorName = (enrollment: Enrollment): string => {
-    const professors = enrollment.courseCycle.professors;
-    if (professors.length === 0) return 'Sin asignar';
-    const prof = professors[0];
-    return `${prof.firstName} ${prof.lastName1}`;
-  };
-
-  // Obtener color consistente para un curso
-  const getCourseColor = (courseCode: string): string => {
-    const hash = courseCode.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
-    const colors = ['#1E40A3', '#10B981', '#F13072', '#ffa726', '#ef5350'];
-    return colors[hash % colors.length];
-  };
-
-  if (loading) {
-    console.log('🔄 Estado: LOADING');
-    return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <div className="text-center">
-          <div className="w-12 h-12 border-4 border-accent-solid border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-secondary">Cargando cursos...</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (error) {
-    console.log('❌ Estado: ERROR', error);
-    return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <div className="text-center">
-          <Icon name="error" size={64} className="text-error-solid mb-4 mx-auto" />
-          <p className="text-lg font-semibold text-primary mb-2">{error}</p>
-          <button 
-            onClick={() => window.location.reload()}
-            className="mt-4 px-4 py-2 bg-accent-solid text-white rounded-lg hover:bg-accent-solid-hover transition-colors"
-          >
-            Reintentar
-          </button>
-        </div>
-      </div>
-    );
-  }
+  const selectedCourseName = selectedCourseId
+    ? uniqueCourses.find((c: { code: string }) => c.code === selectedCourseId)?.name || 'Curso seleccionado'
+    : 'Filtrar por Curso';
 
   return (
-    <div className="grid grid-cols-1 xl:grid-cols-[1fr_400px] gap-12">
-        
+    <div className="flex flex-col gap-12">
+      <div className="flex justify-between items-center">
+        <h1 className="text-3xl font-semibold text-text-primary">Calendario de Clases</h1>
+
+        <div className="relative w-64">
+          <button
+            onClick={() => setIsFilterOpen(!isFilterOpen)}
+            className="w-full h-12 px-3 py-3.5 bg-bg-primary rounded border border-stroke-primary flex justify-between items-center gap-2 hover:bg-bg-secondary transition-colors"
+            disabled={loadingCourses}
+          >
+            <span className={`flex-1 text-left text-base ${selectedCourseId ? 'text-text-primary' : 'text-text-tertiary'}`}>
+              {selectedCourseName}
+            </span>
+            <MdExpandMore className={`w-5 h-5 text-icon-tertiary transition-transform ${isFilterOpen ? 'rotate-180' : ''}`} />
+          </button>
+
+          {isFilterOpen && (
+            <div className="absolute top-full left-0 right-0 mt-2 bg-bg-primary rounded-lg shadow-2xl border border-stroke-primary z-20 max-h-80 overflow-y-auto">
+              <button
+                onClick={() => {
+                  filterByCourse(null);
+                  setIsFilterOpen(false);
+                }}
+                className={`w-full px-4 py-3 text-left hover:bg-bg-secondary transition-colors ${!selectedCourseId ? 'bg-accent-light text-text-accent-primary' : 'text-text-primary'}`}
+              >
+                Todos los cursos
+              </button>
+              {uniqueCourses.map((course: { id: string; code: string; name: string }) => (
+                <button
+                  key={course.id}
+                  onClick={() => {
+                    filterByCourse(course.code);
+                    setIsFilterOpen(false);
+                  }}
+                  className={`w-full px-4 py-3 text-left hover:bg-bg-secondary transition-colors ${selectedCourseId === course.code ? 'bg-accent-light text-text-accent-primary' : 'text-text-primary'}`}
+                >
+                  <div className="font-medium">{course.code}</div>
+                  <div className="text-sm text-text-secondary">{course.name}</div>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div className="p-4 bg-bg-primary rounded-xl border border-stroke-primary">
+        <div className="flex justify-between items-center">
+          <div className="flex items-center gap-5">
+            <button
+              onClick={goToToday}
+              className="px-4 py-3 bg-bg-primary rounded-lg border border-stroke-accent-primary text-sm font-medium text-text-accent-primary hover:bg-accent-light transition-colors"
+            >
+              Hoy
+            </button>
+
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={goToPrevious}
+                  className="p-1 rounded-lg hover:bg-bg-secondary transition-colors"
+                  aria-label="Anterior"
+                >
+                  <MdChevronLeft className="w-4 h-4 text-icon-accent-primary" />
+                </button>
+                <button
+                  onClick={goToNext}
+                  className="p-1 rounded-lg hover:bg-bg-secondary transition-colors"
+                  aria-label="Siguiente"
+                >
+                  <MdChevronRight className="w-4 h-4 text-icon-accent-primary" />
+                </button>
+              </div>
+
+              <div className="flex items-center gap-1 capitalize">
+                <span className="text-xl font-medium text-text-primary">{getCurrentMonthYear()}</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2.5">
+            <button
+              onClick={() => changeView('weekly')}
+              className={`px-2.5 py-2 rounded flex items-center gap-1 text-sm font-medium transition-colors ${
+                view === 'weekly'
+                  ? 'bg-bg-accent-primary-solid text-text-white'
+                  : 'bg-bg-primary text-text-accent-primary border border-stroke-accent-primary hover:bg-accent-light'
+              }`}
+            >
+              <MdCalendarViewWeek className="w-4 h-4" />
+              Semanal
+            </button>
+            <button
+              onClick={() => changeView('monthly')}
+              className={`px-2.5 py-2 rounded flex items-center gap-1 text-sm font-medium transition-colors ${
+                view === 'monthly'
+                  ? 'bg-bg-accent-primary-solid text-text-white'
+                  : 'bg-bg-primary text-text-accent-primary border border-stroke-accent-primary hover:bg-accent-light'
+              }`}
+            >
+              <MdCalendarViewMonth className="w-4 h-4" />
+              Mensual
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {loading ? (
+        <div className="flex items-center justify-center h-96">
+          <div className="text-center">
+            <div className="w-12 h-12 border-4 border-accent-light border-t-accent-solid rounded-full animate-spin mx-auto mb-4" />
+            <p className="text-text-secondary">Cargando eventos...</p>
+          </div>
+        </div>
+      ) : view === 'weekly' ? (
+        <div className="bg-bg-primary rounded-2xl border border-stroke-primary overflow-hidden">
+          <div className="flex border-b border-stroke-primary">
+            <div className="w-16" />
+            {weekDays.map((day, index) => (
+              <div
+                key={index}
+                className={`flex-1 p-4 flex flex-col items-center gap-px ${index < 6 ? 'border-r border-stroke-primary' : ''} ${isToday(day) ? 'bg-info-secondary-solid/10' : ''}`}
+              >
+                <div className="text-xs font-medium text-text-tertiary">{DAY_NAMES[index]}</div>
+                <div
+                  className={`w-9 h-9 flex items-center justify-center rounded-full ${
+                    isToday(day) ? 'bg-info-primary-solid text-text-white' : ''
+                  }`}
+                >
+                  <span className="text-xl font-medium text-text-primary">{day.getDate()}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className="flex overflow-x-auto">
+            <div className="w-16 flex flex-col">
+              {HOURS.map((hour) => {
+                const period = hour >= 12 ? 'PM' : 'AM';
+                const displayHour = hour > 12 ? hour - 12 : hour === 12 ? 12 : hour;
+                return (
+                  <div
+                    key={hour}
+                    className="h-20 px-4 py-3 border-b border-stroke-primary flex justify-end items-start gap-1"
+                  >
+                    <span className="text-xs font-medium text-text-tertiary">{displayHour}</span>
+                    <span className="text-xs font-medium text-text-tertiary">{period}</span>
+                  </div>
+                );
+              })}
+            </div>
+
+            {weekDays.map((day, dayIndex) => {
+              const dayEvents = getEventsByDay(day);
+
+              return (
+                <div
+                  key={dayIndex}
+                  className={`flex-1 relative ${dayIndex < 6 ? 'border-r border-stroke-secondary' : ''}`}
+                  style={{ minWidth: '140px' }}
+                >
+                  {HOURS.map((hour, hourIndex) => (
+                    <div
+                      key={hour}
+                      className={`h-20 pr-4 ${hourIndex < HOURS.length - 1 ? 'border-b border-stroke-secondary' : ''}`}
+                    />
+                  ))}
+
+                  {dayEvents.map((event) => {
+                    const position = getEventPosition(event);
+                    const colors = courseColorMap.get(event.courseCode) || COURSE_COLORS[0];
+
+                    return (
+                      <div
+                        key={event.id}
+                        className={`absolute left-0 right-4 ${colors.bg} rounded-lg overflow-hidden cursor-pointer hover:opacity-90 transition-opacity shadow-sm`}
+                        style={{
+                          top: `${position.top}px`,
+                          height: `${position.height}px`,
+                        }}
+                        onClick={() => handleEventClick(event)}
+                      >
+                        <div className={`h-full px-2.5 py-1.5 rounded-l-lg border-l-4 ${colors.border} flex flex-col gap-1`}>
+                          <div className="flex items-start gap-0.5 flex-wrap">
+                            <span className="text-[10px] font-medium text-text-primary line-clamp-1">
+                              Clase {event.sessionNumber}
+                            </span>
+                            <span className="text-[10px] font-medium text-text-primary">-</span>
+                            <span className="text-[10px] font-medium text-text-primary line-clamp-1">
+                              {event.title}
+                            </span>
+                          </div>
+                          <div className="flex-1 min-h-0">
+                            <p className="text-xs font-medium text-text-primary line-clamp-3">
+                              {event.courseName}
+                            </p>
+                          </div>
+                          <div className="text-xs text-text-secondary">
+                            {formatEventTime(event)}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      ) : (
+        <div className="bg-bg-primary rounded-2xl border border-stroke-primary p-12 text-center">
+          <p className="text-text-tertiary">Vista mensual en desarrollo</p>
+        </div>
+      )}
+
+      <EventDetailModal
+        event={selectedEvent}
+        isOpen={isModalOpen}
+        onClose={() => {
+          setIsModalOpen(false);
+          setSelectedEvent(null);
+        }}
+      />
     </div>
   );
 }
