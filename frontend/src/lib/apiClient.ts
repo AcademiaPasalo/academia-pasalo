@@ -166,22 +166,19 @@ export class ApiClient {
           this.processQueue(refreshError as Error, null);
           this.isRefreshing = false;
           
-          // Si falla el refresh, limpiar auth
-          clearAuth();
-          
           // Disparar evento personalizado UNA SOLA VEZ para mostrar modal de sesión cerrada
+          // NO llamar clearAuth() aquí — el modal lo hará al redirigir,
+          // para evitar que DashboardLayout redirija antes de que el modal se vea.
           if (typeof window !== 'undefined' && !this.sessionClosedEventFired) {
             this.sessionClosedEventFired = true;
-            
+
             const event = new CustomEvent('session-closed-remotely', {
               detail: { reason: 'Token de sesión inválido o expirado' }
             });
             window.dispatchEvent(event);
-            
-            // Redirigir después de 3 segundos
-            setTimeout(() => {
-              window.location.href = '/plataforma';
-            }, 3000);
+          } else {
+            // Si ya se disparó el evento, limpiar auth directamente
+            clearAuth();
           }
           
           // NO lanzar el error - esto evita que el navegador muestre alertas nativas
