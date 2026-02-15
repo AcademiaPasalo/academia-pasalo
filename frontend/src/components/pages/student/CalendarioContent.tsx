@@ -371,7 +371,7 @@ export default function CalendarioContent() {
             ))}
           </div>
 
-          <div className="flex-1 overflow-y-auto overflow-x-hidden min-h-0 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+          <div id="calendar-scroll-container" className="flex-1 overflow-y-auto overflow-x-hidden min-h-0 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
             <div className="flex min-w-full">
               <div className="w-16 flex flex-col flex-shrink-0 bg-bg-primary sticky left-0 z-10">
                 {HOURS.map((hour) => {

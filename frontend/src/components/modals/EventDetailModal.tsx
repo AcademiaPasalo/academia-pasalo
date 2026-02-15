@@ -55,21 +55,34 @@ export default function EventDetailModal({
     setPosition({ top, left });
   }, [isOpen, event, anchorPosition]);
 
-  // Bloquear scroll del body cuando el tooltip está abierto
+  // Bloquear scroll cuando el tooltip está abierto
   useEffect(() => {
     if (isOpen) {
-      // Guardar el scroll actual y bloquear
+      // Bloquear scroll del body
       const scrollY = window.scrollY;
       document.body.style.position = 'fixed';
       document.body.style.top = `-${scrollY}px`;
       document.body.style.width = '100%';
+      document.body.style.overflow = 'hidden';
+
+      // Bloquear scroll del calendario específicamente
+      const calendarContainer = document.getElementById('calendar-scroll-container');
+      if (calendarContainer) {
+        calendarContainer.style.overflow = 'hidden';
+      }
 
       return () => {
         // Restaurar scroll cuando se cierra
         document.body.style.position = '';
         document.body.style.top = '';
         document.body.style.width = '';
+        document.body.style.overflow = '';
         window.scrollTo(0, scrollY);
+
+        // Restaurar scroll del calendario
+        if (calendarContainer) {
+          calendarContainer.style.overflow = '';
+        }
       };
     }
   }, [isOpen]);
