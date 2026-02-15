@@ -208,8 +208,8 @@ export default function CalendarioContent() {
   const handleEventClick = (event: ClassEvent, e: React.MouseEvent) => {
     const rect = e.currentTarget.getBoundingClientRect();
     setAnchorPosition({
-      x: rect.right,
-      y: rect.top,
+      x: rect.right - 8,
+      y: rect.top - 24,
     });
     setSelectedEvent(event);
     setIsModalOpen(true);
