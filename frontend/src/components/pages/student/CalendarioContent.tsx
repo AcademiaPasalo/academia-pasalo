@@ -209,7 +209,7 @@ export default function CalendarioContent() {
   const handleEventClick = (event: ClassEvent, e: React.MouseEvent) => {
     const rect = e.currentTarget.getBoundingClientRect();
     setAnchorPosition({
-      x: rect.right - 8,
+      x: rect.right - 16,
       y: rect.top - 24,
     });
     setSelectedEvent(event);
@@ -544,7 +544,7 @@ export default function CalendarioContent() {
                   return (
                     <div
                       key={weekIndex}
-                      className="flex min-h-[200px] border-b border-stroke-secondary"
+                      className={`flex min-h-[108px] ${weekIndex < weeksCount - 1 ? "border-b border-stroke-secondary" : ""}`}
                     >
                   {weekDays.map((day, dayIndex) => {
                     const dayEvents = getEventsForDay(day);
@@ -554,7 +554,7 @@ export default function CalendarioContent() {
                     return (
                       <div
                         key={`${day.getTime()}-${dayIndex}`}
-                        className={`flex-1 h-full min-h-0 py-2 flex flex-col items-center gap-2 overflow-hidden ${
+                        className={`flex-1 self-stretch py-2 flex flex-col items-center gap-2 ${
                           dayIndex < 6 ? "border-r border-stroke-secondary" : ""
                         }`}
                       >
@@ -580,24 +580,22 @@ export default function CalendarioContent() {
                         </div>
 
                         {/* Eventos del día */}
-                        <div className="self-stretch pr-2 flex flex-col items-start gap-0.5 flex-1 min-h-0 overflow-hidden">
+                        <div className="self-stretch flex flex-col items-stretch gap-0.5 flex-1 min-h-0">
                           {dayEvents.slice(0, 2).map((event) => {
                             const colors = getCourseColor(event.courseCode);
 
                             return (
                               <div
                                 key={event.id}
-                                className="self-stretch rounded-lg flex items-center overflow-hidden cursor-pointer hover:opacity-80 transition-opacity"
-                                style={{ backgroundColor: colors.secondary }}
+                                className="rounded-lg overflow-hidden border-l-4 px-2 py-1 cursor-pointer hover:opacity-80 transition-opacity"
+                                style={{
+                                  borderLeftColor: colors.primary,
+                                  backgroundColor: colors.secondary
+                                }}
                                 onClick={(e) => handleEventClick(event, e)}
                               >
-                                <div
-                                  className="self-stretch px-2.5 py-1.5 rounded-l-lg border-l-4 flex items-center"
-                                  style={{ borderLeftColor: colors.primary }}
-                                >
-                                  <div className="flex-1 text-xs font-medium text-text-primary line-clamp-1">
-                                    {event.courseCode}
-                                  </div>
+                                <div className="text-xs font-medium text-text-primary line-clamp-1">
+                                  {event.courseCode}
                                 </div>
                               </div>
                             );
