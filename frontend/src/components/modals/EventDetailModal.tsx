@@ -1,7 +1,3 @@
-// ============================================
-// EVENT DETAIL MODAL - Tooltip de Detalle de Evento de Clase
-// ============================================
-
 "use client";
 
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
@@ -109,10 +105,6 @@ export default function EventDetailModal({
   }, [isOpen, onClose]);
 
   if (!isOpen || !event) return null;
-
-  console.log("🔍 [EventDetailModal] Event:", event);
-  console.log("🔍 [EventDetailModal] liveMeetingUrl:", event.liveMeetingUrl);
-  console.log("🔍 [EventDetailModal] topic:", event.topic);
 
   const colors = getCourseColor(event.courseCode);
 

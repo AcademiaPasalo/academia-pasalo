@@ -1,7 +1,3 @@
-// ============================================
-// CALENDARIO CONTENT - Página de Calendario de Clases del Estudiante
-// ============================================
-
 "use client";
 
 import { useState, useEffect } from "react";
@@ -58,13 +54,6 @@ export default function CalendarioContent() {
     setBreadcrumbItems([{ icon: "event", label: "Calendario" }]);
   }, [setBreadcrumbItems]);
 
-  console.log("📊 [CalendarioContent] Renderizando con:", {
-    eventos: events?.length || 0,
-    cargando: loading,
-    cursoSeleccionado: selectedCourseId,
-    diasSemana: weekDays.map((d) => d.toLocaleDateString()),
-  });
-
   // Actualizar la hora actual cada minuto
   useEffect(() => {
     const timer = setInterval(() => {
@@ -92,14 +81,6 @@ export default function CalendarioContent() {
 
       return eventLocal.getTime() === dayLocal.getTime();
     });
-
-    if (dayEvents.length > 0) {
-      console.log(
-        `📆 [getEventsByDay] Día ${day.toLocaleDateString()}:`,
-        dayEvents.length,
-        "eventos",
-      );
-    }
 
     return dayEvents;
   };
@@ -186,7 +167,7 @@ export default function CalendarioContent() {
     if (startMinutes === 0 && endMinutes === 0) {
       const startTime = format(startDate, "h", { locale: es });
       const endTime = format(endDate, "h a", { locale: es })
-        .replace(" ", "") // 👈 quita espacio
+        .replace(" ", "")
         .toLowerCase();
 
       return `${startTime} - ${endTime}`;
@@ -200,7 +181,7 @@ export default function CalendarioContent() {
     const endTime = format(endDate, endMinutes === 0 ? "h a" : "h:mm a", {
       locale: es,
     })
-      .replace(" ", "") // 👈 quita espacio
+      .replace(" ", "")
       .toLowerCase();
 
     return `${startTime} - ${endTime}`;

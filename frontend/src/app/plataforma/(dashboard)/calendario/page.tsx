@@ -6,6 +6,6 @@ export const metadata: Metadata = {
   description: 'Revisa tu calendario',
 };
 
-export default function InicioPage() {
+export default function CalendarioPage() {
   return <RoleBasedContent />;
 }
