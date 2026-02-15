@@ -26,11 +26,14 @@ export function useCalendar() {
         start: format(start, 'yyyy-MM-dd'),
         end: format(end, 'yyyy-MM-dd'),
       };
-      const response = await classEventService.getMySchedule(params);
-      setEvents(response.data);
+      console.log('📅 [useCalendar] Cargando eventos desde:', params.start, 'hasta:', params.end);
+      const events = await classEventService.getMySchedule(params);
+      console.log('📅 [useCalendar] Eventos recibidos:', events.length, 'eventos');
+      console.log('📅 [useCalendar] Primeros 3 eventos:', events.slice(0, 3));
+      setEvents(events);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error al cargar eventos');
-      console.error('Error loading events:', err);
+      console.error('❌ [useCalendar] Error loading events:', err);
     } finally {
       setLoading(false);
     }
@@ -80,14 +83,22 @@ export function useCalendar() {
   };
 
   const filteredEvents = useMemo(() => {
-    if (!events || events.length === 0) return [];
+    console.log('🔍 [useCalendar] Filtrando eventos. Total:', events?.length || 0, 'Curso seleccionado:', selectedCourseId);
 
-    if (selectedCourseId) {
-      return events.filter((event) =>
-        event.courseName.includes(selectedCourseId) || event.courseCode === selectedCourseId
-      );
+    if (!events || events.length === 0) {
+      console.log('🔍 [useCalendar] No hay eventos para filtrar');
+      return [];
     }
 
+    if (selectedCourseId) {
+      const filtered = events.filter((event) =>
+        event.courseName.includes(selectedCourseId) || event.courseCode === selectedCourseId
+      );
+      console.log('🔍 [useCalendar] Eventos filtrados por curso:', filtered.length);
+      return filtered;
+    }
+
+    console.log('🔍 [useCalendar] Devolviendo todos los eventos:', events.length);
     return events;
   }, [events, selectedCourseId]);
 

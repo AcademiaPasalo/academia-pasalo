@@ -204,7 +204,7 @@ export default function EventDetailModal({ event, isOpen, onClose }: EventDetail
           )}
 
           <div className="flex gap-3 pt-4">
-            {event.canJoinMeeting && !event.isCancelled && (
+            {event.canJoinLive && !event.isCancelled && (
               <button
                 onClick={handleJoinMeeting}
                 className="flex-1 flex items-center justify-center gap-2 px-6 py-3 bg-accent-solid text-text-white rounded-lg font-medium hover:bg-accent-solid-hover transition-colors"
@@ -213,7 +213,7 @@ export default function EventDetailModal({ event, isOpen, onClose }: EventDetail
                 Unirse a la reunión
               </button>
             )}
-            {event.canCopyLink && !event.isCancelled && (
+            {event.canCopyLiveLink && !event.isCancelled && (
               <button
                 onClick={handleCopyLink}
                 className="flex-1 flex items-center justify-center gap-2 px-6 py-3 bg-bg-secondary text-text-accent-primary rounded-lg font-medium hover:bg-bg-secondary-hover border border-stroke-accent-primary transition-colors"

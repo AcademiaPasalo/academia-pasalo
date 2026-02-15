@@ -2,26 +2,26 @@
 // CALENDARIO CONTENT - Página de Calendario de Clases del Estudiante
 // ============================================
 
-'use client';
+"use client";
 
-import { useState, useMemo } from 'react';
-import { useCalendar } from '@/hooks/useCalendar';
-import { useEnrollments } from '@/hooks/useEnrollments';
-import type { ClassEvent } from '@/types/classEvent';
-import EventDetailModal from '@/components/modals/EventDetailModal';
-import { MdChevronLeft, MdChevronRight, MdExpandMore, MdCalendarViewWeek, MdCalendarViewMonth } from 'react-icons/md';
+import { useState, useEffect } from "react";
+import { useCalendar } from "@/hooks/useCalendar";
+import { useEnrollments } from "@/hooks/useEnrollments";
+import type { ClassEvent } from "@/types/classEvent";
+import EventDetailModal from "@/components/modals/EventDetailModal";
+import {
+  MdChevronLeft,
+  MdChevronRight,
+  MdExpandMore,
+  MdCalendarViewWeek,
+  MdCalendarViewMonth,
+} from "react-icons/md";
+import { format, parseISO } from "date-fns";
+import { es } from "date-fns/locale";
+import { getCourseColor } from "@/lib/courseColors";
 
 const HOURS = Array.from({ length: 23 }, (_, i) => i + 1);
-const DAY_NAMES = ['DOM', 'LUN', 'MAR', 'MIÉ', 'JUE', 'VIE', 'SÁB'];
-
-const COURSE_COLORS = [
-  { bg: 'bg-[#E0F2FE]', border: 'border-[#0891B2]' },
-  { bg: 'bg-[#FCE7F3]', border: 'border-[#EC4899]' },
-  { bg: 'bg-[#DCFCE7]', border: 'border-[#10B981]' },
-  { bg: 'bg-[#FEF3C7]', border: 'border-[#F59E0B]' },
-  { bg: 'bg-[#E9D5FF]', border: 'border-[#A855F7]' },
-  { bg: 'bg-[#DBEAFE]', border: 'border-[#3B82F6]' },
-];
+const DAY_NAMES = ["DOM", "LUN", "MAR", "MIÉ", "JUE", "VIE", "SÁB"];
 
 export default function CalendarioContent() {
   const {
@@ -43,28 +43,54 @@ export default function CalendarioContent() {
   const [selectedEvent, setSelectedEvent] = useState<ClassEvent | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isFilterOpen, setIsFilterOpen] = useState(false);
+  const [currentTime, setCurrentTime] = useState(new Date());
 
   const weekDays = getWeekDays();
 
-  const courseColorMap = useMemo(() => {
-    const map = new Map<string, typeof COURSE_COLORS[0]>();
-    uniqueCourses.forEach((course: { id: string; code: string; name: string }, index: number) => {
-      map.set(course.code, COURSE_COLORS[index % COURSE_COLORS.length]);
-    });
-    return map;
-  }, [uniqueCourses]);
+  console.log("📊 [CalendarioContent] Renderizando con:", {
+    eventos: events?.length || 0,
+    cargando: loading,
+    cursoSeleccionado: selectedCourseId,
+    diasSemana: weekDays.map((d) => d.toLocaleDateString()),
+  });
+
+  // Actualizar la hora actual cada minuto
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentTime(new Date());
+    }, 60000); // Actualizar cada minuto
+
+    return () => clearInterval(timer);
+  }, []);
 
   const getEventsByDay = (day: Date) => {
     if (!events || events.length === 0) return [];
 
-    return events.filter((event) => {
+    const dayEvents = events.filter((event) => {
       const eventDate = new Date(event.startDatetime);
-      return (
-        eventDate.getDate() === day.getDate() &&
-        eventDate.getMonth() === day.getMonth() &&
-        eventDate.getFullYear() === day.getFullYear()
+      const eventLocal = new Date(
+        eventDate.getFullYear(),
+        eventDate.getMonth(),
+        eventDate.getDate(),
       );
+      const dayLocal = new Date(
+        day.getFullYear(),
+        day.getMonth(),
+        day.getDate(),
+      );
+
+      return eventLocal.getTime() === dayLocal.getTime();
     });
+
+    if (dayEvents.length > 0) {
+      console.log(
+        `📆 [getEventsByDay] Día ${day.toLocaleDateString()}:`,
+        dayEvents.length,
+        "eventos",
+      );
+    }
+
+    return dayEvents;
   };
 
   const getEventPosition = (event: ClassEvent) => {
@@ -77,12 +103,23 @@ export default function CalendarioContent() {
     const endMinutes = end.getMinutes();
 
     const startPosition = (startHour - 1) * 80 + (startMinutes / 60) * 80;
-    const duration = (endHour - startHour) * 80 + ((endMinutes - startMinutes) / 60) * 80;
+    const duration =
+      (endHour - startHour) * 80 + ((endMinutes - startMinutes) / 60) * 80;
 
     return {
       top: startPosition,
       height: Math.max(duration, 40),
     };
+  };
+
+  const getCurrentTimePosition = () => {
+    const now = currentTime;
+    const hours = now.getHours();
+    const minutes = now.getMinutes();
+
+    // Posición relativa desde la 1 AM (hora 0 en nuestro array es 1 AM)
+    const position = (hours - 1) * 80 + (minutes / 60) * 80;
+    return position;
   };
 
   const formatEventTime = (event: ClassEvent) => {
@@ -95,12 +132,45 @@ export default function CalendarioContent() {
     const endMin = end.getMinutes();
 
     const formatHour = (hour: number, min: number) => {
-      const period = hour >= 12 ? 'pm' : 'am';
+      const period = hour >= 12 ? "pm" : "am";
       const displayHour = hour > 12 ? hour - 12 : hour === 0 ? 12 : hour;
-      return min > 0 ? `${displayHour}:${min.toString().padStart(2, '0')}${period}` : `${displayHour}${period}`;
+      return min > 0
+        ? `${displayHour}:${min.toString().padStart(2, "0")}${period}`
+        : `${displayHour}${period}`;
     };
 
     return `${formatHour(startHour, startMin)} - ${formatHour(endHour, endMin)}`;
+  };
+
+  const formatTimeRange = (start: string, end: string) => {
+    const startDate = parseISO(start);
+    const endDate = parseISO(end);
+
+    const startMinutes = startDate.getMinutes();
+    const endMinutes = endDate.getMinutes();
+
+    // Si ambos tienen minutos = 0, mostrar solo horas
+    if (startMinutes === 0 && endMinutes === 0) {
+      const startTime = format(startDate, "h", { locale: es });
+      const endTime = format(endDate, "h a", { locale: es })
+        .replace(" ", "") // 👈 quita espacio
+        .toLowerCase();
+
+      return `${startTime} - ${endTime}`;
+    }
+
+    // Si alguno tiene minutos, mostrar formato completo
+    const startTime = format(startDate, startMinutes === 0 ? "h" : "h:mm", {
+      locale: es,
+    });
+
+    const endTime = format(endDate, endMinutes === 0 ? "h a" : "h:mm a", {
+      locale: es,
+    })
+      .replace(" ", "") // 👈 quita espacio
+      .toLowerCase();
+
+    return `${startTime} - ${endTime}`;
   };
 
   const handleEventClick = (event: ClassEvent) => {
@@ -109,13 +179,16 @@ export default function CalendarioContent() {
   };
 
   const selectedCourseName = selectedCourseId
-    ? uniqueCourses.find((c: { code: string }) => c.code === selectedCourseId)?.name || 'Curso seleccionado'
-    : 'Filtrar por Curso';
+    ? uniqueCourses.find((c: { code: string }) => c.code === selectedCourseId)
+        ?.name || "Curso seleccionado"
+    : "Filtrar por Curso";
 
   return (
     <div className="flex flex-col gap-12">
       <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-semibold text-text-primary">Calendario de Clases</h1>
+        <h1 className="text-3xl font-semibold text-text-primary">
+          Calendario de Clases
+        </h1>
 
         <div className="relative w-64">
           <button
@@ -123,10 +196,14 @@ export default function CalendarioContent() {
             className="w-full h-12 px-3 py-3.5 bg-bg-primary rounded border border-stroke-primary flex justify-between items-center gap-2 hover:bg-bg-secondary transition-colors"
             disabled={loadingCourses}
           >
-            <span className={`flex-1 text-left text-base ${selectedCourseId ? 'text-text-primary' : 'text-text-tertiary'}`}>
+            <span
+              className={`flex-1 text-left text-base ${selectedCourseId ? "text-text-primary" : "text-text-tertiary"}`}
+            >
               {selectedCourseName}
             </span>
-            <MdExpandMore className={`w-5 h-5 text-icon-tertiary transition-transform ${isFilterOpen ? 'rotate-180' : ''}`} />
+            <MdExpandMore
+              className={`w-5 h-5 text-icon-tertiary transition-transform ${isFilterOpen ? "rotate-180" : ""}`}
+            />
           </button>
 
           {isFilterOpen && (
@@ -136,23 +213,27 @@ export default function CalendarioContent() {
                   filterByCourse(null);
                   setIsFilterOpen(false);
                 }}
-                className={`w-full px-4 py-3 text-left hover:bg-bg-secondary transition-colors ${!selectedCourseId ? 'bg-accent-light text-text-accent-primary' : 'text-text-primary'}`}
+                className={`w-full px-4 py-3 text-left hover:bg-bg-secondary transition-colors ${!selectedCourseId ? "bg-accent-light text-text-accent-primary" : "text-text-primary"}`}
               >
                 Todos los cursos
               </button>
-              {uniqueCourses.map((course: { id: string; code: string; name: string }) => (
-                <button
-                  key={course.id}
-                  onClick={() => {
-                    filterByCourse(course.code);
-                    setIsFilterOpen(false);
-                  }}
-                  className={`w-full px-4 py-3 text-left hover:bg-bg-secondary transition-colors ${selectedCourseId === course.code ? 'bg-accent-light text-text-accent-primary' : 'text-text-primary'}`}
-                >
-                  <div className="font-medium">{course.code}</div>
-                  <div className="text-sm text-text-secondary">{course.name}</div>
-                </button>
-              ))}
+              {uniqueCourses.map(
+                (course: { id: string; code: string; name: string }) => (
+                  <button
+                    key={course.id}
+                    onClick={() => {
+                      filterByCourse(course.code);
+                      setIsFilterOpen(false);
+                    }}
+                    className={`w-full px-4 py-3 text-left hover:bg-bg-secondary transition-colors ${selectedCourseId === course.code ? "bg-accent-light text-text-accent-primary" : "text-text-primary"}`}
+                  >
+                    <div className="font-medium">{course.code}</div>
+                    <div className="text-sm text-text-secondary">
+                      {course.name}
+                    </div>
+                  </button>
+                ),
+              )}
             </div>
           )}
         </div>
@@ -187,29 +268,31 @@ export default function CalendarioContent() {
               </div>
 
               <div className="flex items-center gap-1 capitalize">
-                <span className="text-xl font-medium text-text-primary">{getCurrentMonthYear()}</span>
+                <span className="text-xl font-medium text-text-primary">
+                  {getCurrentMonthYear()}
+                </span>
               </div>
             </div>
           </div>
 
           <div className="flex items-center gap-2.5">
             <button
-              onClick={() => changeView('weekly')}
+              onClick={() => changeView("weekly")}
               className={`px-2.5 py-2 rounded flex items-center gap-1 text-sm font-medium transition-colors ${
-                view === 'weekly'
-                  ? 'bg-bg-accent-primary-solid text-text-white'
-                  : 'bg-bg-primary text-text-accent-primary border border-stroke-accent-primary hover:bg-accent-light'
+                view === "weekly"
+                  ? "bg-bg-accent-primary-solid text-text-white"
+                  : "bg-bg-primary text-text-accent-primary border border-stroke-accent-primary hover:bg-accent-light"
               }`}
             >
               <MdCalendarViewWeek className="w-4 h-4" />
               Semanal
             </button>
             <button
-              onClick={() => changeView('monthly')}
+              onClick={() => changeView("monthly")}
               className={`px-2.5 py-2 rounded flex items-center gap-1 text-sm font-medium transition-colors ${
-                view === 'monthly'
-                  ? 'bg-bg-accent-primary-solid text-text-white'
-                  : 'bg-bg-primary text-text-accent-primary border border-stroke-accent-primary hover:bg-accent-light'
+                view === "monthly"
+                  ? "bg-bg-accent-primary-solid text-text-white"
+                  : "bg-bg-primary text-text-accent-primary border border-stroke-accent-primary hover:bg-accent-light"
               }`}
             >
               <MdCalendarViewMonth className="w-4 h-4" />
@@ -226,22 +309,26 @@ export default function CalendarioContent() {
             <p className="text-text-secondary">Cargando eventos...</p>
           </div>
         </div>
-      ) : view === 'weekly' ? (
+      ) : view === "weekly" ? (
         <div className="bg-bg-primary rounded-2xl border border-stroke-primary overflow-hidden">
           <div className="flex border-b border-stroke-primary">
             <div className="w-16" />
             {weekDays.map((day, index) => (
               <div
                 key={index}
-                className={`flex-1 p-4 flex flex-col items-center gap-px ${index < 6 ? 'border-r border-stroke-primary' : ''} ${isToday(day) ? 'bg-info-secondary-solid/10' : ''}`}
+                className={`flex-1 p-4 flex flex-col items-center gap-px ${index < 6 ? "border-r border-stroke-primary" : ""} ${isToday(day) ? "bg-info-secondary-solid/10" : ""}`}
               >
-                <div className="text-xs font-medium text-text-tertiary">{DAY_NAMES[index]}</div>
+                <div className="text-xs font-medium text-text-tertiary">
+                  {DAY_NAMES[index]}
+                </div>
                 <div
                   className={`w-9 h-9 flex items-center justify-center rounded-full ${
-                    isToday(day) ? 'bg-info-primary-solid text-text-white' : ''
+                    isToday(day) ? "bg-info-primary-solid text-text-white" : ""
                   }`}
                 >
-                  <span className="text-xl font-medium text-text-primary">{day.getDate()}</span>
+                  <span className="text-xl font-medium text-text-primary">
+                    {day.getDate()}
+                  </span>
                 </div>
               </div>
             ))}
@@ -250,15 +337,20 @@ export default function CalendarioContent() {
           <div className="flex overflow-x-auto">
             <div className="w-16 flex flex-col">
               {HOURS.map((hour) => {
-                const period = hour >= 12 ? 'PM' : 'AM';
-                const displayHour = hour > 12 ? hour - 12 : hour === 12 ? 12 : hour;
+                const period = hour >= 12 ? "PM" : "AM";
+                const displayHour =
+                  hour > 12 ? hour - 12 : hour === 12 ? 12 : hour;
                 return (
                   <div
                     key={hour}
                     className="h-20 px-4 py-3 border-b border-stroke-primary flex justify-end items-start gap-1"
                   >
-                    <span className="text-xs font-medium text-text-tertiary">{displayHour}</span>
-                    <span className="text-xs font-medium text-text-tertiary">{period}</span>
+                    <span className="text-xs font-medium text-text-tertiary">
+                      {displayHour}
+                    </span>
+                    <span className="text-xs font-medium text-text-tertiary">
+                      {period}
+                    </span>
                   </div>
                 );
               })}
@@ -266,51 +358,62 @@ export default function CalendarioContent() {
 
             {weekDays.map((day, dayIndex) => {
               const dayEvents = getEventsByDay(day);
+              const isTodayColumn = isToday(day);
+              const currentTimePos = getCurrentTimePosition();
 
               return (
                 <div
                   key={dayIndex}
-                  className={`flex-1 relative ${dayIndex < 6 ? 'border-r border-stroke-secondary' : ''}`}
-                  style={{ minWidth: '140px' }}
+                  className={`flex-1 relative ${dayIndex < 6 ? "border-r border-stroke-secondary" : ""}`}
+                  style={{ minWidth: "140px" }}
                 >
                   {HOURS.map((hour, hourIndex) => (
                     <div
                       key={hour}
-                      className={`h-20 pr-4 ${hourIndex < HOURS.length - 1 ? 'border-b border-stroke-secondary' : ''}`}
+                      className={`h-20 pr-4 ${hourIndex < HOURS.length - 1 ? "border-b border-stroke-secondary" : ""}`}
                     />
                   ))}
 
+                  {/* Marca de hora actual */}
+                  {isTodayColumn && currentTimePos > 0 && (
+                    <div
+                      className="absolute left-0 right-4 flex items-center z-10"
+                      style={{ top: `${currentTimePos}px` }}
+                    >
+                      <div className="w-2 h-2 bg-info-secondary-solid rounded-full" />
+                      <div className="flex-1 h-0 border-t border-stroke-info-tertiary" />
+                    </div>
+                  )}
+
                   {dayEvents.map((event) => {
                     const position = getEventPosition(event);
-                    const colors = courseColorMap.get(event.courseCode) || COURSE_COLORS[0];
+                    const colors = getCourseColor(event.courseCode);
 
                     return (
                       <div
                         key={event.id}
-                        className={`absolute left-0 right-4 ${colors.bg} rounded-lg overflow-hidden cursor-pointer hover:opacity-90 transition-opacity shadow-sm`}
+                        className="absolute left-0 right-4 rounded-lg overflow-hidden cursor-pointer hover:opacity-90 transition-opacity shadow-sm"
                         style={{
                           top: `${position.top}px`,
                           height: `${position.height}px`,
+                          backgroundColor: colors.secondary,
                         }}
                         onClick={() => handleEventClick(event)}
                       >
-                        <div className={`h-full px-2.5 py-1.5 rounded-l-lg border-l-4 ${colors.border} flex flex-col gap-1`}>
-                          <div className="flex items-start gap-0.5 flex-wrap">
-                            <span className="text-[10px] font-medium text-text-primary line-clamp-1">
-                              Clase {event.sessionNumber}
-                            </span>
-                            <span className="text-[10px] font-medium text-text-primary">-</span>
-                            <span className="text-[10px] font-medium text-text-primary line-clamp-1">
-                              {event.title}
-                            </span>
-                          </div>
+                        <div
+                          className="h-full px-2.5 py-1.5 rounded-l-lg border-l-4 flex flex-col gap-1"
+                          style={{ borderLeftColor: colors.primary }}
+                        >
+                          <span className="text-[10px] font-medium text-text-primary line-clamp-1">
+                            {event.title}
+                          </span>
                           <div className="flex-1 min-h-0">
                             <p className="text-xs font-medium text-text-primary line-clamp-3">
                               {event.courseName}
                             </p>
                           </div>
                           <div className="text-xs text-text-secondary">
-                            {formatEventTime(event)}
+                            {formatTimeRange(event.startDatetime, event.endDatetime)}
                           </div>
                         </div>
                       </div>
