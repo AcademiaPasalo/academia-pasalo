@@ -77,8 +77,11 @@ jobs:
         env:
           DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
           DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
-          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+
           DB_NAME: ${{ secrets.DB_NAME }}
+          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+          DB_USER: academia
+
           JWT_SECRET: ${{ secrets.JWT_SECRET }}
           GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
           GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
@@ -90,12 +93,16 @@ jobs:
           username: ubuntu
           key: ${{ secrets.EC2_SSH_KEY }}
           script_stop: true
-          envs: DOCKER_USERNAME,DOCKER_PASSWORD,DB_PASSWORD,DB_NAME,JWT_SECRET,GOOGLE_CLIENT_ID,GOOGLE_CLIENT_SECRET,GOOGLE_REDIRECT_URI,MAXMIND_LICENSE_KEY,CORS_ORIGINS
+          envs: DOCKER_USERNAME,DOCKER_PASSWORD,DB_NAME,DB_PASSWORD,DB_USER,JWT_SECRET,GOOGLE_CLIENT_ID,GOOGLE_CLIENT_SECRET,GOOGLE_REDIRECT_URI,MAXMIND_LICENSE_KEY,CORS_ORIGINS
           script: |
             set -Eeuo pipefail
 
             APP_DIR="/home/ubuntu/academia-pasalo"
             COMPOSE_FILE="$APP_DIR/backend/docker-compose.prod.yml"
+
+            DB_HOST="172.31.65.82"
+            DB_PORT="3306"
+            MYSQL="mysql -u \"$DB_USER\" -p\"$DB_PASSWORD\" -h \"$DB_HOST\" -P \"$DB_PORT\""
 
             # 0) Asegurar repo
             if [ ! -d "$APP_DIR/.git" ]; then
@@ -108,17 +115,13 @@ jobs:
             git reset --hard origin/main
             git clean -fd -e letsencrypt/ -e certbot/ || true
 
-            # 1) Runtime dirs (solo certbot; no tocamos letsencrypt porque suele ser root)
+            # 1) Runtime dirs (certbot)
             mkdir -p "$APP_DIR/certbot/www/.well-known/acme-challenge" "$APP_DIR/letsencrypt"
             chown -R ubuntu:ubuntu "$APP_DIR/certbot" || true
             chmod -R 755 "$APP_DIR/certbot" || true
 
-            # 2) Validar compose (sin "&&" para que drone-ssh no corte)
-            if [ ! -f "$COMPOSE_FILE" ]; then
-              echo "ERROR: No existe $COMPOSE_FILE"
-              ls -la "$APP_DIR/backend" || true
-              exit 1
-            fi
+            # 2) Validar compose
+            [ -f "$COMPOSE_FILE" ] || { echo "ERROR: No existe $COMPOSE_FILE"; ls -la "$APP_DIR/backend" || true; exit 1; }
 
             # 3) Login Docker
             echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
@@ -127,6 +130,9 @@ jobs:
             cat > "$APP_DIR/backend/.env" <<EOF
             GITHUB_REPOSITORY=${{ github.repository }}
             DOCKER_USERNAME=$DOCKER_USERNAME
+            DB_HOST=$DB_HOST
+            DB_PORT=$DB_PORT
+            DB_USER=$DB_USER
             DB_PASSWORD=$DB_PASSWORD
             DB_NAME=$DB_NAME
             JWT_SECRET=$JWT_SECRET
@@ -142,30 +148,25 @@ jobs:
             docker-compose -f "$COMPOSE_FILE" down
             docker-compose -f "$COMPOSE_FILE" up -d
 
-            # 6) Esperar MySQL healthy (healthcheck ya está en tu compose)
+            # 6) Esperar MySQL host
             for i in $(seq 1 60); do
-              if docker inspect -f '{{.State.Health.Status}}' academia-pasalo-mysql 2>/dev/null | grep -q healthy; then
-                echo "✅ MySQL healthy"
+              if eval "$MYSQL -D \"$DB_NAME\" -e \"SELECT 1;\" >/dev/null 2>&1"; then
+                echo "✅ MySQL host disponible"
                 break
               fi
               sleep 2
             done
+            eval "$MYSQL -D \"$DB_NAME\" -e \"SELECT 1;\" >/dev/null 2>&1" || { echo "❌ MySQL host no responde"; sudo systemctl status mysql --no-pager || true; exit 1; }
 
-            docker inspect -f '{{.State.Health.Status}}' academia-pasalo-mysql | grep -q healthy || {
-              echo "❌ MySQL no llegó a healthy"
-              docker logs academia-pasalo-mysql --tail 200
-              exit 1
-            }
-
-            # 7) Ejecutar scripts SQL
-            docker exec -i academia-pasalo-mysql mysql -u root -p"$DB_PASSWORD" "$DB_NAME" < "$APP_DIR/backend/db/eliminar_tablas_academia_pasalo_v1.sql"
-            docker exec -i academia-pasalo-mysql mysql -u root -p"$DB_PASSWORD" "$DB_NAME" < "$APP_DIR/backend/db/creacion_tablas_academia_pasalo_v1.sql"
-            docker exec -i academia-pasalo-mysql mysql -u root -p"$DB_PASSWORD" "$DB_NAME" < "$APP_DIR/backend/db/datos_iniciales_academa_pasalo_v1.sql"
-            docker exec -i academia-pasalo-mysql mysql -u root -p"$DB_PASSWORD" "$DB_NAME" < "$APP_DIR/backend/db/datos_prueba_cursos_y_matriculas.sql"
+            # 7) Scripts SQL
+            eval "$MYSQL \"$DB_NAME\" < \"$APP_DIR/backend/db/eliminar_tablas_academia_pasalo_v1.sql\""
+            eval "$MYSQL \"$DB_NAME\" < \"$APP_DIR/backend/db/creacion_tablas_academia_pasalo_v1.sql\""
+            eval "$MYSQL \"$DB_NAME\" < \"$APP_DIR/backend/db/datos_iniciales_academa_pasalo_v1.sql\""
+            eval "$MYSQL \"$DB_NAME\" < \"$APP_DIR/backend/db/datos_prueba_cursos_y_matriculas.sql\""
 
             # 8) Verificar BD
-            TABLES_COUNT=$(docker exec academia-pasalo-mysql mysql -u root -p"$DB_PASSWORD" -D "$DB_NAME" -sN -e "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = '$DB_NAME';" 2>/dev/null || echo "0")
-            [ "$TABLES_COUNT" -gt 0 ] || { echo "❌ Error en scripts SQL"; docker logs academia-pasalo-mysql --tail 200; exit 1; }
+            TABLES_COUNT=$(eval "$MYSQL -D \"$DB_NAME\" -sN -e \"SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = '$DB_NAME';\" 2>/dev/null" || echo "0")
+            [ "$TABLES_COUNT" -gt 0 ] || { echo "❌ Error en scripts SQL"; exit 1; }
             echo "✅ BD inicializada: $TABLES_COUNT tablas"
 
             # 9) Verificar contenedores clave
