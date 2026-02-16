@@ -79,7 +79,7 @@ export class EnrollmentsService {
               name: enrollment.courseCycle.course.courseType.name,
             },
             cycleLevel: {
-              name: enrollment.courseCycle.course.cycleLevel.name,
+              name: `${enrollment.courseCycle.course.cycleLevel.levelNumber}° Ciclo`,
             },
           },
           academicCycle: {
