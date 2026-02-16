@@ -506,17 +506,6 @@ export class MaterialsService {
       const startOk = !m.visibleFrom || new Date(m.visibleFrom) <= now;
       const endOk = !m.visibleUntil || new Date(m.visibleUntil) >= now;
       
-      if (m.displayName === 'Guía Futura') {
-        console.log('[DEBUG] applyVisibilityFilter - Guía Futura:', {
-          id: m.id,
-          visibleFrom: m.visibleFrom,
-          type: typeof m.visibleFrom,
-          now: now.toISOString(),
-          startOk,
-          comparison: new Date(m.visibleFrom).toISOString()
-        });
-      }
-      
       return startOk && endOk;
     });
 
