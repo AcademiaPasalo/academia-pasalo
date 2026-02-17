@@ -55,8 +55,8 @@ describe('ClassEventResponseDto', () => {
       evaluation: {
         number: 1,
         evaluationType: { code: 'PC' },
-        courseCycle: { course: { name: 'N', code: 'C' } }
-      }
+        courseCycle: { course: { name: 'N', code: 'C' } },
+      },
     } as unknown as ClassEvent;
 
     const dto = ClassEventResponseDto.fromEntity(
@@ -84,8 +84,8 @@ describe('ClassEventResponseDto', () => {
       evaluation: {
         number: 2,
         evaluationType: { code: 'EX' },
-        courseCycle: { course: { name: 'N', code: 'C' } }
-      }
+        courseCycle: { course: { name: 'N', code: 'C' } },
+      },
     } as unknown as ClassEvent;
 
     const dto = ClassEventResponseDto.fromEntity(

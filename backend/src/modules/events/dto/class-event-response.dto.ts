@@ -18,12 +18,13 @@ export class ClassEventResponseDto {
   canJoinLive: boolean;
   canWatchRecording: boolean;
   canCopyLiveLink: boolean;
-    canCopyRecordingLink: boolean;
-    courseName: string;
-    courseCode: string;
-    evaluationName: string;
-    creator: {
-      id: string;    firstName: string;
+  canCopyRecordingLink: boolean;
+  courseName: string;
+  courseCode: string;
+  evaluationName: string;
+  creator: {
+    id: string;
+    firstName: string;
     lastName1: string;
     lastName2: string;
     profilePhotoUrl: string | null;

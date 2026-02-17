@@ -424,7 +424,7 @@ describe('ClassEventsService', () => {
       } as unknown as ClassEvent;
 
       const status = service.calculateEventStatus(eventWithStrings);
-      
+
       // Si getEpoch no funcionara, esto devolvería FINALIZADA por error de comparación alfabética
       expect(status).toBe(CLASS_EVENT_STATUS.PROGRAMADA);
     });

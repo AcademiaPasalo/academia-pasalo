@@ -168,6 +168,8 @@ CREATE TABLE course (
   cycle_level_id BIGINT NOT NULL,
   code VARCHAR(50) NOT NULL,
   name VARCHAR(100) NOT NULL,
+  primary_color VARCHAR(7) NULL,
+  secondary_color VARCHAR(7) NULL,
   created_at DATETIME NOT NULL,
   updated_at DATETIME,
   FOREIGN KEY (course_type_id) REFERENCES course_type(id),
@@ -278,8 +280,7 @@ CREATE TABLE file_resource (
   mime_type VARCHAR(100) NOT NULL,
   size_bytes BIGINT NOT NULL,
   storage_url VARCHAR(500) NOT NULL,
-  created_at DATETIME NOT NULL,
-  CONSTRAINT uq_file_resource_hash UNIQUE (checksum_hash)
+  created_at DATETIME NOT NULL
 );
 
 CREATE TABLE file_version (

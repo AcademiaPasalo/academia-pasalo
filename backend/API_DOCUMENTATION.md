@@ -314,9 +314,17 @@ Base URL: `/api/v1/cycles` | `/api/v1/courses`
       "code": "string (max 50)",
       "name": "string (max 100)",
       "courseTypeId": "string (ID)",
-      "cycleLevelId": "string (ID)"
+      "cycleLevelId": "string (ID)",
+      "primaryColor": "string (permite null, formato #RRGGBB)",
+      "secondaryColor": "string (permite null, formato #RRGGBB)"
     }
     ```
+
+#### Actualizar Materia
+*   **Endpoint:** `PATCH /:id`
+*   **Roles:** `ADMIN`, `SUPER_ADMIN`
+*   **Request Body:** Similar a `POST /` (todos los campos son opcionales).
+*   **Efecto en Caché:** Esta operación dispara una **invalidación global** de las cachés de Dashboard, Contenido de Curso y Calendarios para garantizar la consistencia visual inmediata en todos los usuarios.
 
 #### Listar Materias
 *   **Endpoint:** `GET /`

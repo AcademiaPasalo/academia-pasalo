@@ -505,7 +505,7 @@ export class MaterialsService {
     const visibleMaterials = materials.filter((m) => {
       const startOk = !m.visibleFrom || new Date(m.visibleFrom) <= now;
       const endOk = !m.visibleUntil || new Date(m.visibleUntil) >= now;
-      
+
       return startOk && endOk;
     });
 

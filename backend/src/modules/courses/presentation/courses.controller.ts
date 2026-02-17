@@ -16,6 +16,7 @@ import {
 } from '@modules/courses/dto/course-response.dto';
 import { CourseContentResponseDto } from '@modules/courses/dto/course-content.dto';
 import { CreateCourseDto } from '@modules/courses/dto/create-course.dto';
+import { UpdateCourseDto } from '@modules/courses/dto/update-course.dto';
 import { AssignCourseToCycleDto } from '@modules/courses/dto/assign-course-to-cycle.dto';
 import { AssignCourseCycleProfessorDto } from '@modules/courses/dto/assign-course-cycle-professor.dto';
 import { Auth } from '@common/decorators/auth.decorator';
@@ -25,6 +26,7 @@ import { User } from '@modules/users/domain/user.entity';
 import { ResponseMessage } from '@common/decorators/response-message.decorator';
 import { plainToInstance } from 'class-transformer';
 import { ROLE_CODES } from '@common/constants/role-codes.constants';
+import { Patch } from '@nestjs/common';
 
 @Controller('courses')
 @Auth()
@@ -58,6 +60,19 @@ export class CoursesController {
   @ResponseMessage('Materia creada exitosamente')
   async create(@Body() createCourseDto: CreateCourseDto) {
     const course = await this.coursesService.create(createCourseDto);
+    return plainToInstance(CourseResponseDto, course, {
+      excludeExtraneousValues: true,
+    });
+  }
+
+  @Patch(':id')
+  @Roles(ROLE_CODES.ADMIN, ROLE_CODES.SUPER_ADMIN)
+  @ResponseMessage('Materia actualizada exitosamente')
+  async update(
+    @Param('id') id: string,
+    @Body() updateCourseDto: UpdateCourseDto,
+  ) {
+    const course = await this.coursesService.update(id, updateCourseDto);
     return plainToInstance(CourseResponseDto, course, {
       excludeExtraneousValues: true,
     });
