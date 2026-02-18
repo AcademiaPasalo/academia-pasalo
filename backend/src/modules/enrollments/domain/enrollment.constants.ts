@@ -16,6 +16,7 @@ export type EnrollmentStatusCode =
 
 export const ENROLLMENT_CACHE_KEYS = {
   DASHBOARD: (userId: string) => `cache:enrollment:user:${userId}:dashboard`,
+  GLOBAL_DASHBOARD_GROUP: 'cache:enrollment:user:*:dashboard',
   ACCESS_CHECK: (userId: string, evaluationId: string) =>
     `cache:access:user:${userId}:eval:${evaluationId}`,
   USER_ACCESS_GROUP: (userId: string) => `cache:access:user:${userId}:*`,

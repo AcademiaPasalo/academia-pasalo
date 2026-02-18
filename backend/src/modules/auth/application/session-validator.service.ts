@@ -8,6 +8,7 @@ import {
   SESSION_STATUS_CODES,
 } from '@modules/auth/interfaces/security.constants';
 import { createHash } from 'crypto';
+import { getEpoch } from '@common/utils/date.util';
 
 @Injectable()
 export class SessionValidatorService {
@@ -51,7 +52,7 @@ export class SessionValidatorService {
       throw new UnauthorizedException(SECURITY_MESSAGES.UNAUTHORIZED_DEVICE);
     }
 
-    if (session.expiresAt < new Date()) {
+    if (getEpoch(session.expiresAt) < getEpoch(new Date())) {
       const revokedStatusId = await this.sessionStatusService.getIdByCode(
         SESSION_STATUS_CODES.REVOKED,
       );
@@ -95,7 +96,7 @@ export class SessionValidatorService {
     if (
       !session.isActive ||
       session.sessionStatusId !== activeStatusId ||
-      session.expiresAt < new Date()
+      getEpoch(session.expiresAt) < getEpoch(new Date())
     ) {
       throw new UnauthorizedException(SECURITY_MESSAGES.INVALID_SESSION);
     }

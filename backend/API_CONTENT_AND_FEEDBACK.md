@@ -61,6 +61,7 @@ Obtiene todas las sesiones programadas para el usuario (alumno o profesor) dentr
         "canCopyRecordingLink": boolean, // true si puede copiar el link de grabacion
         "courseName": string,
         "courseCode": string,
+        "evaluationName": string, // e.g. "PC1"
         "creator": { "id": string, "firstName": string, "lastName1": string, "profilePhotoUrl": string | null },
         "professors": [ { "id": string, "firstName": string, "lastName1": string, "profilePhotoUrl": string | null } ]
       }
@@ -136,7 +137,9 @@ Obtiene el listado de cursos donde el alumno tiene una matrícula activa.
 
 #### Operaciones Administrativas (Admin/SuperAdmin)
 *   **POST /courses**: Crear materia base.
-    *   `body: { "code": "string", "name": "string", "courseTypeId": "ID", "cycleLevelId": "ID" }`
+    *   `body: { "code": "string", "name": "string", "courseTypeId": "ID", "cycleLevelId": "ID", "primaryColor": "string (permite null)", "secondaryColor": "string (permite null)" }`
+*   **PATCH /courses/:id**: Actualizar materia (nombre, código, colores).
+    *   **Nota:** Invalida automáticamente cachés de Dashboard y Horarios.
 *   **POST /courses/assign-cycle**: Aperturar materia en un ciclo (Crea CourseCycle).
     *   `body: { "courseId": "ID", "academicCycleId": "ID" }`
 *   **POST /courses/cycle/:id/professors**: Asignar profesor a la plana del curso.

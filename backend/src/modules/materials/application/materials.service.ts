@@ -338,16 +338,16 @@ export class MaterialsService {
     await this.checkAuthorizedAccess(user, evaluationId);
 
     const cacheKey = MATERIAL_CACHE_KEYS.ROOTS(evaluationId);
-    const cached = await this.cacheService.get<MaterialFolder[]>(cacheKey);
-    if (cached) return cached;
+    let roots = await this.cacheService.get<MaterialFolder[]>(cacheKey);
 
-    const status = await this.getActiveFolderStatus();
-    const roots = await this.folderRepository.findRootsByEvaluation(
-      evaluationId,
-      status.id,
-    );
-
-    await this.cacheService.set(cacheKey, roots, this.CACHE_TTL);
+    if (!roots) {
+      const status = await this.getActiveFolderStatus();
+      roots = await this.folderRepository.findRootsByEvaluation(
+        evaluationId,
+        status.id,
+      );
+      await this.cacheService.set(cacheKey, roots, this.CACHE_TTL);
+    }
 
     return this.applyVisibilityFilter(user, roots, []).folders;
   }
@@ -362,22 +362,26 @@ export class MaterialsService {
     await this.checkAuthorizedAccess(user, folder.evaluationId, folder);
 
     const cacheKey = MATERIAL_CACHE_KEYS.CONTENTS(folderId);
-    const cached = await this.cacheService.get<{
+    let contents = await this.cacheService.get<{
       folders: MaterialFolder[];
       materials: Material[];
     }>(cacheKey);
-    if (cached) return cached;
 
-    const status = await this.getActiveFolderStatus();
-    const [folders, materials] = await Promise.all([
-      this.folderRepository.findSubFolders(folderId, status.id),
-      this.materialRepository.findByFolderId(folderId),
-    ]);
+    if (!contents) {
+      const status = await this.getActiveFolderStatus();
+      const [folders, materials] = await Promise.all([
+        this.folderRepository.findSubFolders(folderId, status.id),
+        this.materialRepository.findByFolderId(folderId),
+      ]);
+      contents = { folders, materials };
+      await this.cacheService.set(cacheKey, contents, this.CACHE_TTL);
+    }
 
-    const result = { folders, materials };
-    await this.cacheService.set(cacheKey, result, this.CACHE_TTL);
-
-    return this.applyVisibilityFilter(user, result.folders, result.materials);
+    return this.applyVisibilityFilter(
+      user,
+      contents.folders,
+      contents.materials,
+    );
   }
 
   async getClassEventMaterials(
@@ -501,6 +505,7 @@ export class MaterialsService {
     const visibleMaterials = materials.filter((m) => {
       const startOk = !m.visibleFrom || new Date(m.visibleFrom) <= now;
       const endOk = !m.visibleUntil || new Date(m.visibleUntil) >= now;
+
       return startOk && endOk;
     });
 
