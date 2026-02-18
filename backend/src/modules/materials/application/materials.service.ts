@@ -603,7 +603,7 @@ export class MaterialsService {
   }
 
   private async rollbackFile(path: string) {
-    const fileName = path.split(/[\/]/).pop();
+    const fileName = path.split(/[\\/]/).pop();
     if (fileName) await this.storageService.deleteFile(fileName);
   }
 

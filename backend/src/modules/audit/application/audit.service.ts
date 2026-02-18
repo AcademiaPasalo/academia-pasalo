@@ -243,7 +243,11 @@ export class AuditService implements OnApplicationBootstrap {
         key: 'userEmail',
         width: 35,
       },
-      { header: AUDIT_EXCEL_CONFIG.COLUMNS.USER_ROLE, key: 'userRole', width: 20 },
+      {
+        header: AUDIT_EXCEL_CONFIG.COLUMNS.USER_ROLE,
+        key: 'userRole',
+        width: 20,
+      },
       {
         header: AUDIT_EXCEL_CONFIG.COLUMNS.ACTION_NAME,
         key: 'actionName',

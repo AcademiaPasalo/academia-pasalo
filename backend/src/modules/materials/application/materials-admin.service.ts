@@ -226,7 +226,7 @@ export class MaterialsAdminService {
 
     if (fileToDeletePath) {
       const pathString = fileToDeletePath;
-      const fileName = pathString.split(/[\/]/).pop();
+      const fileName = pathString.split(/[\\/]/).pop();
       if (fileName) {
         await this.storageService.deleteFile(fileName);
         this.logger.warn({

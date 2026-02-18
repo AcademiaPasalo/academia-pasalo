@@ -18,6 +18,7 @@ import {
   DatabaseError,
   MySqlErrorCode,
 } from '@common/interfaces/database-error.interface';
+import { getErrnoFromDbError } from '@common/utils/mysql-error.util';
 
 @Injectable()
 export class UsersService {
@@ -47,8 +48,7 @@ export class UsersService {
         updatedAt: null,
       });
     } catch (error) {
-      const dbError = error as DatabaseError;
-      const errno = dbError.errno ?? dbError.driverError?.errno;
+      const errno = getErrnoFromDbError(error as DatabaseError);
       if (errno === MySqlErrorCode.DUPLICATE_ENTRY) {
         throw new ConflictException('El correo electrónico ya está registrado');
       }
@@ -108,8 +108,7 @@ export class UsersService {
       try {
         updatedUser = await this.userRepository.save(user, manager);
       } catch (error) {
-        const dbError = error as DatabaseError;
-        const errno = dbError.errno ?? dbError.driverError?.errno;
+        const errno = getErrnoFromDbError(error as DatabaseError);
         if (errno === MySqlErrorCode.DUPLICATE_ENTRY) {
           throw new ConflictException(
             'El correo electrónico ya está registrado',
@@ -161,8 +160,7 @@ export class UsersService {
       try {
         updatedUser = await this.userRepository.save(user, manager);
       } catch (error) {
-        const dbError = error as DatabaseError;
-        const errno = dbError.errno ?? dbError.driverError?.errno;
+        const errno = getErrnoFromDbError(error as DatabaseError);
         if (errno === MySqlErrorCode.DUPLICATE_ENTRY) {
           throw new ConflictException('El usuario ya tiene este rol asignado');
         }
@@ -206,8 +204,7 @@ export class UsersService {
       try {
         updatedUser = await this.userRepository.save(user, manager);
       } catch (error) {
-        const dbError = error as DatabaseError;
-        const errno = dbError.errno ?? dbError.driverError?.errno;
+        const errno = getErrnoFromDbError(error as DatabaseError);
 
         if (
           errno === MySqlErrorCode.LOCK_WAIT_TIMEOUT ||

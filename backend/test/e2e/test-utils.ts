@@ -19,9 +19,9 @@ import {
   MATERIAL_STATUS_CODES,
 } from '@modules/materials/domain/material.constants';
 import {
-  LOCATION_SOURCES,
   SESSION_STATUS_CODES,
 } from '@modules/auth/interfaces/security.constants';
+import { ROLE_CODES } from '@common/constants/role-codes.constants';
 
 interface BasicEntity {
   id: string;
