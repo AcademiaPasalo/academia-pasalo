@@ -14,6 +14,7 @@ import { ENROLLMENT_TYPE_CODES } from '@modules/enrollments/domain/enrollment.co
 import { EVALUATION_TYPE_CODES } from '@modules/evaluations/domain/evaluation.constants';
 import { RedisCacheService } from '@infrastructure/cache/redis-cache.service';
 import { EnrollmentEvaluation } from '@modules/enrollments/domain/enrollment-evaluation.entity';
+import { MATERIAL_CACHE_KEYS } from '@modules/materials/domain/material.constants';
 
 describe('E2E: Integridad de Seguridad y Blindaje de Accesos', () => {
   let app: INestApplication;
@@ -285,6 +286,79 @@ describe('E2E: Integridad de Seguridad y Blindaje de Accesos', () => {
         .get(`/api/v1/materials/folders/evaluation/${evaluationPC1.id}`)
         .set('Authorization', `Bearer ${studentPartial.token}`)
         .expect(403);
+    });
+  });
+
+  describe('BLINDAJE PUNTO 4: Consistencia de Visibilidad Dinámica', () => {
+    it('debe filtrar materiales futuros incluso si ya existen en la caché completa', async () => {
+      // 0. Restaurar acceso
+      const enrollment = await dataSource
+        .getRepository(Enrollment)
+        .findOneOrFail({
+          where: { userId: studentPartial.user.id },
+        });
+      await dataSource
+        .getRepository(EnrollmentEvaluation)
+        .update(
+          { evaluationId: evaluationPC1.id, enrollmentId: enrollment.id },
+          { isActive: true, accessEndDate: nextMonth },
+        );
+      await cacheService.invalidateGroup(
+        `cache:access:user:${studentPartial.user.id}:*`,
+      );
+
+      // 0.1 Asegurar que la CARPETA sea siempre visible (ayer) para que no de 403 por carpeta bloqueada
+      await dataSource.query(
+        'UPDATE material_folder SET visible_from = ? WHERE id = ?',
+        [yesterday, pc1FolderId],
+      );
+      await cacheService.del(MATERIAL_CACHE_KEYS.ROOTS(evaluationPC1.id));
+      await cacheService.del(MATERIAL_CACHE_KEYS.CONTENTS(pc1FolderId));
+
+      // 1. Crear un material que se desbloquea en el FUTURO (Mañana)
+      const tomorrow = new Date(now.getTime() + 86400000);
+      const resMat = await request(app.getHttpServer())
+        .post('/api/v1/materials')
+        .set('Authorization', `Bearer ${admin.token}`)
+        .attach('file', Buffer.from('%PDF-1.4 future'), 'future.pdf')
+        .field('materialFolderId', pc1FolderId)
+        .field('displayName', 'Guía Futura')
+        .field('visibleFrom', tomorrow.toISOString())
+        .expect(201);
+
+      const futureMatId = resMat.body.data.id;
+
+      // 2. Alumno consulta -> No debe ver el material (lista vacía)
+      const res1 = await request(app.getHttpServer())
+        .get(`/api/v1/materials/folders/${pc1FolderId}`)
+        .set('Authorization', `Bearer ${studentPartial.token}`)
+        .expect(200);
+
+      const mats1 = res1.body.data.materials;
+      expect(
+        mats1.find((m: any) => String(m.id) === String(futureMatId)),
+      ).toBeUndefined();
+
+      // 3. Hack técnico: Movemos el 'visibleFrom' a AYER en la BD
+      await dataSource.query(
+        'UPDATE material SET visible_from = ? WHERE id = ?',
+        [yesterday, futureMatId],
+      );
+
+      // Invalidamos la caché de la carpeta usando la constante oficial para que el cambio de la BD sea visible
+      await cacheService.del(MATERIAL_CACHE_KEYS.CONTENTS(pc1FolderId));
+
+      // 4. Alumno consulta de nuevo -> Debe ver el material AHORA
+      const res2 = await request(app.getHttpServer())
+        .get(`/api/v1/materials/folders/${pc1FolderId}`)
+        .set('Authorization', `Bearer ${studentPartial.token}`)
+        .expect(200);
+
+      const mats2 = res2.body.data.materials;
+      const found = mats2.find(
+        (m: any) => String(m.id) === String(futureMatId),
+      );
+      expect(found).toBeDefined();
     });
   });
 

@@ -17,6 +17,7 @@ import { Evaluation } from '@modules/evaluations/domain/evaluation.entity';
 import { RedisCacheService } from '@infrastructure/cache/redis-cache.service';
 import { MyEnrollmentsResponseDto } from '@modules/enrollments/dto/my-enrollments-response.dto';
 import { technicalSettings } from '@config/technical-settings';
+import { getEpoch } from '@common/utils/date.util';
 import {
   ENROLLMENT_CACHE_KEYS,
   ENROLLMENT_STATUS_CODES,
@@ -78,7 +79,7 @@ export class EnrollmentsService {
               name: enrollment.courseCycle.course.courseType.name,
             },
             cycleLevel: {
-              name: enrollment.courseCycle.course.cycleLevel.name,
+              name: `${enrollment.courseCycle.course.cycleLevel.levelNumber}° Ciclo`,
             },
           },
           academicCycle: {
@@ -160,7 +161,7 @@ export class EnrollmentsService {
       const now = new Date();
       const cycleEndDate = new Date(courseCycle.academicCycle.endDate);
 
-      if (cycleEndDate < now) {
+      if (getEpoch(cycleEndDate) < getEpoch(now)) {
         this.logger.warn({
           message: 'Intento de matrícula en ciclo finalizado',
           courseCycleId: dto.courseCycleId,
@@ -242,7 +243,9 @@ export class EnrollmentsService {
           const maxAcademicEndDate = academicEvaluations.reduce(
             (max, current) => {
               const currentEndDate = new Date(current.endDate);
-              return currentEndDate > max ? currentEndDate : max;
+              return getEpoch(currentEndDate) > getEpoch(max)
+                ? currentEndDate
+                : max;
             },
             new Date(0),
           );
@@ -268,7 +271,8 @@ export class EnrollmentsService {
             accessEnd = bankAccessLimitDate;
           } else if (type.code === ENROLLMENT_TYPE_CODES.FULL) {
             const cycleEnd = new Date(courseCycle.academicCycle.endDate);
-            accessEnd = accessEnd > cycleEnd ? accessEnd : cycleEnd;
+            accessEnd =
+              getEpoch(accessEnd) > getEpoch(cycleEnd) ? accessEnd : cycleEnd;
           } else if (isHistorical) {
             const simil = currentCycleEvaluations.find(
               (c) =>
@@ -281,7 +285,8 @@ export class EnrollmentsService {
               accessEnd = new Date(simil.endDate);
             } else {
               const cycleEnd = new Date(courseCycle.academicCycle.endDate);
-              accessEnd = accessEnd > cycleEnd ? accessEnd : cycleEnd;
+              accessEnd =
+                getEpoch(accessEnd) > getEpoch(cycleEnd) ? accessEnd : cycleEnd;
             }
           }
 

@@ -13,11 +13,13 @@ import { ClassEventProfessorRepository } from '@modules/events/infrastructure/cl
 import { ClassEventRecordingStatusRepository } from '@modules/events/infrastructure/class-event-recording-status.repository';
 import { EvaluationRepository } from '@modules/evaluations/infrastructure/evaluation.repository';
 import { EnrollmentEvaluationRepository } from '@modules/enrollments/infrastructure/enrollment-evaluation.repository';
+import { CourseCycleProfessorRepository } from '@modules/courses/infrastructure/course-cycle-professor.repository';
 import { UserRepository } from '@modules/users/infrastructure/user.repository';
 import { RedisCacheService } from '@infrastructure/cache/redis-cache.service';
 import { ClassEvent } from '@modules/events/domain/class-event.entity';
 import { User } from '@modules/users/domain/user.entity';
 import { technicalSettings } from '@config/technical-settings';
+import { getEpoch } from '@common/utils/date.util';
 import {
   ClassEventAccess,
   ClassEventStatus,
@@ -29,6 +31,7 @@ import {
   ADMIN_ROLE_CODES,
   ROLE_CODES,
 } from '@common/constants/role-codes.constants';
+import { COURSE_CACHE_KEYS } from '@modules/courses/domain/course.constants';
 
 @Injectable()
 export class ClassEventsService {
@@ -42,13 +45,6 @@ export class ClassEventsService {
   private readonly RECORDING_STATUS_CACHE_TTL =
     technicalSettings.cache.events.recordingStatusCatalogCacheTtlSeconds;
 
-  private getProfessorAssignmentCacheKey(
-    courseCycleId: string,
-    professorUserId: string,
-  ): string {
-    return `cache:cc-professor:cycle:${courseCycleId}:prof:${professorUserId}`;
-  }
-
   private getRecordingStatusCacheKey(code: string): string {
     return `cache:class-event-recording-status:code:${code}`;
   }
@@ -60,6 +56,7 @@ export class ClassEventsService {
     private readonly classEventRecordingStatusRepository: ClassEventRecordingStatusRepository,
     private readonly evaluationRepository: EvaluationRepository,
     private readonly enrollmentEvaluationRepository: EnrollmentEvaluationRepository,
+    private readonly courseCycleProfessorRepository: CourseCycleProfessorRepository,
     private readonly userRepository: UserRepository,
     private readonly cacheService: RedisCacheService,
   ) {}
@@ -86,6 +83,18 @@ export class ClassEventsService {
       evaluation.startDate,
       evaluation.endDate,
     );
+
+    const overlap = await this.classEventRepository.findOverlap(
+      evaluation.courseCycleId,
+      startDatetime,
+      endDatetime,
+    );
+
+    if (overlap) {
+      throw new ConflictException(
+        `El horario ya está ocupado por la sesión ${overlap.sessionNumber} de ${overlap.evaluation.evaluationType.name}${overlap.evaluation.number}`,
+      );
+    }
 
     return await this.dataSource.transaction(async (manager) => {
       const notAvailableStatusId = await this.getRecordingStatusIdByCode(
@@ -220,6 +229,19 @@ export class ClassEventsService {
           evaluation.startDate,
           evaluation.endDate,
         );
+
+        const overlap = await this.classEventRepository.findOverlap(
+          evaluation.courseCycleId,
+          finalStart,
+          finalEnd,
+          eventId,
+        );
+
+        if (overlap) {
+          throw new ConflictException(
+            `No es posible actualizar el horario. Existe un cruce con la sesión ${overlap.sessionNumber} de ${overlap.evaluation.evaluationType.name}${overlap.evaluation.number}`,
+          );
+        }
       }
     }
 
@@ -308,11 +330,14 @@ export class ClassEventsService {
       return CLASS_EVENT_STATUS.CANCELADA;
     }
 
-    const now = new Date();
-    if (now < event.startDatetime) {
+    const nowTime = getEpoch(new Date());
+    const startTime = getEpoch(event.startDatetime);
+    const endTime = getEpoch(event.endDatetime);
+
+    if (nowTime < startTime) {
       return CLASS_EVENT_STATUS.PROGRAMADA;
     }
-    if (now >= event.startDatetime && now < event.endDatetime) {
+    if (nowTime >= startTime && nowTime < endTime) {
       return CLASS_EVENT_STATUS.EN_CURSO;
     }
     return CLASS_EVENT_STATUS.FINALIZADA;
@@ -405,12 +430,8 @@ export class ClassEventsService {
     }
 
     if (roleCodes.includes(ROLE_CODES.PROFESSOR)) {
-      const evaluation =
-        await this.evaluationRepository.findByIdWithCycle(evaluationId);
-      if (!evaluation) return false;
-
-      const cacheKey = this.getProfessorAssignmentCacheKey(
-        evaluation.courseCycleId,
+      const cacheKey = COURSE_CACHE_KEYS.PROFESSOR_ASSIGNMENT(
+        evaluationId,
         user.id,
       );
       const cached = await this.cacheService.get<boolean>(cacheKey);
@@ -418,18 +439,18 @@ export class ClassEventsService {
         return cached;
       }
 
-      const isAssigned = await this.dataSource.query(
-        'SELECT 1 FROM course_cycle_professor WHERE course_cycle_id = ? AND professor_user_id = ? LIMIT 1',
-        [evaluation.courseCycleId, user.id],
-      );
+      const isAssigned =
+        await this.courseCycleProfessorRepository.isProfessorAssignedToEvaluation(
+          evaluationId,
+          user.id,
+        );
 
-      const result = isAssigned.length > 0;
       await this.cacheService.set(
         cacheKey,
-        result,
+        isAssigned,
         this.PROFESSOR_ASSIGNMENT_CACHE_TTL,
       );
-      return result;
+      return isAssigned;
     }
 
     return await this.enrollmentEvaluationRepository.checkAccess(
@@ -445,29 +466,7 @@ export class ClassEventsService {
     const user = await this.userRepository.findById(userId);
     if (!user) return false;
 
-    const roleCodes = (user.roles || []).map((r) => r.code);
-
-    if (roleCodes.some((r) => ADMIN_ROLE_CODES.includes(r))) {
-      return true;
-    }
-
-    if (roleCodes.includes(ROLE_CODES.PROFESSOR)) {
-      const evaluation =
-        await this.evaluationRepository.findByIdWithCycle(evaluationId);
-      if (!evaluation) return false;
-
-      const isAssigned = await this.dataSource.query(
-        'SELECT 1 FROM course_cycle_professor WHERE course_cycle_id = ? AND professor_user_id = ? LIMIT 1',
-        [evaluation.courseCycleId, userId],
-      );
-
-      return isAssigned.length > 0;
-    }
-
-    return await this.enrollmentEvaluationRepository.checkAccess(
-      userId,
-      evaluationId,
-    );
+    return await this.checkUserAuthorizationWithUser(user, evaluationId);
   }
 
   async getMySchedule(
@@ -586,19 +585,24 @@ export class ClassEventsService {
     evaluationStart: Date,
     evaluationEnd: Date,
   ): void {
-    if (endDatetime <= startDatetime) {
+    const startTime = getEpoch(startDatetime);
+    const endTime = getEpoch(endDatetime);
+    const evalStartTime = getEpoch(evaluationStart);
+    const evalEndTime = getEpoch(evaluationEnd);
+
+    if (endTime <= startTime) {
       throw new BadRequestException(
         'La fecha de fin debe ser posterior a la fecha de inicio',
       );
     }
 
-    if (startDatetime < evaluationStart || startDatetime > evaluationEnd) {
+    if (startTime < evalStartTime || startTime > evalEndTime) {
       throw new BadRequestException(
         'La fecha de inicio debe estar dentro del rango de la evaluación',
       );
     }
 
-    if (endDatetime < evaluationStart || endDatetime > evaluationEnd) {
+    if (endTime < evalStartTime || endTime > evalEndTime) {
       throw new BadRequestException(
         'La fecha de fin debe estar dentro del rango de la evaluación',
       );

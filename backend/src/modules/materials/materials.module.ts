@@ -23,7 +23,7 @@ import { DeletionRequestRepository } from './infrastructure/deletion-request.rep
 import { MaterialCatalogRepository } from './infrastructure/material-catalog.repository';
 import { StorageModule } from '@infrastructure/storage/storage.module';
 import { EnrollmentsModule } from '@modules/enrollments/enrollments.module';
-import { UsersModule } from '@modules/users/users.module';
+import { CoursesModule } from '@modules/courses/courses.module';
 import { ClassEventsModule } from '@modules/events/class-events.module';
 
 @Module({
@@ -40,7 +40,7 @@ import { ClassEventsModule } from '@modules/events/class-events.module';
     ]),
     StorageModule,
     EnrollmentsModule,
-    UsersModule,
+    CoursesModule,
     ClassEventsModule,
     AuditModule,
   ],

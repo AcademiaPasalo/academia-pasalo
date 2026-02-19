@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import Redis from 'ioredis';
+import util from 'util';
 import { technicalSettings } from '@config/technical-settings';
 
 @Injectable()
@@ -152,7 +153,9 @@ export class RedisCacheService implements OnModuleInit, OnModuleDestroy {
 
       stream.on('error', (error: unknown) => {
         const errObject =
-          error instanceof Error ? error : new Error(String(error));
+          error instanceof Error
+            ? error
+            : new Error(util.inspect(error, { depth: null }));
         this.logger.error({
           message: 'Error durante la invalidación de grupo',
           pattern,

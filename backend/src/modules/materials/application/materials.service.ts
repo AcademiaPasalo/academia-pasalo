@@ -6,7 +6,7 @@ import {
   BadRequestException,
   ForbiddenException,
 } from '@nestjs/common';
-import { DataSource } from 'typeorm';
+import { DataSource, EntityManager } from 'typeorm';
 import { StorageService } from '@infrastructure/storage/storage.service';
 import { AccessEngineService } from '@modules/enrollments/application/access-engine.service';
 import { RedisCacheService } from '@infrastructure/cache/redis-cache.service';
@@ -16,7 +16,8 @@ import { FileResourceRepository } from '@modules/materials/infrastructure/file-r
 import { FileVersionRepository } from '@modules/materials/infrastructure/file-version.repository';
 import { MaterialCatalogRepository } from '@modules/materials/infrastructure/material-catalog.repository';
 import { DeletionRequestRepository } from '@modules/materials/infrastructure/deletion-request.repository';
-import { UserRepository } from '@modules/users/infrastructure/user.repository';
+import { CourseCycleProfessorRepository } from '@modules/courses/infrastructure/course-cycle-professor.repository';
+import { ClassEventRepository } from '@modules/events/infrastructure/class-event.repository';
 import { CreateMaterialFolderDto } from '@modules/materials/dto/create-material-folder.dto';
 import { UploadMaterialDto } from '@modules/materials/dto/upload-material.dto';
 import { RequestDeletionDto } from '@modules/materials/dto/request-deletion.dto';
@@ -25,12 +26,13 @@ import { Material } from '@modules/materials/domain/material.entity';
 import { FileResource } from '@modules/materials/domain/file-resource.entity';
 import { FileVersion } from '@modules/materials/domain/file-version.entity';
 import { User } from '@modules/users/domain/user.entity';
+import type { UserWithSession } from '@modules/auth/strategies/jwt.strategy';
 import { AuditService } from '@modules/audit/application/audit.service';
 import {
   AUDIT_ACTION_CODES,
   AUDIT_ENTITY_TYPES,
 } from '@modules/audit/interfaces/audit.constants';
-import { ClassEventRepository } from '@modules/events/infrastructure/class-event.repository';
+import { getEpoch } from '@common/utils/date.util';
 import * as fs from 'fs';
 import { technicalSettings } from '@config/technical-settings';
 import {
@@ -38,10 +40,10 @@ import {
   ROLE_CODES,
 } from '@common/constants/role-codes.constants';
 import {
-  DELETION_REQUEST_STATUS_CODES,
   FOLDER_STATUS_CODES,
   MATERIAL_CACHE_KEYS,
   MATERIAL_STATUS_CODES,
+  DELETION_REQUEST_STATUS_CODES,
 } from '@modules/materials/domain/material.constants';
 
 @Injectable()
@@ -61,7 +63,7 @@ export class MaterialsService {
     private readonly fileVersionRepository: FileVersionRepository,
     private readonly catalogRepository: MaterialCatalogRepository,
     private readonly deletionRequestRepository: DeletionRequestRepository,
-    private readonly userRepository: UserRepository,
+    private readonly courseCycleProfessorRepository: CourseCycleProfessorRepository,
     private readonly auditService: AuditService,
     private readonly classEventRepository: ClassEventRepository,
   ) {}
@@ -129,19 +131,20 @@ export class MaterialsService {
     const folder = await this.folderRepository.findById(dto.materialFolderId);
     if (!folder) throw new NotFoundException('Carpeta destino no encontrada');
 
-    if (dto.classEventId) {
-      await this.validateClassEventAssociation(
-        dto.classEventId,
-        folder.evaluationId,
-      );
-    }
-
     const now = new Date();
     let storagePath = '';
     let isNewFile = false;
 
     try {
       const result = await this.dataSource.transaction(async (manager) => {
+        if (dto.classEventId) {
+          await this.validateClassEventAssociation(
+            dto.classEventId,
+            folder.evaluationId,
+            manager,
+          );
+        }
+
         const hash = await this.storageService.calculateHash(file.buffer);
         const existingResource =
           await this.fileResourceRepository.findByHash(hash);
@@ -203,7 +206,7 @@ export class MaterialsService {
           materialFolderId: folder.id,
           classEventId: dto.classEventId || null,
           fileResourceId: finalResource.id,
-          fileVersion: finalVersion,
+          fileVersionId: finalVersion.id,
           materialStatusId: activeStatus.id,
           displayName: dto.displayName,
           visibleFrom: dto.visibleFrom ? new Date(dto.visibleFrom) : null,
@@ -332,28 +335,28 @@ export class MaterialsService {
   }
 
   async getRootFolders(
-    user: User,
+    user: UserWithSession,
     evaluationId: string,
   ): Promise<MaterialFolder[]> {
     await this.checkAuthorizedAccess(user, evaluationId);
 
     const cacheKey = MATERIAL_CACHE_KEYS.ROOTS(evaluationId);
-    const cached = await this.cacheService.get<MaterialFolder[]>(cacheKey);
-    if (cached) return cached;
+    let roots = await this.cacheService.get<MaterialFolder[]>(cacheKey);
 
-    const status = await this.getActiveFolderStatus();
-    const roots = await this.folderRepository.findRootsByEvaluation(
-      evaluationId,
-      status.id,
-    );
-
-    await this.cacheService.set(cacheKey, roots, this.CACHE_TTL);
+    if (!roots) {
+      const status = await this.getActiveFolderStatus();
+      roots = await this.folderRepository.findRootsByEvaluation(
+        evaluationId,
+        status.id,
+      );
+      await this.cacheService.set(cacheKey, roots, this.CACHE_TTL);
+    }
 
     return this.applyVisibilityFilter(user, roots, []).folders;
   }
 
   async getFolderContents(
-    user: User,
+    user: UserWithSession,
     folderId: string,
   ): Promise<{ folders: MaterialFolder[]; materials: Material[] }> {
     const folder = await this.folderRepository.findById(folderId);
@@ -362,26 +365,30 @@ export class MaterialsService {
     await this.checkAuthorizedAccess(user, folder.evaluationId, folder);
 
     const cacheKey = MATERIAL_CACHE_KEYS.CONTENTS(folderId);
-    const cached = await this.cacheService.get<{
+    let contents = await this.cacheService.get<{
       folders: MaterialFolder[];
       materials: Material[];
     }>(cacheKey);
-    if (cached) return cached;
 
-    const status = await this.getActiveFolderStatus();
-    const [folders, materials] = await Promise.all([
-      this.folderRepository.findSubFolders(folderId, status.id),
-      this.materialRepository.findByFolderId(folderId),
-    ]);
+    if (!contents) {
+      const status = await this.getActiveFolderStatus();
+      const [folders, materials] = await Promise.all([
+        this.folderRepository.findSubFolders(folderId, status.id),
+        this.materialRepository.findByFolderId(folderId),
+      ]);
+      contents = { folders, materials };
+      await this.cacheService.set(cacheKey, contents, this.CACHE_TTL);
+    }
 
-    const result = { folders, materials };
-    await this.cacheService.set(cacheKey, result, this.CACHE_TTL);
-
-    return this.applyVisibilityFilter(user, result.folders, result.materials);
+    return this.applyVisibilityFilter(
+      user,
+      contents.folders,
+      contents.materials,
+    );
   }
 
   async getClassEventMaterials(
-    user: User,
+    user: UserWithSession,
     classEventId: string,
   ): Promise<Material[]> {
     const classEvent =
@@ -406,7 +413,7 @@ export class MaterialsService {
   }
 
   async download(
-    user: User,
+    user: UserWithSession,
     materialId: string,
   ): Promise<{
     stream: NodeJS.ReadableStream;
@@ -422,7 +429,12 @@ export class MaterialsService {
     if (!folder)
       throw new NotFoundException('Carpeta contenedora no encontrada');
 
-    await this.checkAuthorizedAccess(user, folder.evaluationId, folder);
+    await this.checkAuthorizedAccess(
+      user,
+      folder.evaluationId,
+      folder,
+      material,
+    );
 
     const resource = material.fileResource;
     if (!resource)
@@ -477,30 +489,33 @@ export class MaterialsService {
   }
 
   private applyVisibilityFilter(
-    user: User,
+    user: User | UserWithSession,
     folders: MaterialFolder[],
     materials: Material[],
   ) {
+    const activeRole = (user as UserWithSession).activeRole;
     const roleCodes = (user.roles || []).map((r) => r.code);
-    const hasPrivilegedAccess =
-      roleCodes.some((r) => ADMIN_ROLE_CODES.includes(r)) ||
-      roleCodes.includes(ROLE_CODES.PROFESSOR);
 
-    if (hasPrivilegedAccess) {
+    const isStaff =
+      activeRole === ROLE_CODES.ADMIN ||
+      roleCodes.some((r) => ADMIN_ROLE_CODES.includes(r));
+    const isProfessor = activeRole === ROLE_CODES.PROFESSOR;
+
+    if (isStaff || isProfessor) {
       return { folders, materials };
     }
 
-    const now = new Date();
+    const nowTime = getEpoch(new Date());
 
     const visibleFolders = folders.filter((f) => {
-      const startOk = !f.visibleFrom || new Date(f.visibleFrom) <= now;
-      const endOk = !f.visibleUntil || new Date(f.visibleUntil) >= now;
+      const startOk = !f.visibleFrom || getEpoch(f.visibleFrom) <= nowTime;
+      const endOk = !f.visibleUntil || getEpoch(f.visibleUntil) >= nowTime;
       return startOk && endOk;
     });
 
     const visibleMaterials = materials.filter((m) => {
-      const startOk = !m.visibleFrom || new Date(m.visibleFrom) <= now;
-      const endOk = !m.visibleUntil || new Date(m.visibleUntil) >= now;
+      const startOk = !m.visibleFrom || getEpoch(m.visibleFrom) <= nowTime;
+      const endOk = !m.visibleUntil || getEpoch(m.visibleUntil) >= nowTime;
       return startOk && endOk;
     });
 
@@ -508,27 +523,33 @@ export class MaterialsService {
   }
 
   private async checkAuthorizedAccess(
-    user: User,
+    user: UserWithSession,
     evaluationId: string,
     folder?: MaterialFolder,
+    material?: Material,
   ): Promise<void> {
+    const activeRole = user.activeRole;
     const roleCodes = (user.roles || []).map((r) => r.code);
 
-    if (roleCodes.some((r) => ADMIN_ROLE_CODES.includes(r))) {
+    if (
+      activeRole === ROLE_CODES.ADMIN ||
+      roleCodes.some((r) => ADMIN_ROLE_CODES.includes(r))
+    ) {
       return;
     }
 
-    if (roleCodes.includes(ROLE_CODES.PROFESSOR)) {
-      const isAssigned = await this.dataSource.query(
-        `SELECT 1 FROM course_cycle_professor ccp
-         INNER JOIN evaluation e ON e.course_cycle_id = ccp.course_cycle_id
-         WHERE e.id = ? AND ccp.professor_user_id = ? AND ccp.revoked_at IS NULL LIMIT 1`,
-        [evaluationId, user.id],
-      );
-      if (isAssigned.length === 0)
+    if (activeRole === ROLE_CODES.PROFESSOR) {
+      const isAssigned =
+        await this.courseCycleProfessorRepository.isProfessorAssignedToEvaluation(
+          evaluationId,
+          user.id,
+        );
+
+      if (!isAssigned) {
         throw new ForbiddenException(
           'No tienes permiso para ver materiales de este curso',
         );
+      }
       return;
     }
 
@@ -536,13 +557,30 @@ export class MaterialsService {
       user.id,
       evaluationId,
     );
-    if (!hasEnrollment)
+    if (!hasEnrollment) {
       throw new ForbiddenException(
         'No tienes acceso a este contenido educativo',
       );
+    }
 
-    if (folder?.visibleFrom && new Date() < new Date(folder.visibleFrom)) {
-      throw new ForbiddenException('Este contenido aún no está disponible');
+    const now = new Date();
+
+    if (folder) {
+      if (folder.visibleFrom && now < new Date(folder.visibleFrom)) {
+        throw new ForbiddenException('Este contenido aún no está disponible');
+      }
+      if (folder.visibleUntil && now > new Date(folder.visibleUntil)) {
+        throw new ForbiddenException('Este contenido ya no está disponible');
+      }
+    }
+
+    if (material) {
+      if (material.visibleFrom && now < new Date(material.visibleFrom)) {
+        throw new ForbiddenException('Este material aún no está disponible');
+      }
+      if (material.visibleUntil && now > new Date(material.visibleUntil)) {
+        throw new ForbiddenException('Este material ya no está disponible');
+      }
     }
   }
 
@@ -550,10 +588,11 @@ export class MaterialsService {
     const status = await this.catalogRepository.findFolderStatusByCode(
       FOLDER_STATUS_CODES.ACTIVE,
     );
-    if (!status)
+    if (!status) {
       throw new InternalServerErrorException(
         `Error de configuración: Estado ${FOLDER_STATUS_CODES.ACTIVE} de carpeta faltante`,
       );
+    }
     return status;
   }
 
@@ -561,10 +600,11 @@ export class MaterialsService {
     const status = await this.catalogRepository.findMaterialStatusByCode(
       MATERIAL_STATUS_CODES.ACTIVE,
     );
-    if (!status)
+    if (!status) {
       throw new InternalServerErrorException(
         `Error de configuración: Estado ${MATERIAL_STATUS_CODES.ACTIVE} de material faltante`,
       );
+    }
     return status;
   }
 
@@ -581,9 +621,12 @@ export class MaterialsService {
   private async validateClassEventAssociation(
     classEventId: string,
     evaluationId: string,
+    manager?: EntityManager,
   ) {
-    const classEvent =
-      await this.classEventRepository.findByIdSimple(classEventId);
+    const classEvent = await this.classEventRepository.findByIdSimple(
+      classEventId,
+      manager,
+    );
     if (!classEvent) {
       throw new NotFoundException('Sesion de clase no encontrada');
     }
@@ -598,8 +641,10 @@ export class MaterialsService {
   }
 
   private async rollbackFile(path: string) {
-    const fileName = path.split(/[\/]/).pop();
-    if (fileName) await this.storageService.deleteFile(fileName);
+    const fileName = path.split(/[\\/]/).pop();
+    if (fileName) {
+      await this.storageService.deleteFile(fileName);
+    }
   }
 
   private async invalidateFolderCache(folderId: string) {
