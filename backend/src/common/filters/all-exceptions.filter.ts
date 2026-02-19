@@ -34,7 +34,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
       message: this.getErrorMessage(exception),
       error: this.getErrorName(httpStatus),
       timestamp: new Date().toISOString(),
-      path: httpAdapter.getRequestUrl(request),
+      path: httpAdapter.getRequestUrl(request) as string,
     };
 
     if (httpStatus === HttpStatus.INTERNAL_SERVER_ERROR) {

@@ -5,6 +5,7 @@ import {
   CallHandler,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
+import { Response } from 'express';
 import { Observable } from 'rxjs';
 import { map } from 'rxjs/operators';
 import { ApiResponse } from '@common/interfaces/api-response.interface';
@@ -23,7 +24,7 @@ export class TransformInterceptor<T> implements NestInterceptor<
   ): Observable<ApiResponse<T>> {
     return next.handle().pipe(
       map((data) => {
-        const response = context.switchToHttp().getResponse();
+        const response = context.switchToHttp().getResponse<Response>();
         const statusCode = response.statusCode;
 
         const customMessage = this.reflector.get<string>(
@@ -36,7 +37,7 @@ export class TransformInterceptor<T> implements NestInterceptor<
         return {
           statusCode,
           message,
-          data: data === undefined ? null : data,
+          data: (data === undefined ? null : data) as T,
           timestamp: new Date().toISOString(),
         };
       }),

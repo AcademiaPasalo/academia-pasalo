@@ -524,7 +524,7 @@ export class MaterialsService {
     }
 
     if (roleCodes.includes(ROLE_CODES.PROFESSOR)) {
-      const isAssigned = await this.dataSource.query(
+      const isAssigned = await this.dataSource.query<unknown[]>(
         `SELECT 1 FROM course_cycle_professor ccp
          INNER JOIN evaluation e ON e.course_cycle_id = ccp.course_cycle_id
          WHERE e.id = ? AND ccp.professor_user_id = ? AND ccp.revoked_at IS NULL LIMIT 1`,

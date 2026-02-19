@@ -422,7 +422,7 @@ export class ClassEventsService {
         return cached;
       }
 
-      const isAssigned = await this.dataSource.query(
+      const isAssigned = await this.dataSource.query<unknown[]>(
         'SELECT 1 FROM course_cycle_professor WHERE course_cycle_id = ? AND professor_user_id = ? LIMIT 1',
         [evaluation.courseCycleId, user.id],
       );
@@ -460,7 +460,7 @@ export class ClassEventsService {
         await this.evaluationRepository.findByIdWithCycle(evaluationId);
       if (!evaluation) return false;
 
-      const isAssigned = await this.dataSource.query(
+      const isAssigned = await this.dataSource.query<unknown[]>(
         'SELECT 1 FROM course_cycle_professor WHERE course_cycle_id = ? AND professor_user_id = ? LIMIT 1',
         [evaluation.courseCycleId, userId],
       );

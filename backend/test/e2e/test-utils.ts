@@ -18,9 +18,7 @@ import {
   FOLDER_STATUS_CODES,
   MATERIAL_STATUS_CODES,
 } from '@modules/materials/domain/material.constants';
-import {
-  SESSION_STATUS_CODES,
-} from '@modules/auth/interfaces/security.constants';
+import { SESSION_STATUS_CODES } from '@modules/auth/interfaces/security.constants';
 import { ROLE_CODES } from '@common/constants/role-codes.constants';
 
 interface BasicEntity {

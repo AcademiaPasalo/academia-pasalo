@@ -36,7 +36,9 @@ export class EnrollmentEvaluationRepository {
   }
 
   async checkAccess(userId: string, evaluationId: string): Promise<boolean> {
-    const result = await this.ormRepository.query(
+    const result = await this.ormRepository.query<
+      [{ hasAccess: number | string }]
+    >(
       `SELECT EXISTS(
         SELECT 1 FROM enrollment_evaluation ee
         INNER JOIN enrollment e ON e.id = ee.enrollment_id
