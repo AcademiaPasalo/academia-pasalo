@@ -84,6 +84,18 @@ export class ClassEventsService {
       evaluation.endDate,
     );
 
+    const overlap = await this.classEventRepository.findOverlap(
+      evaluation.courseCycleId,
+      startDatetime,
+      endDatetime,
+    );
+
+    if (overlap) {
+      throw new ConflictException(
+        `El horario ya está ocupado por la sesión ${overlap.sessionNumber} de ${overlap.evaluation.evaluationType.name}${overlap.evaluation.number}`,
+      );
+    }
+
     return await this.dataSource.transaction(async (manager) => {
       const notAvailableStatusId = await this.getRecordingStatusIdByCode(
         CLASS_EVENT_RECORDING_STATUS_CODES.NOT_AVAILABLE,
@@ -217,6 +229,19 @@ export class ClassEventsService {
           evaluation.startDate,
           evaluation.endDate,
         );
+
+        const overlap = await this.classEventRepository.findOverlap(
+          evaluation.courseCycleId,
+          finalStart,
+          finalEnd,
+          eventId,
+        );
+
+        if (overlap) {
+          throw new ConflictException(
+            `No es posible actualizar el horario. Existe un cruce con la sesión ${overlap.sessionNumber} de ${overlap.evaluation.evaluationType.name}${overlap.evaluation.number}`,
+          );
+        }
       }
     }
 

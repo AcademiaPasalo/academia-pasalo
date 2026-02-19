@@ -15,6 +15,7 @@ import {
   CycleLevelResponseDto,
 } from '@modules/courses/dto/course-response.dto';
 import { CourseContentResponseDto } from '@modules/courses/dto/course-content.dto';
+import { UserResponseDto } from '@modules/users/dto/user-response.dto';
 import { CreateCourseDto } from '@modules/courses/dto/create-course.dto';
 import { UpdateCourseDto } from '@modules/courses/dto/update-course.dto';
 import { AssignCourseToCycleDto } from '@modules/courses/dto/assign-course-to-cycle.dto';
@@ -89,6 +90,17 @@ export class CoursesController {
       message: 'Curso asignado al ciclo exitosamente',
       data: result,
     };
+  }
+
+  @Get('cycle/:id/professors')
+  @Roles(ROLE_CODES.PROFESSOR, ROLE_CODES.ADMIN, ROLE_CODES.SUPER_ADMIN)
+  @ResponseMessage('Profesores del curso obtenidos exitosamente')
+  async getProfessorsByCycle(@Param('id') courseCycleId: string) {
+    const professors =
+      await this.coursesService.getProfessorsByCourseCycle(courseCycleId);
+    return plainToInstance(UserResponseDto, professors, {
+      excludeExtraneousValues: true,
+    });
   }
 
   @Post('cycle/:id/professors')

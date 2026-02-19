@@ -248,20 +248,21 @@ export class UsersService {
     currentUser: User,
     updateUserDto: UpdateUserDto,
   ): boolean {
-    if (
-      typeof updateUserDto.email === 'string' &&
-      updateUserDto.email !== currentUser.email
-    ) {
-      return true;
-    }
+    const fieldsToCompare: (keyof UpdateUserDto)[] = [
+      'email',
+      'firstName',
+      'lastName1',
+      'lastName2',
+      'phone',
+      'career',
+      'profilePhotoUrl',
+      'isActive',
+    ];
 
-    if (
-      typeof updateUserDto.isActive === 'boolean' &&
-      updateUserDto.isActive !== currentUser.isActive
-    ) {
-      return true;
-    }
-
-    return false;
+    return fieldsToCompare.some((field) => {
+      const newValue = updateUserDto[field];
+      if (newValue === undefined) return false;
+      return newValue !== currentUser[field];
+    });
   }
 }

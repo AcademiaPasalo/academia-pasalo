@@ -8,6 +8,7 @@ import {
   SESSION_STATUS_CODES,
 } from '@modules/auth/interfaces/security.constants';
 import { RedisCacheService } from '@infrastructure/cache/redis-cache.service';
+import { COURSE_CACHE_KEYS } from '@modules/courses/domain/course.constants';
 
 describe('IdentitySecurityService', () => {
   let service: IdentitySecurityService;
@@ -23,6 +24,7 @@ describe('IdentitySecurityService', () => {
 
   const cacheServiceMock = {
     del: jest.fn(),
+    invalidateGroup: jest.fn(),
   };
 
   beforeEach(async () => {
@@ -70,6 +72,9 @@ describe('IdentitySecurityService', () => {
       3,
       'cache:user:profile:10',
     );
+    expect(cacheServiceMock.invalidateGroup).toHaveBeenCalledWith(
+      COURSE_CACHE_KEYS.GLOBAL_PROFESSOR_LIST_GROUP,
+    );
   });
 
   it('baneo revoca sesiones activas y limpia caché', async () => {
@@ -98,6 +103,9 @@ describe('IdentitySecurityService', () => {
     );
     expect(cacheServiceMock.del).toHaveBeenCalledWith('cache:session:s1:user');
     expect(cacheServiceMock.del).toHaveBeenCalledWith('cache:user:profile:10');
+    expect(cacheServiceMock.invalidateGroup).toHaveBeenCalledWith(
+      COURSE_CACHE_KEYS.GLOBAL_PROFESSOR_LIST_GROUP,
+    );
   });
 
   it('si no existe estado REVOKED lanza error de configuración', async () => {

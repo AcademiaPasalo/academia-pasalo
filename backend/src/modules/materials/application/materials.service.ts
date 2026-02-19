@@ -32,6 +32,7 @@ import {
   AUDIT_ACTION_CODES,
   AUDIT_ENTITY_TYPES,
 } from '@modules/audit/interfaces/audit.constants';
+import { getEpoch } from '@common/utils/date.util';
 import * as fs from 'fs';
 import { technicalSettings } from '@config/technical-settings';
 import {
@@ -504,18 +505,17 @@ export class MaterialsService {
       return { folders, materials };
     }
 
-    const now = new Date();
+    const nowTime = getEpoch(new Date());
 
     const visibleFolders = folders.filter((f) => {
-      const startOk = !f.visibleFrom || new Date(f.visibleFrom) <= now;
-      const endOk = !f.visibleUntil || new Date(f.visibleUntil) >= now;
+      const startOk = !f.visibleFrom || getEpoch(f.visibleFrom) <= nowTime;
+      const endOk = !f.visibleUntil || getEpoch(f.visibleUntil) >= nowTime;
       return startOk && endOk;
     });
 
     const visibleMaterials = materials.filter((m) => {
-      const startOk = !m.visibleFrom || new Date(m.visibleFrom) <= now;
-      const endOk = !m.visibleUntil || new Date(m.visibleUntil) >= now;
-
+      const startOk = !m.visibleFrom || getEpoch(m.visibleFrom) <= nowTime;
+      const endOk = !m.visibleUntil || getEpoch(m.visibleUntil) >= nowTime;
       return startOk && endOk;
     });
 
@@ -623,8 +623,10 @@ export class MaterialsService {
     evaluationId: string,
     manager?: EntityManager,
   ) {
-    const classEvent =
-      await this.classEventRepository.findByIdSimple(classEventId, manager);
+    const classEvent = await this.classEventRepository.findByIdSimple(
+      classEventId,
+      manager,
+    );
     if (!classEvent) {
       throw new NotFoundException('Sesion de clase no encontrada');
     }

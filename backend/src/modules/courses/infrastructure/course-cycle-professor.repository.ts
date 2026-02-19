@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { EntityManager, Repository } from 'typeorm';
+import { EntityManager, Repository, IsNull } from 'typeorm';
 import { CourseCycleProfessor } from '@modules/courses/domain/course-cycle-professor.entity';
 import { Evaluation } from '@modules/evaluations/domain/evaluation.entity';
 
@@ -72,12 +72,12 @@ export class CourseCycleProfessorRepository {
 
     const result = await repo
       .createQueryBuilder('ccp')
-      .select('1')
+      .select('1', 'exists')
       .where('ccp.course_cycle_id = :courseCycleId', { courseCycleId })
       .andWhere('ccp.professor_user_id = :professorUserId', { professorUserId })
       .andWhere('ccp.revoked_at IS NULL')
       .limit(1)
-      .getRawOne();
+      .getRawOne<{ exists: string }>();
 
     return !!result;
   }
@@ -102,7 +102,7 @@ export class CourseCycleProfessorRepository {
       : this.ormRepository;
 
     const isArray = Array.isArray(evaluationIdOrIds);
-    const ids = isArray ? evaluationIdOrIds : [evaluationIdOrIds];
+    const ids: string[] = isArray ? evaluationIdOrIds : [evaluationIdOrIds];
 
     if (ids.length === 0) {
       return isArray ? new Map() : false;
@@ -141,11 +141,23 @@ export class CourseCycleProfessorRepository {
       {
         courseCycleId,
         professorUserId,
-        revokedAt: null,
+        revokedAt: IsNull(),
       },
       {
         revokedAt: new Date(),
       },
     );
+  }
+
+  async findByCourseCycleId(
+    courseCycleId: string,
+  ): Promise<CourseCycleProfessor[]> {
+    return await this.ormRepository
+      .createQueryBuilder('ccp')
+      .innerJoinAndSelect('ccp.professor', 'professor')
+      .where('ccp.course_cycle_id = :courseCycleId', { courseCycleId })
+      .andWhere('ccp.revoked_at IS NULL')
+      .andWhere('professor.is_active = :isActive', { isActive: true })
+      .getMany();
   }
 }

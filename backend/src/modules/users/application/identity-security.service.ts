@@ -12,6 +12,7 @@ import {
   type IdentityInvalidationReason,
 } from '@modules/auth/interfaces/security.constants';
 import { RedisCacheService } from '@infrastructure/cache/redis-cache.service';
+import { COURSE_CACHE_KEYS } from '@modules/courses/domain/course.constants';
 
 @Injectable()
 export class IdentitySecurityService {
@@ -69,6 +70,10 @@ export class IdentitySecurityService {
     }
 
     await this.cacheService.del(`cache:user:profile:${userId}`);
+
+    await this.cacheService.invalidateGroup(
+      COURSE_CACHE_KEYS.GLOBAL_PROFESSOR_LIST_GROUP,
+    );
 
     this.logger.log({
       level: 'info',

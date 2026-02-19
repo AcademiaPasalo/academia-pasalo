@@ -35,6 +35,7 @@ import { COURSE_CACHE_KEYS } from '@modules/courses/domain/course.constants';
 import { ENROLLMENT_CACHE_KEYS } from '@modules/enrollments/domain/enrollment.constants';
 import { CLASS_EVENT_CACHE_KEYS } from '@modules/events/domain/class-event.constants';
 import { technicalSettings } from '@config/technical-settings';
+import { User } from '@/modules/users/domain/user.entity';
 
 type EvaluationWithAccess = Evaluation & {
   enrollmentEvaluations?: EnrollmentEvaluation[];
@@ -230,6 +231,9 @@ export class CoursesService {
     await this.cacheService.invalidateGroup(
       COURSE_CACHE_KEYS.GLOBAL_PROFESSOR_ASSIGNMENT_GROUP,
     );
+    await this.cacheService.invalidateGroup(
+      COURSE_CACHE_KEYS.GLOBAL_PROFESSOR_LIST_GROUP,
+    );
   }
 
   async revokeProfessorFromCourseCycle(
@@ -252,6 +256,33 @@ export class CoursesService {
     await this.cacheService.invalidateGroup(
       COURSE_CACHE_KEYS.GLOBAL_PROFESSOR_ASSIGNMENT_GROUP,
     );
+    await this.cacheService.invalidateGroup(
+      COURSE_CACHE_KEYS.GLOBAL_PROFESSOR_LIST_GROUP,
+    );
+  }
+
+  async getProfessorsByCourseCycle(courseCycleId: string): Promise<User[]> {
+    const cacheKey = COURSE_CACHE_KEYS.PROFESSORS_LIST(courseCycleId);
+    const cached = await this.cacheService.get<User[]>(cacheKey);
+    if (cached) return cached;
+
+    const cycle = await this.courseCycleRepository.findById(courseCycleId);
+    if (!cycle) {
+      throw new NotFoundException('Ciclo del curso no encontrado');
+    }
+
+    const assignments =
+      await this.courseCycleProfessorRepository.findByCourseCycleId(
+        courseCycleId,
+      );
+    const professors = assignments.map((a) => a.professor);
+
+    await this.cacheService.set(
+      cacheKey,
+      professors,
+      this.PROFESSOR_ASSIGNMENT_CACHE_TTL,
+    );
+    return professors;
   }
 
   async findAllTypes(): Promise<CourseType[]> {

@@ -76,8 +76,12 @@ describe('ClassEventsService', () => {
           provide: DataSource,
           useValue: {
             transaction: jest.fn((arg1: unknown, arg2?: unknown) => {
-              const runInTransaction = (typeof arg1 === 'function' ? arg1 : arg2) as (manager: EntityManager) => Promise<unknown>;
-              return runInTransaction({ getRepository: jest.fn() } as unknown as EntityManager);
+              const runInTransaction = (
+                typeof arg1 === 'function' ? arg1 : arg2
+              ) as (manager: EntityManager) => Promise<unknown>;
+              return runInTransaction({
+                getRepository: jest.fn(),
+              } as unknown as EntityManager);
             }),
             query: jest.fn().mockResolvedValue([{ 1: 1 }]),
           },
@@ -93,6 +97,7 @@ describe('ClassEventsService', () => {
             update: jest.fn(),
             cancelEvent: jest.fn(),
             findByUserAndRange: jest.fn(),
+            findOverlap: jest.fn(),
           },
         },
         {
@@ -192,6 +197,27 @@ describe('ClassEventsService', () => {
       );
     });
 
+    it('debe lanzar ConflictException si hay traslape de horario en el curso', async () => {
+      evaluationRepository.findByIdWithCycle.mockResolvedValue(mockEvaluation);
+      classEventRepository.findOverlap.mockResolvedValue({
+        sessionNumber: 2,
+        evaluation: { evaluationType: { name: 'PC' }, number: 1 },
+      } as any);
+
+      await expect(
+        service.createEvent(
+          'eval-1',
+          3,
+          'Clase 3',
+          'Topic',
+          new Date('2026-02-01T08:00:00Z'),
+          new Date('2026-02-01T10:00:00Z'),
+          'link',
+          mockProfessor,
+        ),
+      ).rejects.toThrow('El horario ya está ocupado por la sesión 2 de PC1');
+    });
+
     it('debe usar cache para estado de grabacion si ya existe', async () => {
       cacheService.get.mockImplementation(async (key: string) => {
         if (key === 'cache:class-event-recording-status:code:NOT_AVAILABLE') {
@@ -264,7 +290,9 @@ describe('ClassEventsService', () => {
 
     it('debe conceder acceso a PROFESORES asignados', async () => {
       userRepository.findById.mockResolvedValue(mockProfessor);
-      (courseCycleProfessorRepository.isProfessorAssignedToEvaluation as jest.Mock).mockResolvedValue(true);
+      (
+        courseCycleProfessorRepository.isProfessorAssignedToEvaluation as jest.Mock
+      ).mockResolvedValue(true);
 
       const result = await service.checkUserAuthorization('prof-1', 'eval-1');
       expect(result).toBe(true);
@@ -272,7 +300,9 @@ describe('ClassEventsService', () => {
 
     it('debe denegar acceso a PROFESORES NO asignados', async () => {
       userRepository.findById.mockResolvedValue(mockProfessor);
-      (courseCycleProfessorRepository.isProfessorAssignedToEvaluation as jest.Mock).mockResolvedValue(false);
+      (
+        courseCycleProfessorRepository.isProfessorAssignedToEvaluation as jest.Mock
+      ).mockResolvedValue(false);
 
       const result = await service.checkUserAuthorization('prof-1', 'eval-1');
       expect(result).toBe(false);
@@ -305,7 +335,9 @@ describe('ClassEventsService', () => {
       expect(result).toBe(false);
       expect(userRepository.findById).not.toHaveBeenCalled();
       expect(enrollmentEvaluationRepository.checkAccess).not.toHaveBeenCalled();
-      expect(courseCycleProfessorRepository.isProfessorAssignedToEvaluation).not.toHaveBeenCalled();
+      expect(
+        courseCycleProfessorRepository.isProfessorAssignedToEvaluation,
+      ).not.toHaveBeenCalled();
     });
 
     it('como STUDENT debe consultar checkAccess (sin consultar userRepository.findById)', async () => {
@@ -334,16 +366,17 @@ describe('ClassEventsService', () => {
         startDatetime: new Date(now + 60 * 60 * 1000),
         endDatetime: new Date(now + 2 * 60 * 60 * 1000),
       } as ClassEvent;
-      (courseCycleProfessorRepository.isProfessorAssignedToEvaluation as jest.Mock).mockResolvedValue(true);
+      (
+        courseCycleProfessorRepository.isProfessorAssignedToEvaluation as jest.Mock
+      ).mockResolvedValue(true);
 
       const result = await service.canAccessMeetingLink(event, mockProfessor);
 
       expect(result).toBe(true);
       expect(userRepository.findById).not.toHaveBeenCalled();
-      expect(courseCycleProfessorRepository.isProfessorAssignedToEvaluation).toHaveBeenCalledWith(
-        'eval-1',
-        'prof-1',
-      );
+      expect(
+        courseCycleProfessorRepository.isProfessorAssignedToEvaluation,
+      ).toHaveBeenCalledWith('eval-1', 'prof-1');
       expect(cacheService.set).toHaveBeenCalled();
     });
   });
@@ -483,6 +516,62 @@ describe('ClassEventsService', () => {
       expect(cacheService.invalidateGroup).toHaveBeenCalledWith(
         CLASS_EVENT_CACHE_KEYS.GLOBAL_SCHEDULE_GROUP,
       );
+    });
+
+    it('debe lanzar ConflictException si el nuevo horario para actualizar se cruza con otra sesión', async () => {
+      const existingEvent = { ...mockEvent, id: 'event-1' };
+      const overlappingEvent = {
+        id: 'event-2',
+        sessionNumber: 3,
+        evaluation: { evaluationType: { name: 'PC' }, number: 1 },
+      } as any;
+
+      classEventRepository.findByIdSimple.mockResolvedValue(existingEvent);
+      evaluationRepository.findByIdWithCycle.mockResolvedValue(mockEvaluation);
+      classEventRepository.findOverlap.mockResolvedValue(overlappingEvent);
+
+      await expect(
+        service.updateEvent(
+          'event-1',
+          mockProfessor,
+          undefined,
+          undefined,
+          new Date('2026-02-05T08:00:00Z'),
+          new Date('2026-02-05T10:00:00Z'),
+        ),
+      ).rejects.toThrow(
+        'No es posible actualizar el horario. Existe un cruce con la sesión 3 de PC1',
+      );
+
+      expect(classEventRepository.findOverlap).toHaveBeenCalledWith(
+        'cycle-1',
+        expect.any(Date),
+        expect.any(Date),
+        'event-1',
+      );
+    });
+
+    it('debe actualizar el horario exitosamente si no hay traslape', async () => {
+      const existingEvent = { ...mockEvent, id: 'event-1' };
+
+      classEventRepository.findByIdSimple.mockResolvedValue(existingEvent);
+      evaluationRepository.findByIdWithCycle.mockResolvedValue(mockEvaluation);
+      classEventRepository.findOverlap.mockResolvedValue(null);
+      classEventRepository.update.mockResolvedValue({
+        ...existingEvent,
+        startDatetime: new Date('2026-02-10T08:00:00Z'),
+      } as any);
+
+      await service.updateEvent(
+        'event-1',
+        mockProfessor,
+        undefined,
+        undefined,
+        new Date('2026-02-10T08:00:00Z'),
+        new Date('2026-02-10T10:00:00Z'),
+      );
+
+      expect(classEventRepository.update).toHaveBeenCalled();
     });
   });
 });

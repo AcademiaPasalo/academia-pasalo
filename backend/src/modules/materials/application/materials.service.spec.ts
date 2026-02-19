@@ -12,9 +12,7 @@ import { MaterialCatalogRepository } from '@modules/materials/infrastructure/mat
 import { DeletionRequestRepository } from '@modules/materials/infrastructure/deletion-request.repository';
 import { CourseCycleProfessorRepository } from '@modules/courses/infrastructure/course-cycle-professor.repository';
 import { AuditService } from '@modules/audit/application/audit.service';
-import {
-  AUDIT_ENTITY_TYPES,
-} from '@modules/audit/interfaces/audit.constants';
+import { AUDIT_ENTITY_TYPES } from '@modules/audit/interfaces/audit.constants';
 import { ClassEventRepository } from '@modules/events/infrastructure/class-event.repository';
 import { MaterialFolder } from '@modules/materials/domain/material-folder.entity';
 import { UserWithSession } from '@modules/auth/strategies/jwt.strategy';
@@ -24,9 +22,7 @@ import { DeletionRequestStatus } from '@modules/materials/domain/deletion-reques
 import { Material } from '@modules/materials/domain/material.entity';
 import { FileResource } from '@modules/materials/domain/file-resource.entity';
 import { ROLE_CODES } from '@common/constants/role-codes.constants';
-import {
-  MATERIAL_CACHE_KEYS,
-} from '@modules/materials/domain/material.constants';
+import { MATERIAL_CACHE_KEYS } from '@modules/materials/domain/material.constants';
 import { ClassEvent } from '@modules/events/domain/class-event.entity';
 
 const mockFolder = (
@@ -175,11 +171,10 @@ describe('MaterialsService', () => {
     classEventRepo = module.get(ClassEventRepository);
 
     dataSource.transaction.mockImplementation(
-      (
-        arg1: unknown,
-        arg2?: unknown,
-      ) => {
-        const runInTransaction = (typeof arg1 === 'function' ? arg1 : arg2) as (manager: EntityManager) => Promise<unknown>;
+      (arg1: unknown, arg2?: unknown) => {
+        const runInTransaction = (typeof arg1 === 'function' ? arg1 : arg2) as (
+          manager: EntityManager,
+        ) => Promise<unknown>;
         if (!runInTransaction) return Promise.resolve();
 
         const mockManager = {
@@ -283,12 +278,11 @@ describe('MaterialsService', () => {
       } as Material;
 
       dataSource.transaction.mockImplementation(
-        (
-          arg1: unknown,
-          arg2?: unknown,
-        ) => {
-          const runInTransaction = (typeof arg1 === 'function' ? arg1 : arg2) as (manager: EntityManager) => Promise<unknown>;
-          
+        (arg1: unknown, arg2?: unknown) => {
+          const runInTransaction = (
+            typeof arg1 === 'function' ? arg1 : arg2
+          ) as (manager: EntityManager) => Promise<unknown>;
+
           const mockManager = {
             findOne: jest
               .fn()
@@ -301,7 +295,9 @@ describe('MaterialsService', () => {
               .mockResolvedValueOnce(persistedMaterial),
           } as unknown as EntityManager;
 
-          return runInTransaction ? runInTransaction(mockManager) : Promise.resolve();
+          return runInTransaction
+            ? runInTransaction(mockManager)
+            : Promise.resolve();
         },
       );
 
@@ -334,16 +330,17 @@ describe('MaterialsService', () => {
 
     it('should deny access to professor if assignment is revoked', async () => {
       folderRepo.findById.mockResolvedValue(mockFolder('folder-1', '100'));
-      (courseCycleProfessorRepo.isProfessorAssignedToEvaluation as jest.Mock).mockResolvedValue(false);
+      (
+        courseCycleProfessorRepo.isProfessorAssignedToEvaluation as jest.Mock
+      ).mockResolvedValue(false);
 
       await expect(
         service.getFolderContents(mockProfessor, 'folder-1'),
       ).rejects.toThrow('No tienes permiso para ver materiales de este curso');
 
-      expect(courseCycleProfessorRepo.isProfessorAssignedToEvaluation).toHaveBeenCalledWith(
-        '100',
-        'prof-1',
-      );
+      expect(
+        courseCycleProfessorRepo.isProfessorAssignedToEvaluation,
+      ).toHaveBeenCalledWith('100', 'prof-1');
     });
 
     it('should allow access to professor if assignment is active', async () => {
@@ -354,7 +351,9 @@ describe('MaterialsService', () => {
       folderRepo.findSubFolders.mockResolvedValue([]);
       materialRepo.findByFolderId.mockResolvedValue([]);
 
-      (courseCycleProfessorRepo.isProfessorAssignedToEvaluation as jest.Mock).mockResolvedValue(true);
+      (
+        courseCycleProfessorRepo.isProfessorAssignedToEvaluation as jest.Mock
+      ).mockResolvedValue(true);
 
       const result = await service.getFolderContents(mockProfessor, 'folder-1');
 
@@ -408,7 +407,9 @@ describe('MaterialsService', () => {
 
       dataSource.transaction.mockImplementation(
         async (arg1: unknown, arg2?: unknown) => {
-          const runInTransaction = (typeof arg1 === 'function' ? arg1 : arg2) as (manager: EntityManager) => Promise<unknown>;
+          const runInTransaction = (
+            typeof arg1 === 'function' ? arg1 : arg2
+          ) as (manager: EntityManager) => Promise<unknown>;
           const mockManager = {
             findOne: jest.fn().mockResolvedValue(persistedMaterial),
             create: jest.fn((_: unknown, data: object) => data),
