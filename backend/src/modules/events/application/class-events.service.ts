@@ -13,6 +13,7 @@ import { ClassEventProfessorRepository } from '@modules/events/infrastructure/cl
 import { ClassEventRecordingStatusRepository } from '@modules/events/infrastructure/class-event-recording-status.repository';
 import { EvaluationRepository } from '@modules/evaluations/infrastructure/evaluation.repository';
 import { EnrollmentEvaluationRepository } from '@modules/enrollments/infrastructure/enrollment-evaluation.repository';
+import { CourseCycleProfessorRepository } from '@modules/courses/infrastructure/course-cycle-professor.repository';
 import { UserRepository } from '@modules/users/infrastructure/user.repository';
 import { RedisCacheService } from '@infrastructure/cache/redis-cache.service';
 import { ClassEvent } from '@modules/events/domain/class-event.entity';
@@ -30,6 +31,7 @@ import {
   ADMIN_ROLE_CODES,
   ROLE_CODES,
 } from '@common/constants/role-codes.constants';
+import { COURSE_CACHE_KEYS } from '@modules/courses/domain/course.constants';
 
 @Injectable()
 export class ClassEventsService {
@@ -43,13 +45,6 @@ export class ClassEventsService {
   private readonly RECORDING_STATUS_CACHE_TTL =
     technicalSettings.cache.events.recordingStatusCatalogCacheTtlSeconds;
 
-  private getProfessorAssignmentCacheKey(
-    courseCycleId: string,
-    professorUserId: string,
-  ): string {
-    return `cache:cc-professor:cycle:${courseCycleId}:prof:${professorUserId}`;
-  }
-
   private getRecordingStatusCacheKey(code: string): string {
     return `cache:class-event-recording-status:code:${code}`;
   }
@@ -61,6 +56,7 @@ export class ClassEventsService {
     private readonly classEventRecordingStatusRepository: ClassEventRecordingStatusRepository,
     private readonly evaluationRepository: EvaluationRepository,
     private readonly enrollmentEvaluationRepository: EnrollmentEvaluationRepository,
+    private readonly courseCycleProfessorRepository: CourseCycleProfessorRepository,
     private readonly userRepository: UserRepository,
     private readonly cacheService: RedisCacheService,
   ) {}
@@ -409,12 +405,8 @@ export class ClassEventsService {
     }
 
     if (roleCodes.includes(ROLE_CODES.PROFESSOR)) {
-      const evaluation =
-        await this.evaluationRepository.findByIdWithCycle(evaluationId);
-      if (!evaluation) return false;
-
-      const cacheKey = this.getProfessorAssignmentCacheKey(
-        evaluation.courseCycleId,
+      const cacheKey = COURSE_CACHE_KEYS.PROFESSOR_ASSIGNMENT(
+        evaluationId,
         user.id,
       );
       const cached = await this.cacheService.get<boolean>(cacheKey);
@@ -422,18 +414,18 @@ export class ClassEventsService {
         return cached;
       }
 
-      const isAssigned = await this.dataSource.query<unknown[]>(
-        'SELECT 1 FROM course_cycle_professor WHERE course_cycle_id = ? AND professor_user_id = ? LIMIT 1',
-        [evaluation.courseCycleId, user.id],
-      );
+      const isAssigned =
+        await this.courseCycleProfessorRepository.isProfessorAssignedToEvaluation(
+          evaluationId,
+          user.id,
+        );
 
-      const result = isAssigned.length > 0;
       await this.cacheService.set(
         cacheKey,
-        result,
+        isAssigned,
         this.PROFESSOR_ASSIGNMENT_CACHE_TTL,
       );
-      return result;
+      return isAssigned;
     }
 
     return await this.enrollmentEvaluationRepository.checkAccess(
@@ -449,29 +441,7 @@ export class ClassEventsService {
     const user = await this.userRepository.findById(userId);
     if (!user) return false;
 
-    const roleCodes = (user.roles || []).map((r) => r.code);
-
-    if (roleCodes.some((r) => ADMIN_ROLE_CODES.includes(r))) {
-      return true;
-    }
-
-    if (roleCodes.includes(ROLE_CODES.PROFESSOR)) {
-      const evaluation =
-        await this.evaluationRepository.findByIdWithCycle(evaluationId);
-      if (!evaluation) return false;
-
-      const isAssigned = await this.dataSource.query<unknown[]>(
-        'SELECT 1 FROM course_cycle_professor WHERE course_cycle_id = ? AND professor_user_id = ? LIMIT 1',
-        [evaluation.courseCycleId, userId],
-      );
-
-      return isAssigned.length > 0;
-    }
-
-    return await this.enrollmentEvaluationRepository.checkAccess(
-      userId,
-      evaluationId,
-    );
+    return await this.checkUserAuthorizationWithUser(user, evaluationId);
   }
 
   async getMySchedule(

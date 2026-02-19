@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { EntityManager, Repository } from 'typeorm';
 import { CourseCycleProfessor } from '@modules/courses/domain/course-cycle-professor.entity';
+import { Evaluation } from '@modules/evaluations/domain/evaluation.entity';
 
 @Injectable()
 export class CourseCycleProfessorRepository {
@@ -58,6 +59,74 @@ export class CourseCycleProfessorRepository {
     existing.assignedAt = now;
     existing.revokedAt = null;
     return await repo.save(existing);
+  }
+
+  async isProfessorAssigned(
+    courseCycleId: string,
+    professorUserId: string,
+    manager?: EntityManager,
+  ): Promise<boolean> {
+    const repo = manager
+      ? manager.getRepository(CourseCycleProfessor)
+      : this.ormRepository;
+
+    const result = await repo
+      .createQueryBuilder('ccp')
+      .select('1')
+      .where('ccp.course_cycle_id = :courseCycleId', { courseCycleId })
+      .andWhere('ccp.professor_user_id = :professorUserId', { professorUserId })
+      .andWhere('ccp.revoked_at IS NULL')
+      .limit(1)
+      .getRawOne();
+
+    return !!result;
+  }
+
+  async isProfessorAssignedToEvaluation(
+    evaluationId: string,
+    professorUserId: string,
+    manager?: EntityManager,
+  ): Promise<boolean>;
+  async isProfessorAssignedToEvaluation(
+    evaluationIds: string[],
+    professorUserId: string,
+    manager?: EntityManager,
+  ): Promise<Map<string, boolean>>;
+  async isProfessorAssignedToEvaluation(
+    evaluationIdOrIds: string | string[],
+    professorUserId: string,
+    manager?: EntityManager,
+  ): Promise<boolean | Map<string, boolean>> {
+    const repo = manager
+      ? manager.getRepository(CourseCycleProfessor)
+      : this.ormRepository;
+
+    const isArray = Array.isArray(evaluationIdOrIds);
+    const ids = isArray ? evaluationIdOrIds : [evaluationIdOrIds];
+
+    if (ids.length === 0) {
+      return isArray ? new Map() : false;
+    }
+
+    const query = repo
+      .createQueryBuilder('ccp')
+      .select('ev.id', 'evaluationId')
+      .innerJoin(Evaluation, 'ev', 'ev.course_cycle_id = ccp.course_cycle_id')
+      .where('ev.id IN (:...ids)', { ids })
+      .andWhere('ccp.professor_user_id = :professorUserId', { professorUserId })
+      .andWhere('ccp.revoked_at IS NULL');
+
+    const results = await query.getRawMany<{ evaluationId: string }>();
+
+    if (!isArray) {
+      return results.length > 0;
+    }
+
+    const resultMap = new Map<string, boolean>();
+    ids.forEach((id) => resultMap.set(id, false));
+    results.forEach((r) => resultMap.set(r.evaluationId, true));
+
+    return resultMap;
   }
 
   async revoke(

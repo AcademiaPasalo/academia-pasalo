@@ -6,9 +6,10 @@ import { ClassEventProfessorRepository } from '@modules/events/infrastructure/cl
 import { ClassEventRecordingStatusRepository } from '@modules/events/infrastructure/class-event-recording-status.repository';
 import { EvaluationRepository } from '@modules/evaluations/infrastructure/evaluation.repository';
 import { EnrollmentEvaluationRepository } from '@modules/enrollments/infrastructure/enrollment-evaluation.repository';
+import { CourseCycleProfessorRepository } from '@modules/courses/infrastructure/course-cycle-professor.repository';
 import { UserRepository } from '@modules/users/infrastructure/user.repository';
 import { RedisCacheService } from '@infrastructure/cache/redis-cache.service';
-import { User } from '@modules/users/domain/user.entity';
+import { UserWithSession } from '@modules/auth/strategies/jwt.strategy';
 import { ClassEvent } from '@modules/events/domain/class-event.entity';
 import { Evaluation } from '@modules/evaluations/domain/evaluation.entity';
 import { ROLE_CODES } from '@common/constants/role-codes.constants';
@@ -21,26 +22,30 @@ describe('ClassEventsService', () => {
   let service: ClassEventsService;
   let classEventRepository: jest.Mocked<ClassEventRepository>;
   let evaluationRepository: jest.Mocked<EvaluationRepository>;
+  let courseCycleProfessorRepository: jest.Mocked<CourseCycleProfessorRepository>;
   let classEventRecordingStatusRepository: jest.Mocked<ClassEventRecordingStatusRepository>;
   let enrollmentEvaluationRepository: jest.Mocked<EnrollmentEvaluationRepository>;
   let userRepository: jest.Mocked<UserRepository>;
   let cacheService: jest.Mocked<RedisCacheService>;
   let dataSource: jest.Mocked<DataSource>;
 
-  const mockAdmin = {
+  const mockAdmin: UserWithSession = {
     id: 'admin-1',
+    activeRole: ROLE_CODES.ADMIN,
     roles: [{ code: ROLE_CODES.ADMIN }],
-  } as User;
+  } as UserWithSession;
 
-  const mockProfessor = {
+  const mockProfessor: UserWithSession = {
     id: 'prof-1',
+    activeRole: ROLE_CODES.PROFESSOR,
     roles: [{ code: ROLE_CODES.PROFESSOR }],
-  } as User;
+  } as UserWithSession;
 
-  const mockStudent = {
+  const mockStudent: UserWithSession = {
     id: 'student-1',
+    activeRole: ROLE_CODES.STUDENT,
     roles: [{ code: ROLE_CODES.STUDENT }],
-  } as User;
+  } as UserWithSession;
 
   const mockEvent = {
     id: 'event-1',
@@ -70,9 +75,10 @@ describe('ClassEventsService', () => {
         {
           provide: DataSource,
           useValue: {
-            transaction: jest.fn((cb: (manager: unknown) => Promise<unknown>) =>
-              cb({ getRepository: jest.fn() }),
-            ),
+            transaction: jest.fn((arg1: unknown, arg2?: unknown) => {
+              const runInTransaction = (typeof arg1 === 'function' ? arg1 : arg2) as (manager: EntityManager) => Promise<unknown>;
+              return runInTransaction({ getRepository: jest.fn() } as unknown as EntityManager);
+            }),
             query: jest.fn().mockResolvedValue([{ 1: 1 }]),
           },
         },
@@ -120,6 +126,13 @@ describe('ClassEventsService', () => {
           },
         },
         {
+          provide: CourseCycleProfessorRepository,
+          useValue: {
+            isProfessorAssigned: jest.fn(),
+            isProfessorAssignedToEvaluation: jest.fn(),
+          },
+        },
+        {
           provide: UserRepository,
           useValue: {
             findById: jest.fn(),
@@ -140,6 +153,7 @@ describe('ClassEventsService', () => {
     service = module.get<ClassEventsService>(ClassEventsService);
     classEventRepository = module.get(ClassEventRepository);
     evaluationRepository = module.get(EvaluationRepository);
+    courseCycleProfessorRepository = module.get(CourseCycleProfessorRepository);
     classEventRecordingStatusRepository = module.get(
       ClassEventRecordingStatusRepository,
     );
@@ -250,8 +264,7 @@ describe('ClassEventsService', () => {
 
     it('debe conceder acceso a PROFESORES asignados', async () => {
       userRepository.findById.mockResolvedValue(mockProfessor);
-      evaluationRepository.findByIdWithCycle.mockResolvedValue(mockEvaluation);
-      dataSource.query.mockResolvedValue([{ 1: 1 }]);
+      (courseCycleProfessorRepository.isProfessorAssignedToEvaluation as jest.Mock).mockResolvedValue(true);
 
       const result = await service.checkUserAuthorization('prof-1', 'eval-1');
       expect(result).toBe(true);
@@ -259,8 +272,7 @@ describe('ClassEventsService', () => {
 
     it('debe denegar acceso a PROFESORES NO asignados', async () => {
       userRepository.findById.mockResolvedValue(mockProfessor);
-      evaluationRepository.findByIdWithCycle.mockResolvedValue(mockEvaluation);
-      dataSource.query.mockResolvedValue([]);
+      (courseCycleProfessorRepository.isProfessorAssignedToEvaluation as jest.Mock).mockResolvedValue(false);
 
       const result = await service.checkUserAuthorization('prof-1', 'eval-1');
       expect(result).toBe(false);
@@ -293,8 +305,7 @@ describe('ClassEventsService', () => {
       expect(result).toBe(false);
       expect(userRepository.findById).not.toHaveBeenCalled();
       expect(enrollmentEvaluationRepository.checkAccess).not.toHaveBeenCalled();
-      expect(evaluationRepository.findByIdWithCycle).not.toHaveBeenCalled();
-      expect(dataSource.query).not.toHaveBeenCalled();
+      expect(courseCycleProfessorRepository.isProfessorAssignedToEvaluation).not.toHaveBeenCalled();
     });
 
     it('como STUDENT debe consultar checkAccess (sin consultar userRepository.findById)', async () => {
@@ -316,24 +327,23 @@ describe('ClassEventsService', () => {
       );
     });
 
-    it('como PROFESSOR debe consultar la evaluación y la asignación (sin consultar userRepository.findById)', async () => {
+    it('como PROFESSOR debe consultar la asignación (sin consultar userRepository.findById)', async () => {
       const now = Date.now();
       const event = {
         ...mockEvent,
         startDatetime: new Date(now + 60 * 60 * 1000),
         endDatetime: new Date(now + 2 * 60 * 60 * 1000),
       } as ClassEvent;
-      evaluationRepository.findByIdWithCycle.mockResolvedValue(mockEvaluation);
-      dataSource.query.mockResolvedValue([{ 1: 1 }]);
+      (courseCycleProfessorRepository.isProfessorAssignedToEvaluation as jest.Mock).mockResolvedValue(true);
 
       const result = await service.canAccessMeetingLink(event, mockProfessor);
 
       expect(result).toBe(true);
       expect(userRepository.findById).not.toHaveBeenCalled();
-      expect(evaluationRepository.findByIdWithCycle).toHaveBeenCalledWith(
+      expect(courseCycleProfessorRepository.isProfessorAssignedToEvaluation).toHaveBeenCalledWith(
         'eval-1',
+        'prof-1',
       );
-      expect(dataSource.query).toHaveBeenCalled();
       expect(cacheService.set).toHaveBeenCalled();
     });
   });
@@ -416,7 +426,6 @@ describe('ClassEventsService', () => {
 
   describe('Integridad de Tipos de Fecha (Regresión)', () => {
     it('debe calcular PROGRAMADA aunque la BD devuelva fechas como STRINGS (Protección getEpoch)', () => {
-      // Mock de evento con fechas en formato STRING (comportamiento real de drivers SQL)
       const eventWithStrings = {
         startDatetime: '2026-12-01T10:00:00.000Z',
         endDatetime: '2026-12-01T12:00:00.000Z',
@@ -425,7 +434,6 @@ describe('ClassEventsService', () => {
 
       const status = service.calculateEventStatus(eventWithStrings);
 
-      // Si getEpoch no funcionara, esto devolvería FINALIZADA por error de comparación alfabética
       expect(status).toBe(CLASS_EVENT_STATUS.PROGRAMADA);
     });
   });

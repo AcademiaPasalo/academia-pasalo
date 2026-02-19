@@ -61,13 +61,6 @@ export class CoursesService {
     private readonly cacheService: RedisCacheService,
   ) {}
 
-  private getProfessorAssignmentCacheKey(
-    courseCycleId: string,
-    professorUserId: string,
-  ): string {
-    return `cache:cc-professor:cycle:${courseCycleId}:prof:${professorUserId}`;
-  }
-
   async findAllCourses(): Promise<Course[]> {
     return await this.courseRepository.findAll();
   }
@@ -234,11 +227,9 @@ export class CoursesService {
       );
     });
 
-    const cacheKey = this.getProfessorAssignmentCacheKey(
-      courseCycleId,
-      professorUserId,
+    await this.cacheService.invalidateGroup(
+      COURSE_CACHE_KEYS.GLOBAL_PROFESSOR_ASSIGNMENT_GROUP,
     );
-    await this.cacheService.del(cacheKey);
   }
 
   async revokeProfessorFromCourseCycle(
@@ -258,11 +249,9 @@ export class CoursesService {
       );
     });
 
-    const cacheKey = this.getProfessorAssignmentCacheKey(
-      courseCycleId,
-      professorUserId,
+    await this.cacheService.invalidateGroup(
+      COURSE_CACHE_KEYS.GLOBAL_PROFESSOR_ASSIGNMENT_GROUP,
     );
-    await this.cacheService.del(cacheKey);
   }
 
   async findAllTypes(): Promise<CourseType[]> {
