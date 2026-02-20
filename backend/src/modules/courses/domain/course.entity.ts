@@ -27,6 +27,12 @@ export class Course {
   @Column({ length: 100 })
   name: string;
 
+  @Column({ name: 'primary_color', length: 7, nullable: true })
+  primaryColor: string;
+
+  @Column({ name: 'secondary_color', length: 7, nullable: true })
+  secondaryColor: string;
+
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
 

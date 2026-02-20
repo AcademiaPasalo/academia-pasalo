@@ -1,4 +1,4 @@
-import { Logger } from '@nestjs/common';
+import { Logger, InternalServerErrorException } from '@nestjs/common';
 import {
   EntitySubscriberInterface,
   EventSubscriber,
@@ -14,6 +14,7 @@ import { Injectable } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { ENROLLMENT_TYPE_CODES } from '@modules/enrollments/domain/enrollment.constants';
 import { EVALUATION_TYPE_CODES } from '@modules/evaluations/domain/evaluation.constants';
+import { getEpoch } from '@common/utils/date.util';
 
 @EventSubscriber()
 @Injectable()
@@ -37,13 +38,15 @@ export class EvaluationSubscriber implements EntitySubscriberInterface<Evaluatio
     });
 
     if (!evaluationType) {
-      this.logger.warn({
+      this.logger.error({
         message:
-          'Tipo de evaluación no encontrado, omitiendo lógica del subscriber',
+          'Error de integridad: Tipo de evaluación no encontrado en subscriber',
         evaluationTypeId: evaluation.evaluationTypeId,
         evaluationId: evaluation.id,
       });
-      return;
+      throw new InternalServerErrorException(
+        'Error de integridad al procesar la evaluación',
+      );
     }
 
     const fullType = await manager.findOne(EnrollmentType, {
@@ -51,12 +54,14 @@ export class EvaluationSubscriber implements EntitySubscriberInterface<Evaluatio
     });
 
     if (!fullType) {
-      this.logger.warn({
+      this.logger.error({
         message:
-          'Tipo de matrícula FULL no encontrado, omitiendo lógica del subscriber',
+          'Error de integridad: Tipo de matrícula FULL no encontrado en subscriber',
         evaluationId: evaluation.id,
       });
-      return;
+      throw new InternalServerErrorException(
+        'Configuración de sistema incompleta (FULL_TYPE)',
+      );
     }
 
     const BATCH_SIZE = 100;
@@ -109,7 +114,9 @@ export class EvaluationSubscriber implements EntitySubscriberInterface<Evaluatio
             if (academicEvaluations.length > 0) {
               const maxAcademicEndDate = academicEvaluations.reduce(
                 (max, current) => {
-                  return current.endDate > max ? current.endDate : max;
+                  return getEpoch(current.endDate) > getEpoch(max)
+                    ? current.endDate
+                    : max;
                 },
                 new Date(0),
               );

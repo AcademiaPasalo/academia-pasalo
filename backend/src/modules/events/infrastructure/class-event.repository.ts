@@ -25,6 +25,7 @@ export class ClassEventRepository {
     return await this.ormRepository
       .createQueryBuilder('classEvent')
       .leftJoinAndSelect('classEvent.evaluation', 'evaluation')
+      .leftJoinAndSelect('evaluation.evaluationType', 'evaluationType')
       .leftJoinAndSelect('evaluation.courseCycle', 'courseCycle')
       .leftJoinAndSelect('courseCycle.course', 'course')
       .leftJoinAndSelect('courseCycle.academicCycle', 'academicCycle')
@@ -53,6 +54,7 @@ export class ClassEventRepository {
     return await this.ormRepository
       .createQueryBuilder('classEvent')
       .leftJoinAndSelect('classEvent.evaluation', 'evaluation')
+      .leftJoinAndSelect('evaluation.evaluationType', 'evaluationType')
       .leftJoinAndSelect('evaluation.courseCycle', 'courseCycle')
       .leftJoinAndSelect('courseCycle.course', 'course')
       .leftJoinAndSelect('classEvent.creator', 'creator')
@@ -89,6 +91,7 @@ export class ClassEventRepository {
     return await this.ormRepository
       .createQueryBuilder('classEvent')
       .leftJoinAndSelect('classEvent.evaluation', 'evaluation')
+      .leftJoinAndSelect('evaluation.evaluationType', 'evaluationType')
       .leftJoinAndSelect('evaluation.courseCycle', 'courseCycle')
       .leftJoinAndSelect('courseCycle.course', 'course')
       .leftJoinAndSelect('classEvent.creator', 'creator')
@@ -131,6 +134,40 @@ export class ClassEventRepository {
     });
   }
 
+  async findOverlap(
+    courseCycleId: string,
+    start: Date,
+    end: Date,
+    excludeEventId?: string,
+    manager?: EntityManager,
+  ): Promise<ClassEvent | null> {
+    const repo = manager
+      ? manager.getRepository(ClassEvent)
+      : this.ormRepository;
+
+    const qb = repo
+      .createQueryBuilder('ce')
+      .select(['ce.id', 'ce.sessionNumber', 'ev.id', 'ev.number', 'et.name'])
+      .innerJoin('ce.evaluation', 'ev')
+      .innerJoin('ev.evaluationType', 'et')
+      .where('ev.course_cycle_id = :courseCycleId', { courseCycleId })
+      .andWhere('ce.is_cancelled = :isCancelled', { isCancelled: false })
+      .andWhere(
+        new Brackets((qb) => {
+          qb.where(':start < ce.end_datetime AND :end > ce.start_datetime', {
+            start,
+            end,
+          });
+        }),
+      );
+
+    if (excludeEventId) {
+      qb.andWhere('ce.id != :excludeEventId', { excludeEventId });
+    }
+
+    return await qb.getOne();
+  }
+
   async findByUserAndRange(
     userId: string,
     startDate: Date,
@@ -139,6 +176,7 @@ export class ClassEventRepository {
     const qb = this.ormRepository
       .createQueryBuilder('classEvent')
       .leftJoinAndSelect('classEvent.evaluation', 'evaluation')
+      .leftJoinAndSelect('evaluation.evaluationType', 'evaluationType')
       .leftJoinAndSelect('evaluation.courseCycle', 'courseCycle')
       .leftJoinAndSelect('courseCycle.course', 'course')
       .leftJoinAndSelect('classEvent.creator', 'creator')

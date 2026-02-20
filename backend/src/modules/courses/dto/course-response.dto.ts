@@ -33,6 +33,12 @@ export class CourseResponseDto {
   name: string;
 
   @Expose()
+  primaryColor: string;
+
+  @Expose()
+  secondaryColor: string;
+
+  @Expose()
   @Type(() => CourseTypeResponseDto)
   courseType: CourseTypeResponseDto;
 

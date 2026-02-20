@@ -18,10 +18,8 @@ import {
   FOLDER_STATUS_CODES,
   MATERIAL_STATUS_CODES,
 } from '@modules/materials/domain/material.constants';
-import {
-  LOCATION_SOURCES,
-  SESSION_STATUS_CODES,
-} from '@modules/auth/interfaces/security.constants';
+import { SESSION_STATUS_CODES } from '@modules/auth/interfaces/security.constants';
+import { ROLE_CODES } from '@common/constants/role-codes.constants';
 
 interface BasicEntity {
   id: string;
@@ -289,15 +287,17 @@ export class TestSeeder {
         }),
       )) as BasicEntity;
 
-    const deviceId = 'device-' + Date.now();
+    const timestamp = Date.now();
+    const random = Math.floor(Math.random() * 1000000);
+    const deviceId = `device-${timestamp}-${random}`;
     const sessionRepo = this.dataSource.getRepository('UserSession');
     const session = (await sessionRepo.save(
       sessionRepo.create({
         userId: user.id,
         deviceId,
         ipAddress: '127.0.0.1',
-        refreshTokenHash: 'hash-' + Date.now(),
-        refreshTokenJti: 'jti-' + Date.now(),
+        refreshTokenHash: `hash-${timestamp}-${random}`,
+        refreshTokenJti: `jti-${timestamp}-${random}`,
         sessionStatusId: activeStatus.id,
         isActive: true,
         expiresAt: new Date(Date.now() + 1000 * 60 * 60),

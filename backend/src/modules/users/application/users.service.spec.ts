@@ -205,6 +205,33 @@ describe('UsersService', () => {
     );
   });
 
+  it('update: cambio de nombre invalida identidad y caché de profesores', async () => {
+    const existing = {
+      id: '1',
+      email: 'user@test.com',
+      firstName: 'Original',
+      isActive: true,
+      roles: [],
+    };
+
+    userRepositoryMock.findById.mockResolvedValue(existing);
+    userRepositoryMock.save.mockResolvedValue({
+      ...existing,
+      firstName: 'Nuevo Nombre',
+    });
+
+    await usersService.update('1', { firstName: 'Nuevo Nombre' });
+
+    expect(
+      identitySecurityServiceMock.invalidateUserIdentity,
+    ).toHaveBeenCalledWith(
+      '1',
+      expect.objectContaining({
+        reason: IDENTITY_INVALIDATION_REASONS.SENSITIVE_UPDATE,
+      }),
+    );
+  });
+
   it('update: desbaneo invalida identidad sin revocar sesiones antiguas', async () => {
     const existing = {
       id: '1',

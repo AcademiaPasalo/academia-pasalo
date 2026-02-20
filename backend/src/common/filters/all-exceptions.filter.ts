@@ -24,9 +24,9 @@ export class AllExceptionsFilter implements ExceptionFilter {
     const ctx = host.switchToHttp();
     const request = ctx.getRequest<RequestWithUrl>();
 
-    const httpStatus =
+    const httpStatus: HttpStatus =
       exception instanceof HttpException
-        ? exception.getStatus()
+        ? (exception.getStatus() as HttpStatus)
         : HttpStatus.INTERNAL_SERVER_ERROR;
 
     const responseBody = {
@@ -34,7 +34,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
       message: this.getErrorMessage(exception),
       error: this.getErrorName(httpStatus),
       timestamp: new Date().toISOString(),
-      path: httpAdapter.getRequestUrl(request),
+      path: httpAdapter.getRequestUrl(request) as string,
     };
 
     if (httpStatus === HttpStatus.INTERNAL_SERVER_ERROR) {
@@ -82,7 +82,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
     return 'Error Interno del Servidor. Por favor contacte con la academia.';
   }
 
-  private getErrorName(status: number): string {
+  private getErrorName(status: HttpStatus): string {
     return HttpStatus[status] || 'Error Desconocido';
   }
 }

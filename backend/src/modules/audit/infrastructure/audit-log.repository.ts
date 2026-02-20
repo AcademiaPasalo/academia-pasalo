@@ -36,7 +36,9 @@ export class AuditLogRepository {
     const query = this.repository
       .createQueryBuilder('l')
       .leftJoinAndSelect('l.auditAction', 'a')
-      .leftJoinAndSelect('l.user', 'u');
+      .leftJoinAndSelect('l.user', 'u')
+      .leftJoinAndSelect('u.lastActiveRole', 'lar')
+      .leftJoinAndSelect('u.roles', 'r');
 
     if (filters.startDate) {
       query.andWhere('l.eventDatetime >= :startDate', {

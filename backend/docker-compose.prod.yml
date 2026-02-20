@@ -28,9 +28,9 @@ services:
     expose:
       - "3001"
     environment:
-      - DB_HOST=mysql
+      - DB_HOST=172.31.65.82
       - DB_PORT=3306
-      - DB_USER=root
+      - DB_USER=${DB_USER}
       - DB_PASSWORD=${DB_PASSWORD}
       - DB_NAME=${DB_NAME}
       - REDIS_HOST=redis
@@ -45,8 +45,6 @@ services:
       - NODE_ENV=production
       - PORT=3001
     depends_on:
-      mysql:
-        condition: service_healthy
       redis:
         condition: service_healthy
     networks:
@@ -84,32 +82,10 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-
-  mysql:
-    image: mysql:8.0
-    container_name: academia-pasalo-mysql
-    restart: unless-stopped
-    expose:
-      - "3306"
-    environment:
-      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD}
-      MYSQL_DATABASE: ${DB_NAME}
-    volumes:
-      - mysql_data:/var/lib/mysql
-    networks:
-      - academia-network
-    healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${DB_PASSWORD}"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
 networks:
   academia-network:
     driver: bridge
 
 volumes:
   redis_data:
-    driver: local
-  mysql_data:
     driver: local

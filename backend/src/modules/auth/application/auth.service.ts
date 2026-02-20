@@ -33,6 +33,7 @@ import {
 import { RedisCacheService } from '@infrastructure/cache/redis-cache.service';
 import { createHash } from 'crypto';
 import { technicalSettings } from '@config/technical-settings';
+import { getEpoch } from '@common/utils/date.util';
 
 @Injectable()
 export class AuthService {
@@ -177,7 +178,7 @@ export class AuthService {
           throw new UnauthorizedException(SECURITY_MESSAGES.INVALID_SESSION);
         }
 
-        if (lockedSession.expiresAt < new Date()) {
+        if (getEpoch(lockedSession.expiresAt) < getEpoch(new Date())) {
           await this.sessionService.deactivateSession(
             lockedSession.id,
             manager,

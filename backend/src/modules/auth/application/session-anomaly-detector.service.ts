@@ -137,7 +137,7 @@ export class SessionAnomalyDetectorService {
     return nLat >= minLat && nLat <= maxLat && nLon >= minLon && nLon <= maxLon;
   }
 
-  async resolveCoordinates(metadata: RequestMetadata): Promise<{
+  resolveCoordinates(metadata: RequestMetadata): Promise<{
     metadata: RequestMetadata;
     locationSource: LocationSource;
   }> {
@@ -145,16 +145,22 @@ export class SessionAnomalyDetectorService {
     const hasLongitude = typeof metadata.longitude === 'number';
 
     if (hasLatitude && hasLongitude) {
-      return { metadata, locationSource: LOCATION_SOURCES.GPS };
+      return Promise.resolve({
+        metadata,
+        locationSource: LOCATION_SOURCES.GPS,
+      });
     }
 
     const geo = this.geoProvider.resolve(metadata.ipAddress);
 
     if (!geo) {
-      return { metadata, locationSource: LOCATION_SOURCES.NONE };
+      return Promise.resolve({
+        metadata,
+        locationSource: LOCATION_SOURCES.NONE,
+      });
     }
 
-    return {
+    return Promise.resolve({
       metadata: {
         ...metadata,
         latitude: geo.latitude,
@@ -163,6 +169,6 @@ export class SessionAnomalyDetectorService {
         country: geo.country || undefined,
       },
       locationSource: LOCATION_SOURCES.IP,
-    };
+    });
   }
 }

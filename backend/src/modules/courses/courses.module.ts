@@ -43,6 +43,7 @@ import { CyclesModule } from '@modules/cycles/cycles.module';
     CourseTypeRepository,
     CycleLevelRepository,
     CourseCycleRepository,
+    CourseCycleProfessorRepository,
     CoursesService,
   ],
 })
