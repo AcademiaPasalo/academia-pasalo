@@ -51,6 +51,12 @@ export const routeAccessConfig: Record<string, RouteAccess> = {
     allowedRoles: ['SUPER_ADMIN'],
     component: 'ConfiguracionContent',
     redirectOnDenied: '/plataforma/inicio'
+  },
+  // Ruta compartida para todos los roles
+  '/plataforma/perfil': {
+    allowedRoles: ['STUDENT', 'TEACHER', 'ADMIN', 'SUPER_ADMIN'],
+    component: 'PerfilContent',
+    redirectOnDenied: '/plataforma/inicio'
   }
 };
 
