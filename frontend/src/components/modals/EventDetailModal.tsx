@@ -5,14 +5,18 @@ import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import type { ClassEvent } from "@/types/classEvent";
 import { getCourseColor } from "@/lib/courseColors";
-import { MdClose, MdLink, MdContentCopy, MdCheck } from "react-icons/md";
+import { MdClose, MdLink, MdContentCopy, MdCheck, MdEdit, MdEventBusy } from "react-icons/md";
 import Icon from "../ui/Icon";
 
 interface EventDetailModalProps {
   event: ClassEvent | null;
   isOpen: boolean;
   onClose: () => void;
-  anchorPosition?: { x: number; y: number }; // Posición del evento clickeado
+  anchorPosition?: { x: number; y: number };
+  canEdit?: boolean;
+  canCancel?: boolean;
+  onEdit?: () => void;
+  onCancel?: () => void;
 }
 
 export default function EventDetailModal({
@@ -20,6 +24,10 @@ export default function EventDetailModal({
   isOpen,
   onClose,
   anchorPosition,
+  canEdit,
+  canCancel,
+  onEdit,
+  onCancel,
 }: EventDetailModalProps) {
   const tooltipRef = useRef<HTMLDivElement>(null);
   const [position, setPosition] = useState({ top: 0, left: 0 });
@@ -319,6 +327,30 @@ export default function EventDetailModal({
                 {event.liveMeetingUrl}
               </a>
             </div>
+          </div>
+        )}
+
+        {/* Teacher actions */}
+        {(canEdit || canCancel) && !event.isCancelled && (
+          <div className="self-stretch flex items-center gap-2 pt-2">
+            {canEdit && onEdit && (
+              <button
+                onClick={() => { onClose(); onEdit(); }}
+                className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg bg-accent-light text-text-accent-primary text-sm font-medium hover:bg-accent-light/80 transition-colors"
+              >
+                <MdEdit className="w-4 h-4" />
+                Editar
+              </button>
+            )}
+            {canCancel && onCancel && (
+              <button
+                onClick={() => { onClose(); onCancel(); }}
+                className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg bg-error-light text-error-solid text-sm font-medium hover:bg-error-light/80 transition-colors"
+              >
+                <MdEventBusy className="w-4 h-4" />
+                Cancelar
+              </button>
+            )}
           </div>
         )}
       </div>

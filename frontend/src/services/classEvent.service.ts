@@ -10,6 +10,25 @@ export interface MyScheduleParams {
   end: string; // Fecha fin del rango (ISO-8601, ej: 2026-02-07)
 }
 
+export interface CreateClassEventPayload {
+  evaluationId: string;
+  sessionNumber: number;
+  title: string;
+  topic: string;
+  startDatetime: string; // ISO-8601
+  endDatetime: string; // ISO-8601
+  liveMeetingUrl: string;
+}
+
+export interface UpdateClassEventPayload {
+  title?: string;
+  topic?: string;
+  startDatetime?: string;
+  endDatetime?: string;
+  liveMeetingUrl?: string;
+  recordingUrl?: string;
+}
+
 export const classEventService = {
   /**
    * Obtener el horario/calendario del usuario actual (Alumno o Profesor)
@@ -168,5 +187,19 @@ export const classEventService = {
       start: today.toISOString().split('T')[0],
       end: endOfDay.toISOString().split('T')[0]
     };
-  }
+  },
+
+  async createEvent(payload: CreateClassEventPayload): Promise<ClassEvent> {
+    const response = await apiClient.post<ClassEvent>('/class-events', payload);
+    return response.data;
+  },
+
+  async updateEvent(id: string, payload: UpdateClassEventPayload): Promise<ClassEvent> {
+    const response = await apiClient.patch<ClassEvent>(`/class-events/${id}`, payload);
+    return response.data;
+  },
+
+  async cancelEvent(id: string): Promise<void> {
+    await apiClient.delete(`/class-events/${id}/cancel`);
+  },
 };

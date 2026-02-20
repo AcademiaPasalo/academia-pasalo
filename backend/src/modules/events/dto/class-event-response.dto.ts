@@ -21,6 +21,8 @@ export class ClassEventResponseDto {
   canCopyRecordingLink: boolean;
   courseName: string;
   courseCode: string;
+  courseCycleId: string;
+  evaluationId: string;
   evaluationName: string;
   creator: {
     id: string;
@@ -61,6 +63,8 @@ export class ClassEventResponseDto {
       canCopyRecordingLink: access.canCopyRecordingLink,
       courseName: event.evaluation?.courseCycle?.course?.name || '',
       courseCode: event.evaluation?.courseCycle?.course?.code || '',
+      courseCycleId: event.evaluation?.courseCycleId || '',
+      evaluationId: event.evaluationId || '',
       evaluationName: event.evaluation
         ? `${event.evaluation.evaluationType?.code || ''}${event.evaluation.number || ''}`.trim()
         : '',
