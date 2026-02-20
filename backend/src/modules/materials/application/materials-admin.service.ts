@@ -51,7 +51,7 @@ export class MaterialsAdminService {
       );
     if (!pendingStatus)
       throw new InternalServerErrorException(
-        `Error de configuración: Estado ${DELETION_REQUEST_STATUS_CODES.PENDING} faltante`,
+        `Error de configuracion: Estado ${DELETION_REQUEST_STATUS_CODES.PENDING} faltante`,
       );
 
     return await this.requestRepository.findByStatusId(pendingStatus.id);
@@ -114,7 +114,7 @@ export class MaterialsAdminService {
 
     if (!approvedStatus || !archivedMaterialStatus) {
       throw new InternalServerErrorException(
-        `Error de configuración: Estados de sistema faltantes (${DELETION_REQUEST_STATUS_CODES.APPROVED}/${MATERIAL_STATUS_CODES.ARCHIVED})`,
+        `Error de configuracion: Estados de sistema faltantes (${DELETION_REQUEST_STATUS_CODES.APPROVED}/${MATERIAL_STATUS_CODES.ARCHIVED})`,
       );
     }
 
@@ -153,7 +153,7 @@ export class MaterialsAdminService {
       );
     if (!rejectedStatus)
       throw new InternalServerErrorException(
-        `Error de configuración: Estado ${DELETION_REQUEST_STATUS_CODES.REJECTED} faltante`,
+        `Error de configuracion: Estado ${DELETION_REQUEST_STATUS_CODES.REJECTED} faltante`,
       );
 
     await manager.update(DeletionRequest, requestId, {
@@ -174,11 +174,15 @@ export class MaterialsAdminService {
       );
     if (material.materialStatusId !== archivedStatus?.id) {
       throw new BadRequestException(
-        'Solo se pueden eliminar físicamente materiales que estén ARCHIVADOS.',
+        'Solo se pueden eliminar fisicamente materiales que esten ARCHIVADOS.',
       );
     }
 
-    let fileToDeletePath: string | null = null;
+    let fileToDeleteResource: {
+      storageProvider: FileResource['storageProvider'];
+      storageKey: string;
+      storageUrl: string | null;
+    } | null = null;
 
     await this.dataSource.transaction(async (manager) => {
       const materialRecord = await manager.findOne(Material, {
@@ -217,29 +221,33 @@ export class MaterialsAdminService {
             where: { id: resourceId },
           });
           if (resource) {
-            fileToDeletePath = resource.storageUrl;
+            fileToDeleteResource = {
+              storageProvider: resource.storageProvider,
+              storageKey: resource.storageKey,
+              storageUrl: resource.storageUrl,
+            };
             await manager.delete(FileResource, resourceId);
           }
         }
       }
     });
 
-    if (fileToDeletePath) {
-      const pathString = fileToDeletePath;
-      const fileName = pathString.split(/[\\/]/).pop();
-      if (fileName) {
-        await this.storageService.deleteFile(fileName);
-        this.logger.warn({
-          message: 'Archivo físico eliminado (Garbage Collection)',
-          file: fileName,
-        });
-      }
+    if (fileToDeleteResource) {
+      await this.storageService.deleteFile(
+        fileToDeleteResource.storageKey,
+        fileToDeleteResource.storageProvider,
+        fileToDeleteResource.storageUrl,
+      );
+      this.logger.warn({
+        message: 'Archivo fisico eliminado (Garbage Collection)',
+        file: fileToDeleteResource.storageKey,
+      });
     }
 
     await this.invalidateMaterialCaches(material);
 
     this.logger.warn({
-      message: 'Material eliminado físicamente (Hard Delete)',
+      message: 'Material eliminado fisicamente (Hard Delete)',
       materialId,
       adminId,
     });

@@ -22,6 +22,7 @@ describe('MaterialsAdminService', () => {
   let requestRepo: jest.Mocked<DeletionRequestRepository>;
   let catalogRepo: jest.Mocked<MaterialCatalogRepository>;
   let cacheService: jest.Mocked<RedisCacheService>;
+  let storageService: jest.Mocked<StorageService>;
 
   const mockMaterial = {
     id: 'mat-1',
@@ -74,6 +75,7 @@ describe('MaterialsAdminService', () => {
     requestRepo = module.get(DeletionRequestRepository);
     catalogRepo = module.get(MaterialCatalogRepository);
     cacheService = module.get(RedisCacheService);
+    storageService = module.get(StorageService);
   });
 
   describe('reviewRequest - Approval', () => {
@@ -108,7 +110,6 @@ describe('MaterialsAdminService', () => {
 
       await service.reviewRequest('admin-1', 'req-1', {
         action: DeletionReviewAction.APPROVE,
-        reason: 'ok',
       });
 
       expect(cacheService.del).toHaveBeenCalledWith(
@@ -117,6 +118,27 @@ describe('MaterialsAdminService', () => {
       expect(cacheService.del).toHaveBeenCalledWith(
         'cache:materials:class-event:event-1',
       );
+    });
+
+    it('should throw when request is not pending anymore', async () => {
+      requestRepo.findById.mockResolvedValue({
+        id: 'req-1',
+        entityId: 'mat-1',
+        deletionRequestStatusId: 'status-approved',
+      } as DeletionRequest);
+      catalogRepo.findDeletionRequestStatusByCode.mockImplementation(
+        async (code) => {
+          if (code === DELETION_REQUEST_STATUS_CODES.PENDING)
+            return { id: 'status-pending' } as any;
+          return null;
+        },
+      );
+
+      await expect(
+        service.reviewRequest('admin-1', 'req-1', {
+          action: DeletionReviewAction.APPROVE,
+        }),
+      ).rejects.toThrow('ya fue revisada');
     });
   });
 
@@ -132,10 +154,18 @@ describe('MaterialsAdminService', () => {
 
       dataSource.transaction.mockImplementation(async (cb: any) => {
         const manager = {
-          findOne: jest.fn().mockResolvedValue({
-            ...mockMaterial,
-            fileVersion: { fileResourceId: 'res-1' },
-          }),
+          findOne: jest
+            .fn()
+            .mockResolvedValueOnce({
+              ...mockMaterial,
+              fileVersion: { fileResourceId: 'res-1' },
+            })
+            .mockResolvedValueOnce({
+              id: 'res-1',
+              storageProvider: 'GDRIVE',
+              storageKey: 'file-123',
+              storageUrl: null,
+            }),
           delete: jest.fn().mockResolvedValue({}),
           count: jest.fn().mockResolvedValue(0),
         } as any;
@@ -144,12 +174,61 @@ describe('MaterialsAdminService', () => {
 
       await service.hardDeleteMaterial('admin-1', 'mat-1');
 
+      expect(storageService.deleteFile).toHaveBeenCalledWith(
+        'file-123',
+        'GDRIVE',
+        null,
+      );
+
       expect(cacheService.del).toHaveBeenCalledWith(
         'cache:materials:contents:folder:folder-1',
       );
       expect(cacheService.del).toHaveBeenCalledWith(
         'cache:materials:class-event:event-1',
       );
+    });
+
+    it('should reject hard delete when material is not archived', async () => {
+      materialRepo.findById.mockResolvedValue({
+        ...mockMaterial,
+        materialStatusId: 'status-active',
+      } as Material);
+      catalogRepo.findMaterialStatusByCode.mockResolvedValue({
+        id: 'status-archived',
+      } as any);
+
+      await expect(
+        service.hardDeleteMaterial('admin-1', 'mat-1'),
+      ).rejects.toThrow('ARCHIVADOS');
+    });
+
+    it('should not delete physical file when there are remaining references', async () => {
+      materialRepo.findById.mockResolvedValue({
+        ...mockMaterial,
+        materialStatusId: 'status-archived',
+      } as Material);
+      catalogRepo.findMaterialStatusByCode.mockResolvedValue({
+        id: 'status-archived',
+      } as any);
+
+      dataSource.transaction.mockImplementation(async (cb: any) => {
+        const manager = {
+          findOne: jest.fn().mockResolvedValue({
+            ...mockMaterial,
+            fileVersion: { fileResourceId: 'res-1' },
+          }),
+          delete: jest.fn().mockResolvedValue({}),
+          count: jest
+            .fn()
+            .mockResolvedValueOnce(0)
+            .mockResolvedValueOnce(2),
+        } as any;
+        return cb(manager);
+      });
+
+      await service.hardDeleteMaterial('admin-1', 'mat-1');
+
+      expect(storageService.deleteFile).not.toHaveBeenCalled();
     });
   });
 });

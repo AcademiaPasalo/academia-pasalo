@@ -10,6 +10,7 @@ import { TransformInterceptor } from '@common/interceptors/transform.interceptor
 import * as path from 'path';
 import * as os from 'os';
 import * as fs from 'fs';
+import { Readable } from 'stream';
 import { User } from '@modules/users/domain/user.entity';
 import { CourseCycle } from '@modules/courses/domain/course-cycle.entity';
 import { Evaluation } from '@modules/evaluations/domain/evaluation.entity';
@@ -42,6 +43,23 @@ describe('E2E: Gestión de Materiales y Seguridad', () => {
   let courseCycle: CourseCycle;
   let evaluation: Evaluation;
   let rootFolderId: string;
+  const storageMock = {
+    calculateHash: jest.fn().mockResolvedValue('mock-sha256-hash'),
+    saveFile: jest.fn().mockImplementation(async (name: string, buffer: Buffer) => {
+      const tempPath = path.join(os.tmpdir(), name);
+      await fs.promises.writeFile(tempPath, buffer);
+      return {
+        storageProvider: 'LOCAL',
+        storageKey: name,
+        storageUrl: tempPath,
+      };
+    }),
+    deleteFile: jest.fn().mockResolvedValue(undefined),
+    getFileStream: jest.fn().mockImplementation(async () => {
+      return Readable.from(Buffer.from('%PDF-1.4 downloaded'));
+    }),
+    onModuleInit: jest.fn(),
+  };
 
   const now = new Date();
   const yesterday = new Date(now);
@@ -55,18 +73,7 @@ describe('E2E: Gestión de Materiales y Seguridad', () => {
       imports: [AppModule],
     })
       .overrideProvider(StorageService)
-      .useValue({
-        calculateHash: jest.fn().mockResolvedValue('mock-sha256-hash'),
-        saveFile: jest
-          .fn()
-          .mockImplementation(async (name: string, buffer: Buffer) => {
-            const tempPath = path.join(os.tmpdir(), name);
-            await fs.promises.writeFile(tempPath, buffer);
-            return tempPath;
-          }),
-        deleteFile: jest.fn().mockResolvedValue(undefined),
-        onModuleInit: jest.fn(),
-      })
+      .useValue(storageMock)
       .compile();
 
     app = moduleFixture.createNestApplication();

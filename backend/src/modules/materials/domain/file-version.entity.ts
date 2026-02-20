@@ -23,8 +23,8 @@ export class FileVersion {
   @Column({ name: 'version_number', type: 'int' })
   versionNumber: number;
 
-  @Column({ name: 'storage_url', type: 'varchar', length: 500 })
-  storageUrl: string;
+  @Column({ name: 'storage_url', type: 'varchar', length: 500, nullable: true })
+  storageUrl: string | null;
 
   @Column({ name: 'created_at', type: 'datetime' })
   createdAt: Date;

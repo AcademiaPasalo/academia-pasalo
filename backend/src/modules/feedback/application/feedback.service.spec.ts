@@ -152,7 +152,11 @@ describe('FeedbackService', () => {
       jest.spyOn(testimonyRepo, 'findByUserAndCycle').mockResolvedValue(null);
       jest
         .spyOn(storageService, 'saveFile')
-        .mockResolvedValue('path/to/pic.jpg');
+        .mockResolvedValue({
+          storageProvider: 'LOCAL' as const,
+          storageKey: 'pic.jpg',
+          storageUrl: 'path/to/pic.jpg',
+        });
       jest.spyOn(testimonyRepo, 'create').mockResolvedValue({
         id: 'test1',
         photoUrl: 'path/to/pic.jpg',

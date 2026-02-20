@@ -33,7 +33,6 @@ import {
   AUDIT_ENTITY_TYPES,
 } from '@modules/audit/interfaces/audit.constants';
 import { getEpoch } from '@common/utils/date.util';
-import * as fs from 'fs';
 import { technicalSettings } from '@config/technical-settings';
 import {
   ADMIN_ROLE_CODES,
@@ -44,6 +43,7 @@ import {
   MATERIAL_CACHE_KEYS,
   MATERIAL_STATUS_CODES,
   DELETION_REQUEST_STATUS_CODES,
+  STORAGE_PROVIDER_CODES,
 } from '@modules/materials/domain/material.constants';
 
 @Injectable()
@@ -132,7 +132,11 @@ export class MaterialsService {
     if (!folder) throw new NotFoundException('Carpeta destino no encontrada');
 
     const now = new Date();
-    let storagePath = '';
+    let savedResource: {
+      storageProvider: (typeof STORAGE_PROVIDER_CODES)[keyof typeof STORAGE_PROVIDER_CODES];
+      storageKey: string;
+      storageUrl: string | null;
+    } | null = null;
     let isNewFile = false;
 
     try {
@@ -147,7 +151,10 @@ export class MaterialsService {
 
         const hash = await this.storageService.calculateHash(file.buffer);
         const existingResource =
-          await this.fileResourceRepository.findByHash(hash);
+          await this.fileResourceRepository.findByHashAndSize(
+            hash,
+            String(file.size),
+          );
 
         let finalResource: FileResource;
         let finalVersion: FileVersion;
@@ -158,9 +165,10 @@ export class MaterialsService {
             '_',
           );
           const uniqueName = `${Date.now()}-${sanitizedOriginalName}`;
-          storagePath = await this.storageService.saveFile(
+          savedResource = await this.storageService.saveFile(
             uniqueName,
             file.buffer,
+            file.mimetype,
           );
           isNewFile = true;
 
@@ -169,7 +177,9 @@ export class MaterialsService {
             originalName: file.originalname,
             mimeType: file.mimetype,
             sizeBytes: String(file.size),
-            storageUrl: storagePath,
+            storageProvider: savedResource.storageProvider,
+            storageKey: savedResource.storageKey,
+            storageUrl: savedResource.storageUrl,
             createdAt: now,
           });
           finalResource = await manager.save(resourceEntity);
@@ -234,7 +244,7 @@ export class MaterialsService {
       }
       return result;
     } catch (error) {
-      if (isNewFile && storagePath) await this.rollbackFile(storagePath);
+      if (isNewFile && savedResource) await this.rollbackFile(savedResource);
       throw error;
     }
   }
@@ -247,7 +257,11 @@ export class MaterialsService {
     if (!file) throw new BadRequestException('Archivo requerido');
 
     const now = new Date();
-    let storagePath = '';
+    let savedResource: {
+      storageProvider: (typeof STORAGE_PROVIDER_CODES)[keyof typeof STORAGE_PROVIDER_CODES];
+      storageKey: string;
+      storageUrl: string | null;
+    } | null = null;
     let isNewFile = false;
 
     try {
@@ -262,7 +276,10 @@ export class MaterialsService {
 
         const hash = await this.storageService.calculateHash(file.buffer);
         const existingResource =
-          await this.fileResourceRepository.findByHash(hash);
+          await this.fileResourceRepository.findByHashAndSize(
+            hash,
+            String(file.size),
+          );
 
         let finalResource: FileResource;
 
@@ -272,9 +289,10 @@ export class MaterialsService {
             '_',
           );
           const uniqueName = `${Date.now()}-${sanitizedOriginalName}`;
-          storagePath = await this.storageService.saveFile(
+          savedResource = await this.storageService.saveFile(
             uniqueName,
             file.buffer,
+            file.mimetype,
           );
           isNewFile = true;
 
@@ -283,7 +301,9 @@ export class MaterialsService {
             originalName: file.originalname,
             mimeType: file.mimetype,
             sizeBytes: String(file.size),
-            storageUrl: storagePath,
+            storageProvider: savedResource.storageProvider,
+            storageKey: savedResource.storageKey,
+            storageUrl: savedResource.storageUrl,
             createdAt: now,
           });
           finalResource = await manager.save(resourceEntity);
@@ -329,7 +349,7 @@ export class MaterialsService {
       }
       return result;
     } catch (error) {
-      if (isNewFile && storagePath) await this.rollbackFile(storagePath);
+      if (isNewFile && savedResource) await this.rollbackFile(savedResource);
       throw error;
     }
   }
@@ -441,12 +461,11 @@ export class MaterialsService {
       throw new InternalServerErrorException(
         'Integridad de datos corrupta: Material sin recurso físico',
       );
-
-    if (!fs.existsSync(resource.storageUrl)) {
-      throw new NotFoundException('El archivo físico no existe en el servidor');
-    }
-
-    const stream = fs.createReadStream(resource.storageUrl);
+    const stream = await this.storageService.getFileStream(
+      resource.storageKey,
+      resource.storageProvider,
+      resource.storageUrl,
+    );
     return {
       stream,
       fileName: material.displayName || resource.originalName,
@@ -640,11 +659,16 @@ export class MaterialsService {
     return classEvent;
   }
 
-  private async rollbackFile(path: string) {
-    const fileName = path.split(/[\\/]/).pop();
-    if (fileName) {
-      await this.storageService.deleteFile(fileName);
-    }
+  private async rollbackFile(resource: {
+    storageProvider: (typeof STORAGE_PROVIDER_CODES)[keyof typeof STORAGE_PROVIDER_CODES];
+    storageKey: string;
+    storageUrl: string | null;
+  }) {
+    await this.storageService.deleteFile(
+      resource.storageKey,
+      resource.storageProvider,
+      resource.storageUrl,
+    );
   }
 
   private async invalidateFolderCache(folderId: string) {

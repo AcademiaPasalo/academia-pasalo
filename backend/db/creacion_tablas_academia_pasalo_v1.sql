@@ -279,15 +279,20 @@ CREATE TABLE file_resource (
   original_name VARCHAR(255) NOT NULL,
   mime_type VARCHAR(100) NOT NULL,
   size_bytes BIGINT NOT NULL,
-  storage_url VARCHAR(500) NOT NULL,
-  created_at DATETIME NOT NULL
+  storage_provider VARCHAR(20) NOT NULL DEFAULT 'LOCAL',
+  storage_key VARCHAR(512) NOT NULL,
+  storage_url VARCHAR(500) NULL,
+  created_at DATETIME NOT NULL,
+  CONSTRAINT chk_file_resource_storage_provider CHECK (
+    storage_provider IN ('LOCAL', 'GDRIVE', 'S3')
+  )
 );
 
 CREATE TABLE file_version (
   id BIGINT PRIMARY KEY AUTO_INCREMENT,
   file_resource_id BIGINT NOT NULL,
   version_number INT NOT NULL,
-  storage_url VARCHAR(500) NOT NULL,
+  storage_url VARCHAR(500) NULL,
   created_at DATETIME NOT NULL,
   created_by BIGINT NOT NULL,
   CONSTRAINT uq_resource_version UNIQUE (file_resource_id, version_number),
@@ -472,6 +477,21 @@ ON material(material_status_id);
 
 CREATE INDEX idx_material_visibility
 ON material(visible_from, visible_until);
+
+CREATE UNIQUE INDEX uq_file_resource_dedup
+ON file_resource(checksum_hash, size_bytes);
+
+CREATE UNIQUE INDEX uq_file_resource_provider_key
+ON file_resource(storage_provider, storage_key);
+
+CREATE INDEX idx_file_version_resource
+ON file_version(file_resource_id);
+
+CREATE INDEX idx_material_file_resource
+ON material(file_resource_id);
+
+CREATE INDEX idx_material_file_version
+ON material(file_version_id);
 
 CREATE INDEX idx_audit_log_user_date
 ON audit_log(user_id, event_datetime);
