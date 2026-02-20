@@ -285,6 +285,14 @@ export class CoursesService {
     return professors;
   }
 
+  async getMyCourseCycles(professorUserId: string): Promise<CourseCycle[]> {
+    const assignments =
+      await this.courseCycleProfessorRepository.findByProfessorUserId(
+        professorUserId,
+      );
+    return assignments.map((a) => a.courseCycle);
+  }
+
   async findAllTypes(): Promise<CourseType[]> {
     return await this.courseTypeRepository.findAll();
   }

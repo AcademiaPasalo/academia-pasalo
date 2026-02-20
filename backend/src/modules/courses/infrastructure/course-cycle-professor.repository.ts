@@ -160,4 +160,19 @@ export class CourseCycleProfessorRepository {
       .andWhere('professor.is_active = :isActive', { isActive: true })
       .getMany();
   }
+
+  async findByProfessorUserId(
+    professorUserId: string,
+  ): Promise<CourseCycleProfessor[]> {
+    return await this.ormRepository
+      .createQueryBuilder('ccp')
+      .innerJoinAndSelect('ccp.courseCycle', 'cc')
+      .innerJoinAndSelect('cc.course', 'course')
+      .innerJoinAndSelect('cc.academicCycle', 'cycle')
+      .where('ccp.professor_user_id = :professorUserId', { professorUserId })
+      .andWhere('ccp.revoked_at IS NULL')
+      .orderBy('cycle.startDate', 'DESC')
+      .addOrderBy('course.name', 'ASC')
+      .getMany();
+  }
 }

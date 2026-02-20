@@ -15,6 +15,7 @@ import StudentCalendarioContent from '@/components/pages/student/CalendarioConte
 
 // Importar componentes de docente
 import TeacherInicioContent from '@/components/pages/teacher/InicioContent';
+import TeacherCalendarioContent from '@/components/pages/teacher/CalendarioContent';
 
 // Importar componentes de admin
 import AdminInicioContent from '@/components/pages/admin/InicioContent';
@@ -33,6 +34,7 @@ const componentMap: Record<string, React.ComponentType<any>> = {
   
   // Docente
   'teacher/InicioContent': TeacherInicioContent,
+  'teacher/CalendarioContent': TeacherCalendarioContent,
   
   // Admin
   'admin/InicioContent': AdminInicioContent,
