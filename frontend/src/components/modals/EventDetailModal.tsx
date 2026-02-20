@@ -5,7 +5,7 @@ import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import type { ClassEvent } from "@/types/classEvent";
 import { getCourseColor } from "@/lib/courseColors";
-import { MdClose, MdCalendarToday, MdLink } from "react-icons/md";
+import { MdClose, MdLink, MdContentCopy, MdCheck } from "react-icons/md";
 import Icon from "../ui/Icon";
 
 interface EventDetailModalProps {
@@ -23,6 +23,7 @@ export default function EventDetailModal({
 }: EventDetailModalProps) {
   const tooltipRef = useRef<HTMLDivElement>(null);
   const [position, setPosition] = useState({ top: 0, left: 0 });
+  const [copied, setCopied] = useState(false);
 
   useLayoutEffect(() => {
     if (!isOpen || !event || !anchorPosition || !tooltipRef.current) return;
@@ -104,6 +105,10 @@ export default function EventDetailModal({
     }
   }, [isOpen, onClose]);
 
+  useEffect(() => {
+    if (!isOpen) setCopied(false);
+  }, [isOpen]);
+
   if (!isOpen || !event) return null;
 
   const colors = getCourseColor(event.courseCode);
@@ -146,6 +151,35 @@ export default function EventDetailModal({
     return `${event.creator.firstName} ${event.creator.lastName1}`;
   };
 
+  const handleCopySummary = async () => {
+    const lines = [
+      `${event.courseName}`,
+      `${formatDate()} · ${formatTime()}`,
+      `Asesor: ${getTeacherName()}`,
+    ];
+
+    if (event.topic) lines.push(`Tema: ${event.topic}`);
+    if (event.liveMeetingUrl) lines.push(`Link: ${event.liveMeetingUrl}`);
+
+    try {
+      await navigator.clipboard.writeText(lines.join("\n"));
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // Fallback para navegadores sin clipboard API
+      const textArea = document.createElement("textarea");
+      textArea.value = lines.join("\n");
+      textArea.style.position = "fixed";
+      textArea.style.left = "-999999px";
+      document.body.appendChild(textArea);
+      textArea.select();
+      document.execCommand("copy");
+      textArea.remove();
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  };
+
   return (
     <div
       ref={tooltipRef}
@@ -155,11 +189,22 @@ export default function EventDetailModal({
         left: `${position.left}px`,
       }}
     >
-      {/* Header con botón cerrar */}
-      <div className="self-stretch px-2 pt-3 pb-2 flex justify-end items-center gap-4">
+      {/* Header con acciones */}
+      <div className="self-stretch px-2 pt-3 pb-2 flex justify-end items-center gap-1">
+        <button
+          onClick={handleCopySummary}
+          className="p-1 rounded-full flex justify-center items-center hover:bg-bg-secondary transition-colors"
+          title={copied ? "Copiado" : "Copiar resumen"}
+        >
+          {copied ? (
+            <MdCheck className="w-5 h-5 text-success-primary" />
+          ) : (
+            <MdContentCopy className="w-5 h-5 text-icon-tertiary" />
+          )}
+        </button>
         <button
           onClick={onClose}
-          className="p-1 rounded-full flex justify-center items-center gap-1 hover:bg-bg-secondary transition-colors"
+          className="p-1 rounded-full flex justify-center items-center hover:bg-bg-secondary transition-colors"
         >
           <MdClose className="w-5 h-5 text-icon-tertiary" />
         </button>
