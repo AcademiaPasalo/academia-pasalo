@@ -28,7 +28,7 @@ export class EvaluationsController {
   }
 
   @Get('course-cycle/:id')
-  @Roles(ROLE_CODES.ADMIN, ROLE_CODES.SUPER_ADMIN)
+  @Roles(ROLE_CODES.PROFESSOR, ROLE_CODES.ADMIN, ROLE_CODES.SUPER_ADMIN)
   @ResponseMessage('Evaluaciones obtenidas exitosamente')
   async findByCourseCycle(@Param('id') id: string) {
     return await this.evaluationsService.findByCourseCycle(id);

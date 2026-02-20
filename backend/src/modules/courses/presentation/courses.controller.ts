@@ -15,6 +15,7 @@ import {
   CycleLevelResponseDto,
 } from '@modules/courses/dto/course-response.dto';
 import { CourseContentResponseDto } from '@modules/courses/dto/course-content.dto';
+import { MyCourseCycleResponseDto } from '@modules/courses/dto/my-course-cycle-response.dto';
 import { UserResponseDto } from '@modules/users/dto/user-response.dto';
 import { CreateCourseDto } from '@modules/courses/dto/create-course.dto';
 import { UpdateCourseDto } from '@modules/courses/dto/update-course.dto';
@@ -129,6 +130,16 @@ export class CoursesController {
       courseCycleId,
       professorUserId,
     );
+  }
+
+  @Get('my-courses')
+  @Roles(ROLE_CODES.PROFESSOR)
+  @ResponseMessage('Cursos del profesor obtenidos exitosamente')
+  async getMyCourses(@CurrentUser() user: User) {
+    const courseCycles = await this.coursesService.getMyCourseCycles(user.id);
+    return plainToInstance(MyCourseCycleResponseDto, courseCycles, {
+      excludeExtraneousValues: true,
+    });
   }
 
   @Get()

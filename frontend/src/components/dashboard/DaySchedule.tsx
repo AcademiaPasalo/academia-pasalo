@@ -235,19 +235,8 @@ export default function DaySchedule() {
             const colors = getCourseColor(event.courseCode);
             const isNow = event.status === "EN_CURSO";
 
-            // Verificar si puede unirse (30 min antes del inicio hasta el fin)
-            const now = new Date();
-            const startTime = parseISO(event.startDatetime);
-            const endTime = parseISO(event.endDatetime);
-            const thirtyMinutesBefore = new Date(
-              startTime.getTime() - 30 * 60 * 1000,
-            );
-
             const canJoinNow =
-              event.canJoinLive &&
-              now >= thirtyMinutesBefore &&
-              now <= endTime &&
-              !event.isCancelled;
+              !!event.liveMeetingUrl && !event.isCancelled;
 
             return (
               <div

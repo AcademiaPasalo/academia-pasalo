@@ -71,4 +71,30 @@ export const coursesService = {
     );
     return response.data.data;
   },
+
+  /**
+   * Obtener los cursos-ciclo asignados al profesor actual (PROFESSOR)
+   */
+  async getMyCourseCycles(): Promise<CourseCycle[]> {
+    const response = await apiClient.get<CourseCycle[]>('/courses/my-courses');
+    return response.data;
+  },
+
+  /**
+   * Obtener los profesores asignados a un curso-ciclo
+   */
+  async getProfessorsByCourseCycle(courseCycleId: string): Promise<Array<{
+    id: string;
+    firstName: string;
+    lastName1: string;
+    profilePhotoUrl: string | null;
+  }>> {
+    const response = await apiClient.get<Array<{
+      id: string;
+      firstName: string;
+      lastName1: string;
+      profilePhotoUrl: string | null;
+    }>>(`/courses/cycle/${courseCycleId}/professors`);
+    return response.data;
+  },
 };
