@@ -37,6 +37,7 @@ describe('StorageService', () => {
 
   it('should save local files returning provider metadata', async () => {
     const configService = createConfigService({
+      STORAGE_PROVIDER: 'LOCAL',
       GOOGLE_APPLICATION_CREDENTIALS: null,
       STORAGE_PATH: 'uploads',
     });
@@ -57,6 +58,7 @@ describe('StorageService', () => {
 
   it('should throw NotFoundException when local file stream does not exist', async () => {
     const configService = createConfigService({
+      STORAGE_PROVIDER: 'LOCAL',
       GOOGLE_APPLICATION_CREDENTIALS: null,
       STORAGE_PATH: 'uploads',
     });
@@ -70,6 +72,7 @@ describe('StorageService', () => {
 
   it('should require GOOGLE_DRIVE_ROOT_FOLDER_ID when drive is enabled', async () => {
     const configService = createConfigService({
+      STORAGE_PROVIDER: 'GDRIVE',
       GOOGLE_APPLICATION_CREDENTIALS: 'C:\\secret.json',
       GOOGLE_DRIVE_ROOT_FOLDER_ID: null,
     });
@@ -82,6 +85,7 @@ describe('StorageService', () => {
 
   it('should ignore legacy GOOGLE_DRIVE_SERVICE_ACCOUNT_KEY_PATH when GOOGLE_APPLICATION_CREDENTIALS is missing', async () => {
     const configService = createConfigService({
+      STORAGE_PROVIDER: 'LOCAL',
       GOOGLE_APPLICATION_CREDENTIALS: null,
       GOOGLE_DRIVE_SERVICE_ACCOUNT_KEY_PATH: 'C:\\legacy-secret.json',
       STORAGE_PATH: 'uploads',
@@ -91,13 +95,18 @@ describe('StorageService', () => {
     jest.spyOn(fs.promises, 'writeFile').mockResolvedValue(undefined);
 
     await expect(
-      service.saveFile('legacy-test.pdf', Buffer.from('abc'), 'application/pdf'),
+      service.saveFile(
+        'legacy-test.pdf',
+        Buffer.from('abc'),
+        'application/pdf',
+      ),
     ).resolves.toMatchObject({ storageProvider: 'LOCAL' });
     expect(googleAuthMocks.GoogleAuth).not.toHaveBeenCalled();
   });
 
   it('should fail when root folder id is invalid or inaccessible', async () => {
     const configService = createConfigService({
+      STORAGE_PROVIDER: 'GDRIVE',
       GOOGLE_APPLICATION_CREDENTIALS: 'C:\\secret.json',
       GOOGLE_DRIVE_ROOT_FOLDER_ID: 'invalid-root-id',
     });
@@ -114,6 +123,7 @@ describe('StorageService', () => {
 
   it('should create uploads, objects and archivado folders under root on init', async () => {
     const configService = createConfigService({
+      STORAGE_PROVIDER: 'GDRIVE',
       GOOGLE_APPLICATION_CREDENTIALS: 'C:\\secret.json',
       GOOGLE_DRIVE_ROOT_FOLDER_ID: 'root-1',
     });
@@ -154,6 +164,7 @@ describe('StorageService', () => {
 
   it('should upload files to Google Drive objects folder', async () => {
     const configService = createConfigService({
+      STORAGE_PROVIDER: 'GDRIVE',
       GOOGLE_APPLICATION_CREDENTIALS: 'C:\\secret.json',
       GOOGLE_DRIVE_ROOT_FOLDER_ID: 'root-1',
     });
@@ -194,6 +205,7 @@ describe('StorageService', () => {
 
   it('should reject root folder id when file is not a folder', async () => {
     const configService = createConfigService({
+      STORAGE_PROVIDER: 'GDRIVE',
       GOOGLE_APPLICATION_CREDENTIALS: 'C:\\secret.json',
       GOOGLE_DRIVE_ROOT_FOLDER_ID: 'not-folder',
     });
@@ -212,6 +224,7 @@ describe('StorageService', () => {
 
   it('should reject root folder id when folder is trashed', async () => {
     const configService = createConfigService({
+      STORAGE_PROVIDER: 'GDRIVE',
       GOOGLE_APPLICATION_CREDENTIALS: 'C:\\secret.json',
       GOOGLE_DRIVE_ROOT_FOLDER_ID: 'trashed-folder',
     });
@@ -234,6 +247,7 @@ describe('StorageService', () => {
 
   it('should throw for unsupported storage provider in deleteFile', async () => {
     const configService = createConfigService({
+      STORAGE_PROVIDER: 'LOCAL',
       GOOGLE_APPLICATION_CREDENTIALS: null,
       STORAGE_PATH: 'uploads',
     });

@@ -231,9 +231,9 @@ describe('E2E: Materials Admin Full Flow', () => {
       filteredByStatus.body as GenericDataResponse<PaginatedMaterialsData<any>>
     ).data;
     expect(statusData.items.length).toBeGreaterThan(0);
-    expect(statusData.items.every((item: any) => item.status.code === 'ACTIVE')).toBe(
-      true,
-    );
+    expect(
+      statusData.items.every((item: any) => item.status.code === 'ACTIVE'),
+    ).toBe(true);
 
     const filteredBySearch = await request(app.getHttpServer())
       .get('/api/v1/admin/materials/files?search=Material 2')

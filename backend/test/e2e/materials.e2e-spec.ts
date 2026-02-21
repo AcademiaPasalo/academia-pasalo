@@ -232,7 +232,8 @@ describe('E2E: Gestion de Materiales y Seguridad', () => {
           visibleFrom: new Date().toISOString(),
         })
         .expect(201);
-      otherCourseFolderId = (otherFolderRes.body as MaterialFolderResponse).data.id;
+      otherCourseFolderId = (otherFolderRes.body as MaterialFolderResponse).data
+        .id;
 
       const otherMaterialRes = await request(app.getHttpServer())
         .post('/api/v1/materials')
@@ -241,7 +242,8 @@ describe('E2E: Gestion de Materiales y Seguridad', () => {
         .field('materialFolderId', otherCourseFolderId)
         .field('displayName', 'Material Ajeno')
         .expect(201);
-      otherCourseMaterialId = (otherMaterialRes.body as MaterialUploadResponse).data.id;
+      otherCourseMaterialId = (otherMaterialRes.body as MaterialUploadResponse)
+        .data.id;
 
       const future = new Date();
       future.setFullYear(now.getFullYear() + 1);
@@ -301,7 +303,11 @@ describe('E2E: Gestion de Materiales y Seguridad', () => {
       await request(app.getHttpServer())
         .post('/api/v1/materials')
         .set('Authorization', `Bearer ${professor.token}`)
-        .attach('file', Buffer.from('%PDF-1.4 unauthorized-upload'), 'blocked.pdf')
+        .attach(
+          'file',
+          Buffer.from('%PDF-1.4 unauthorized-upload'),
+          'blocked.pdf',
+        )
         .field('materialFolderId', otherCourseFolderId)
         .field('displayName', 'No permitido')
         .expect(403);

@@ -378,7 +378,9 @@ describe('MaterialsService', () => {
         const duplicateErr = { errno: 1062 };
         const manager = {
           create: jest.fn((_: unknown, data: object) => data),
-          findOne: jest.fn().mockResolvedValue({ id: 'ver-1', versionNumber: 1 }),
+          findOne: jest
+            .fn()
+            .mockResolvedValue({ id: 'ver-1', versionNumber: 1 }),
           save: jest
             .fn()
             .mockRejectedValueOnce(duplicateErr)
@@ -815,8 +817,16 @@ describe('MaterialsService', () => {
         storageUrl: '/path/concurrent.pdf',
       });
 
-      const promise1 = service.addVersion(mockProfessor, 'mat-concurrent', file);
-      const promise2 = service.addVersion(mockProfessor, 'mat-concurrent', file);
+      const promise1 = service.addVersion(
+        mockProfessor,
+        'mat-concurrent',
+        file,
+      );
+      const promise2 = service.addVersion(
+        mockProfessor,
+        'mat-concurrent',
+        file,
+      );
 
       const [res1, res2] = await Promise.all([promise1, promise2]);
 

@@ -45,7 +45,10 @@ describe('MaterialsAdminService', () => {
         },
         {
           provide: MaterialRepository,
-          useValue: { findById: jest.fn(), findAdminMaterialFilesPage: jest.fn() },
+          useValue: {
+            findById: jest.fn(),
+            findAdminMaterialFilesPage: jest.fn(),
+          },
         },
         {
           provide: MaterialCatalogRepository,

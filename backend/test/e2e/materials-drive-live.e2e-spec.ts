@@ -86,9 +86,7 @@ describeLive('E2E Live: Materials + Google Drive', () => {
 
   beforeAll(async () => {
     if (!process.env.GOOGLE_APPLICATION_CREDENTIALS) {
-      throw new Error(
-        'Falta GOOGLE_APPLICATION_CREDENTIALS para live E2E',
-      );
+      throw new Error('Falta GOOGLE_APPLICATION_CREDENTIALS para live E2E');
     }
     if (!process.env.GOOGLE_DRIVE_ROOT_FOLDER_ID) {
       throw new Error('Falta GOOGLE_DRIVE_ROOT_FOLDER_ID para live E2E');

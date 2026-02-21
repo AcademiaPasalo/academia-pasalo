@@ -34,6 +34,7 @@ export class StorageService implements OnModuleInit {
   private driveRootFolderId: string | null = null;
   private isDriveRootFolderValidated = false;
   private storagePath: string;
+  private readonly storageProvider: StorageProviderCode;
   private readonly googleDriveServiceAccountKeyPath: string | null;
   private readonly googleDriveRootFolderIdConfig: string | null;
 
@@ -42,6 +43,21 @@ export class StorageService implements OnModuleInit {
       'STORAGE_PATH',
       technicalSettings.uploads.storage.storagePathFallback,
     );
+    const storageProviderRaw = (
+      this.configService.get<string>(
+        'STORAGE_PROVIDER',
+        STORAGE_PROVIDER_CODES.LOCAL,
+      ) || STORAGE_PROVIDER_CODES.LOCAL
+    ).toUpperCase();
+    if (
+      storageProviderRaw !== STORAGE_PROVIDER_CODES.LOCAL &&
+      storageProviderRaw !== STORAGE_PROVIDER_CODES.GDRIVE
+    ) {
+      throw new InternalServerErrorException(
+        `STORAGE_PROVIDER invalido: ${storageProviderRaw}`,
+      );
+    }
+    this.storageProvider = storageProviderRaw as StorageProviderCode;
     this.googleDriveServiceAccountKeyPath = this.configService.get<string>(
       'GOOGLE_APPLICATION_CREDENTIALS',
       null,
@@ -149,7 +165,7 @@ export class StorageService implements OnModuleInit {
   }
 
   private isGoogleDriveEnabled(): boolean {
-    return !!this.googleDriveServiceAccountKeyPath;
+    return this.storageProvider === STORAGE_PROVIDER_CODES.GDRIVE;
   }
 
   private getGoogleAuth(): GoogleAuth {
