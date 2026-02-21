@@ -173,6 +173,7 @@ export class ClassEventRepository {
     startDate: Date,
     endDate: Date,
   ): Promise<ClassEvent[]> {
+    const now = new Date();
     const qb = this.ormRepository
       .createQueryBuilder('classEvent')
       .leftJoinAndSelect('classEvent.evaluation', 'evaluation')
@@ -217,12 +218,12 @@ export class ClassEventRepository {
                   ON e.id = ee.enrollment_id
                 WHERE ee.evaluation_id = classEvent.evaluation_id
                   AND ee.is_active = 1
-                  AND ee.access_start_date <= UTC_TIMESTAMP()
-                  AND ee.access_end_date >= UTC_TIMESTAMP()
+                  AND ee.access_start_date <= :now
+                  AND ee.access_end_date >= :now
                   AND e.user_id = :userId
                   AND e.cancelled_at IS NULL
               )`,
-              { userId },
+              { userId, now },
             );
         }),
       )

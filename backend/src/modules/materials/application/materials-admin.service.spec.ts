@@ -45,7 +45,7 @@ describe('MaterialsAdminService', () => {
         },
         {
           provide: MaterialRepository,
-          useValue: { findById: jest.fn() },
+          useValue: { findById: jest.fn(), findAdminMaterialFilesPage: jest.fn() },
         },
         {
           provide: MaterialCatalogRepository,
@@ -139,6 +139,69 @@ describe('MaterialsAdminService', () => {
           action: DeletionReviewAction.APPROVE,
         }),
       ).rejects.toThrow('ya fue revisada');
+    });
+  });
+
+  describe('findMaterialFiles', () => {
+    it('should return paginated file list response', async () => {
+      materialRepo.findAdminMaterialFilesPage.mockResolvedValue({
+        totalItems: 1,
+        rows: [
+          {
+            materialId: 'mat-1',
+            displayName: 'Material 1',
+            classEventId: null,
+            visibleFrom: null,
+            visibleUntil: null,
+            createdAt: new Date('2026-01-01T10:00:00.000Z'),
+            updatedAt: null,
+            statusCode: 'ACTIVE',
+            statusName: 'Activo',
+            folderId: 'folder-1',
+            folderName: 'Root',
+            evaluationId: 'eval-1',
+            evaluationNumber: 1,
+            evaluationTypeCode: 'PC',
+            evaluationTypeName: 'Practica calificada',
+            courseCode: 'MAT101',
+            courseName: 'Matematica',
+            academicCycleCode: '2026-I',
+            fileResourceId: 'res-1',
+            fileVersionId: 'ver-1',
+            versionNumber: 2,
+            originalName: 'file.pdf',
+            mimeType: 'application/pdf',
+            sizeBytes: '2048',
+            storageProvider: 'LOCAL',
+            createdById: 'user-1',
+            createdByEmail: 'admin@test.com',
+            createdByFirstName: 'Admin',
+            createdByLastName1: 'Uno',
+            createdByLastName2: null,
+          },
+        ],
+      } as any);
+
+      const response = await service.findMaterialFiles({
+        page: 2,
+        pageSize: 1,
+        search: 'MAT',
+      });
+
+      expect(materialRepo.findAdminMaterialFilesPage).toHaveBeenCalledWith({
+        page: 2,
+        pageSize: 1,
+        search: 'MAT',
+        statusCode: undefined,
+      });
+      expect(response.totalItems).toBe(1);
+      expect(response.totalPages).toBe(1);
+      expect(response.items[0]).toMatchObject({
+        materialId: 'mat-1',
+        status: { code: 'ACTIVE', name: 'Activo' },
+        file: { versionNumber: 2, sizeBytes: '2048' },
+        createdBy: { id: 'user-1', email: 'admin@test.com' },
+      });
     });
   });
 

@@ -36,7 +36,7 @@ export class MaterialsController {
     @CurrentUser() user: UserWithSession,
     @Body() dto: CreateMaterialFolderDto,
   ) {
-    return await this.materialsService.createFolder(user.id, dto);
+    return await this.materialsService.createFolder(user, dto);
   }
 
   @Post()
@@ -49,7 +49,7 @@ export class MaterialsController {
     @Body() dto: UploadMaterialDto,
     @UploadedFile() file: Express.Multer.File,
   ) {
-    return await this.materialsService.uploadMaterial(user.id, dto, file);
+    return await this.materialsService.uploadMaterial(user, dto, file);
   }
 
   @Post(':id/versions')
@@ -62,7 +62,7 @@ export class MaterialsController {
     @Param('id') materialId: string,
     @UploadedFile() file: Express.Multer.File,
   ) {
-    return await this.materialsService.addVersion(user.id, materialId, file);
+    return await this.materialsService.addVersion(user, materialId, file);
   }
 
   @Get('folders/evaluation/:evaluationId')
@@ -146,6 +146,6 @@ export class MaterialsController {
     @CurrentUser() user: UserWithSession,
     @Body() dto: RequestDeletionDto,
   ) {
-    await this.materialsService.requestDeletion(user.id, dto);
+    await this.materialsService.requestDeletion(user, dto);
   }
 }

@@ -1,4 +1,8 @@
-import { ForbiddenException, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  NotFoundException,
+} from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { DataSource } from 'typeorm';
 import { CoursesService } from '@modules/courses/application/courses.service';
@@ -16,6 +20,7 @@ describe('CoursesService student views', () => {
   let service: CoursesService;
   let dataSource: jest.Mocked<DataSource>;
   let courseCycleRepository: jest.Mocked<CourseCycleRepository>;
+  let courseCycleProfessorRepository: jest.Mocked<CourseCycleProfessorRepository>;
   let evaluationRepository: jest.Mocked<EvaluationRepository>;
 
   const currentCycle = {
@@ -47,6 +52,7 @@ describe('CoursesService student views', () => {
         {
           provide: CourseCycleRepository,
           useValue: {
+            findById: jest.fn(),
             findFullById: jest.fn(),
             findPreviousByCourseId: jest.fn(),
             findByCourseIdAndCycleCode: jest.fn(),
@@ -54,7 +60,13 @@ describe('CoursesService student views', () => {
             findAdminCourseCyclesPage: jest.fn(),
           },
         },
-        { provide: CourseCycleProfessorRepository, useValue: {} },
+        {
+          provide: CourseCycleProfessorRepository,
+          useValue: {
+            upsertAssign: jest.fn(),
+            revoke: jest.fn(),
+          },
+        },
         {
           provide: EvaluationRepository,
           useValue: {
@@ -77,6 +89,7 @@ describe('CoursesService student views', () => {
     service = module.get(CoursesService);
     dataSource = module.get(DataSource);
     courseCycleRepository = module.get(CourseCycleRepository);
+    courseCycleProfessorRepository = module.get(CourseCycleProfessorRepository);
     evaluationRepository = module.get(EvaluationRepository);
   });
 
@@ -362,5 +375,44 @@ describe('CoursesService student views', () => {
       pageSize: 10,
       search: undefined,
     });
+  });
+
+  it('should assign professor when user is active and has PROFESSOR role', async () => {
+    (courseCycleRepository.findById as jest.Mock).mockResolvedValue({
+      id: 'cc-1',
+    });
+    (dataSource.query as jest.Mock).mockResolvedValue([
+      { isActiveProfessor: 1 },
+    ]);
+    (dataSource.transaction as jest.Mock).mockImplementation(async (cb) => {
+      await cb({});
+    });
+
+    await service.assignProfessorToCourseCycle('cc-1', 'prof-1');
+
+    expect(dataSource.query).toHaveBeenCalledWith(expect.any(String), [
+      'prof-1',
+      'PROFESSOR',
+    ]);
+    expect(courseCycleProfessorRepository.upsertAssign).toHaveBeenCalledWith(
+      'cc-1',
+      'prof-1',
+      expect.anything(),
+    );
+  });
+
+  it('should reject assignment when user is not an active professor', async () => {
+    (courseCycleRepository.findById as jest.Mock).mockResolvedValue({
+      id: 'cc-1',
+    });
+    (dataSource.query as jest.Mock).mockResolvedValue([
+      { isActiveProfessor: 0 },
+    ]);
+
+    await expect(
+      service.assignProfessorToCourseCycle('cc-1', 'user-1'),
+    ).rejects.toThrow(BadRequestException);
+
+    expect(courseCycleProfessorRepository.upsertAssign).not.toHaveBeenCalled();
   });
 });

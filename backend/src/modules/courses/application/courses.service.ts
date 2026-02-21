@@ -5,6 +5,7 @@ import {
   Logger,
   InternalServerErrorException,
   ForbiddenException,
+  BadRequestException,
 } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import { CourseRepository } from '@modules/courses/infrastructure/course.repository';
@@ -51,6 +52,7 @@ import {
   STUDENT_EVALUATION_LABELS,
   StudentEvaluationLabel,
 } from '@modules/courses/domain/student-course.constants';
+import { ROLE_CODES } from '@common/constants/role-codes.constants';
 
 type EvaluationWithAccess = Evaluation & {
   enrollmentEvaluations?: EnrollmentEvaluation[];
@@ -284,6 +286,7 @@ export class CoursesService {
     if (!cycle) {
       throw new NotFoundException('Ciclo del curso no encontrado');
     }
+    await this.assertUserIsActiveProfessor(professorUserId);
 
     await this.dataSource.transaction(async (manager) => {
       await this.courseCycleProfessorRepository.upsertAssign(
@@ -654,5 +657,31 @@ export class CoursesService {
       .filter((word) => word.length > 0)
       .map((word) => word.charAt(0).toLocaleUpperCase('es-PE') + word.slice(1))
       .join(' ');
+  }
+
+  private async assertUserIsActiveProfessor(userId: string): Promise<void> {
+    const rows = await this.dataSource.query<
+      Array<{ isActiveProfessor: number | string }>
+    >(
+      `SELECT EXISTS(
+        SELECT 1
+        FROM user u
+        INNER JOIN user_role ur
+          ON ur.user_id = u.id
+        INNER JOIN role r
+          ON r.id = ur.role_id
+        WHERE u.id = ?
+          AND u.is_active = 1
+          AND r.code = ?
+        LIMIT 1
+      ) AS isActiveProfessor`,
+      [userId, ROLE_CODES.PROFESSOR],
+    );
+
+    if (Number(rows[0]?.isActiveProfessor) !== 1) {
+      throw new BadRequestException(
+        'El usuario seleccionado no es un profesor activo.',
+      );
+    }
   }
 }

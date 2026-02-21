@@ -43,7 +43,7 @@ export class StorageService implements OnModuleInit {
       technicalSettings.uploads.storage.storagePathFallback,
     );
     this.googleDriveServiceAccountKeyPath = this.configService.get<string>(
-      'GOOGLE_DRIVE_SERVICE_ACCOUNT_KEY_PATH',
+      'GOOGLE_APPLICATION_CREDENTIALS',
       null,
     );
     this.googleDriveRootFolderIdConfig = this.configService.get<string>(
@@ -155,7 +155,7 @@ export class StorageService implements OnModuleInit {
   private getGoogleAuth(): GoogleAuth {
     if (!this.googleDriveServiceAccountKeyPath) {
       throw new InternalServerErrorException(
-        'Falta GOOGLE_DRIVE_SERVICE_ACCOUNT_KEY_PATH en configuracion',
+        'Falta GOOGLE_APPLICATION_CREDENTIALS en configuracion',
       );
     }
 

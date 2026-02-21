@@ -11,6 +11,10 @@ import { MaterialRepository } from '@modules/materials/infrastructure/material.r
 import { MaterialCatalogRepository } from '@modules/materials/infrastructure/material-catalog.repository';
 import { DeletionRequest } from '@modules/materials/domain/deletion-request.entity';
 import {
+  AdminMaterialFileListQueryDto,
+  AdminMaterialFileListResponseDto,
+} from '@modules/materials/dto/admin-material-file-list.dto';
+import {
   DeletionReviewAction,
   ReviewDeletionRequestDto,
 } from '@modules/materials/dto/review-deletion-request.dto';
@@ -55,6 +59,73 @@ export class MaterialsAdminService {
       );
 
     return await this.requestRepository.findByStatusId(pendingStatus.id);
+  }
+
+  async findMaterialFiles(
+    query: AdminMaterialFileListQueryDto,
+  ): Promise<AdminMaterialFileListResponseDto> {
+    const page = query.page ?? 1;
+    const pageSize = query.pageSize ?? 20;
+
+    const { rows, totalItems } =
+      await this.materialRepository.findAdminMaterialFilesPage({
+        page,
+        pageSize,
+        search: query.search,
+        statusCode: query.statusCode,
+      });
+    const totalPages = totalItems === 0 ? 0 : Math.ceil(totalItems / pageSize);
+
+    return {
+      items: rows.map((row) => ({
+        materialId: row.materialId,
+        displayName: row.displayName,
+        classEventId: row.classEventId,
+        visibleFrom: row.visibleFrom,
+        visibleUntil: row.visibleUntil,
+        createdAt: row.createdAt,
+        updatedAt: row.updatedAt,
+        status: {
+          code: row.statusCode,
+          name: row.statusName,
+        },
+        folder: {
+          id: row.folderId,
+          name: row.folderName,
+        },
+        evaluation: {
+          id: row.evaluationId,
+          number: Number(row.evaluationNumber),
+          evaluationTypeCode: row.evaluationTypeCode,
+          evaluationTypeName: row.evaluationTypeName,
+          courseCode: row.courseCode,
+          courseName: row.courseName,
+          academicCycleCode: row.academicCycleCode,
+        },
+        file: {
+          resourceId: row.fileResourceId,
+          versionId: row.fileVersionId,
+          versionNumber: Number(row.versionNumber),
+          originalName: row.originalName,
+          mimeType: row.mimeType,
+          sizeBytes: row.sizeBytes,
+          storageProvider: row.storageProvider,
+        },
+        createdBy: row.createdById
+          ? {
+              id: row.createdById,
+              email: row.createdByEmail || '',
+              firstName: row.createdByFirstName || '',
+              lastName1: row.createdByLastName1,
+              lastName2: row.createdByLastName2,
+            }
+          : null,
+      })),
+      page,
+      pageSize,
+      totalItems,
+      totalPages,
+    };
   }
 
   async reviewRequest(

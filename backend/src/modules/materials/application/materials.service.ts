@@ -33,11 +33,13 @@ import {
   AUDIT_ENTITY_TYPES,
 } from '@modules/audit/interfaces/audit.constants';
 import { getEpoch } from '@common/utils/date.util';
+import { getErrnoFromDbError } from '@common/utils/mysql-error.util';
 import { technicalSettings } from '@config/technical-settings';
 import {
   ADMIN_ROLE_CODES,
   ROLE_CODES,
 } from '@common/constants/role-codes.constants';
+import { MySqlErrorCode } from '@common/interfaces/database-error.interface';
 import {
   FOLDER_STATUS_CODES,
   MATERIAL_CACHE_KEYS,
@@ -69,11 +71,17 @@ export class MaterialsService {
   ) {}
 
   async createFolder(
-    userId: string,
+    user: UserWithSession,
     dto: CreateMaterialFolderDto,
   ): Promise<MaterialFolder> {
+    await this.assertCanManageEvaluation(user, dto.evaluationId);
+
     const activeStatus = await this.getActiveFolderStatus();
     const now = new Date();
+    const { visibleFrom, visibleUntil } = this.parseVisibilityRange(
+      dto.visibleFrom,
+      dto.visibleUntil,
+    );
 
     if (dto.parentFolderId) {
       const parent = await this.validateParentFolder(
@@ -88,9 +96,9 @@ export class MaterialsService {
       parentFolderId: dto.parentFolderId || null,
       folderStatusId: activeStatus.id,
       name: dto.name,
-      visibleFrom: dto.visibleFrom ? new Date(dto.visibleFrom) : null,
-      visibleUntil: dto.visibleUntil ? new Date(dto.visibleUntil) : null,
-      createdById: userId,
+      visibleFrom,
+      visibleUntil,
+      createdById: user.id,
       createdAt: now,
       updatedAt: now,
     });
@@ -105,7 +113,7 @@ export class MaterialsService {
   }
 
   async uploadMaterial(
-    userId: string,
+    user: UserWithSession,
     dto: UploadMaterialDto,
     file: Express.Multer.File,
   ): Promise<Material> {
@@ -130,6 +138,11 @@ export class MaterialsService {
     const activeStatus = await this.getActiveMaterialStatus();
     const folder = await this.folderRepository.findById(dto.materialFolderId);
     if (!folder) throw new NotFoundException('Carpeta destino no encontrada');
+    await this.assertCanManageEvaluation(user, folder.evaluationId);
+    const { visibleFrom, visibleUntil } = this.parseVisibilityRange(
+      dto.visibleFrom,
+      dto.visibleUntil,
+    );
 
     const now = new Date();
     let savedResource: {
@@ -182,16 +195,58 @@ export class MaterialsService {
             storageUrl: savedResource.storageUrl,
             createdAt: now,
           });
-          finalResource = await manager.save(resourceEntity);
+          try {
+            finalResource = await manager.save(resourceEntity);
+          } catch (error) {
+            const dbErrno = getErrnoFromDbError(error);
+            if (dbErrno !== MySqlErrorCode.DUPLICATE_ENTRY) {
+              throw error;
+            }
 
-          const versionEntity = manager.create(FileVersion, {
-            fileResourceId: finalResource.id,
-            versionNumber: 1,
-            storageUrl: finalResource.storageUrl,
-            createdById: userId,
-            createdAt: now,
+            const dedupResource =
+              await this.fileResourceRepository.findByHashAndSize(
+                hash,
+                String(file.size),
+              );
+            if (!dedupResource) {
+              throw error;
+            }
+
+            finalResource = dedupResource;
+            if (savedResource) {
+              try {
+                await this.rollbackFile(savedResource);
+              } catch (cleanupError) {
+                this.logger.warn({
+                  message:
+                    'No se pudo limpiar archivo huÃ©rfano tras colisiÃ³n de deduplicaciÃ³n',
+                  storageKey: savedResource.storageKey,
+                  error:
+                    cleanupError instanceof Error
+                      ? cleanupError.message
+                      : String(cleanupError),
+                });
+              }
+              savedResource = null;
+              isNewFile = false;
+            }
+          }
+
+          const version1 = await manager.findOne(FileVersion, {
+            where: { fileResourceId: finalResource.id, versionNumber: 1 },
           });
-          finalVersion = await manager.save(versionEntity);
+          if (!version1) {
+            const versionEntity = manager.create(FileVersion, {
+              fileResourceId: finalResource.id,
+              versionNumber: 1,
+              storageUrl: finalResource.storageUrl,
+              createdById: user.id,
+              createdAt: now,
+            });
+            finalVersion = await manager.save(versionEntity);
+          } else {
+            finalVersion = version1;
+          }
         } else {
           finalResource = existingResource;
           const version1 = await manager.findOne(FileVersion, {
@@ -203,7 +258,7 @@ export class MaterialsService {
               fileResourceId: finalResource.id,
               versionNumber: 1,
               storageUrl: finalResource.storageUrl,
-              createdById: userId,
+              createdById: user.id,
               createdAt: now,
             });
             finalVersion = await manager.save(versionEntity);
@@ -219,16 +274,16 @@ export class MaterialsService {
           fileVersionId: finalVersion.id,
           materialStatusId: activeStatus.id,
           displayName: dto.displayName,
-          visibleFrom: dto.visibleFrom ? new Date(dto.visibleFrom) : null,
-          visibleUntil: dto.visibleUntil ? new Date(dto.visibleUntil) : null,
-          createdById: userId,
+          visibleFrom,
+          visibleUntil,
+          createdById: user.id,
           createdAt: now,
           updatedAt: now,
         });
         const savedMaterial = await manager.save(materialEntity);
 
         await this.auditService.logAction(
-          userId,
+          user.id,
           AUDIT_ACTION_CODES.FILE_UPLOAD,
           AUDIT_ENTITY_TYPES.MATERIAL,
           savedMaterial.id,
@@ -250,11 +305,26 @@ export class MaterialsService {
   }
 
   async addVersion(
-    userId: string,
+    user: UserWithSession,
     materialId: string,
     file: Express.Multer.File,
   ): Promise<Material> {
     if (!file) throw new BadRequestException('Archivo requerido');
+    const allowedMimeTypes: readonly string[] =
+      technicalSettings.uploads.materials.allowedMimeTypes;
+
+    if (!allowedMimeTypes.includes(file.mimetype)) {
+      throw new BadRequestException(
+        `Tipo de archivo no permitido. Solo se aceptan documentos educativos (PDF, imÃ¡genes, Office).`,
+      );
+    }
+
+    if (file.mimetype === 'application/pdf') {
+      const pdfMagic = file.buffer.subarray(0, 4).toString('hex');
+      if (pdfMagic !== technicalSettings.uploads.materials.pdfMagicHeaderHex) {
+        throw new BadRequestException('El archivo no es un PDF vÃ¡lido');
+      }
+    }
 
     const now = new Date();
     let savedResource: {
@@ -268,11 +338,22 @@ export class MaterialsService {
       const result = await this.dataSource.transaction(async (manager) => {
         const freshMaterial = await manager.findOne(Material, {
           where: { id: materialId },
+          relations: { materialFolder: true },
           lock: { mode: 'pessimistic_write' },
         });
 
         if (!freshMaterial)
           throw new NotFoundException('Material no encontrado');
+        if (!freshMaterial.materialFolder) {
+          throw new InternalServerErrorException(
+            'Integridad de datos corrupta: Material sin carpeta contenedora',
+          );
+        }
+        await this.assertCanManageEvaluation(
+          user,
+          freshMaterial.materialFolder.evaluationId,
+          manager,
+        );
 
         const hash = await this.storageService.calculateHash(file.buffer);
         const existingResource =
@@ -306,25 +387,101 @@ export class MaterialsService {
             storageUrl: savedResource.storageUrl,
             createdAt: now,
           });
-          finalResource = await manager.save(resourceEntity);
+          try {
+            finalResource = await manager.save(resourceEntity);
+          } catch (error) {
+            const dbErrno = getErrnoFromDbError(error);
+            if (dbErrno !== MySqlErrorCode.DUPLICATE_ENTRY) {
+              throw error;
+            }
+
+            const dedupResource =
+              await this.fileResourceRepository.findByHashAndSize(
+                hash,
+                String(file.size),
+              );
+            if (!dedupResource) {
+              throw error;
+            }
+
+            finalResource = dedupResource;
+            if (savedResource) {
+              try {
+                await this.rollbackFile(savedResource);
+              } catch (cleanupError) {
+                this.logger.warn({
+                  message:
+                    'No se pudo limpiar archivo huÃ©rfano tras colisiÃ³n de deduplicaciÃ³n',
+                  storageKey: savedResource.storageKey,
+                  error:
+                    cleanupError instanceof Error
+                      ? cleanupError.message
+                      : String(cleanupError),
+                });
+              }
+              savedResource = null;
+              isNewFile = false;
+            }
+          }
         } else {
           finalResource = existingResource;
         }
 
-        const currentVersion = await manager.findOne(FileVersion, {
+        const lockedResource = await manager.findOne(FileResource, {
+          where: { id: finalResource.id },
+          lock: { mode: 'pessimistic_write' },
+        });
+        if (!lockedResource) {
+          throw new InternalServerErrorException(
+            'Integridad de datos corrupta: recurso de archivo no encontrado',
+          );
+        }
+
+        const currentMaterialVersion = await manager.findOne(FileVersion, {
           where: { id: freshMaterial.fileVersionId },
         });
+        const nextMaterialVersionNumber =
+          (currentMaterialVersion?.versionNumber || 0) + 1;
 
-        const nextVersionNumber = (currentVersion?.versionNumber || 0) + 1;
+        let savedVersion: FileVersion | null = null;
+        const maxAttempts = 3;
+        for (let attempt = 0; attempt < maxAttempts; attempt++) {
+          const latestVersion = await manager.findOne(FileVersion, {
+            where: { fileResourceId: finalResource.id },
+            order: { versionNumber: 'DESC' },
+          });
+          const nextResourceVersionNumber =
+            (latestVersion?.versionNumber || 0) + 1;
+          const nextVersionNumber = Math.max(
+            nextMaterialVersionNumber,
+            nextResourceVersionNumber,
+          );
 
-        const versionEntity = manager.create(FileVersion, {
-          fileResourceId: finalResource.id,
-          versionNumber: nextVersionNumber,
-          storageUrl: finalResource.storageUrl,
-          createdById: userId,
-          createdAt: now,
-        });
-        const savedVersion = await manager.save(versionEntity);
+          const versionEntity = manager.create(FileVersion, {
+            fileResourceId: finalResource.id,
+            versionNumber: nextVersionNumber,
+            storageUrl: finalResource.storageUrl,
+            createdById: user.id,
+            createdAt: now,
+          });
+
+          try {
+            savedVersion = await manager.save(versionEntity);
+            break;
+          } catch (error) {
+            const dbErrno = getErrnoFromDbError(error);
+            const isLastAttempt = attempt === maxAttempts - 1;
+            if (dbErrno !== MySqlErrorCode.DUPLICATE_ENTRY || isLastAttempt) {
+              throw error;
+            }
+          }
+        }
+
+        if (!savedVersion) {
+          throw new InternalServerErrorException(
+            'No se pudo crear una nueva version del material',
+          );
+        }
 
         freshMaterial.fileResourceId = finalResource.id;
         freshMaterial.fileVersionId = savedVersion.id;
@@ -333,7 +490,7 @@ export class MaterialsService {
         const updatedMaterial = await manager.save(freshMaterial);
 
         await this.auditService.logAction(
-          userId,
+          user.id,
           AUDIT_ACTION_CODES.FILE_EDIT,
           AUDIT_ENTITY_TYPES.MATERIAL,
           updatedMaterial.id,
@@ -392,9 +549,10 @@ export class MaterialsService {
 
     if (!contents) {
       const status = await this.getActiveFolderStatus();
+      const materialStatus = await this.getActiveMaterialStatus();
       const [folders, materials] = await Promise.all([
         this.folderRepository.findSubFolders(folderId, status.id),
-        this.materialRepository.findByFolderId(folderId),
+        this.materialRepository.findByFolderId(folderId, materialStatus.id),
       ]);
       contents = { folders, materials };
       await this.cacheService.set(cacheKey, contents, this.CACHE_TTL);
@@ -425,8 +583,11 @@ export class MaterialsService {
       return this.applyVisibilityFilter(user, [], cached).materials;
     }
 
-    const materials =
-      await this.materialRepository.findByClassEventId(classEventId);
+    const materialStatus = await this.getActiveMaterialStatus();
+    const materials = await this.materialRepository.findByClassEventId(
+      classEventId,
+      materialStatus.id,
+    );
     await this.cacheService.set(cacheKey, materials, this.CACHE_TTL);
 
     return this.applyVisibilityFilter(user, [], materials).materials;
@@ -474,7 +635,7 @@ export class MaterialsService {
   }
 
   async requestDeletion(
-    userId: string,
+    user: UserWithSession,
     dto: RequestDeletionDto,
   ): Promise<void> {
     const pendingStatus =
@@ -489,15 +650,24 @@ export class MaterialsService {
     if (dto.entityType === AUDIT_ENTITY_TYPES.MATERIAL) {
       const exists = await this.materialRepository.findById(dto.entityId);
       if (!exists) throw new NotFoundException('Material no encontrado');
+      const folder = await this.folderRepository.findById(
+        exists.materialFolderId,
+      );
+      if (!folder)
+        throw new InternalServerErrorException(
+          'Integridad de datos corrupta: Material sin carpeta contenedora',
+        );
+      await this.assertCanManageEvaluation(user, folder.evaluationId);
     } else {
       const exists = await this.folderRepository.findById(dto.entityId);
       if (!exists) throw new NotFoundException('Carpeta no encontrada');
+      await this.assertCanManageEvaluation(user, exists.evaluationId);
     }
 
     const now = new Date();
 
     await this.deletionRequestRepository.create({
-      requestedById: userId,
+      requestedById: user.id,
       deletionRequestStatusId: pendingStatus.id,
       entityType: dto.entityType,
       entityId: dto.entityId,
@@ -505,6 +675,60 @@ export class MaterialsService {
       createdAt: now,
       updatedAt: now,
     });
+  }
+
+  private parseVisibilityRange(
+    visibleFrom?: string,
+    visibleUntil?: string,
+  ): { visibleFrom: Date | null; visibleUntil: Date | null } {
+    const startDate = visibleFrom ? new Date(visibleFrom) : null;
+    const endDate = visibleUntil ? new Date(visibleUntil) : null;
+
+    if (startDate && endDate && getEpoch(startDate) > getEpoch(endDate)) {
+      throw new BadRequestException(
+        'Rango de visibilidad invÃ¡lido: visibleFrom no puede ser mayor que visibleUntil',
+      );
+    }
+
+    return {
+      visibleFrom: startDate,
+      visibleUntil: endDate,
+    };
+  }
+
+  private async assertCanManageEvaluation(
+    user: UserWithSession,
+    evaluationId: string,
+    manager?: EntityManager,
+  ): Promise<void> {
+    const activeRole = user.activeRole;
+    const roleCodes = (user.roles || []).map((r) => r.code);
+
+    if (
+      activeRole === ROLE_CODES.ADMIN ||
+      roleCodes.some((r) => ADMIN_ROLE_CODES.includes(r))
+    ) {
+      return;
+    }
+
+    if (activeRole !== ROLE_CODES.PROFESSOR) {
+      throw new ForbiddenException(
+        'No tienes permiso para gestionar materiales de este curso',
+      );
+    }
+
+    const isAssigned =
+      await this.courseCycleProfessorRepository.isProfessorAssignedToEvaluation(
+        evaluationId,
+        user.id,
+        manager,
+      );
+
+    if (!isAssigned) {
+      throw new ForbiddenException(
+        'No tienes permiso para gestionar materiales de este curso',
+      );
+    }
   }
 
   private applyVisibilityFilter(

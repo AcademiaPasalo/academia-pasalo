@@ -17,6 +17,14 @@ interface GenericDataResponse<T> {
   data: T;
 }
 
+interface PaginatedMaterialsData<T> {
+  items: T[];
+  page: number;
+  pageSize: number;
+  totalItems: number;
+  totalPages: number;
+}
+
 describe('E2E: Materials Admin Full Flow', () => {
   let app: INestApplication;
   let dataSource: DataSource;
@@ -107,6 +115,10 @@ describe('E2E: Materials Admin Full Flow', () => {
       TestSeeder.generateUniqueEmail('sa_adm'),
       ['SUPER_ADMIN'],
     );
+    await dataSource.query(
+      'INSERT INTO course_cycle_professor (course_cycle_id, professor_user_id, assigned_at) VALUES (?, ?, NOW())',
+      [courseCycle.id, professor.user.id],
+    );
 
     const folderRes = await request(app.getHttpServer())
       .post('/api/v1/materials/folders')
@@ -192,6 +204,55 @@ describe('E2E: Materials Admin Full Flow', () => {
     ).data.map((x) => x.id);
     expect(ids).toContain(requestIdToApprove);
     expect(ids).toContain(requestIdToReject);
+  });
+
+  it('admin can list material files with pagination and filters', async () => {
+    const paged = await request(app.getHttpServer())
+      .get('/api/v1/admin/materials/files?page=1&pageSize=1')
+      .set('Authorization', `Bearer ${admin.token}`)
+      .expect(200);
+
+    const pagedData = (
+      paged.body as GenericDataResponse<PaginatedMaterialsData<any>>
+    ).data;
+    expect(pagedData.page).toBe(1);
+    expect(pagedData.pageSize).toBe(1);
+    expect(pagedData.totalItems).toBeGreaterThanOrEqual(2);
+    expect(pagedData.items).toHaveLength(1);
+    expect(pagedData.items[0].status.code).toBeDefined();
+    expect(pagedData.items[0].evaluation.courseCode).toContain('ADM101');
+    expect(pagedData.items[0].file.versionNumber).toBeGreaterThanOrEqual(1);
+
+    const filteredByStatus = await request(app.getHttpServer())
+      .get('/api/v1/admin/materials/files?statusCode=ACTIVE')
+      .set('Authorization', `Bearer ${admin.token}`)
+      .expect(200);
+    const statusData = (
+      filteredByStatus.body as GenericDataResponse<PaginatedMaterialsData<any>>
+    ).data;
+    expect(statusData.items.length).toBeGreaterThan(0);
+    expect(statusData.items.every((item: any) => item.status.code === 'ACTIVE')).toBe(
+      true,
+    );
+
+    const filteredBySearch = await request(app.getHttpServer())
+      .get('/api/v1/admin/materials/files?search=Material 2')
+      .set('Authorization', `Bearer ${admin.token}`)
+      .expect(200);
+    const searchData = (
+      filteredBySearch.body as GenericDataResponse<PaginatedMaterialsData<any>>
+    ).data;
+    expect(searchData.items.length).toBeGreaterThan(0);
+    expect(
+      searchData.items.some((item: any) => item.displayName === 'Material 2'),
+    ).toBe(true);
+  });
+
+  it('non admin roles cannot list material files', async () => {
+    await request(app.getHttpServer())
+      .get('/api/v1/admin/materials/files')
+      .set('Authorization', `Bearer ${professor.token}`)
+      .expect(403);
   });
 
   it('admin can reject request', async () => {

@@ -37,7 +37,7 @@ describe('StorageService', () => {
 
   it('should save local files returning provider metadata', async () => {
     const configService = createConfigService({
-      GOOGLE_DRIVE_SERVICE_ACCOUNT_KEY_PATH: null,
+      GOOGLE_APPLICATION_CREDENTIALS: null,
       STORAGE_PATH: 'uploads',
     });
     const service = new StorageService(configService);
@@ -57,7 +57,7 @@ describe('StorageService', () => {
 
   it('should throw NotFoundException when local file stream does not exist', async () => {
     const configService = createConfigService({
-      GOOGLE_DRIVE_SERVICE_ACCOUNT_KEY_PATH: null,
+      GOOGLE_APPLICATION_CREDENTIALS: null,
       STORAGE_PATH: 'uploads',
     });
     const service = new StorageService(configService);
@@ -70,7 +70,7 @@ describe('StorageService', () => {
 
   it('should require GOOGLE_DRIVE_ROOT_FOLDER_ID when drive is enabled', async () => {
     const configService = createConfigService({
-      GOOGLE_DRIVE_SERVICE_ACCOUNT_KEY_PATH: 'C:\\secret.json',
+      GOOGLE_APPLICATION_CREDENTIALS: 'C:\\secret.json',
       GOOGLE_DRIVE_ROOT_FOLDER_ID: null,
     });
     const service = new StorageService(configService);
@@ -80,9 +80,25 @@ describe('StorageService', () => {
     );
   });
 
+  it('should ignore legacy GOOGLE_DRIVE_SERVICE_ACCOUNT_KEY_PATH when GOOGLE_APPLICATION_CREDENTIALS is missing', async () => {
+    const configService = createConfigService({
+      GOOGLE_APPLICATION_CREDENTIALS: null,
+      GOOGLE_DRIVE_SERVICE_ACCOUNT_KEY_PATH: 'C:\\legacy-secret.json',
+      STORAGE_PATH: 'uploads',
+    });
+    const service = new StorageService(configService);
+
+    jest.spyOn(fs.promises, 'writeFile').mockResolvedValue(undefined);
+
+    await expect(
+      service.saveFile('legacy-test.pdf', Buffer.from('abc'), 'application/pdf'),
+    ).resolves.toMatchObject({ storageProvider: 'LOCAL' });
+    expect(googleAuthMocks.GoogleAuth).not.toHaveBeenCalled();
+  });
+
   it('should fail when root folder id is invalid or inaccessible', async () => {
     const configService = createConfigService({
-      GOOGLE_DRIVE_SERVICE_ACCOUNT_KEY_PATH: 'C:\\secret.json',
+      GOOGLE_APPLICATION_CREDENTIALS: 'C:\\secret.json',
       GOOGLE_DRIVE_ROOT_FOLDER_ID: 'invalid-root-id',
     });
     const service = new StorageService(configService);
@@ -98,7 +114,7 @@ describe('StorageService', () => {
 
   it('should create uploads, objects and archivado folders under root on init', async () => {
     const configService = createConfigService({
-      GOOGLE_DRIVE_SERVICE_ACCOUNT_KEY_PATH: 'C:\\secret.json',
+      GOOGLE_APPLICATION_CREDENTIALS: 'C:\\secret.json',
       GOOGLE_DRIVE_ROOT_FOLDER_ID: 'root-1',
     });
     const service = new StorageService(configService);
@@ -138,7 +154,7 @@ describe('StorageService', () => {
 
   it('should upload files to Google Drive objects folder', async () => {
     const configService = createConfigService({
-      GOOGLE_DRIVE_SERVICE_ACCOUNT_KEY_PATH: 'C:\\secret.json',
+      GOOGLE_APPLICATION_CREDENTIALS: 'C:\\secret.json',
       GOOGLE_DRIVE_ROOT_FOLDER_ID: 'root-1',
     });
     const service = new StorageService(configService);
@@ -178,7 +194,7 @@ describe('StorageService', () => {
 
   it('should reject root folder id when file is not a folder', async () => {
     const configService = createConfigService({
-      GOOGLE_DRIVE_SERVICE_ACCOUNT_KEY_PATH: 'C:\\secret.json',
+      GOOGLE_APPLICATION_CREDENTIALS: 'C:\\secret.json',
       GOOGLE_DRIVE_ROOT_FOLDER_ID: 'not-folder',
     });
     const service = new StorageService(configService);
@@ -196,7 +212,7 @@ describe('StorageService', () => {
 
   it('should reject root folder id when folder is trashed', async () => {
     const configService = createConfigService({
-      GOOGLE_DRIVE_SERVICE_ACCOUNT_KEY_PATH: 'C:\\secret.json',
+      GOOGLE_APPLICATION_CREDENTIALS: 'C:\\secret.json',
       GOOGLE_DRIVE_ROOT_FOLDER_ID: 'trashed-folder',
     });
     const service = new StorageService(configService);
@@ -218,7 +234,7 @@ describe('StorageService', () => {
 
   it('should throw for unsupported storage provider in deleteFile', async () => {
     const configService = createConfigService({
-      GOOGLE_DRIVE_SERVICE_ACCOUNT_KEY_PATH: null,
+      GOOGLE_APPLICATION_CREDENTIALS: null,
       STORAGE_PATH: 'uploads',
     });
     const service = new StorageService(configService);
