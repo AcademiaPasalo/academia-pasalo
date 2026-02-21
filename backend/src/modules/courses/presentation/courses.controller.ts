@@ -16,6 +16,11 @@ import {
 } from '@modules/courses/dto/course-response.dto';
 import { CourseContentResponseDto } from '@modules/courses/dto/course-content.dto';
 import { MyCourseCycleResponseDto } from '@modules/courses/dto/my-course-cycle-response.dto';
+import {
+  StudentCurrentCycleContentResponseDto,
+  StudentPreviousCycleContentResponseDto,
+  StudentPreviousCycleListResponseDto,
+} from '@modules/courses/dto/student-course-view.dto';
 import { UserResponseDto } from '@modules/users/dto/user-response.dto';
 import { CreateCourseDto } from '@modules/courses/dto/create-course.dto';
 import { UpdateCourseDto } from '@modules/courses/dto/update-course.dto';
@@ -37,7 +42,6 @@ export class CoursesController {
 
   @Get('cycle/:id/content')
   @Roles(
-    ROLE_CODES.STUDENT,
     ROLE_CODES.PROFESSOR,
     ROLE_CODES.ADMIN,
     ROLE_CODES.SUPER_ADMIN,
@@ -52,6 +56,58 @@ export class CoursesController {
       user.id,
     );
     return plainToInstance(CourseContentResponseDto, content, {
+      excludeExtraneousValues: true,
+    });
+  }
+
+  @Get('cycle/:id/current')
+  @Roles(ROLE_CODES.STUDENT)
+  @ResponseMessage('Contenido del ciclo vigente del curso obtenido exitosamente')
+  async getCurrentCycleContentForStudent(
+    @Param('id') courseCycleId: string,
+    @CurrentUser() user: User,
+  ) {
+    const content = await this.coursesService.getStudentCurrentCycleContent(
+      courseCycleId,
+      user.id,
+    );
+    return plainToInstance(StudentCurrentCycleContentResponseDto, content, {
+      excludeExtraneousValues: true,
+    });
+  }
+
+  @Get('cycle/:id/previous-cycles')
+  @Roles(ROLE_CODES.STUDENT)
+  @ResponseMessage('Ciclos anteriores del curso obtenidos exitosamente')
+  async getPreviousCyclesForStudent(
+    @Param('id') courseCycleId: string,
+    @CurrentUser() user: User,
+  ) {
+    const cycles = await this.coursesService.getStudentPreviousCycles(
+      courseCycleId,
+      user.id,
+    );
+    return plainToInstance(StudentPreviousCycleListResponseDto, cycles, {
+      excludeExtraneousValues: true,
+    });
+  }
+
+  @Get('cycle/:id/previous-cycles/:cycleCode/content')
+  @Roles(ROLE_CODES.STUDENT)
+  @ResponseMessage(
+    'Contenido del ciclo anterior del curso obtenido exitosamente',
+  )
+  async getPreviousCycleContentForStudent(
+    @Param('id') courseCycleId: string,
+    @Param('cycleCode') cycleCode: string,
+    @CurrentUser() user: User,
+  ) {
+    const content = await this.coursesService.getStudentPreviousCycleContent(
+      courseCycleId,
+      cycleCode,
+      user.id,
+    );
+    return plainToInstance(StudentPreviousCycleContentResponseDto, content, {
       excludeExtraneousValues: true,
     });
   }
