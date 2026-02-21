@@ -192,6 +192,9 @@ export class ClassEventRepository {
         startDate,
         endDate,
       })
+      .andWhere('classEvent.isCancelled = :isCancelled', {
+        isCancelled: false,
+      })
       .andWhere(
         new Brackets((where) => {
           where
