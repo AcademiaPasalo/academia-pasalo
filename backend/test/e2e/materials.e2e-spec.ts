@@ -45,15 +45,17 @@ describe('E2E: Gestión de Materiales y Seguridad', () => {
   let rootFolderId: string;
   const storageMock = {
     calculateHash: jest.fn().mockResolvedValue('mock-sha256-hash'),
-    saveFile: jest.fn().mockImplementation(async (name: string, buffer: Buffer) => {
-      const tempPath = path.join(os.tmpdir(), name);
-      await fs.promises.writeFile(tempPath, buffer);
-      return {
-        storageProvider: 'LOCAL',
-        storageKey: name,
-        storageUrl: tempPath,
-      };
-    }),
+    saveFile: jest
+      .fn()
+      .mockImplementation(async (name: string, buffer: Buffer) => {
+        const tempPath = path.join(os.tmpdir(), name);
+        await fs.promises.writeFile(tempPath, buffer);
+        return {
+          storageProvider: 'LOCAL',
+          storageKey: name,
+          storageUrl: tempPath,
+        };
+      }),
     deleteFile: jest.fn().mockResolvedValue(undefined),
     getFileStream: jest.fn().mockImplementation(async () => {
       return Readable.from(Buffer.from('%PDF-1.4 downloaded'));

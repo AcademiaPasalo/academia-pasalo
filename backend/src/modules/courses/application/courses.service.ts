@@ -23,6 +23,10 @@ import { CreateCourseDto } from '@modules/courses/dto/create-course.dto';
 import { UpdateCourseDto } from '@modules/courses/dto/update-course.dto';
 import { AssignCourseToCycleDto } from '@modules/courses/dto/assign-course-to-cycle.dto';
 import {
+  AdminCourseCycleListQueryDto,
+  AdminCourseCycleListResponseDto,
+} from '@modules/courses/dto/admin-course-cycle-list.dto';
+import {
   CourseContentResponseDto,
   EvaluationStatusDto,
 } from '@modules/courses/dto/course-content.dto';
@@ -81,6 +85,50 @@ export class CoursesService {
 
   async findAllCourses(): Promise<Course[]> {
     return await this.courseRepository.findAll();
+  }
+
+  async findAdminCourseCycles(
+    query: AdminCourseCycleListQueryDto,
+  ): Promise<AdminCourseCycleListResponseDto> {
+    const page = query.page ?? 1;
+    const pageSize = query.pageSize ?? 10;
+
+    const { rows, totalItems } =
+      await this.courseCycleRepository.findAdminCourseCyclesPage({
+        page,
+        pageSize,
+        search: query.search,
+      });
+
+    const now = new Date();
+    const totalPages = totalItems === 0 ? 0 : Math.ceil(totalItems / pageSize);
+
+    return {
+      items: rows.map((row) => {
+        const startDate = new Date(row.academicCycleStartDate);
+        const endDate = new Date(row.academicCycleEndDate);
+        return {
+          courseCycleId: row.courseCycleId,
+          course: {
+            id: row.courseId,
+            code: row.courseCode,
+            name: row.courseName,
+          },
+          academicCycle: {
+            id: row.academicCycleId,
+            code: row.academicCycleCode,
+            startDate,
+            endDate,
+            isCurrent: now >= startDate && now <= endDate,
+          },
+          professors: row.professors,
+        };
+      }),
+      page,
+      pageSize,
+      totalItems,
+      totalPages,
+    };
   }
 
   async findCourseById(id: string): Promise<Course> {
@@ -428,7 +476,9 @@ export class CoursesService {
       evaluations: evaluations.map((evaluation) => {
         const startDate = new Date(evaluation.startDate);
         const endDate = new Date(evaluation.endDate);
-        const hasAccess = this.hasActiveAccess(evaluation as EvaluationWithAccess);
+        const hasAccess = this.hasActiveAccess(
+          evaluation as EvaluationWithAccess,
+        );
 
         let label: StudentEvaluationLabel;
         if (now > endDate) {
@@ -465,10 +515,11 @@ export class CoursesService {
       );
     }
 
-    const previousCycles = await this.courseCycleRepository.findPreviousByCourseId(
-      accessContext.cycle.courseId,
-      new Date(accessContext.cycle.academicCycle.startDate),
-    );
+    const previousCycles =
+      await this.courseCycleRepository.findPreviousByCourseId(
+        accessContext.cycle.courseId,
+        new Date(accessContext.cycle.academicCycle.startDate),
+      );
 
     return {
       cycles: previousCycles.map((cycle) => ({
@@ -492,10 +543,11 @@ export class CoursesService {
       );
     }
 
-    const targetCycle = await this.courseCycleRepository.findByCourseIdAndCycleCode(
-      accessContext.cycle.courseId,
-      previousCycleCode,
-    );
+    const targetCycle =
+      await this.courseCycleRepository.findByCourseIdAndCycleCode(
+        accessContext.cycle.courseId,
+        previousCycleCode,
+      );
     if (!targetCycle) {
       throw new NotFoundException('Ciclo anterior no encontrado');
     }
@@ -538,9 +590,7 @@ export class CoursesService {
       courseCycleId,
     );
     if (!enrollmentTypeCode) {
-      throw new ForbiddenException(
-        'No tienes matrícula activa en este curso.',
-      );
+      throw new ForbiddenException('No tienes matrícula activa en este curso.');
     }
 
     const canViewPreviousCycles =
@@ -606,4 +656,3 @@ export class CoursesService {
       .join(' ');
   }
 }
-

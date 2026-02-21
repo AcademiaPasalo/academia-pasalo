@@ -1,4 +1,7 @@
-import { InternalServerErrorException, NotFoundException } from '@nestjs/common';
+import {
+  InternalServerErrorException,
+  NotFoundException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as fs from 'fs';
 import { StorageService } from '@infrastructure/storage/storage.service';
@@ -41,7 +44,11 @@ describe('StorageService', () => {
 
     jest.spyOn(fs.promises, 'writeFile').mockResolvedValue(undefined);
 
-    const result = await service.saveFile('file.pdf', Buffer.from('abc'), 'application/pdf');
+    const result = await service.saveFile(
+      'file.pdf',
+      Buffer.from('abc'),
+      'application/pdf',
+    );
 
     expect(result.storageProvider).toBe('LOCAL');
     expect(result.storageKey).toBe('file.pdf');
@@ -99,7 +106,11 @@ describe('StorageService', () => {
       request: jest
         .fn()
         .mockResolvedValueOnce({
-          data: { id: 'root-1', mimeType: 'application/vnd.google-apps.folder', trashed: false },
+          data: {
+            id: 'root-1',
+            mimeType: 'application/vnd.google-apps.folder',
+            trashed: false,
+          },
         })
         .mockResolvedValueOnce({ data: { files: [] } })
         .mockResolvedValueOnce({ data: { id: 'uploads-id' } })
@@ -114,7 +125,11 @@ describe('StorageService', () => {
 
     const createCalls = mockClient.request.mock.calls
       .map((call) => call[0])
-      .filter((req) => req.method === 'POST' && req.data?.mimeType === 'application/vnd.google-apps.folder');
+      .filter(
+        (req) =>
+          req.method === 'POST' &&
+          req.data?.mimeType === 'application/vnd.google-apps.folder',
+      );
     expect(createCalls).toHaveLength(3);
     expect(createCalls[0].data.name).toBe('uploads');
     expect(createCalls[1].data.name).toBe('objects');
@@ -131,12 +146,19 @@ describe('StorageService', () => {
       request: jest
         .fn()
         .mockResolvedValueOnce({
-          data: { id: 'root-1', mimeType: 'application/vnd.google-apps.folder', trashed: false },
+          data: {
+            id: 'root-1',
+            mimeType: 'application/vnd.google-apps.folder',
+            trashed: false,
+          },
         })
         .mockResolvedValueOnce({ data: { files: [{ id: 'uploads-id' }] } })
         .mockResolvedValueOnce({ data: { files: [{ id: 'objects-id' }] } })
         .mockResolvedValueOnce({
-          data: { id: 'drive-file-id', webContentLink: 'https://drive/content' },
+          data: {
+            id: 'drive-file-id',
+            webContentLink: 'https://drive/content',
+          },
         }),
     };
     googleAuthMocks.__mockGetClient.mockResolvedValue(mockClient);
@@ -201,8 +223,8 @@ describe('StorageService', () => {
     });
     const service = new StorageService(configService);
 
-    await expect(
-      service.deleteFile('key', 'S3' as any),
-    ).rejects.toBeInstanceOf(InternalServerErrorException);
+    await expect(service.deleteFile('key', 'S3' as any)).rejects.toBeInstanceOf(
+      InternalServerErrorException,
+    );
   });
 });

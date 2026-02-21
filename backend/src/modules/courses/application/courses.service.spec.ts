@@ -51,6 +51,7 @@ describe('CoursesService student views', () => {
             findPreviousByCourseId: jest.fn(),
             findByCourseIdAndCycleCode: jest.fn(),
             hasAccessiblePreviousByCourseIdAndUserId: jest.fn(),
+            findAdminCourseCyclesPage: jest.fn(),
           },
         },
         { provide: CourseCycleProfessorRepository, useValue: {} },
@@ -142,11 +143,15 @@ describe('CoursesService student views', () => {
     const result = await service.getStudentCurrentCycleContent('100', '501');
 
     expect(result.canViewPreviousCycles).toBe(true);
-    expect(result.evaluations[0].label).toBe(STUDENT_EVALUATION_LABELS.COMPLETED);
+    expect(result.evaluations[0].label).toBe(
+      STUDENT_EVALUATION_LABELS.COMPLETED,
+    );
     expect(result.evaluations[1].label).toBe(
       STUDENT_EVALUATION_LABELS.IN_PROGRESS,
     );
-    expect(result.evaluations[2].label).toBe(STUDENT_EVALUATION_LABELS.UPCOMING);
+    expect(result.evaluations[2].label).toBe(
+      STUDENT_EVALUATION_LABELS.UPCOMING,
+    );
     expect(result.evaluations[3].label).toBe(STUDENT_EVALUATION_LABELS.LOCKED);
     expect(result.evaluations[0].shortName).toBe('PC1');
     expect(result.evaluations[0].fullName).toBe('Practica Calificada 1');
@@ -156,7 +161,9 @@ describe('CoursesService student views', () => {
     (courseCycleRepository.findFullById as jest.Mock).mockResolvedValue(
       currentCycle,
     );
-    (dataSource.query as jest.Mock).mockResolvedValue([{ typeCode: 'PARTIAL' }]);
+    (dataSource.query as jest.Mock).mockResolvedValue([
+      { typeCode: 'PARTIAL' },
+    ]);
     (
       courseCycleRepository.hasAccessiblePreviousByCourseIdAndUserId as jest.Mock
     ).mockResolvedValue(false);
@@ -176,16 +183,18 @@ describe('CoursesService student views', () => {
     (courseCycleRepository.findFullById as jest.Mock).mockResolvedValue(
       currentCycle,
     );
-    (dataSource.query as jest.Mock).mockResolvedValue([{ typeCode: 'PARTIAL' }]);
+    (dataSource.query as jest.Mock).mockResolvedValue([
+      { typeCode: 'PARTIAL' },
+    ]);
     (
       courseCycleRepository.hasAccessiblePreviousByCourseIdAndUserId as jest.Mock
     ).mockResolvedValue(true);
-    (courseCycleRepository.findPreviousByCourseId as jest.Mock).mockResolvedValue(
-      [
-        { academicCycle: { code: '2025-2' } },
-        { academicCycle: { code: '2025-1' } },
-      ],
-    );
+    (
+      courseCycleRepository.findPreviousByCourseId as jest.Mock
+    ).mockResolvedValue([
+      { academicCycle: { code: '2025-2' } },
+      { academicCycle: { code: '2025-1' } },
+    ]);
 
     const result = await service.getStudentPreviousCycles('100', '501');
     expect(result.cycles).toEqual([
@@ -199,12 +208,12 @@ describe('CoursesService student views', () => {
       currentCycle,
     );
     (dataSource.query as jest.Mock).mockResolvedValue([{ typeCode: 'FULL' }]);
-    (courseCycleRepository.findByCourseIdAndCycleCode as jest.Mock).mockResolvedValue(
-      {
-        id: '55',
-        academicCycle: { code: '2025-2', startDate: new Date('2025-01-01') },
-      },
-    );
+    (
+      courseCycleRepository.findByCourseIdAndCycleCode as jest.Mock
+    ).mockResolvedValue({
+      id: '55',
+      academicCycle: { code: '2025-2', startDate: new Date('2025-01-01') },
+    });
     (evaluationRepository.findAllWithUserAccess as jest.Mock).mockResolvedValue(
       [
         {
@@ -234,7 +243,9 @@ describe('CoursesService student views', () => {
       '501',
     );
 
-    expect(result.evaluations[0].label).toBe(STUDENT_EVALUATION_LABELS.ARCHIVED);
+    expect(result.evaluations[0].label).toBe(
+      STUDENT_EVALUATION_LABELS.ARCHIVED,
+    );
     expect(result.evaluations[1].label).toBe(STUDENT_EVALUATION_LABELS.LOCKED);
   });
 
@@ -254,15 +265,102 @@ describe('CoursesService student views', () => {
       currentCycle,
     );
     (dataSource.query as jest.Mock).mockResolvedValue([{ typeCode: 'FULL' }]);
-    (courseCycleRepository.findByCourseIdAndCycleCode as jest.Mock).mockResolvedValue(
-      {
-        id: '200',
-        academicCycle: { code: '2026-1', startDate: new Date('2026-01-01') },
-      },
-    );
+    (
+      courseCycleRepository.findByCourseIdAndCycleCode as jest.Mock
+    ).mockResolvedValue({
+      id: '200',
+      academicCycle: { code: '2026-1', startDate: new Date('2026-01-01') },
+    });
 
     await expect(
       service.getStudentPreviousCycleContent('100', '2026-1', '501'),
     ).rejects.toThrow(NotFoundException);
+  });
+
+  it('should return paginated admin course cycles with professors', async () => {
+    jest.useFakeTimers().setSystemTime(new Date('2026-02-15T10:00:00.000Z'));
+
+    (
+      courseCycleRepository.findAdminCourseCyclesPage as jest.Mock
+    ).mockResolvedValue({
+      rows: [
+        {
+          courseCycleId: 'cc1',
+          courseId: 'c1',
+          courseCode: 'MAT101',
+          courseName: 'Matematica',
+          academicCycleId: 'ac1',
+          academicCycleCode: '2026-1',
+          academicCycleStartDate: new Date('2026-01-01'),
+          academicCycleEndDate: new Date('2026-06-30'),
+          professors: [
+            {
+              id: 'prof-1',
+              firstName: 'Ana',
+              lastName1: 'Perez',
+              lastName2: '',
+              profilePhotoUrl: null,
+            },
+          ],
+        },
+      ],
+      totalItems: 1,
+    });
+
+    const result = await service.findAdminCourseCycles({
+      page: 1,
+      pageSize: 20,
+      search: 'MAT',
+    });
+
+    expect(
+      courseCycleRepository.findAdminCourseCyclesPage,
+    ).toHaveBeenCalledWith({
+      page: 1,
+      pageSize: 20,
+      search: 'MAT',
+    });
+    expect(result.totalItems).toBe(1);
+    expect(result.totalPages).toBe(1);
+    expect(result.items[0].academicCycle.isCurrent).toBe(true);
+    expect(result.items[0].professors).toHaveLength(1);
+    expect(result.items[0].professors[0].id).toBe('prof-1');
+  });
+
+  it('should return totalPages=0 when there are no admin course cycles', async () => {
+    (
+      courseCycleRepository.findAdminCourseCyclesPage as jest.Mock
+    ).mockResolvedValue({
+      rows: [],
+      totalItems: 0,
+    });
+
+    const result = await service.findAdminCourseCycles({
+      page: 1,
+      pageSize: 10,
+    });
+
+    expect(result.items).toEqual([]);
+    expect(result.totalItems).toBe(0);
+    expect(result.totalPages).toBe(0);
+  });
+
+  it('should use pageSize=10 by default on admin course cycles list', async () => {
+    (
+      courseCycleRepository.findAdminCourseCyclesPage as jest.Mock
+    ).mockResolvedValue({
+      rows: [],
+      totalItems: 0,
+    });
+
+    await service.findAdminCourseCycles({});
+
+    expect(
+      courseCycleRepository.findAdminCourseCyclesPage,
+    ).toHaveBeenCalledWith({
+      page: 1,
+      pageSize: 10,
+      search: undefined,
+    });
   });
 });

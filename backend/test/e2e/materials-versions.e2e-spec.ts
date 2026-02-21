@@ -55,15 +55,17 @@ describe('E2E: Materials Full Flows (Dedup + Versions + Integrity)', () => {
       if (content.includes('version2')) return 'hash_v2_456';
       return `hash_${Date.now()}_${Math.random()}`;
     }),
-    saveFile: jest.fn().mockImplementation(async (name: string, buffer: Buffer) => {
-      const tempPath = path.join(os.tmpdir(), name);
-      await fs.promises.writeFile(tempPath, buffer);
-      return {
-        storageProvider: 'LOCAL',
-        storageKey: `${Date.now()}-${Math.random().toString(16).slice(2)}-${name}`,
-        storageUrl: tempPath,
-      };
-    }),
+    saveFile: jest
+      .fn()
+      .mockImplementation(async (name: string, buffer: Buffer) => {
+        const tempPath = path.join(os.tmpdir(), name);
+        await fs.promises.writeFile(tempPath, buffer);
+        return {
+          storageProvider: 'LOCAL',
+          storageKey: `${Date.now()}-${Math.random().toString(16).slice(2)}-${name}`,
+          storageUrl: tempPath,
+        };
+      }),
     deleteFile: jest.fn().mockResolvedValue(undefined),
     getFileStream: jest
       .fn()

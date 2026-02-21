@@ -318,5 +318,3 @@ describe('E2E: Class Events (Eventos de Clase)', () => {
     });
   });
 });
-
-

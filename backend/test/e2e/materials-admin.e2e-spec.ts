@@ -187,9 +187,9 @@ describe('E2E: Materials Admin Full Flow', () => {
       .set('Authorization', `Bearer ${admin.token}`)
       .expect(200);
 
-    const ids = (res.body as GenericDataResponse<Array<{ id: string }>>).data.map(
-      (x) => x.id,
-    );
+    const ids = (
+      res.body as GenericDataResponse<Array<{ id: string }>>
+    ).data.map((x) => x.id);
     expect(ids).toContain(requestIdToApprove);
     expect(ids).toContain(requestIdToReject);
   });

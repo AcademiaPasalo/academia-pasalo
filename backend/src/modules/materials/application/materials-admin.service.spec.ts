@@ -218,10 +218,7 @@ describe('MaterialsAdminService', () => {
             fileVersion: { fileResourceId: 'res-1' },
           }),
           delete: jest.fn().mockResolvedValue({}),
-          count: jest
-            .fn()
-            .mockResolvedValueOnce(0)
-            .mockResolvedValueOnce(2),
+          count: jest.fn().mockResolvedValueOnce(0).mockResolvedValueOnce(2),
         } as any;
         return cb(manager);
       });

@@ -86,7 +86,9 @@ describeLive('E2E Live: Materials + Google Drive', () => {
 
   beforeAll(async () => {
     if (!process.env.GOOGLE_DRIVE_SERVICE_ACCOUNT_KEY_PATH) {
-      throw new Error('Falta GOOGLE_DRIVE_SERVICE_ACCOUNT_KEY_PATH para live E2E');
+      throw new Error(
+        'Falta GOOGLE_DRIVE_SERVICE_ACCOUNT_KEY_PATH para live E2E',
+      );
     }
     if (!process.env.GOOGLE_DRIVE_ROOT_FOLDER_ID) {
       throw new Error('Falta GOOGLE_DRIVE_ROOT_FOLDER_ID para live E2E');
@@ -113,7 +115,10 @@ describeLive('E2E Live: Materials + Google Drive', () => {
       formatDate(yesterday),
       formatDate(nextMonth),
     );
-    const course = await seeder.createCourse(`COURSE-${runId}`, `Drive ${runId}`);
+    const course = await seeder.createCourse(
+      `COURSE-${runId}`,
+      `Drive ${runId}`,
+    );
     courseCycle = await seeder.linkCourseCycle(course.id, cycle.id);
     evaluation = await seeder.createEvaluation(
       courseCycle.id,

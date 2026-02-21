@@ -3,7 +3,7 @@ import { ClassEvent } from '@modules/events/domain/class-event.entity';
 import { CLASS_EVENT_STATUS } from '@modules/events/domain/class-event.constants';
 
 describe('ClassEventResponseDto', () => {
-  it('debe exponer URLs aunque no haya permisos efectivos', () => {
+  it('debe exponer URLs en el response', () => {
     const event = {
       id: 'event-1',
       sessionNumber: 1,

@@ -1,4 +1,4 @@
-﻿# ESPECIFICACIÓN TÉCNICA DE API: CONTENIDO, MATERIALES Y FEEDBACK
+# ESPECIFICACIÓN TÉCNICA DE API: CONTENIDO, MATERIALES Y FEEDBACK
 ==================================================================
 
 Esta API gestiona el núcleo de la experiencia académica: cursos, materiales educativos, testimonios y calendario de clases. Sigue el estándar de respuesta unificada del proyecto.
@@ -55,10 +55,10 @@ Obtiene todas las sesiones programadas para el usuario (alumno o profesor) dentr
         "recordingStatus": "NOT_AVAILABLE" | "PROCESSING" | "READY" | "FAILED",
         "isCancelled": boolean,
         "status": "PROGRAMADA" | "EN_CURSO" | "FINALIZADA" | "CANCELADA",
-        "canJoinLive": boolean,       // true si la clase está activa y el usuario tiene acceso
-        "canWatchRecording": boolean, // true si hay grabación disponible y el usuario tiene acceso
-        "canCopyLiveLink": boolean,   // true si el usuario puede copiar el link de vivo
-        "canCopyRecordingLink": boolean, // true si puede copiar el link de grabación
+        "canJoinLive": boolean,
+        "canWatchRecording": boolean,
+        "canCopyLiveLink": boolean,
+        "canCopyRecordingLink": boolean,
         "courseName": string,
         "courseCode": string,
         "evaluationName": string, // e.g. "PC1"
@@ -217,6 +217,9 @@ El endpoint legado `GET /courses/cycle/:courseCycleId/content` queda para roles 
     * `body: { "code": "string", "name": "string", "courseTypeId": "ID", "cycleLevelId": "ID", "primaryColor": "string (permite null)", "secondaryColor": "string (permite null)" }`
 - **PATCH /courses/:id**: Actualizar materia (nombre, código, colores).
     * **Nota:** Invalida automáticamente cachés de Dashboard y Horarios.
+- **GET /courses/course-cycles**: Listado paginado de curso-ciclos para panel admin/superadmin.
+    * Query params: page (default 1), pageSize (default 10, max 100), search (opcional).
+    * Incluye courseCycleId, datos de curso, datos de ciclo, bandera isCurrent y métricas agregadas: evaluations, activeEnrollments, activeProfessors.
 - **POST /courses/assign-cycle**: Aperturar materia en un ciclo (Crea CourseCycle).
     * `body: { "courseId": "ID", "academicCycleId": "ID" }`
 - **POST /courses/cycle/:id/professors**: Asignar profesor a la plana del curso.
@@ -343,5 +346,10 @@ Permite navegar la jerarquía de una evaluación. Requiere matrícula en la eval
 - **POST /feedback/admin/:testimonyId/feature:** Destacar testimonio en la web.
     * `body: { isActive: boolean, displayOrder: number }`
     * **Efecto:** Invalida automáticamente el caché público.
+
+
+
+
+
 
 

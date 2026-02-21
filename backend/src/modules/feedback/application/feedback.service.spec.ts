@@ -150,13 +150,11 @@ describe('FeedbackService', () => {
         .spyOn(enrollmentRepo, 'findActiveByUserAndCourseCycle')
         .mockResolvedValue({ id: '1' } as Enrollment);
       jest.spyOn(testimonyRepo, 'findByUserAndCycle').mockResolvedValue(null);
-      jest
-        .spyOn(storageService, 'saveFile')
-        .mockResolvedValue({
-          storageProvider: 'LOCAL' as const,
-          storageKey: 'pic.jpg',
-          storageUrl: 'path/to/pic.jpg',
-        });
+      jest.spyOn(storageService, 'saveFile').mockResolvedValue({
+        storageProvider: 'LOCAL' as const,
+        storageKey: 'pic.jpg',
+        storageUrl: 'path/to/pic.jpg',
+      });
       jest.spyOn(testimonyRepo, 'create').mockResolvedValue({
         id: 'test1',
         photoUrl: 'path/to/pic.jpg',
