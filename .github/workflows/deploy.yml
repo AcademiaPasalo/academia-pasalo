@@ -89,11 +89,21 @@ jobs:
           GOOGLE_REDIRECT_URI: ${{ secrets.GOOGLE_REDIRECT_URI }}
           MAXMIND_LICENSE_KEY: ${{ secrets.MAXMIND_LICENSE_KEY }}
           CORS_ORIGINS: ${{ secrets.CORS_ORIGINS }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
         with:
           host: ${{ secrets.EC2_HOST }}
           username: ubuntu
           key: ${{ secrets.EC2_SSH_KEY }}
           script_stop: true
-          envs: DOCKER_USERNAME,DOCKER_PASSWORD,DB_NAME,DB_PASSWORD,DB_USER,JWT_SECRET,GOOGLE_CLIENT_ID,GOOGLE_CLIENT_SECRET,GOOGLE_REDIRECT_URI,MAXMIND_LICENSE_KEY,CORS_ORIGINS
+          envs: DOCKER_USERNAME,DOCKER_PASSWORD,DB_NAME,DB_PASSWORD,DB_USER,JWT_SECRET,GOOGLE_DRIVE_SA_JSON,GOOGLE_CLIENT_ID,GOOGLE_CLIENT_SECRET,GOOGLE_REDIRECT_URI,MAXMIND_LICENSE_KEY,CORS_ORIGINS,GITHUB_REPOSITORY
           script: |
-            /home/ubuntu/academia-pasalo/backend/scripts/deploy.sh
+            set -Eeuo pipefail
+            APP_DIR="/home/ubuntu/academia-pasalo"
+            if [ ! -d "$APP_DIR/.git" ]; then
+              mkdir -p "$APP_DIR"
+              git clone "https://github.com/${GITHUB_REPOSITORY}.git" "$APP_DIR"
+            fi
+            cd "$APP_DIR"
+            git fetch origin
+            git reset --hard origin/main
+            bash backend/scripts/deploy.sh
