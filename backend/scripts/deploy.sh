@@ -8,12 +8,6 @@ DB_HOST="172.31.65.82"
 DB_PORT="3306"
 MYSQL="mysql -u \"$DB_USER\" -p\"$DB_PASSWORD\" -h \"$DB_HOST\" -P \"$DB_PORT\""
 
-# 0) Asegurar repo
-if [ ! -d "$APP_DIR/.git" ]; then
-  mkdir -p "$APP_DIR"
-  git clone git@github.com:${GITHUB_REPOSITORY}.git "$APP_DIR"
-fi
-
 cd "$APP_DIR"
 git fetch origin
 git reset --hard origin/main
@@ -25,14 +19,14 @@ chown -R ubuntu:ubuntu "$APP_DIR/certbot" || true
 chmod -R 755 "$APP_DIR/certbot" || true
 
 # --- Google SA key (Drive) ---
-# Requiere que exista la env var: GOOGLE_DRIVE_SA_JSON (desde GitHub Secrets)
+# Requiere env var: GOOGLE_DRIVE_SA_JSON
 sudo mkdir -p /opt/academia/secrets
 sudo chown ubuntu:ubuntu /opt/academia/secrets
 sudo chmod 700 /opt/academia/secrets
 
 umask 077
-cat > /opt/academia/secrets/google-drive-sa.json <<'EOF'
-$GOOGLE_DRIVE_SA_JSON
+cat > /opt/academia/secrets/google-drive-sa.json <<EOF
+${GOOGLE_DRIVE_SA_JSON}
 EOF
 
 sudo chown ubuntu:ubuntu /opt/academia/secrets/google-drive-sa.json
@@ -94,7 +88,7 @@ for c in academia-pasalo-nginx academia-pasalo-backend academia-pasalo-frontend;
   [ "$(docker inspect -f '{{.State.Status}}' "$c")" = "running" ] || { echo "❌ $c no está running"; docker logs --tail=200 "$c"; exit 1; }
 done
 
-# 10) Verificación del archivo dentro del contenedor (opcional pero útil)
+# 10) Verificación del archivo dentro del contenedor (requiere mount en docker-compose)
 docker exec -it academia-pasalo-backend ls -l /opt/academia/secrets/google-drive-sa.json >/dev/null 2>&1 || {
   echo "❌ El backend no ve /opt/academia/secrets/google-drive-sa.json (falta mount en docker-compose)"
   exit 1
