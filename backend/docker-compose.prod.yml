@@ -47,6 +47,8 @@ services:
       - API_PREFIX=api/v1
       - NODE_ENV=production
       - PORT=3001
+      - GOOGLE_DRIVE_ROOT_FOLDER_ID=${GOOGLE_DRIVE_ROOT_FOLDER_ID}
+      - STORAGE_PROVIDER=${STORAGE_PROVIDER}
     volumes:
       - /opt/academia/secrets/google-drive-sa.json:/opt/academia/secrets/google-drive-sa.json:ro
     depends_on:
