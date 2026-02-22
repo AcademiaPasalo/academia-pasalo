@@ -88,9 +88,10 @@ for c in academia-pasalo-nginx academia-pasalo-backend academia-pasalo-frontend;
   [ "$(docker inspect -f '{{.State.Status}}' "$c")" = "running" ] || { echo "❌ $c no está running"; docker logs --tail=200 "$c"; exit 1; }
 done
 
-# 10) Verificación del archivo dentro del contenedor (requiere mount en docker-compose)
-docker exec -it academia-pasalo-backend ls -l /opt/academia/secrets/google-drive-sa.json >/dev/null 2>&1 || {
-  echo "❌ El backend no ve /opt/academia/secrets/google-drive-sa.json (falta mount en docker-compose)"
+# 10) Verificación del archivo dentro del contenedor
+docker exec academia-pasalo-backend sh -lc 'ls -l /opt/academia/secrets/google-drive-sa.json && test -s /opt/academia/secrets/google-drive-sa.json' >/dev/null 2>&1 || {
+  echo "❌ El backend no ve /opt/academia/secrets/google-drive-sa.json o está vacío"
+  docker inspect academia-pasalo-backend --format '{{range .Mounts}}{{println .Source "->" .Destination}}{{end}}' | grep -n 'google-drive-sa' || true
   exit 1
 }
 
