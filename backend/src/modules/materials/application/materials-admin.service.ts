@@ -11,6 +11,10 @@ import { MaterialRepository } from '@modules/materials/infrastructure/material.r
 import { MaterialCatalogRepository } from '@modules/materials/infrastructure/material-catalog.repository';
 import { DeletionRequest } from '@modules/materials/domain/deletion-request.entity';
 import {
+  AdminMaterialFileListQueryDto,
+  AdminMaterialFileListResponseDto,
+} from '@modules/materials/dto/admin-material-file-list.dto';
+import {
   DeletionReviewAction,
   ReviewDeletionRequestDto,
 } from '@modules/materials/dto/review-deletion-request.dto';
@@ -51,10 +55,77 @@ export class MaterialsAdminService {
       );
     if (!pendingStatus)
       throw new InternalServerErrorException(
-        `Error de configuración: Estado ${DELETION_REQUEST_STATUS_CODES.PENDING} faltante`,
+        `Error de configuracion: Estado ${DELETION_REQUEST_STATUS_CODES.PENDING} faltante`,
       );
 
     return await this.requestRepository.findByStatusId(pendingStatus.id);
+  }
+
+  async findMaterialFiles(
+    query: AdminMaterialFileListQueryDto,
+  ): Promise<AdminMaterialFileListResponseDto> {
+    const page = query.page ?? 1;
+    const pageSize = query.pageSize ?? 20;
+
+    const { rows, totalItems } =
+      await this.materialRepository.findAdminMaterialFilesPage({
+        page,
+        pageSize,
+        search: query.search,
+        statusCode: query.statusCode,
+      });
+    const totalPages = totalItems === 0 ? 0 : Math.ceil(totalItems / pageSize);
+
+    return {
+      items: rows.map((row) => ({
+        materialId: row.materialId,
+        displayName: row.displayName,
+        classEventId: row.classEventId,
+        visibleFrom: row.visibleFrom,
+        visibleUntil: row.visibleUntil,
+        createdAt: row.createdAt,
+        updatedAt: row.updatedAt,
+        status: {
+          code: row.statusCode,
+          name: row.statusName,
+        },
+        folder: {
+          id: row.folderId,
+          name: row.folderName,
+        },
+        evaluation: {
+          id: row.evaluationId,
+          number: Number(row.evaluationNumber),
+          evaluationTypeCode: row.evaluationTypeCode,
+          evaluationTypeName: row.evaluationTypeName,
+          courseCode: row.courseCode,
+          courseName: row.courseName,
+          academicCycleCode: row.academicCycleCode,
+        },
+        file: {
+          resourceId: row.fileResourceId,
+          versionId: row.fileVersionId,
+          versionNumber: Number(row.versionNumber),
+          originalName: row.originalName,
+          mimeType: row.mimeType,
+          sizeBytes: row.sizeBytes,
+          storageProvider: row.storageProvider,
+        },
+        createdBy: row.createdById
+          ? {
+              id: row.createdById,
+              email: row.createdByEmail || '',
+              firstName: row.createdByFirstName || '',
+              lastName1: row.createdByLastName1,
+              lastName2: row.createdByLastName2,
+            }
+          : null,
+      })),
+      page,
+      pageSize,
+      totalItems,
+      totalPages,
+    };
   }
 
   async reviewRequest(
@@ -114,7 +185,7 @@ export class MaterialsAdminService {
 
     if (!approvedStatus || !archivedMaterialStatus) {
       throw new InternalServerErrorException(
-        `Error de configuración: Estados de sistema faltantes (${DELETION_REQUEST_STATUS_CODES.APPROVED}/${MATERIAL_STATUS_CODES.ARCHIVED})`,
+        `Error de configuracion: Estados de sistema faltantes (${DELETION_REQUEST_STATUS_CODES.APPROVED}/${MATERIAL_STATUS_CODES.ARCHIVED})`,
       );
     }
 
@@ -153,7 +224,7 @@ export class MaterialsAdminService {
       );
     if (!rejectedStatus)
       throw new InternalServerErrorException(
-        `Error de configuración: Estado ${DELETION_REQUEST_STATUS_CODES.REJECTED} faltante`,
+        `Error de configuracion: Estado ${DELETION_REQUEST_STATUS_CODES.REJECTED} faltante`,
       );
 
     await manager.update(DeletionRequest, requestId, {
@@ -174,11 +245,15 @@ export class MaterialsAdminService {
       );
     if (material.materialStatusId !== archivedStatus?.id) {
       throw new BadRequestException(
-        'Solo se pueden eliminar físicamente materiales que estén ARCHIVADOS.',
+        'Solo se pueden eliminar fisicamente materiales que esten ARCHIVADOS.',
       );
     }
 
-    let fileToDeletePath: string | null = null;
+    let fileToDeleteResource: {
+      storageProvider: FileResource['storageProvider'];
+      storageKey: string;
+      storageUrl: string | null;
+    } | null = null;
 
     await this.dataSource.transaction(async (manager) => {
       const materialRecord = await manager.findOne(Material, {
@@ -217,29 +292,33 @@ export class MaterialsAdminService {
             where: { id: resourceId },
           });
           if (resource) {
-            fileToDeletePath = resource.storageUrl;
+            fileToDeleteResource = {
+              storageProvider: resource.storageProvider,
+              storageKey: resource.storageKey,
+              storageUrl: resource.storageUrl,
+            };
             await manager.delete(FileResource, resourceId);
           }
         }
       }
     });
 
-    if (fileToDeletePath) {
-      const pathString = fileToDeletePath;
-      const fileName = pathString.split(/[\\/]/).pop();
-      if (fileName) {
-        await this.storageService.deleteFile(fileName);
-        this.logger.warn({
-          message: 'Archivo físico eliminado (Garbage Collection)',
-          file: fileName,
-        });
-      }
+    if (fileToDeleteResource) {
+      await this.storageService.deleteFile(
+        fileToDeleteResource.storageKey,
+        fileToDeleteResource.storageProvider,
+        fileToDeleteResource.storageUrl,
+      );
+      this.logger.warn({
+        message: 'Archivo fisico eliminado (Garbage Collection)',
+        file: fileToDeleteResource.storageKey,
+      });
     }
 
     await this.invalidateMaterialCaches(material);
 
     this.logger.warn({
-      message: 'Material eliminado físicamente (Hard Delete)',
+      message: 'Material eliminado fisicamente (Hard Delete)',
       materialId,
       adminId,
     });

@@ -4,6 +4,7 @@ import {
   IsOptional,
   IsNumberString,
   MaxLength,
+  IsDateString,
 } from 'class-validator';
 
 export class CreateMaterialFolderDto {
@@ -21,10 +22,10 @@ export class CreateMaterialFolderDto {
   name: string;
 
   @IsOptional()
-  @IsString()
+  @IsDateString()
   visibleFrom?: string;
 
   @IsOptional()
-  @IsString()
+  @IsDateString()
   visibleUntil?: string;
 }

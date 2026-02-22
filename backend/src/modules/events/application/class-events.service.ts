@@ -554,7 +554,7 @@ export class ClassEventsService {
     );
     if (!status) {
       throw new InternalServerErrorException(
-        `Estado de grabacion ${code} no configurado`,
+        `Estado de grabación ${code} no configurado`,
       );
     }
 

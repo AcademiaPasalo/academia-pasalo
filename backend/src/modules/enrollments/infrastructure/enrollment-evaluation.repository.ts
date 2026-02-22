@@ -36,6 +36,7 @@ export class EnrollmentEvaluationRepository {
   }
 
   async checkAccess(userId: string, evaluationId: string): Promise<boolean> {
+    const now = new Date();
     const result = await this.ormRepository.query<
       [{ hasAccess: number | string }]
     >(
@@ -44,13 +45,13 @@ export class EnrollmentEvaluationRepository {
         INNER JOIN enrollment e ON e.id = ee.enrollment_id
         WHERE ee.evaluation_id = ?
           AND ee.is_active = 1
-          AND ee.access_start_date <= NOW()
-          AND ee.access_end_date >= NOW()
+          AND ee.access_start_date <= ?
+          AND ee.access_end_date >= ?
           AND e.user_id = ?
           AND e.cancelled_at IS NULL
         LIMIT 1
       ) as hasAccess`,
-      [evaluationId, userId],
+      [evaluationId, now, now, userId],
     );
 
     return Number(result[0]?.hasAccess) === 1;

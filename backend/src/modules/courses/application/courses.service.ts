@@ -4,6 +4,8 @@ import {
   ConflictException,
   Logger,
   InternalServerErrorException,
+  ForbiddenException,
+  BadRequestException,
 } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import { CourseRepository } from '@modules/courses/infrastructure/course.repository';
@@ -22,9 +24,18 @@ import { CreateCourseDto } from '@modules/courses/dto/create-course.dto';
 import { UpdateCourseDto } from '@modules/courses/dto/update-course.dto';
 import { AssignCourseToCycleDto } from '@modules/courses/dto/assign-course-to-cycle.dto';
 import {
+  AdminCourseCycleListQueryDto,
+  AdminCourseCycleListResponseDto,
+} from '@modules/courses/dto/admin-course-cycle-list.dto';
+import {
   CourseContentResponseDto,
   EvaluationStatusDto,
 } from '@modules/courses/dto/course-content.dto';
+import {
+  StudentCurrentCycleContentResponseDto,
+  StudentPreviousCycleContentResponseDto,
+  StudentPreviousCycleListResponseDto,
+} from '@modules/courses/dto/student-course-view.dto';
 import { Evaluation } from '@modules/evaluations/domain/evaluation.entity';
 import { EnrollmentEvaluation } from '@modules/enrollments/domain/enrollment-evaluation.entity';
 import {
@@ -36,10 +47,22 @@ import { ENROLLMENT_CACHE_KEYS } from '@modules/enrollments/domain/enrollment.co
 import { CLASS_EVENT_CACHE_KEYS } from '@modules/events/domain/class-event.constants';
 import { technicalSettings } from '@config/technical-settings';
 import { User } from '@/modules/users/domain/user.entity';
+import { ENROLLMENT_TYPE_CODES } from '@modules/enrollments/domain/enrollment.constants';
+import {
+  STUDENT_EVALUATION_LABELS,
+  StudentEvaluationLabel,
+} from '@modules/courses/domain/student-course.constants';
+import { ROLE_CODES } from '@common/constants/role-codes.constants';
 
 type EvaluationWithAccess = Evaluation & {
   enrollmentEvaluations?: EnrollmentEvaluation[];
   name?: string;
+};
+
+type StudentCourseAccessContext = {
+  cycle: CourseCycle;
+  enrollmentTypeCode: string;
+  canViewPreviousCycles: boolean;
 };
 
 @Injectable()
@@ -64,6 +87,50 @@ export class CoursesService {
 
   async findAllCourses(): Promise<Course[]> {
     return await this.courseRepository.findAll();
+  }
+
+  async findAdminCourseCycles(
+    query: AdminCourseCycleListQueryDto,
+  ): Promise<AdminCourseCycleListResponseDto> {
+    const page = query.page ?? 1;
+    const pageSize = query.pageSize ?? 10;
+
+    const { rows, totalItems } =
+      await this.courseCycleRepository.findAdminCourseCyclesPage({
+        page,
+        pageSize,
+        search: query.search,
+      });
+
+    const now = new Date();
+    const totalPages = totalItems === 0 ? 0 : Math.ceil(totalItems / pageSize);
+
+    return {
+      items: rows.map((row) => {
+        const startDate = new Date(row.academicCycleStartDate);
+        const endDate = new Date(row.academicCycleEndDate);
+        return {
+          courseCycleId: row.courseCycleId,
+          course: {
+            id: row.courseId,
+            code: row.courseCode,
+            name: row.courseName,
+          },
+          academicCycle: {
+            id: row.academicCycleId,
+            code: row.academicCycleCode,
+            startDate,
+            endDate,
+            isCurrent: now >= startDate && now <= endDate,
+          },
+          professors: row.professors,
+        };
+      }),
+      page,
+      pageSize,
+      totalItems,
+      totalPages,
+    };
   }
 
   async findCourseById(id: string): Promise<Course> {
@@ -219,6 +286,7 @@ export class CoursesService {
     if (!cycle) {
       throw new NotFoundException('Ciclo del curso no encontrado');
     }
+    await this.assertUserIsActiveProfessor(professorUserId);
 
     await this.dataSource.transaction(async (manager) => {
       await this.courseCycleProfessorRepository.upsertAssign(
@@ -387,5 +455,233 @@ export class CoursesService {
         };
       }),
     };
+  }
+
+  async getStudentCurrentCycleContent(
+    courseCycleId: string,
+    userId: string,
+  ): Promise<StudentCurrentCycleContentResponseDto> {
+    const accessContext = await this.getStudentCourseAccessContext(
+      courseCycleId,
+      userId,
+    );
+
+    const now = new Date();
+    const evaluations = await this.evaluationRepository.findAllWithUserAccess(
+      courseCycleId,
+      userId,
+    );
+
+    return {
+      courseCycleId: accessContext.cycle.id,
+      cycleCode: accessContext.cycle.academicCycle.code,
+      canViewPreviousCycles: accessContext.canViewPreviousCycles,
+      evaluations: evaluations.map((evaluation) => {
+        const startDate = new Date(evaluation.startDate);
+        const endDate = new Date(evaluation.endDate);
+        const hasAccess = this.hasActiveAccess(
+          evaluation as EvaluationWithAccess,
+        );
+
+        let label: StudentEvaluationLabel;
+        if (now > endDate) {
+          label = STUDENT_EVALUATION_LABELS.COMPLETED;
+        } else if (now >= startDate && now <= endDate) {
+          label = STUDENT_EVALUATION_LABELS.IN_PROGRESS;
+        } else {
+          label = hasAccess
+            ? STUDENT_EVALUATION_LABELS.UPCOMING
+            : STUDENT_EVALUATION_LABELS.LOCKED;
+        }
+
+        return {
+          id: evaluation.id,
+          shortName: this.buildEvaluationShortName(evaluation),
+          fullName: this.buildEvaluationFullName(evaluation),
+          label,
+        };
+      }),
+    };
+  }
+
+  async getStudentPreviousCycles(
+    courseCycleId: string,
+    userId: string,
+  ): Promise<StudentPreviousCycleListResponseDto> {
+    const accessContext = await this.getStudentCourseAccessContext(
+      courseCycleId,
+      userId,
+    );
+    if (!accessContext.canViewPreviousCycles) {
+      throw new ForbiddenException(
+        'No tienes acceso para consultar ciclos anteriores de este curso.',
+      );
+    }
+
+    const previousCycles =
+      await this.courseCycleRepository.findPreviousByCourseId(
+        accessContext.cycle.courseId,
+        new Date(accessContext.cycle.academicCycle.startDate),
+      );
+
+    return {
+      cycles: previousCycles.map((cycle) => ({
+        cycleCode: cycle.academicCycle.code,
+      })),
+    };
+  }
+
+  async getStudentPreviousCycleContent(
+    courseCycleId: string,
+    previousCycleCode: string,
+    userId: string,
+  ): Promise<StudentPreviousCycleContentResponseDto> {
+    const accessContext = await this.getStudentCourseAccessContext(
+      courseCycleId,
+      userId,
+    );
+    if (!accessContext.canViewPreviousCycles) {
+      throw new ForbiddenException(
+        'No tienes acceso para consultar ciclos anteriores de este curso.',
+      );
+    }
+
+    const targetCycle =
+      await this.courseCycleRepository.findByCourseIdAndCycleCode(
+        accessContext.cycle.courseId,
+        previousCycleCode,
+      );
+    if (!targetCycle) {
+      throw new NotFoundException('Ciclo anterior no encontrado');
+    }
+    if (
+      new Date(targetCycle.academicCycle.startDate) >=
+      new Date(accessContext.cycle.academicCycle.startDate)
+    ) {
+      throw new NotFoundException('Ciclo anterior no encontrado');
+    }
+
+    const evaluations = await this.evaluationRepository.findAllWithUserAccess(
+      targetCycle.id,
+      userId,
+    );
+
+    return {
+      cycleCode: previousCycleCode,
+      evaluations: evaluations.map((evaluation) => ({
+        id: evaluation.id,
+        shortName: this.buildEvaluationShortName(evaluation),
+        fullName: this.buildEvaluationFullName(evaluation),
+        label: this.hasActiveAccess(evaluation as EvaluationWithAccess)
+          ? STUDENT_EVALUATION_LABELS.ARCHIVED
+          : STUDENT_EVALUATION_LABELS.LOCKED,
+      })),
+    };
+  }
+
+  private async getStudentCourseAccessContext(
+    courseCycleId: string,
+    userId: string,
+  ): Promise<StudentCourseAccessContext> {
+    const cycle = await this.courseCycleRepository.findFullById(courseCycleId);
+    if (!cycle) {
+      throw new NotFoundException('Ciclo del curso no encontrado');
+    }
+
+    const enrollmentTypeCode = await this.getActiveEnrollmentTypeCode(
+      userId,
+      courseCycleId,
+    );
+    if (!enrollmentTypeCode) {
+      throw new ForbiddenException('No tienes matrícula activa en este curso.');
+    }
+
+    const canViewPreviousCycles =
+      enrollmentTypeCode === ENROLLMENT_TYPE_CODES.FULL
+        ? true
+        : await this.courseCycleRepository.hasAccessiblePreviousByCourseIdAndUserId(
+            cycle.courseId,
+            new Date(cycle.academicCycle.startDate),
+            userId,
+          );
+
+    return {
+      cycle,
+      enrollmentTypeCode,
+      canViewPreviousCycles,
+    };
+  }
+
+  private async getActiveEnrollmentTypeCode(
+    userId: string,
+    courseCycleId: string,
+  ): Promise<string | null> {
+    const rows = await this.dataSource.query<
+      Array<{ typeCode: string | null }>
+    >(
+      `SELECT et.code as typeCode
+       FROM enrollment e
+       INNER JOIN enrollment_type et
+         ON et.id = e.enrollment_type_id
+       WHERE e.user_id = ?
+         AND e.course_cycle_id = ?
+         AND e.cancelled_at IS NULL
+       LIMIT 1`,
+      [userId, courseCycleId],
+    );
+
+    return rows[0]?.typeCode ?? null;
+  }
+
+  private hasActiveAccess(evaluation: EvaluationWithAccess): boolean {
+    const access =
+      evaluation.enrollmentEvaluations && evaluation.enrollmentEvaluations[0]
+        ? evaluation.enrollmentEvaluations[0]
+        : null;
+    return !!access && access.isActive;
+  }
+
+  private buildEvaluationShortName(evaluation: Evaluation): string {
+    return `${evaluation.evaluationType.code}${evaluation.number}`;
+  }
+
+  private buildEvaluationFullName(evaluation: Evaluation): string {
+    const typeName = this.toTitleCase(evaluation.evaluationType.name);
+    return `${typeName} ${evaluation.number}`;
+  }
+
+  private toTitleCase(value: string): string {
+    return value
+      .toLocaleLowerCase('es-PE')
+      .split(/\s+/)
+      .filter((word) => word.length > 0)
+      .map((word) => word.charAt(0).toLocaleUpperCase('es-PE') + word.slice(1))
+      .join(' ');
+  }
+
+  private async assertUserIsActiveProfessor(userId: string): Promise<void> {
+    const rows = await this.dataSource.query<
+      Array<{ isActiveProfessor: number | string }>
+    >(
+      `SELECT EXISTS(
+        SELECT 1
+        FROM user u
+        INNER JOIN user_role ur
+          ON ur.user_id = u.id
+        INNER JOIN role r
+          ON r.id = ur.role_id
+        WHERE u.id = ?
+          AND u.is_active = 1
+          AND r.code = ?
+        LIMIT 1
+      ) AS isActiveProfessor`,
+      [userId, ROLE_CODES.PROFESSOR],
+    );
+
+    if (Number(rows[0]?.isActiveProfessor) !== 1) {
+      throw new BadRequestException(
+        'El usuario seleccionado no es un profesor activo.',
+      );
+    }
   }
 }

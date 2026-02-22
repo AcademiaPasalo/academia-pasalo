@@ -10,6 +10,7 @@ import { TransformInterceptor } from '@common/interceptors/transform.interceptor
 import * as path from 'path';
 import * as os from 'os';
 import * as fs from 'fs';
+import { Readable } from 'stream';
 import { User } from '@modules/users/domain/user.entity';
 import { CourseCycle } from '@modules/courses/domain/course-cycle.entity';
 import { Evaluation } from '@modules/evaluations/domain/evaluation.entity';
@@ -31,7 +32,7 @@ interface MaterialUploadResponse {
   };
 }
 
-describe('E2E: Gestión de Materiales y Seguridad', () => {
+describe('E2E: Gestion de Materiales y Seguridad', () => {
   let app: INestApplication;
   let dataSource: DataSource;
   let seeder: TestSeeder;
@@ -42,6 +43,25 @@ describe('E2E: Gestión de Materiales y Seguridad', () => {
   let courseCycle: CourseCycle;
   let evaluation: Evaluation;
   let rootFolderId: string;
+  const storageMock = {
+    calculateHash: jest.fn().mockResolvedValue('mock-sha256-hash'),
+    saveFile: jest
+      .fn()
+      .mockImplementation(async (name: string, buffer: Buffer) => {
+        const tempPath = path.join(os.tmpdir(), name);
+        await fs.promises.writeFile(tempPath, buffer);
+        return {
+          storageProvider: 'LOCAL',
+          storageKey: name,
+          storageUrl: tempPath,
+        };
+      }),
+    deleteFile: jest.fn().mockResolvedValue(undefined),
+    getFileStream: jest.fn().mockImplementation(async () => {
+      return Readable.from(Buffer.from('%PDF-1.4 downloaded'));
+    }),
+    onModuleInit: jest.fn(),
+  };
 
   const now = new Date();
   const yesterday = new Date(now);
@@ -55,18 +75,7 @@ describe('E2E: Gestión de Materiales y Seguridad', () => {
       imports: [AppModule],
     })
       .overrideProvider(StorageService)
-      .useValue({
-        calculateHash: jest.fn().mockResolvedValue('mock-sha256-hash'),
-        saveFile: jest
-          .fn()
-          .mockImplementation(async (name: string, buffer: Buffer) => {
-            const tempPath = path.join(os.tmpdir(), name);
-            await fs.promises.writeFile(tempPath, buffer);
-            return tempPath;
-          }),
-        deleteFile: jest.fn().mockResolvedValue(undefined),
-        onModuleInit: jest.fn(),
-      })
+      .useValue(storageMock)
       .compile();
 
     app = moduleFixture.createNestApplication();
@@ -161,8 +170,8 @@ describe('E2E: Gestión de Materiales y Seguridad', () => {
     if (app) await app.close();
   });
 
-  describe('GESTIÓN DE CARPETAS Y ARCHIVOS', () => {
-    it('Admin debe poder crear carpeta raíz', async () => {
+  describe('GESTION DE CARPETAS Y ARCHIVOS', () => {
+    it('Admin debe poder crear carpeta raiz', async () => {
       const res = await request(app.getHttpServer())
         .post('/api/v1/materials/folders')
         .set('Authorization', `Bearer ${admin.token}`)
@@ -185,7 +194,7 @@ describe('E2E: Gestión de Materiales y Seguridad', () => {
         .set('Authorization', `Bearer ${professor.token}`)
         .attach('file', buffer, 'silabo.pdf')
         .field('materialFolderId', rootFolderId)
-        .field('displayName', 'Sílabo Oficial')
+        .field('displayName', 'Silabo Oficial')
         .expect(201);
     });
   });
@@ -194,6 +203,8 @@ describe('E2E: Gestión de Materiales y Seguridad', () => {
     let materialId: string;
     let lockedFolderId: string;
     let otherCourseEvaluation: Evaluation;
+    let otherCourseFolderId: string;
+    let otherCourseMaterialId: string;
 
     beforeAll(async () => {
       const otherCourse = await seeder.createCourse(
@@ -211,6 +222,28 @@ describe('E2E: Gestión de Materiales y Seguridad', () => {
         formatDate(yesterday),
         formatDate(nextMonth),
       );
+
+      const otherFolderRes = await request(app.getHttpServer())
+        .post('/api/v1/materials/folders')
+        .set('Authorization', `Bearer ${admin.token}`)
+        .send({
+          evaluationId: otherCourseEvaluation.id,
+          name: 'Material Curso Ajeno',
+          visibleFrom: new Date().toISOString(),
+        })
+        .expect(201);
+      otherCourseFolderId = (otherFolderRes.body as MaterialFolderResponse).data
+        .id;
+
+      const otherMaterialRes = await request(app.getHttpServer())
+        .post('/api/v1/materials')
+        .set('Authorization', `Bearer ${admin.token}`)
+        .attach('file', Buffer.from('%PDF-1.4 foreign-material'), 'other.pdf')
+        .field('materialFolderId', otherCourseFolderId)
+        .field('displayName', 'Material Ajeno')
+        .expect(201);
+      otherCourseMaterialId = (otherMaterialRes.body as MaterialUploadResponse)
+        .data.id;
 
       const future = new Date();
       future.setFullYear(now.getFullYear() + 1);
@@ -240,18 +273,64 @@ describe('E2E: Gestión de Materiales y Seguridad', () => {
       materialId = matBody.data.id;
     });
 
-    it('Profesor NO debe poder ver raíces de un curso ajeno (403)', async () => {
+    it('Profesor NO debe poder ver raices de un curso ajeno (403)', async () => {
       await request(app.getHttpServer())
         .get(`/api/v1/materials/folders/evaluation/${otherCourseEvaluation.id}`)
         .set('Authorization', `Bearer ${professor.token}`)
         .expect(403);
     });
 
-    it('Admin SÍ debe poder ver raíces de cualquier curso (Bypass)', async () => {
+    it('Admin SI debe poder ver raices de cualquier curso (Bypass)', async () => {
       await request(app.getHttpServer())
         .get(`/api/v1/materials/folders/evaluation/${otherCourseEvaluation.id}`)
         .set('Authorization', `Bearer ${admin.token}`)
         .expect(200);
+    });
+
+    it('Profesor NO debe poder crear carpeta en un curso ajeno (403)', async () => {
+      await request(app.getHttpServer())
+        .post('/api/v1/materials/folders')
+        .set('Authorization', `Bearer ${professor.token}`)
+        .send({
+          evaluationId: otherCourseEvaluation.id,
+          name: 'Intento no autorizado',
+          visibleFrom: new Date().toISOString(),
+        })
+        .expect(403);
+    });
+
+    it('Profesor NO debe poder subir material a carpeta de curso ajeno (403)', async () => {
+      await request(app.getHttpServer())
+        .post('/api/v1/materials')
+        .set('Authorization', `Bearer ${professor.token}`)
+        .attach(
+          'file',
+          Buffer.from('%PDF-1.4 unauthorized-upload'),
+          'blocked.pdf',
+        )
+        .field('materialFolderId', otherCourseFolderId)
+        .field('displayName', 'No permitido')
+        .expect(403);
+    });
+
+    it('Profesor NO debe poder versionar material de curso ajeno (403)', async () => {
+      await request(app.getHttpServer())
+        .post(`/api/v1/materials/${otherCourseMaterialId}/versions`)
+        .set('Authorization', `Bearer ${professor.token}`)
+        .attach('file', Buffer.from('%PDF-1.4 unauthorized-version'), 'v2.pdf')
+        .expect(403);
+    });
+
+    it('Profesor NO debe poder solicitar eliminacion de material ajeno (403)', async () => {
+      await request(app.getHttpServer())
+        .post('/api/v1/materials/request-deletion')
+        .set('Authorization', `Bearer ${professor.token}`)
+        .send({
+          entityType: 'material',
+          entityId: otherCourseMaterialId,
+          reason: 'Intento no autorizado',
+        })
+        .expect(403);
     });
 
     it('Estudiante NO debe poder descargar material si la carpeta es futura (403)', async () => {
@@ -261,7 +340,7 @@ describe('E2E: Gestión de Materiales y Seguridad', () => {
         .expect(403);
     });
 
-    it('Estudiante con MATRÍCULA CANCELADA debe recibir 403', async () => {
+    it('Estudiante con MATRICULA CANCELADA debe recibir 403', async () => {
       const enrollmentRepo = dataSource.getRepository(Enrollment);
       const enrollment = await enrollmentRepo.findOne({
         where: {

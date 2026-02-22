@@ -71,7 +71,12 @@ export class FeedbackService {
         );
       }
       const uniqueName = `feedback-${Date.now()}-${file.originalname}`;
-      photoUrl = await this.storageService.saveFile(uniqueName, file.buffer);
+      const storedPhoto = await this.storageService.saveFile(
+        uniqueName,
+        file.buffer,
+        file.mimetype,
+      );
+      photoUrl = storedPhoto.storageUrl ?? storedPhoto.storageKey;
     } else if (dto.photoSource === PhotoSource.PROFILE) {
       const user = await this.usersService.findOne(userId);
       photoUrl = user?.profilePhotoUrl || null;

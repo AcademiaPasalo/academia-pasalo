@@ -5,6 +5,7 @@ import {
   Delete,
   Body,
   Param,
+  Query,
   HttpCode,
   HttpStatus,
 } from '@nestjs/common';
@@ -16,11 +17,20 @@ import {
 } from '@modules/courses/dto/course-response.dto';
 import { CourseContentResponseDto } from '@modules/courses/dto/course-content.dto';
 import { MyCourseCycleResponseDto } from '@modules/courses/dto/my-course-cycle-response.dto';
+import {
+  StudentCurrentCycleContentResponseDto,
+  StudentPreviousCycleContentResponseDto,
+  StudentPreviousCycleListResponseDto,
+} from '@modules/courses/dto/student-course-view.dto';
 import { UserResponseDto } from '@modules/users/dto/user-response.dto';
 import { CreateCourseDto } from '@modules/courses/dto/create-course.dto';
 import { UpdateCourseDto } from '@modules/courses/dto/update-course.dto';
 import { AssignCourseToCycleDto } from '@modules/courses/dto/assign-course-to-cycle.dto';
 import { AssignCourseCycleProfessorDto } from '@modules/courses/dto/assign-course-cycle-professor.dto';
+import {
+  AdminCourseCycleListQueryDto,
+  AdminCourseCycleListResponseDto,
+} from '@modules/courses/dto/admin-course-cycle-list.dto';
 import { Auth } from '@common/decorators/auth.decorator';
 import { Roles } from '@common/decorators/roles.decorator';
 import { CurrentUser } from '@common/decorators/current-user.decorator';
@@ -36,12 +46,7 @@ export class CoursesController {
   constructor(private readonly coursesService: CoursesService) {}
 
   @Get('cycle/:id/content')
-  @Roles(
-    ROLE_CODES.STUDENT,
-    ROLE_CODES.PROFESSOR,
-    ROLE_CODES.ADMIN,
-    ROLE_CODES.SUPER_ADMIN,
-  )
+  @Roles(ROLE_CODES.PROFESSOR, ROLE_CODES.ADMIN, ROLE_CODES.SUPER_ADMIN)
   @ResponseMessage('Contenido del curso obtenido exitosamente')
   async getCourseContent(
     @Param('id') courseCycleId: string,
@@ -52,6 +57,60 @@ export class CoursesController {
       user.id,
     );
     return plainToInstance(CourseContentResponseDto, content, {
+      excludeExtraneousValues: true,
+    });
+  }
+
+  @Get('cycle/:id/current')
+  @Roles(ROLE_CODES.STUDENT)
+  @ResponseMessage(
+    'Contenido del ciclo vigente del curso obtenido exitosamente',
+  )
+  async getCurrentCycleContentForStudent(
+    @Param('id') courseCycleId: string,
+    @CurrentUser() user: User,
+  ) {
+    const content = await this.coursesService.getStudentCurrentCycleContent(
+      courseCycleId,
+      user.id,
+    );
+    return plainToInstance(StudentCurrentCycleContentResponseDto, content, {
+      excludeExtraneousValues: true,
+    });
+  }
+
+  @Get('cycle/:id/previous-cycles')
+  @Roles(ROLE_CODES.STUDENT)
+  @ResponseMessage('Ciclos anteriores del curso obtenidos exitosamente')
+  async getPreviousCyclesForStudent(
+    @Param('id') courseCycleId: string,
+    @CurrentUser() user: User,
+  ) {
+    const cycles = await this.coursesService.getStudentPreviousCycles(
+      courseCycleId,
+      user.id,
+    );
+    return plainToInstance(StudentPreviousCycleListResponseDto, cycles, {
+      excludeExtraneousValues: true,
+    });
+  }
+
+  @Get('cycle/:id/previous-cycles/:cycleCode/content')
+  @Roles(ROLE_CODES.STUDENT)
+  @ResponseMessage(
+    'Contenido del ciclo anterior del curso obtenido exitosamente',
+  )
+  async getPreviousCycleContentForStudent(
+    @Param('id') courseCycleId: string,
+    @Param('cycleCode') cycleCode: string,
+    @CurrentUser() user: User,
+  ) {
+    const content = await this.coursesService.getStudentPreviousCycleContent(
+      courseCycleId,
+      cycleCode,
+      user.id,
+    );
+    return plainToInstance(StudentPreviousCycleContentResponseDto, content, {
       excludeExtraneousValues: true,
     });
   }
@@ -148,6 +207,16 @@ export class CoursesController {
   async findAll() {
     const courses = await this.coursesService.findAllCourses();
     return plainToInstance(CourseResponseDto, courses, {
+      excludeExtraneousValues: true,
+    });
+  }
+
+  @Get('course-cycles')
+  @Roles(ROLE_CODES.ADMIN, ROLE_CODES.SUPER_ADMIN)
+  @ResponseMessage('Curso-ciclos obtenidos exitosamente')
+  async findAllCourseCycles(@Query() query: AdminCourseCycleListQueryDto) {
+    const data = await this.coursesService.findAdminCourseCycles(query);
+    return plainToInstance(AdminCourseCycleListResponseDto, data, {
       excludeExtraneousValues: true,
     });
   }

@@ -20,7 +20,11 @@ describe('E2E: Courses Professors (Profesores por Curso)', () => {
   let admin: { user: User; token: string };
   let professor1: { user: User; token: string };
   let professor2: { user: User; token: string };
+  let professor3: { user: User; token: string };
+  let inactiveProfessor: { user: User; token: string };
+  let student: { user: User; token: string };
   let courseCycle: CourseCycle;
+  let assignmentCourseCycle: CourseCycle;
 
   const now = new Date();
   const formatDate = (d: Date) => d.toISOString().split('T')[0];
@@ -74,6 +78,18 @@ describe('E2E: Courses Professors (Profesores por Curso)', () => {
       TestSeeder.generateUniqueEmail('prof2_cp'),
       [ROLE_CODES.PROFESSOR],
     );
+    professor3 = await seeder.createAuthenticatedUser(
+      TestSeeder.generateUniqueEmail('prof3_cp'),
+      [ROLE_CODES.PROFESSOR],
+    );
+    inactiveProfessor = await seeder.createAuthenticatedUser(
+      TestSeeder.generateUniqueEmail('prof_inactive_cp'),
+      [ROLE_CODES.PROFESSOR],
+    );
+    student = await seeder.createAuthenticatedUser(
+      TestSeeder.generateUniqueEmail('student_cp'),
+      [ROLE_CODES.STUDENT],
+    );
 
     const cycle = await seeder.createCycle(
       `CYCLE-CP-${Date.now()}`,
@@ -82,21 +98,72 @@ describe('E2E: Courses Professors (Profesores por Curso)', () => {
     );
     const course = await seeder.createCourse(
       `COURSE-CP-${Date.now()}`,
-      'Física Moderna',
+      'Fisica Moderna',
     );
     courseCycle = await seeder.linkCourseCycle(course.id, cycle.id);
 
-    // Asignar profesores al curso
+    const assignmentCourse = await seeder.createCourse(
+      `COURSE-CP-ASG-${Date.now()}`,
+      'Algebra Discreta',
+    );
+    assignmentCourseCycle = await seeder.linkCourseCycle(
+      assignmentCourse.id,
+      cycle.id,
+    );
+
     await dataSource.query(
       'INSERT INTO course_cycle_professor (course_cycle_id, professor_user_id, assigned_at) VALUES (?, ?, NOW()), (?, ?, NOW())',
       [courseCycle.id, professor1.user.id, courseCycle.id, professor2.user.id],
     );
+
+    await dataSource.query('UPDATE user SET is_active = 0 WHERE id = ?', [
+      inactiveProfessor.user.id,
+    ]);
 
     await cacheService.invalidateGroup('*');
   });
 
   afterAll(async () => {
     await app.close();
+  });
+
+  describe('POST /api/v1/courses/cycle/:id/professors', () => {
+    it('debe permitir asignar un profesor activo al curso/ciclo', async () => {
+      await request(app.getHttpServer())
+        .post(`/api/v1/courses/cycle/${assignmentCourseCycle.id}/professors`)
+        .set('Authorization', `Bearer ${admin.token}`)
+        .send({ professorUserId: professor3.user.id })
+        .expect(201);
+
+      const rows = await dataSource.query<
+        Array<{ professor_user_id: string; revoked_at: Date | null }>
+      >(
+        `SELECT professor_user_id, revoked_at
+         FROM course_cycle_professor
+         WHERE course_cycle_id = ? AND professor_user_id = ?`,
+        [assignmentCourseCycle.id, professor3.user.id],
+      );
+
+      expect(rows).toHaveLength(1);
+      expect(rows[0].professor_user_id).toBe(professor3.user.id);
+      expect(rows[0].revoked_at).toBeNull();
+    });
+
+    it('debe rechazar asignacion cuando el usuario no tiene rol PROFESSOR', async () => {
+      await request(app.getHttpServer())
+        .post(`/api/v1/courses/cycle/${assignmentCourseCycle.id}/professors`)
+        .set('Authorization', `Bearer ${admin.token}`)
+        .send({ professorUserId: student.user.id })
+        .expect(400);
+    });
+
+    it('debe rechazar asignacion cuando el profesor esta inactivo', async () => {
+      await request(app.getHttpServer())
+        .post(`/api/v1/courses/cycle/${assignmentCourseCycle.id}/professors`)
+        .set('Authorization', `Bearer ${admin.token}`)
+        .send({ professorUserId: inactiveProfessor.user.id })
+        .expect(400);
+    });
   });
 
   describe('GET /api/v1/courses/cycle/:id/professors', () => {
@@ -116,33 +183,28 @@ describe('E2E: Courses Professors (Profesores por Curso)', () => {
       );
     });
 
-    it('debe reflejar el baneo de un profesor de forma inmediata (Integridad + Caché)', async () => {
-      // 1. Verificar que está en caché (llamando de nuevo)
+    it('debe reflejar el baneo de un profesor de forma inmediata (Integridad + Cache)', async () => {
       await request(app.getHttpServer())
         .get(`/api/v1/courses/cycle/${courseCycle.id}/professors`)
         .set('Authorization', `Bearer ${admin.token}`)
         .expect(200);
 
-      // 2. Banear al profesor 2 vía API
       await request(app.getHttpServer())
         .patch(`/api/v1/users/${professor2.user.id}`)
         .set('Authorization', `Bearer ${admin.token}`)
         .send({ isActive: false })
         .expect(200);
 
-      // 3. Consultar la lista de nuevo
       const response = await request(app.getHttpServer())
         .get(`/api/v1/courses/cycle/${courseCycle.id}/professors`)
         .set('Authorization', `Bearer ${professor1.token}`)
         .expect(200);
 
-      // El profesor 2 ya no debe estar en la lista
       expect(response.body.data).toHaveLength(1);
       expect(response.body.data[0].id).toBe(professor1.user.id);
     });
 
-    it('debe reflejar la revocación de un profesor del curso', async () => {
-      // Revocar al profesor 1 del curso
+    it('debe reflejar la revocacion de un profesor del curso', async () => {
       await request(app.getHttpServer())
         .delete(
           `/api/v1/courses/cycle/${courseCycle.id}/professors/${professor1.user.id}`,
@@ -150,22 +212,15 @@ describe('E2E: Courses Professors (Profesores por Curso)', () => {
         .set('Authorization', `Bearer ${admin.token}`)
         .expect(204);
 
-      // Consultar la lista
       const response = await request(app.getHttpServer())
         .get(`/api/v1/courses/cycle/${courseCycle.id}/professors`)
         .set('Authorization', `Bearer ${admin.token}`)
         .expect(200);
 
-      // Lista vacía (prof 1 revocado, prof 2 baneado)
       expect(response.body.data).toHaveLength(0);
     });
 
     it('debe denegar acceso si el usuario no tiene rol adecuado', async () => {
-      const student = await seeder.createAuthenticatedUser(
-        TestSeeder.generateUniqueEmail('student_cp'),
-        [ROLE_CODES.STUDENT],
-      );
-
       await request(app.getHttpServer())
         .get(`/api/v1/courses/cycle/${courseCycle.id}/professors`)
         .set('Authorization', `Bearer ${student.token}`)

@@ -274,9 +274,24 @@ describe('E2E: Class Events (Eventos de Clase)', () => {
       expect(res.body.data.length).toBeGreaterThan(0);
     });
 
-    it('debe invalidar el caché del calendario cuando se actualiza un evento', async () => {
+    it('debe invalidar el cachÃ© del calendario cuando se actualiza un evento', async () => {
       const start = formatDate(yesterday);
       const end = formatDate(nextWeek);
+
+      const createRes = await request(app.getHttpServer())
+        .post('/api/v1/class-events')
+        .set('Authorization', `Bearer ${professor.token}`)
+        .send({
+          evaluationId: evaluation.id,
+          sessionNumber: 99,
+          title: 'Evento Cache',
+          topic: 'Cache',
+          startDatetime: tomorrow.toISOString(),
+          endDatetime: new Date(tomorrow.getTime() + 3600000).toISOString(),
+          liveMeetingUrl: 'https://zoom.us/cache',
+        })
+        .expect(201);
+      const cacheEventId = createRes.body.data.id;
 
       await request(app.getHttpServer())
         .get('/api/v1/class-events/my-schedule')
@@ -284,9 +299,9 @@ describe('E2E: Class Events (Eventos de Clase)', () => {
         .set('Authorization', `Bearer ${professor.token}`)
         .expect(200);
 
-      const newTitle = 'Caché Limpio';
+      const newTitle = 'CachÃ© Limpio';
       await request(app.getHttpServer())
-        .patch(`/api/v1/class-events/${createdEventId}`)
+        .patch(`/api/v1/class-events/${cacheEventId}`)
         .set('Authorization', `Bearer ${professor.token}`)
         .send({ title: newTitle })
         .expect(200);
@@ -297,7 +312,8 @@ describe('E2E: Class Events (Eventos de Clase)', () => {
         .set('Authorization', `Bearer ${professor.token}`)
         .expect(200);
 
-      const event = res.body.data.find((e: any) => e.id === createdEventId);
+      const event = res.body.data.find((e: any) => e.id === cacheEventId);
+      expect(event).toBeDefined();
       expect(event.title).toBe(newTitle);
     });
   });

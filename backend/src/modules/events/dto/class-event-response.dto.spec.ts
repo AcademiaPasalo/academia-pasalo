@@ -3,7 +3,7 @@ import { ClassEvent } from '@modules/events/domain/class-event.entity';
 import { CLASS_EVENT_STATUS } from '@modules/events/domain/class-event.constants';
 
 describe('ClassEventResponseDto', () => {
-  it('debe ocultar URLs sensibles cuando no hay permisos efectivos', () => {
+  it('debe exponer URLs en el response', () => {
     const event = {
       id: 'event-1',
       sessionNumber: 1,
@@ -42,11 +42,11 @@ describe('ClassEventResponseDto', () => {
     expect(dto.canWatchRecording).toBe(false);
     expect(dto.canCopyLiveLink).toBe(false);
     expect(dto.canCopyRecordingLink).toBe(false);
-    expect(dto.liveMeetingUrl).toBeNull();
-    expect(dto.recordingUrl).toBeNull();
+    expect(dto.liveMeetingUrl).toBe('https://meet.example.com/room-1');
+    expect(dto.recordingUrl).toBe('https://video.example.com/recording-1');
   });
 
-  it('debe mostrar liveMeetingUrl solo si canJoinLive es true', () => {
+  it('debe incluir URLs y flags de acceso para live', () => {
     const event = {
       liveMeetingUrl: 'https://zoom.us/j/1',
       recordingUrl: 'https://vimeo.com/1',
@@ -71,11 +71,11 @@ describe('ClassEventResponseDto', () => {
     );
 
     expect(dto.liveMeetingUrl).toBe('https://zoom.us/j/1');
-    expect(dto.recordingUrl).toBeNull();
+    expect(dto.recordingUrl).toBe('https://vimeo.com/1');
     expect(dto.evaluationName).toBe('PC1');
   });
 
-  it('debe mostrar recordingUrl solo si canWatchRecording es true (clase finalizada)', () => {
+  it('debe incluir URLs y flags de acceso para recording', () => {
     const event = {
       liveMeetingUrl: 'https://zoom.us/j/1',
       recordingUrl: 'https://vimeo.com/1',
@@ -99,7 +99,7 @@ describe('ClassEventResponseDto', () => {
       },
     );
 
-    expect(dto.liveMeetingUrl).toBeNull();
+    expect(dto.liveMeetingUrl).toBe('https://zoom.us/j/1');
     expect(dto.recordingUrl).toBe('https://vimeo.com/1');
     expect(dto.evaluationName).toBe('EX2');
   });

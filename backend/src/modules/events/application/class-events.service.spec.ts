@@ -218,7 +218,7 @@ describe('ClassEventsService', () => {
       ).rejects.toThrow('El horario ya está ocupado por la sesión 2 de PC1');
     });
 
-    it('debe usar cache para estado de grabacion si ya existe', async () => {
+    it('debe usar cache para estado de grabación si ya existe', async () => {
       cacheService.get.mockImplementation(async (key: string) => {
         if (key === 'cache:class-event-recording-status:code:NOT_AVAILABLE') {
           return '1';
@@ -382,7 +382,7 @@ describe('ClassEventsService', () => {
   });
 
   describe('canWatchRecording', () => {
-    it('debe permitir ver grabacion finalizada con acceso', async () => {
+    it('debe permitir ver grabación finalizada con acceso', async () => {
       const now = Date.now();
       const event = {
         ...mockEvent,
