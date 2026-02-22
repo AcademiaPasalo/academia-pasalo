@@ -15,12 +15,14 @@ services:
       - frontend
     networks:
       - academia-network
+
   certbot:
     image: certbot/certbot:latest
     container_name: academia-pasalo-certbot
     volumes:
       - /home/ubuntu/academia-pasalo/letsencrypt:/etc/letsencrypt
       - /home/ubuntu/academia-pasalo/certbot/www:/var/www/certbot
+
   backend:
     image: ${DOCKER_USERNAME}/academia-pasalo-backend:latest
     container_name: academia-pasalo-backend
@@ -41,9 +43,12 @@ services:
       - GOOGLE_REDIRECT_URI=${GOOGLE_REDIRECT_URI}
       - MAXMIND_LICENSE_KEY=${MAXMIND_LICENSE_KEY}
       - CORS_ORIGINS=${CORS_ORIGINS}
+      - GOOGLE_APPLICATION_CREDENTIALS=/opt/academia/secrets/google-drive-sa.json
       - API_PREFIX=api/v1
       - NODE_ENV=production
       - PORT=3001
+    volumes:
+      - /opt/academia/secrets/google-drive-sa.json:/opt/academia/secrets/google-drive-sa.json:ro
     depends_on:
       redis:
         condition: service_healthy
@@ -82,6 +87,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+
 networks:
   academia-network:
     driver: bridge
