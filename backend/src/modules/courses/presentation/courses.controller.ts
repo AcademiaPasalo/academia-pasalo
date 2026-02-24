@@ -39,6 +39,7 @@ import { ResponseMessage } from '@common/decorators/response-message.decorator';
 import { plainToInstance } from 'class-transformer';
 import { ROLE_CODES } from '@common/constants/role-codes.constants';
 import { Patch } from '@nestjs/common';
+import type { UserWithSession } from '@modules/auth/strategies/jwt.strategy';
 
 @Controller('courses')
 @Auth()
@@ -55,6 +56,7 @@ export class CoursesController {
     const content = await this.coursesService.getCourseContent(
       courseCycleId,
       user.id,
+      (user as UserWithSession).activeRole,
     );
     return plainToInstance(CourseContentResponseDto, content, {
       excludeExtraneousValues: true,

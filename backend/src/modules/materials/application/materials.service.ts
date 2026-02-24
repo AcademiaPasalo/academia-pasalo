@@ -19,6 +19,7 @@ import { DeletionRequestRepository } from '@modules/materials/infrastructure/del
 import { CourseCycleProfessorRepository } from '@modules/courses/infrastructure/course-cycle-professor.repository';
 import { ClassEventRepository } from '@modules/events/infrastructure/class-event.repository';
 import { CreateMaterialFolderDto } from '@modules/materials/dto/create-material-folder.dto';
+import { CreateFolderTemplateDto } from '@modules/materials/dto/create-folder-template.dto';
 import { UploadMaterialDto } from '@modules/materials/dto/upload-material.dto';
 import { RequestDeletionDto } from '@modules/materials/dto/request-deletion.dto';
 import { MaterialFolder } from '@modules/materials/domain/material-folder.entity';
@@ -39,6 +40,7 @@ import {
   ADMIN_ROLE_CODES,
   ROLE_CODES,
 } from '@common/constants/role-codes.constants';
+import { ACCESS_MESSAGES } from '@common/constants/access-messages.constants';
 import { MySqlErrorCode } from '@common/interfaces/database-error.interface';
 import {
   FOLDER_STATUS_CODES,
@@ -110,6 +112,86 @@ export class MaterialsService {
     }
 
     return folder;
+  }
+
+  async createFolderTemplate(
+    user: UserWithSession,
+    dto: CreateFolderTemplateDto,
+  ): Promise<{ rootFolder: MaterialFolder; subFolders: MaterialFolder[] }> {
+    await this.assertCanManageEvaluation(user, dto.evaluationId);
+
+    const activeStatus = await this.getActiveFolderStatus();
+    const now = new Date();
+    const { visibleFrom, visibleUntil } = this.parseVisibilityRange(
+      dto.visibleFrom,
+      dto.visibleUntil,
+    );
+
+    const rootName = dto.rootName.trim();
+    if (!rootName) {
+      throw new BadRequestException(
+        ACCESS_MESSAGES.MATERIAL_TEMPLATE_EMPTY_ROOT_NAME,
+      );
+    }
+
+    const normalizedSubfolderNames = dto.subfolderNames.map((name) =>
+      name.trim(),
+    );
+    if (normalizedSubfolderNames.some((name) => !name)) {
+      throw new BadRequestException(
+        ACCESS_MESSAGES.MATERIAL_TEMPLATE_EMPTY_CHILD_NAME,
+      );
+    }
+
+    const uniqueSubfolderNames = new Set(
+      normalizedSubfolderNames.map((name) => name.toLowerCase()),
+    );
+    if (uniqueSubfolderNames.size !== normalizedSubfolderNames.length) {
+      throw new BadRequestException(
+        ACCESS_MESSAGES.MATERIAL_TEMPLATE_DUPLICATE_CHILD_NAME,
+      );
+    }
+
+    const result = await this.dataSource.transaction(async (manager) => {
+      const rootFolder = manager.create(MaterialFolder, {
+        evaluationId: dto.evaluationId,
+        parentFolderId: null,
+        folderStatusId: activeStatus.id,
+        name: rootName,
+        visibleFrom,
+        visibleUntil,
+        createdById: user.id,
+        createdAt: now,
+        updatedAt: now,
+      });
+      const savedRootFolder = await manager.save(rootFolder);
+
+      const subFolders: MaterialFolder[] = [];
+      for (const subfolderName of normalizedSubfolderNames) {
+        const subFolder = manager.create(MaterialFolder, {
+          evaluationId: dto.evaluationId,
+          parentFolderId: savedRootFolder.id,
+          folderStatusId: activeStatus.id,
+          name: subfolderName,
+          visibleFrom,
+          visibleUntil,
+          createdById: user.id,
+          createdAt: now,
+          updatedAt: now,
+        });
+        subFolders.push(await manager.save(subFolder));
+      }
+
+      return {
+        rootFolder: savedRootFolder,
+        subFolders,
+      };
+    });
+
+    await this.invalidateRootCache(dto.evaluationId);
+    await this.invalidateFolderCache(result.rootFolder.id);
+
+    return result;
   }
 
   async uploadMaterial(
@@ -219,7 +301,7 @@ export class MaterialsService {
               } catch (cleanupError) {
                 this.logger.warn({
                   message:
-                    'No se pudo limpiar archivo huÃ©rfano tras colisiÃ³n de deduplicaciÃ³n',
+                    'No se pudo limpiar archivo huérfano tras colisión de deduplicación',
                   storageKey: savedResource.storageKey,
                   error:
                     cleanupError instanceof Error
@@ -315,14 +397,14 @@ export class MaterialsService {
 
     if (!allowedMimeTypes.includes(file.mimetype)) {
       throw new BadRequestException(
-        `Tipo de archivo no permitido. Solo se aceptan documentos educativos (PDF, imÃ¡genes, Office).`,
+        `Tipo de archivo no permitido. Solo se aceptan documentos educativos (PDF, imágenes, Office).`,
       );
     }
 
     if (file.mimetype === 'application/pdf') {
       const pdfMagic = file.buffer.subarray(0, 4).toString('hex');
       if (pdfMagic !== technicalSettings.uploads.materials.pdfMagicHeaderHex) {
-        throw new BadRequestException('El archivo no es un PDF vÃ¡lido');
+        throw new BadRequestException('El archivo no es un PDF válido');
       }
     }
 
@@ -411,7 +493,7 @@ export class MaterialsService {
               } catch (cleanupError) {
                 this.logger.warn({
                   message:
-                    'No se pudo limpiar archivo huÃ©rfano tras colisiÃ³n de deduplicaciÃ³n',
+                    'No se pudo limpiar archivo huérfano tras colisión de deduplicación',
                   storageKey: savedResource.storageKey,
                   error:
                     cleanupError instanceof Error
@@ -479,7 +561,7 @@ export class MaterialsService {
 
         if (!savedVersion) {
           throw new InternalServerErrorException(
-            'No se pudo crear una nueva version del material',
+            'No se pudo crear una nueva versión del material',
           );
         }
 
@@ -535,7 +617,12 @@ export class MaterialsService {
   async getFolderContents(
     user: UserWithSession,
     folderId: string,
-  ): Promise<{ folders: MaterialFolder[]; materials: Material[] }> {
+  ): Promise<{
+    folders: MaterialFolder[];
+    materials: Material[];
+    totalMaterials: number;
+    subfolderMaterialCount: Record<string, number>;
+  }> {
     const folder = await this.folderRepository.findById(folderId);
     if (!folder) throw new NotFoundException('Carpeta no encontrada');
 
@@ -558,11 +645,35 @@ export class MaterialsService {
       await this.cacheService.set(cacheKey, contents, this.CACHE_TTL);
     }
 
-    return this.applyVisibilityFilter(
+    const visibleContents = this.applyVisibilityFilter(
       user,
       contents.folders,
       contents.materials,
     );
+
+    const materialStatus = await this.getActiveMaterialStatus();
+    const isStudent = user.activeRole === ROLE_CODES.STUDENT;
+    const now = isStudent ? new Date() : undefined;
+
+    const subfolderMaterialCountRaw =
+      await this.materialRepository.countByFolderIds(
+        visibleContents.folders.map((f) => f.id),
+        materialStatus.id,
+        now,
+      );
+    const subfolderMaterialCount = visibleContents.folders.reduce<
+      Record<string, number>
+    >((acc, folderItem) => {
+      acc[folderItem.id] = subfolderMaterialCountRaw[folderItem.id] ?? 0;
+      return acc;
+    }, {});
+
+    return {
+      folders: visibleContents.folders,
+      materials: visibleContents.materials,
+      totalMaterials: visibleContents.materials.length,
+      subfolderMaterialCount,
+    };
   }
 
   async getClassEventMaterials(
@@ -572,7 +683,7 @@ export class MaterialsService {
     const classEvent =
       await this.classEventRepository.findByIdSimple(classEventId);
     if (!classEvent) {
-      throw new NotFoundException('Sesion de clase no encontrada');
+      throw new NotFoundException('Sesión de clase no encontrada');
     }
 
     await this.checkAuthorizedAccess(user, classEvent.evaluationId);
@@ -686,7 +797,7 @@ export class MaterialsService {
 
     if (startDate && endDate && getEpoch(startDate) > getEpoch(endDate)) {
       throw new BadRequestException(
-        'Rango de visibilidad invÃ¡lido: visibleFrom no puede ser mayor que visibleUntil',
+        'Rango de visibilidad inválido: visibleFrom no puede ser mayor que visibleUntil',
       );
     }
 
@@ -858,6 +969,11 @@ export class MaterialsService {
         'Inconsistencia: La carpeta padre no pertenece a la misma evaluación',
       );
     }
+    if (parent && parent.parentFolderId) {
+      throw new BadRequestException(
+        ACCESS_MESSAGES.MATERIAL_FOLDER_DEPTH_EXCEEDED,
+      );
+    }
     return parent;
   }
 
@@ -871,12 +987,12 @@ export class MaterialsService {
       manager,
     );
     if (!classEvent) {
-      throw new NotFoundException('Sesion de clase no encontrada');
+      throw new NotFoundException('Sesión de clase no encontrada');
     }
 
     if (classEvent.evaluationId !== evaluationId) {
       throw new BadRequestException(
-        'Inconsistencia: La sesion no pertenece a la misma evaluacion de la carpeta',
+        'Inconsistencia: La sesión no pertenece a la misma evaluación de la carpeta',
       );
     }
 

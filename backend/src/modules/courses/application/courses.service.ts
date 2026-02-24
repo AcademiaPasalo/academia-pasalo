@@ -53,6 +53,7 @@ import {
   StudentEvaluationLabel,
 } from '@modules/courses/domain/student-course.constants';
 import { ROLE_CODES } from '@common/constants/role-codes.constants';
+import { ACCESS_MESSAGES } from '@common/constants/access-messages.constants';
 
 type EvaluationWithAccess = Evaluation & {
   enrollmentEvaluations?: EnrollmentEvaluation[];
@@ -72,6 +73,8 @@ export class CoursesService {
     technicalSettings.cache.courses.courseContentCacheTtlSeconds;
   private readonly PROFESSOR_ASSIGNMENT_CACHE_TTL =
     technicalSettings.cache.courses.professorAssignmentCacheTtlSeconds;
+  private readonly COURSE_CYCLE_EXISTS_CACHE_TTL =
+    technicalSettings.cache.courses.courseCycleExistsCacheTtlSeconds;
 
   constructor(
     private readonly dataSource: DataSource,
@@ -231,7 +234,7 @@ export class CoursesService {
       );
     }
 
-    return await this.dataSource.transaction(async (manager) => {
+    const courseCycle = await this.dataSource.transaction(async (manager) => {
       const courseCycle = await this.courseCycleRepository.create(
         {
           courseId: course.id,
@@ -276,6 +279,12 @@ export class CoursesService {
 
       return courseCycle;
     });
+
+    await this.cacheService.invalidateGroup(
+      COURSE_CACHE_KEYS.GLOBAL_COURSE_CYCLE_EXISTS_GROUP,
+    );
+
+    return courseCycle;
   }
 
   async assignProfessorToCourseCycle(
@@ -372,6 +381,7 @@ export class CoursesService {
   async getCourseContent(
     courseCycleId: string,
     userId: string,
+    requesterActiveRole?: string,
   ): Promise<CourseContentResponseDto> {
     const cacheKey = COURSE_CACHE_KEYS.COURSE_CONTENT(courseCycleId, userId);
 
@@ -381,10 +391,7 @@ export class CoursesService {
     }>(cacheKey);
 
     if (!rawData) {
-      const cycle = await this.courseCycleRepository.findById(courseCycleId);
-      if (!cycle) {
-        throw new NotFoundException('Ciclo del curso no encontrado');
-      }
+      await this.assertCourseCycleExists(courseCycleId);
 
       const fullCycle =
         await this.courseCycleRepository.findFullById(courseCycleId);
@@ -400,6 +407,35 @@ export class CoursesService {
         evaluations: evaluations as EvaluationWithAccess[],
       };
       await this.cacheService.set(cacheKey, rawData, this.CONTENT_CACHE_TTL);
+    }
+
+    if (requesterActiveRole === ROLE_CODES.PROFESSOR) {
+      const assignmentCacheKey =
+        COURSE_CACHE_KEYS.PROFESSOR_ASSIGNMENT_COURSE_CYCLE(
+          courseCycleId,
+          userId,
+        );
+      const cachedIsAssigned =
+        await this.cacheService.get<boolean>(assignmentCacheKey);
+
+      const isAssigned =
+        cachedIsAssigned !== null
+          ? cachedIsAssigned
+          : await this.courseCycleProfessorRepository.isProfessorAssigned(
+              courseCycleId,
+              userId,
+            );
+      if (cachedIsAssigned === null) {
+        await this.cacheService.set(
+          assignmentCacheKey,
+          isAssigned,
+          this.PROFESSOR_ASSIGNMENT_CACHE_TTL,
+        );
+      }
+
+      if (!isAssigned) {
+        throw new ForbiddenException(ACCESS_MESSAGES.COURSE_CONTENT_FORBIDDEN);
+      }
     }
 
     const now = new Date();
@@ -457,6 +493,29 @@ export class CoursesService {
     };
   }
 
+  private async assertCourseCycleExists(courseCycleId: string): Promise<void> {
+    const existsKey = COURSE_CACHE_KEYS.COURSE_CYCLE_EXISTS(courseCycleId);
+    const cachedExists = await this.cacheService.get<boolean>(existsKey);
+    if (cachedExists !== null) {
+      if (!cachedExists) {
+        throw new NotFoundException('Ciclo del curso no encontrado');
+      }
+      return;
+    }
+
+    const cycle = await this.courseCycleRepository.findById(courseCycleId);
+    const exists = cycle !== null;
+    await this.cacheService.set(
+      existsKey,
+      exists,
+      this.COURSE_CYCLE_EXISTS_CACHE_TTL,
+    );
+
+    if (!exists) {
+      throw new NotFoundException('Ciclo del curso no encontrado');
+    }
+  }
+
   async getStudentCurrentCycleContent(
     courseCycleId: string,
     userId: string,
@@ -496,6 +555,7 @@ export class CoursesService {
 
         return {
           id: evaluation.id,
+          evaluationTypeCode: evaluation.evaluationType.code,
           shortName: this.buildEvaluationShortName(evaluation),
           fullName: this.buildEvaluationFullName(evaluation),
           label,
@@ -570,6 +630,7 @@ export class CoursesService {
       cycleCode: previousCycleCode,
       evaluations: evaluations.map((evaluation) => ({
         id: evaluation.id,
+        evaluationTypeCode: evaluation.evaluationType.code,
         shortName: this.buildEvaluationShortName(evaluation),
         fullName: this.buildEvaluationFullName(evaluation),
         label: this.hasActiveAccess(evaluation as EvaluationWithAccess)

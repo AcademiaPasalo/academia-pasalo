@@ -117,6 +117,7 @@ describe('MaterialsService', () => {
             findById: jest.fn(),
             findByFolderId: jest.fn(),
             findByClassEventId: jest.fn(),
+            countByFolderIds: jest.fn().mockResolvedValue({}),
           },
         },
         {
@@ -227,6 +228,71 @@ describe('MaterialsService', () => {
         }),
       ).rejects.toThrow('Rango de visibilidad inv');
     });
+
+    it('should reject creating a third-level folder (depth > 2)', async () => {
+      catalogRepo.findFolderStatusByCode.mockResolvedValue({
+        id: '1',
+      } as FolderStatus);
+      folderRepo.findById.mockResolvedValue(
+        mockFolder('child-1', '100', 'root-1'),
+      );
+
+      await expect(
+        service.createFolder(mockProfessor, {
+          evaluationId: '100',
+          parentFolderId: 'child-1',
+          name: 'Grandchild Folder',
+        }),
+      ).rejects.toThrow('No se permite crear subcarpetas');
+    });
+  });
+
+  describe('createFolderTemplate', () => {
+    it('should create root and first-level subfolders successfully', async () => {
+      catalogRepo.findFolderStatusByCode.mockResolvedValue({
+        id: '1',
+      } as FolderStatus);
+
+      const result = await service.createFolderTemplate(mockProfessor, {
+        evaluationId: '100',
+        rootName: 'Curso 2026-1',
+        subfolderNames: ['PC1', 'PC2', 'EX1'],
+      });
+
+      expect(result.rootFolder).toBeDefined();
+      expect(result.subFolders).toHaveLength(3);
+      expect(cacheService.del).toHaveBeenCalledWith(
+        MATERIAL_CACHE_KEYS.ROOTS('100'),
+      );
+    });
+
+    it('should reject template creation when subfolder names are duplicated', async () => {
+      catalogRepo.findFolderStatusByCode.mockResolvedValue({
+        id: '1',
+      } as FolderStatus);
+
+      await expect(
+        service.createFolderTemplate(mockProfessor, {
+          evaluationId: '100',
+          rootName: 'Curso 2026-1',
+          subfolderNames: ['PC1', 'pc1'],
+        }),
+      ).rejects.toThrow('no pueden repetirse');
+    });
+
+    it('should reject template creation when any subfolder name is empty', async () => {
+      catalogRepo.findFolderStatusByCode.mockResolvedValue({
+        id: '1',
+      } as FolderStatus);
+
+      await expect(
+        service.createFolderTemplate(mockProfessor, {
+          evaluationId: '100',
+          rootName: 'Curso 2026-1',
+          subfolderNames: ['PC1', '   '],
+        }),
+      ).rejects.toThrow('deben tener contenido');
+    });
   });
 
   describe('uploadMaterial', () => {
@@ -285,7 +351,7 @@ describe('MaterialsService', () => {
           file,
         ),
       ).rejects.toThrow(
-        'Inconsistencia: La sesion no pertenece a la misma evaluacion de la carpeta',
+        'Inconsistencia: La sesión no pertenece a la misma evaluación de la carpeta',
       );
     });
 
@@ -666,6 +732,34 @@ describe('MaterialsService', () => {
       expect(result).toBeDefined();
       expect(materialRepo.findByFolderId).toHaveBeenCalledWith('folder-1', '1');
     });
+
+    it('should return subfolder material count with explicit zeros', async () => {
+      folderRepo.findById.mockResolvedValue(mockFolder('folder-1', '100'));
+      catalogRepo.findFolderStatusByCode.mockResolvedValue({
+        id: '1',
+      } as FolderStatus);
+      catalogRepo.findMaterialStatusByCode.mockResolvedValue({
+        id: '1',
+      } as MaterialStatus);
+      folderRepo.findSubFolders.mockResolvedValue([
+        mockFolder('child-a', '100', 'folder-1'),
+        mockFolder('child-b', '100', 'folder-1'),
+      ]);
+      materialRepo.findByFolderId.mockResolvedValue([]);
+      (materialRepo.countByFolderIds as jest.Mock).mockResolvedValue({
+        'child-a': 2,
+      });
+      (
+        courseCycleProfessorRepo.isProfessorAssignedToEvaluation as jest.Mock
+      ).mockResolvedValue(true);
+
+      const result = await service.getFolderContents(mockProfessor, 'folder-1');
+
+      expect(result.subfolderMaterialCount).toEqual({
+        'child-a': 2,
+        'child-b': 0,
+      });
+    });
   });
 
   describe('requestDeletion', () => {
@@ -714,7 +808,7 @@ describe('MaterialsService', () => {
 
       await expect(
         service.getClassEventMaterials(mockStudent, '999'),
-      ).rejects.toThrow('Sesion de clase no encontrada');
+      ).rejects.toThrow('Sesión de clase no encontrada');
     });
   });
 

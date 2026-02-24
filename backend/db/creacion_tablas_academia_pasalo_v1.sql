@@ -454,6 +454,9 @@ ON course_cycle(course_id, academic_cycle_id);
 CREATE INDEX idx_evaluation_course_cycle
 ON evaluation(course_cycle_id);
 
+CREATE INDEX idx_course_cycle_professor_user_active
+ON course_cycle_professor(professor_user_id, revoked_at, course_cycle_id);
+
 CREATE INDEX idx_evaluation_type_number
 ON evaluation(evaluation_type_id, number);
 
@@ -474,6 +477,9 @@ ON material(class_event_id);
 
 CREATE INDEX idx_material_status
 ON material(material_status_id);
+
+CREATE INDEX idx_material_folder_status
+ON material(material_folder_id, material_status_id);
 
 CREATE INDEX idx_material_visibility
 ON material(visible_from, visible_until);

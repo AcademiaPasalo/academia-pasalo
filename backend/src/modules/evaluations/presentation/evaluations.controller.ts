@@ -11,8 +11,11 @@ import { EvaluationsService } from '@modules/evaluations/application/evaluations
 import { CreateEvaluationDto } from '@modules/evaluations/dto/create-evaluation.dto';
 import { Auth } from '@common/decorators/auth.decorator';
 import { Roles } from '@common/decorators/roles.decorator';
+import { CurrentUser } from '@common/decorators/current-user.decorator';
 import { ResponseMessage } from '@common/decorators/response-message.decorator';
 import { ROLE_CODES } from '@common/constants/role-codes.constants';
+import { User } from '@modules/users/domain/user.entity';
+import type { UserWithSession } from '@modules/auth/strategies/jwt.strategy';
 
 @Controller('evaluations')
 @Auth()
@@ -30,7 +33,11 @@ export class EvaluationsController {
   @Get('course-cycle/:id')
   @Roles(ROLE_CODES.PROFESSOR, ROLE_CODES.ADMIN, ROLE_CODES.SUPER_ADMIN)
   @ResponseMessage('Evaluaciones obtenidas exitosamente')
-  async findByCourseCycle(@Param('id') id: string) {
-    return await this.evaluationsService.findByCourseCycle(id);
+  async findByCourseCycle(@Param('id') id: string, @CurrentUser() user: User) {
+    return await this.evaluationsService.findByCourseCycle(
+      id,
+      user.id,
+      (user as UserWithSession).activeRole,
+    );
   }
 }

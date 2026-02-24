@@ -168,6 +168,8 @@ describe('CoursesService student views', () => {
     expect(result.evaluations[3].label).toBe(STUDENT_EVALUATION_LABELS.LOCKED);
     expect(result.evaluations[0].shortName).toBe('PC1');
     expect(result.evaluations[0].fullName).toBe('Practica Calificada 1');
+    expect(result.evaluations[0].evaluationTypeCode).toBe('PC');
+    expect(result.evaluations[3].evaluationTypeCode).toBe('EX');
   });
 
   it('should hide previous-cycles tab for PARTIAL without previous access', async () => {
@@ -260,6 +262,8 @@ describe('CoursesService student views', () => {
       STUDENT_EVALUATION_LABELS.ARCHIVED,
     );
     expect(result.evaluations[1].label).toBe(STUDENT_EVALUATION_LABELS.LOCKED);
+    expect(result.evaluations[0].evaluationTypeCode).toBe('PC');
+    expect(result.evaluations[1].evaluationTypeCode).toBe('PC');
   });
 
   it('should throw ForbiddenException when user has no active enrollment', async () => {

@@ -15,6 +15,7 @@ import type { Response } from 'express';
 import { MaterialsService } from '@modules/materials/application/materials.service';
 import { UploadMaterialDto } from '@modules/materials/dto/upload-material.dto';
 import { CreateMaterialFolderDto } from '@modules/materials/dto/create-material-folder.dto';
+import { CreateFolderTemplateDto } from '@modules/materials/dto/create-folder-template.dto';
 import { RequestDeletionDto } from '@modules/materials/dto/request-deletion.dto';
 import { Auth } from '@common/decorators/auth.decorator';
 import { Roles } from '@common/decorators/roles.decorator';
@@ -37,6 +38,17 @@ export class MaterialsController {
     @Body() dto: CreateMaterialFolderDto,
   ) {
     return await this.materialsService.createFolder(user, dto);
+  }
+
+  @Post('folders/template')
+  @Roles(ROLE_CODES.ADMIN, ROLE_CODES.PROFESSOR, ROLE_CODES.SUPER_ADMIN)
+  @HttpCode(HttpStatus.CREATED)
+  @ResponseMessage('Estructura de carpetas creada exitosamente')
+  async createFolderTemplate(
+    @CurrentUser() user: UserWithSession,
+    @Body() dto: CreateFolderTemplateDto,
+  ) {
+    return await this.materialsService.createFolderTemplate(user, dto);
   }
 
   @Post()

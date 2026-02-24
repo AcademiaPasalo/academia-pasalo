@@ -6,6 +6,9 @@ export class StudentEvaluationCardDto {
   id: string;
 
   @Expose()
+  evaluationTypeCode: string;
+
+  @Expose()
   shortName: string;
 
   @Expose()

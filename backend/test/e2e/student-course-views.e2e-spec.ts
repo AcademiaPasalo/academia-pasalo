@@ -213,16 +213,29 @@ describe('E2E: Student course views', () => {
     expect(res.body.data.canViewPreviousCycles).toBe(false);
 
     const byId = new Map(
-      res.body.data.evaluations.map((ev: { id: string; label: string }) => [
-        ev.id,
-        ev.label,
-      ]),
+      res.body.data.evaluations.map(
+        (ev: { id: string; label: string; evaluationTypeCode: string }) => [
+          ev.id,
+          { label: ev.label, evaluationTypeCode: ev.evaluationTypeCode },
+        ],
+      ),
     );
 
-    expect(byId.get(currentEvalPastId)).toBe('Completado');
-    expect(byId.get(currentEvalInProgressId)).toBe('En curso');
-    expect(byId.get(currentEvalFutureOpenId)).toBe('Próximamente');
-    expect(byId.get(currentEvalFutureLockedId)).toBe('Bloqueado');
+    expect(byId.get(currentEvalPastId)).toMatchObject({
+      label: 'Completado',
+      evaluationTypeCode: 'PC',
+    });
+    expect(byId.get(currentEvalInProgressId)).toMatchObject({
+      label: 'En curso',
+      evaluationTypeCode: 'PC',
+    });
+    expect(byId.get(currentEvalFutureOpenId)).toMatchObject({
+      evaluationTypeCode: 'PC',
+    });
+    expect(byId.get(currentEvalFutureLockedId)).toMatchObject({
+      label: 'Bloqueado',
+      evaluationTypeCode: 'EX',
+    });
   });
 
   it('partial sin acceso previo: no puede abrir ciclos anteriores (403)', async () => {
@@ -259,13 +272,22 @@ describe('E2E: Student course views', () => {
       .expect(200);
 
     const byId = new Map(
-      res.body.data.evaluations.map((ev: { id: string; label: string }) => [
-        ev.id,
-        ev.label,
-      ]),
+      res.body.data.evaluations.map(
+        (ev: { id: string; label: string; evaluationTypeCode: string }) => [
+          ev.id,
+          { label: ev.label, evaluationTypeCode: ev.evaluationTypeCode },
+        ],
+      ),
     );
-    expect(byId.get(previousEvalArchivedId)).toBe('Archivado');
-    expect(byId.get(previousEvalLockedId)).toBe('Bloqueado');
+
+    expect(byId.get(previousEvalArchivedId)).toMatchObject({
+      label: 'Archivado',
+      evaluationTypeCode: 'PC',
+    });
+    expect(byId.get(previousEvalLockedId)).toMatchObject({
+      label: 'Bloqueado',
+      evaluationTypeCode: 'EX',
+    });
   });
 
   it('alumno sin matrícula no puede entrar al curso (403)', async () => {

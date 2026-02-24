@@ -8,6 +8,7 @@ import { ROLE_CODES } from '@common/constants/role-codes.constants';
 const mockMaterialsService = {
   uploadMaterial: jest.fn(),
   createFolder: jest.fn(),
+  createFolderTemplate: jest.fn(),
   getRootFolders: jest.fn(),
   getFolderContents: jest.fn(),
   getClassEventMaterials: jest.fn(),
@@ -50,6 +51,17 @@ describe('MaterialsController RBAC Security', () => {
       const roles = Reflect.getMetadata(
         'roles',
         materialsController.createFolder,
+      );
+      expect(roles).toBeDefined();
+      expect(roles).toContain(ROLE_CODES.PROFESSOR);
+      expect(roles).toContain(ROLE_CODES.ADMIN);
+      expect(roles).not.toContain(ROLE_CODES.STUDENT);
+    });
+
+    it('endpoint "createFolderTemplate" should restrict access to ADMIN, PROFESSOR, SUPER_ADMIN', () => {
+      const roles = Reflect.getMetadata(
+        'roles',
+        materialsController.createFolderTemplate,
       );
       expect(roles).toBeDefined();
       expect(roles).toContain(ROLE_CODES.PROFESSOR);

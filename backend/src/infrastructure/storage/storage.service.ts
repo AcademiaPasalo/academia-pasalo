@@ -54,7 +54,7 @@ export class StorageService implements OnModuleInit {
       storageProviderRaw !== STORAGE_PROVIDER_CODES.GDRIVE
     ) {
       throw new InternalServerErrorException(
-        `STORAGE_PROVIDER invalido: ${storageProviderRaw}`,
+        `STORAGE_PROVIDER inválido: ${storageProviderRaw}`,
       );
     }
     this.storageProvider = storageProviderRaw as StorageProviderCode;
@@ -171,7 +171,7 @@ export class StorageService implements OnModuleInit {
   private getGoogleAuth(): GoogleAuth {
     if (!this.googleDriveServiceAccountKeyPath) {
       throw new InternalServerErrorException(
-        'Falta GOOGLE_APPLICATION_CREDENTIALS en configuracion',
+        'Falta GOOGLE_APPLICATION_CREDENTIALS en configuración',
       );
     }
 
@@ -217,7 +217,7 @@ export class StorageService implements OnModuleInit {
 
     if (!response.data.id) {
       throw new InternalServerErrorException(
-        'Google Drive no devolvio ID de archivo',
+        'Google Drive no devolvió ID de archivo',
       );
     }
 
@@ -257,7 +257,6 @@ export class StorageService implements OnModuleInit {
       };
       const status = maybeError.response?.status ?? maybeError.code;
       if (status === 404) {
-        // Deletion must be idempotent: if file is already gone, treat as success.
         this.logger.warn({
           message:
             'Archivo en Drive no encontrado al eliminar; se considera eliminado',
@@ -328,7 +327,7 @@ export class StorageService implements OnModuleInit {
 
     if (!this.googleDriveRootFolderIdConfig) {
       throw new InternalServerErrorException(
-        'Falta GOOGLE_DRIVE_ROOT_FOLDER_ID en configuracion',
+        'Falta GOOGLE_DRIVE_ROOT_FOLDER_ID en configuración',
       );
     }
 
@@ -376,13 +375,13 @@ export class StorageService implements OnModuleInit {
         ? String(detailRaw).slice(0, 240)
         : 'sin detalle';
       throw new InternalServerErrorException(
-        `GOOGLE_DRIVE_ROOT_FOLDER_ID invalido/sin permisos o falla de red hacia Google Drive (status=${status}, detail=${detail})`,
+        `GOOGLE_DRIVE_ROOT_FOLDER_ID inválido/sin permisos o falla de red hacia Google Drive (status=${status}, detail=${detail})`,
       );
     }
 
     if (!response.data.id) {
       throw new InternalServerErrorException(
-        'GOOGLE_DRIVE_ROOT_FOLDER_ID invalido: no existe en Google Drive',
+        'GOOGLE_DRIVE_ROOT_FOLDER_ID inválido: no existe en Google Drive',
       );
     }
 
@@ -438,7 +437,7 @@ export class StorageService implements OnModuleInit {
 
     if (!createResponse.data.id) {
       throw new InternalServerErrorException(
-        `Google Drive no devolvio ID de carpeta ${folderName}`,
+        `Google Drive no devolvió ID de carpeta ${folderName}`,
       );
     }
 

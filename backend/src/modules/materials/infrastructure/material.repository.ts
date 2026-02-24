@@ -97,6 +97,42 @@ export class MaterialRepository {
     });
   }
 
+  async countByFolderIds(
+    folderIds: string[],
+    materialStatusId: string,
+    visibleAt?: Date,
+  ): Promise<Record<string, number>> {
+    if (folderIds.length === 0) {
+      return {};
+    }
+
+    const qb = this.ormRepository
+      .createQueryBuilder('m')
+      .select('m.materialFolderId', 'folderId')
+      .addSelect('COUNT(m.id)', 'total')
+      .where('m.materialFolderId IN (:...folderIds)', { folderIds })
+      .andWhere('m.materialStatusId = :materialStatusId', { materialStatusId });
+
+    if (visibleAt) {
+      qb.andWhere('(m.visibleFrom IS NULL OR m.visibleFrom <= :visibleAt)', {
+        visibleAt,
+      }).andWhere('(m.visibleUntil IS NULL OR m.visibleUntil >= :visibleAt)', {
+        visibleAt,
+      });
+    }
+
+    const rows = await qb.groupBy('m.materialFolderId').getRawMany<{
+      folderId: string;
+      total: string;
+    }>();
+
+    const result: Record<string, number> = {};
+    for (const row of rows) {
+      result[row.folderId] = Number(row.total);
+    }
+    return result;
+  }
+
   async findAdminMaterialFilesPage(
     params: AdminMaterialFileListParams,
   ): Promise<{ rows: AdminMaterialFileListRow[]; totalItems: number }> {

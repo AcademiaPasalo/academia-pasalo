@@ -43,6 +43,8 @@ describe('E2E: Gestion de Materiales y Seguridad', () => {
   let courseCycle: CourseCycle;
   let evaluation: Evaluation;
   let rootFolderId: string;
+  let childFolderId: string;
+  let templateRootFolderId: string;
   const storageMock = {
     calculateHash: jest.fn().mockResolvedValue('mock-sha256-hash'),
     saveFile: jest
@@ -187,6 +189,63 @@ describe('E2E: Gestion de Materiales y Seguridad', () => {
       expect(rootFolderId).toBeDefined();
     });
 
+    it('Admin debe poder crear subcarpeta de primer nivel', async () => {
+      const res = await request(app.getHttpServer())
+        .post('/api/v1/materials/folders')
+        .set('Authorization', `Bearer ${admin.token}`)
+        .send({
+          evaluationId: evaluation.id,
+          parentFolderId: rootFolderId,
+          name: 'Subcarpeta PC1',
+        })
+        .expect(201);
+
+      const body = res.body as MaterialFolderResponse;
+      childFolderId = body.data.id;
+      expect(childFolderId).toBeDefined();
+    });
+
+    it('Admin NO debe poder crear subcarpeta de segundo nivel (profundidad > 2)', async () => {
+      await request(app.getHttpServer())
+        .post('/api/v1/materials/folders')
+        .set('Authorization', `Bearer ${admin.token}`)
+        .send({
+          evaluationId: evaluation.id,
+          parentFolderId: childFolderId,
+          name: 'Nieta no permitida',
+        })
+        .expect(400);
+    });
+
+    it('Admin debe poder crear estructura plantilla de 2 niveles', async () => {
+      const res = await request(app.getHttpServer())
+        .post('/api/v1/materials/folders/template')
+        .set('Authorization', `Bearer ${admin.token}`)
+        .send({
+          evaluationId: evaluation.id,
+          rootName: 'Curso Ciclo Actual',
+          subfolderNames: ['PC1', 'PC2', 'EX1'],
+        })
+        .expect(201);
+
+      expect(res.body.data.rootFolder).toBeDefined();
+      expect(res.body.data.subFolders).toHaveLength(3);
+      templateRootFolderId = res.body.data.rootFolder.id;
+      expect(templateRootFolderId).toBeDefined();
+    });
+
+    it('Admin NO debe poder crear plantilla con subcarpetas duplicadas', async () => {
+      await request(app.getHttpServer())
+        .post('/api/v1/materials/folders/template')
+        .set('Authorization', `Bearer ${admin.token}`)
+        .send({
+          evaluationId: evaluation.id,
+          rootName: 'Curso Ciclo Actual 2',
+          subfolderNames: ['PC1', 'pc1'],
+        })
+        .expect(400);
+    });
+
     it('Profesor asignado debe poder subir archivo', async () => {
       const buffer = Buffer.from('%PDF-1.4 content');
       await request(app.getHttpServer())
@@ -196,6 +255,18 @@ describe('E2E: Gestion de Materiales y Seguridad', () => {
         .field('materialFolderId', rootFolderId)
         .field('displayName', 'Silabo Oficial')
         .expect(201);
+    });
+
+    it('Debe retornar conteo total de archivos al consultar contenido de carpeta', async () => {
+      const res = await request(app.getHttpServer())
+        .get(`/api/v1/materials/folders/${rootFolderId}`)
+        .set('Authorization', `Bearer ${admin.token}`)
+        .expect(200);
+
+      expect(typeof res.body.data.totalMaterials).toBe('number');
+      expect(res.body.data.totalMaterials).toBeGreaterThanOrEqual(1);
+      expect(typeof res.body.data.subfolderMaterialCount).toBe('object');
+      expect(res.body.data.subfolderMaterialCount[childFolderId]).toBe(0);
     });
   });
 

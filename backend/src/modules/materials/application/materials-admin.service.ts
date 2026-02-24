@@ -55,7 +55,7 @@ export class MaterialsAdminService {
       );
     if (!pendingStatus)
       throw new InternalServerErrorException(
-        `Error de configuracion: Estado ${DELETION_REQUEST_STATUS_CODES.PENDING} faltante`,
+        `Error de configuración: Estado ${DELETION_REQUEST_STATUS_CODES.PENDING} faltante`,
       );
 
     return await this.requestRepository.findByStatusId(pendingStatus.id);
@@ -185,7 +185,7 @@ export class MaterialsAdminService {
 
     if (!approvedStatus || !archivedMaterialStatus) {
       throw new InternalServerErrorException(
-        `Error de configuracion: Estados de sistema faltantes (${DELETION_REQUEST_STATUS_CODES.APPROVED}/${MATERIAL_STATUS_CODES.ARCHIVED})`,
+        `Error de configuración: Estados de sistema faltantes (${DELETION_REQUEST_STATUS_CODES.APPROVED}/${MATERIAL_STATUS_CODES.ARCHIVED})`,
       );
     }
 
@@ -224,7 +224,7 @@ export class MaterialsAdminService {
       );
     if (!rejectedStatus)
       throw new InternalServerErrorException(
-        `Error de configuracion: Estado ${DELETION_REQUEST_STATUS_CODES.REJECTED} faltante`,
+        `Error de configuración: Estado ${DELETION_REQUEST_STATUS_CODES.REJECTED} faltante`,
       );
 
     await manager.update(DeletionRequest, requestId, {
@@ -245,7 +245,7 @@ export class MaterialsAdminService {
       );
     if (material.materialStatusId !== archivedStatus?.id) {
       throw new BadRequestException(
-        'Solo se pueden eliminar fisicamente materiales que esten ARCHIVADOS.',
+        'Solo se pueden eliminar físicamente materiales que estén ARCHIVADOS.',
       );
     }
 
@@ -310,7 +310,7 @@ export class MaterialsAdminService {
         fileToDeleteResource.storageUrl,
       );
       this.logger.warn({
-        message: 'Archivo fisico eliminado (Garbage Collection)',
+        message: 'Archivo físico eliminado (Garbage Collection)',
         file: fileToDeleteResource.storageKey,
       });
     }
@@ -318,7 +318,7 @@ export class MaterialsAdminService {
     await this.invalidateMaterialCaches(material);
 
     this.logger.warn({
-      message: 'Material eliminado fisicamente (Hard Delete)',
+      message: 'Material eliminado físicamente (Hard Delete)',
       materialId,
       adminId,
     });

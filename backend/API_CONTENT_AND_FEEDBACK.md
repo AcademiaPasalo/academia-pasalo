@@ -152,6 +152,7 @@ Flujo recomendado para frontend cuando el alumno abre un curso:
       "evaluations": [
         {
           "id": "string",
+          "evaluationTypeCode": "PC | EX | ...",
           "shortName": "PC1",
           "fullName": "Práctica Calificada 1",
           "label": "Completado | En curso | Próximamente | Bloqueado"
@@ -196,6 +197,7 @@ Cuando el tab es visible, la lista devuelve todos los ciclos anteriores del curs
       "evaluations": [
         {
           "id": "string",
+          "evaluationTypeCode": "PC | EX | ...",
           "shortName": "PC1",
           "fullName": "Práctica Calificada 1",
           "label": "Archivado | Bloqueado"
@@ -209,7 +211,9 @@ Regla de `label` en ciclo anterior:
 2. `Bloqueado`: no tiene acceso a esa evaluación.
 
 **Nota de seguridad**
-El endpoint legado `GET /courses/cycle/:courseCycleId/content` queda para roles de staff (`PROFESSOR`, `ADMIN`, `SUPER_ADMIN`), no para `STUDENT`.
+El endpoint legado GET /courses/cycle/:courseCycleId/content queda para roles de staff (PROFESSOR, ADMIN, SUPER_ADMIN), no para STUDENT.
+- Si el courseCycleId no existe, responde 404.
+- Si el curso/ciclo existe pero el PROFESSOR no está asignado, responde 403.
 
 
 #### Operaciones Administrativas (Admin/SuperAdmin)
@@ -250,8 +254,11 @@ Define una nueva evaluación dentro de un curso/ciclo.
 
 ### 2. Listar Evaluaciones de un Curso
 - **Endpoint:** `GET /evaluations/course-cycle/:courseCycleId`
-- **Roles:** `ADMIN`, `SUPER_ADMIN`
+- **Roles:** `PROFESSOR`, `ADMIN`, `SUPER_ADMIN`
 - **Data (Response):** Array de evaluaciones con su tipo y fechas.
+- **Reglas de alcance:**
+    * Si el `courseCycleId` no existe, responde `404`.
+    * Si el curso/ciclo existe pero el `PROFESSOR` no está asignado, responde `403`.
 
 ---
 
@@ -263,7 +270,7 @@ Permite navegar la jerarquía de una evaluación. Requiere matrícula en la eval
     * `GET /materials/folders/evaluation/:evaluationId` (Carpetas raíz)
     * `GET /materials/folders/:folderId` (Contenido de una carpeta)
 - **GET /materials/class-event/:classEventId**: Obtiene materiales vinculados a una sesión específica.
-- **Roles:** `STUDENT`, `PROFESSOR`, `ADMIN`
+- **Roles:** `STUDENT`, `PROFESSOR`, `ADMIN`, `SUPER_ADMIN`
 - **Data (Response de Contenido):**
     ```json
     {
@@ -276,18 +283,26 @@ Permite navegar la jerarquía de una evaluación. Requiere matrícula en la eval
           "createdAt": string,
           "classEventId": string | null
         }
-      ]
+      ],
+      "totalMaterials": number,
+      "subfolderMaterialCount": {
+        "subFolderId": number
+      }
     }
     ```
 
 ### 2. Descarga de Archivos
 - **Endpoint:** `GET /materials/:id/download`
-- **Roles:** `STUDENT` (con acceso), `PROFESSOR`, `ADMIN`
+- **Roles:** `STUDENT` (con acceso), `PROFESSOR`, `ADMIN`, `SUPER_ADMIN`
 - **Comportamiento:** Retorna stream binario con headers `Content-Type` y `Content-Disposition`.
 
 ### 3. Gestión Administrativa (Upload/Config)
 - **POST /materials/folders:** Crear carpeta.
-    * `body: { evaluationId: string, parentFolderId?: string, name: string, visibleFrom?: string }`
+    * `body: { evaluationId: string, parentFolderId?: string, name: string, visibleFrom?: string, visibleUntil?: string }`
+    * Regla: solo se permiten 2 niveles (raíz y un nivel de subcarpeta). Un tercer nivel responde `400`.
+- **POST /materials/folders/template:** Crear estructura fija de 2 niveles en una sola petición.
+    * `body: { evaluationId: string, rootName: string, subfolderNames: string[], visibleFrom?: string, visibleUntil?: string }`
+    * Validación: `subfolderNames` (1..50), sin vacíos, sin duplicados case-insensitive.
 - **POST /materials:** Subir archivo nuevo.
     * `Content-Type: multipart/form-data`
     * `body: { file: Buffer, materialFolderId: string, displayName: string, classEventId?: string }`
@@ -346,6 +361,11 @@ Permite navegar la jerarquía de una evaluación. Requiere matrícula en la eval
 - **POST /feedback/admin/:testimonyId/feature:** Destacar testimonio en la web.
     * `body: { isActive: boolean, displayOrder: number }`
     * **Efecto:** Invalida automáticamente el caché público.
+
+
+
+
+
 
 
 
