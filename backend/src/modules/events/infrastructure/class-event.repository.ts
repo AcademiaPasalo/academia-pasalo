@@ -134,11 +134,46 @@ export class ClassEventRepository {
     });
   }
 
+  async findOverlap(
+    courseCycleId: string,
+    start: Date,
+    end: Date,
+    excludeEventId?: string,
+    manager?: EntityManager,
+  ): Promise<ClassEvent | null> {
+    const repo = manager
+      ? manager.getRepository(ClassEvent)
+      : this.ormRepository;
+
+    const qb = repo
+      .createQueryBuilder('ce')
+      .select(['ce.id', 'ce.sessionNumber', 'ev.id', 'ev.number', 'et.name'])
+      .innerJoin('ce.evaluation', 'ev')
+      .innerJoin('ev.evaluationType', 'et')
+      .where('ev.course_cycle_id = :courseCycleId', { courseCycleId })
+      .andWhere('ce.is_cancelled = :isCancelled', { isCancelled: false })
+      .andWhere(
+        new Brackets((qb) => {
+          qb.where(':start < ce.end_datetime AND :end > ce.start_datetime', {
+            start,
+            end,
+          });
+        }),
+      );
+
+    if (excludeEventId) {
+      qb.andWhere('ce.id != :excludeEventId', { excludeEventId });
+    }
+
+    return await qb.getOne();
+  }
+
   async findByUserAndRange(
     userId: string,
     startDate: Date,
     endDate: Date,
   ): Promise<ClassEvent[]> {
+    const now = new Date();
     const qb = this.ormRepository
       .createQueryBuilder('classEvent')
       .leftJoinAndSelect('classEvent.evaluation', 'evaluation')
@@ -157,6 +192,9 @@ export class ClassEventRepository {
       .where('classEvent.startDatetime BETWEEN :startDate AND :endDate', {
         startDate,
         endDate,
+      })
+      .andWhere('classEvent.isCancelled = :isCancelled', {
+        isCancelled: false,
       })
       .andWhere(
         new Brackets((where) => {
@@ -180,12 +218,12 @@ export class ClassEventRepository {
                   ON e.id = ee.enrollment_id
                 WHERE ee.evaluation_id = classEvent.evaluation_id
                   AND ee.is_active = 1
-                  AND ee.access_start_date <= UTC_TIMESTAMP()
-                  AND ee.access_end_date >= UTC_TIMESTAMP()
+                  AND ee.access_start_date <= :now
+                  AND ee.access_end_date >= :now
                   AND e.user_id = :userId
                   AND e.cancelled_at IS NULL
               )`,
-              { userId },
+              { userId, now },
             );
         }),
       )

@@ -154,6 +154,26 @@ describe('E2E: Class Events (Eventos de Clase)', () => {
       createdEventId = response.body.data.id;
     });
 
+    it('debe rechazar creación si el horario se cruza con una sesión existente (409 Conflict)', async () => {
+      const response = await request(app.getHttpServer())
+        .post('/api/v1/class-events')
+        .set('Authorization', `Bearer ${professor.token}`)
+        .send({
+          evaluationId: evaluation.id,
+          sessionNumber: 2,
+          title: 'Clase 2: Traslape',
+          topic: 'Test',
+          startDatetime: new Date(tomorrow.getTime() + 3600000).toISOString(), // Empieza 1 hora después de la Clase 1 (que dura 2h)
+          endDatetime: new Date(tomorrow.getTime() + 10800000).toISOString(),
+          liveMeetingUrl: 'https://zoom.us/test',
+        })
+        .expect(409);
+
+      expect(response.body.message).toContain(
+        'El horario ya está ocupado por la sesión 1',
+      );
+    });
+
     it('debe rechazar creación por alumno (403)', async () => {
       await request(app.getHttpServer())
         .post('/api/v1/class-events')
@@ -201,6 +221,39 @@ describe('E2E: Class Events (Eventos de Clase)', () => {
         .expect(200);
     });
 
+    it('PATCH /api/v1/class-events/:id - Debe fallar si el nuevo horario choca con otra sesión', async () => {
+      // 1. Crear sesión 2 en horario libre (4 horas después de la sesión 1)
+      const res2 = await request(app.getHttpServer())
+        .post('/api/v1/class-events')
+        .set('Authorization', `Bearer ${professor.token}`)
+        .send({
+          evaluationId: evaluation.id,
+          sessionNumber: 2,
+          title: 'Sesión 2',
+          topic: 'T2',
+          startDatetime: new Date(tomorrow.getTime() + 14400000).toISOString(),
+          endDatetime: new Date(tomorrow.getTime() + 18000000).toISOString(),
+          liveMeetingUrl: 'https://zoom.us/s2',
+        })
+        .expect(201);
+
+      const session2Id = res2.body.data.id;
+
+      // 2. Intentar actualizar sesión 1 para que choque con sesión 2
+      const resUpdate = await request(app.getHttpServer())
+        .patch(`/api/v1/class-events/${createdEventId}`)
+        .set('Authorization', `Bearer ${professor.token}`)
+        .send({
+          startDatetime: new Date(tomorrow.getTime() + 14400000).toISOString(),
+          endDatetime: new Date(tomorrow.getTime() + 18000000).toISOString(),
+        })
+        .expect(409);
+
+      expect(resUpdate.body.message).toContain(
+        'No es posible actualizar el horario. Existe un cruce con la sesión 2',
+      );
+    });
+
     it('DELETE /api/v1/class-events/:id/cancel - Cancelar evento', async () => {
       await request(app.getHttpServer())
         .delete(`/api/v1/class-events/${createdEventId}/cancel`)
@@ -221,9 +274,24 @@ describe('E2E: Class Events (Eventos de Clase)', () => {
       expect(res.body.data.length).toBeGreaterThan(0);
     });
 
-    it('debe invalidar el caché del calendario cuando se actualiza un evento', async () => {
+    it('debe invalidar el cachÃ© del calendario cuando se actualiza un evento', async () => {
       const start = formatDate(yesterday);
       const end = formatDate(nextWeek);
+
+      const createRes = await request(app.getHttpServer())
+        .post('/api/v1/class-events')
+        .set('Authorization', `Bearer ${professor.token}`)
+        .send({
+          evaluationId: evaluation.id,
+          sessionNumber: 99,
+          title: 'Evento Cache',
+          topic: 'Cache',
+          startDatetime: tomorrow.toISOString(),
+          endDatetime: new Date(tomorrow.getTime() + 3600000).toISOString(),
+          liveMeetingUrl: 'https://zoom.us/cache',
+        })
+        .expect(201);
+      const cacheEventId = createRes.body.data.id;
 
       await request(app.getHttpServer())
         .get('/api/v1/class-events/my-schedule')
@@ -231,9 +299,9 @@ describe('E2E: Class Events (Eventos de Clase)', () => {
         .set('Authorization', `Bearer ${professor.token}`)
         .expect(200);
 
-      const newTitle = 'Caché Limpio';
+      const newTitle = 'CachÃ© Limpio';
       await request(app.getHttpServer())
-        .patch(`/api/v1/class-events/${createdEventId}`)
+        .patch(`/api/v1/class-events/${cacheEventId}`)
         .set('Authorization', `Bearer ${professor.token}`)
         .send({ title: newTitle })
         .expect(200);
@@ -244,7 +312,8 @@ describe('E2E: Class Events (Eventos de Clase)', () => {
         .set('Authorization', `Bearer ${professor.token}`)
         .expect(200);
 
-      const event = res.body.data.find((e: any) => e.id === createdEventId);
+      const event = res.body.data.find((e: any) => e.id === cacheEventId);
+      expect(event).toBeDefined();
       expect(event.title).toBe(newTitle);
     });
   });

@@ -6,10 +6,8 @@ import { UserSession } from '@modules/auth/domain/user-session.entity';
 import { RequestMetadata } from '@modules/auth/interfaces/request-metadata.interface';
 import {
   AnomalyType,
-  LOCATION_SOURCES,
   LocationSource,
   SECURITY_EVENT_CODES,
-  SecurityEventCode,
 } from '@modules/auth/interfaces/security.constants';
 
 @Injectable()
@@ -48,7 +46,7 @@ export class SessionSecurityService {
     if (isConcurrent && existingSession) {
       await this.securityEventService.logEvent(
         userId,
-        SECURITY_EVENT_CODES.CONCURRENT_SESSION_DETECTED as SecurityEventCode,
+        SECURITY_EVENT_CODES.CONCURRENT_SESSION_DETECTED,
         {
           ipAddress: metadata.ipAddress,
           userAgent: metadata.userAgent,
@@ -67,7 +65,7 @@ export class SessionSecurityService {
     if (anomaly.isAnomalous) {
       await this.securityEventService.logEvent(
         userId,
-        SECURITY_EVENT_CODES.ANOMALOUS_LOGIN_DETECTED as SecurityEventCode,
+        SECURITY_EVENT_CODES.ANOMALOUS_LOGIN_DETECTED,
         {
           ipAddress: metadata.ipAddress,
           userAgent: metadata.userAgent,
@@ -91,7 +89,7 @@ export class SessionSecurityService {
       if (params.isNewDevice) {
         await this.securityEventService.logEvent(
           userId,
-          SECURITY_EVENT_CODES.NEW_DEVICE_DETECTED as SecurityEventCode,
+          SECURITY_EVENT_CODES.NEW_DEVICE_DETECTED,
           {
             ipAddress: metadata.ipAddress,
             userAgent: metadata.userAgent,
@@ -107,7 +105,7 @@ export class SessionSecurityService {
 
       await this.securityEventService.logEvent(
         userId,
-        SECURITY_EVENT_CODES.LOGIN_SUCCESS as SecurityEventCode,
+        SECURITY_EVENT_CODES.LOGIN_SUCCESS,
         {
           ipAddress: metadata.ipAddress,
           userAgent: metadata.userAgent,
@@ -125,7 +123,7 @@ export class SessionSecurityService {
   ): Promise<void> {
     const strikeCount = await this.securityEventService.countEventsByCode(
       userId,
-      SECURITY_EVENT_CODES.ANOMALOUS_LOGIN_DETECTED as SecurityEventCode,
+      SECURITY_EVENT_CODES.ANOMALOUS_LOGIN_DETECTED,
       manager,
     );
 

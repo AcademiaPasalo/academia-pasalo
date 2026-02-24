@@ -168,6 +168,8 @@ CREATE TABLE course (
   cycle_level_id BIGINT NOT NULL,
   code VARCHAR(50) NOT NULL,
   name VARCHAR(100) NOT NULL,
+  primary_color VARCHAR(7) NULL,
+  secondary_color VARCHAR(7) NULL,
   created_at DATETIME NOT NULL,
   updated_at DATETIME,
   FOREIGN KEY (course_type_id) REFERENCES course_type(id),
@@ -277,16 +279,20 @@ CREATE TABLE file_resource (
   original_name VARCHAR(255) NOT NULL,
   mime_type VARCHAR(100) NOT NULL,
   size_bytes BIGINT NOT NULL,
-  storage_url VARCHAR(500) NOT NULL,
+  storage_provider VARCHAR(20) NOT NULL DEFAULT 'LOCAL',
+  storage_key VARCHAR(512) NOT NULL,
+  storage_url VARCHAR(500) NULL,
   created_at DATETIME NOT NULL,
-  CONSTRAINT uq_file_resource_hash UNIQUE (checksum_hash)
+  CONSTRAINT chk_file_resource_storage_provider CHECK (
+    storage_provider IN ('LOCAL', 'GDRIVE', 'S3')
+  )
 );
 
 CREATE TABLE file_version (
   id BIGINT PRIMARY KEY AUTO_INCREMENT,
   file_resource_id BIGINT NOT NULL,
   version_number INT NOT NULL,
-  storage_url VARCHAR(500) NOT NULL,
+  storage_url VARCHAR(500) NULL,
   created_at DATETIME NOT NULL,
   created_by BIGINT NOT NULL,
   CONSTRAINT uq_resource_version UNIQUE (file_resource_id, version_number),
@@ -448,6 +454,9 @@ ON course_cycle(course_id, academic_cycle_id);
 CREATE INDEX idx_evaluation_course_cycle
 ON evaluation(course_cycle_id);
 
+CREATE INDEX idx_course_cycle_professor_user_active
+ON course_cycle_professor(professor_user_id, revoked_at, course_cycle_id);
+
 CREATE INDEX idx_evaluation_type_number
 ON evaluation(evaluation_type_id, number);
 
@@ -469,8 +478,26 @@ ON material(class_event_id);
 CREATE INDEX idx_material_status
 ON material(material_status_id);
 
+CREATE INDEX idx_material_folder_status
+ON material(material_folder_id, material_status_id);
+
 CREATE INDEX idx_material_visibility
 ON material(visible_from, visible_until);
+
+CREATE UNIQUE INDEX uq_file_resource_dedup
+ON file_resource(checksum_hash, size_bytes);
+
+CREATE UNIQUE INDEX uq_file_resource_provider_key
+ON file_resource(storage_provider, storage_key);
+
+CREATE INDEX idx_file_version_resource
+ON file_version(file_resource_id);
+
+CREATE INDEX idx_material_file_resource
+ON material(file_resource_id);
+
+CREATE INDEX idx_material_file_version
+ON material(file_version_id);
 
 CREATE INDEX idx_audit_log_user_date
 ON audit_log(user_id, event_datetime);

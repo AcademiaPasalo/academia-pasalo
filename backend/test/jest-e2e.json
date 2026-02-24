@@ -3,6 +3,7 @@
   "rootDir": "..",
   "testEnvironment": "node",
   "testRegex": ".e2e-spec.ts$",
+  "setupFiles": ["<rootDir>/test/jest-e2e.setup.ts"],
   "moduleNameMapper": {
     "^@/(.*)$": "<rootDir>/src/$1",
     "^@modules/(.*)$": "<rootDir>/src/modules/$1",

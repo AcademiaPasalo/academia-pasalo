@@ -16,6 +16,12 @@ export const DELETION_REQUEST_STATUS_CODES = {
   REJECTED: 'REJECTED',
 } as const;
 
+export const STORAGE_PROVIDER_CODES = {
+  LOCAL: 'LOCAL',
+  GDRIVE: 'GDRIVE',
+  S3: 'S3',
+} as const;
+
 export const MATERIAL_CACHE_KEYS = {
   ROOTS: (evaluationId: string) => `cache:materials:roots:eval:${evaluationId}`,
   CONTENTS: (folderId: string) => `cache:materials:contents:folder:${folderId}`,
@@ -29,3 +35,5 @@ export type FolderStatusCode =
   (typeof FOLDER_STATUS_CODES)[keyof typeof FOLDER_STATUS_CODES];
 export type DeletionRequestStatusCode =
   (typeof DELETION_REQUEST_STATUS_CODES)[keyof typeof DELETION_REQUEST_STATUS_CODES];
+export type StorageProviderCode =
+  (typeof STORAGE_PROVIDER_CODES)[keyof typeof STORAGE_PROVIDER_CODES];

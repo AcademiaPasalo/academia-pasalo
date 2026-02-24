@@ -51,7 +51,7 @@ describe('Redis Auth Security & Performance (E2E)', () => {
     );
     token = auth.token;
 
-    const payload = jwtService.decode(token) as JwtPayload;
+    const payload = jwtService.decode(token);
     sessionId = payload.sessionId;
 
     expect(sessionId).toBeDefined();

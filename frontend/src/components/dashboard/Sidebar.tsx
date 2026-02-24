@@ -283,11 +283,17 @@ export default function Sidebar({
           onClick={toggleUserMenu}
           className={`w-full flex items-center ${isCollapsed ? 'justify-center' : 'gap-2'} rounded-xl transition-colors hover:bg-secondary-hover p-2`}
         >
-          <div
-            className={`w-9 h-9 bg-info-primary-solid rounded-full flex items-center justify-center text-white font-bold text-sm flex-shrink-0`}
-          >
-            {user.initials}
-          </div>
+          {authUser?.profilePhotoUrl ? (
+            <img
+              src={authUser.profilePhotoUrl}
+              alt={user.name}
+              className="w-9 h-9 rounded-full object-cover flex-shrink-0"
+            />
+          ) : (
+            <div className="w-9 h-9 bg-info-primary-solid rounded-full flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
+              {user.initials}
+            </div>
+          )}
           {!isCollapsed && (
             <div className="flex-1 min-w-0 text-left">
               <p className="text-sm text-primary truncate">{user.name}</p>
@@ -305,6 +311,17 @@ export default function Sidebar({
         {/* Menú desplegable */}
         {isUserMenuOpen && !isCollapsed && (
           <div className="absolute bottom-full left-5 right-5 bg-white border border-stroke-primary rounded-xl overflow-hidden">
+            <button
+              onClick={() => {
+                setIsUserMenuOpen(false);
+                router.push('/plataforma/perfil');
+              }}
+              className="w-full flex items-center gap-3 px-4 py-3 text-left text-secondary hover:bg-secondary-hover transition-colors"
+            >
+              <Icon name="person" size={20} />
+              <span className="text-sm font-medium">Mi Perfil</span>
+            </button>
+            <div className="border-t border-stroke-primary" />
             <button
               onClick={handleLogout}
               className="w-full flex items-center gap-3 px-4 py-3 text-left text-error-solid hover:bg-error-hover transition-colors"

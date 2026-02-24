@@ -15,9 +15,12 @@ export class FileResourceRepository {
     return await this.ormRepository.save(newResource);
   }
 
-  async findByHash(hash: string): Promise<FileResource | null> {
+  async findByHashAndSize(
+    hash: string,
+    sizeBytes: string,
+  ): Promise<FileResource | null> {
     return await this.ormRepository.findOne({
-      where: { checksumHash: hash },
+      where: { checksumHash: hash, sizeBytes },
     });
   }
 }

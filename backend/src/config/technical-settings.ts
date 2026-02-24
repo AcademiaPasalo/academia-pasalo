@@ -105,6 +105,8 @@ export const technicalSettings = {
       courseContentCacheTtlSeconds: 600, // 10m
       // src/modules/courses/application/courses.service.ts
       professorAssignmentCacheTtlSeconds: 3600, // 60m
+      // src/modules/courses/application/courses.service.ts
+      courseCycleExistsCacheTtlSeconds: 30, // 30s
     },
 
     enrollments: {

@@ -12,6 +12,7 @@ import {
   type IdentityInvalidationReason,
 } from '@modules/auth/interfaces/security.constants';
 import { RedisCacheService } from '@infrastructure/cache/redis-cache.service';
+import { COURSE_CACHE_KEYS } from '@modules/courses/domain/course.constants';
 
 @Injectable()
 export class IdentitySecurityService {
@@ -48,7 +49,7 @@ export class IdentitySecurityService {
       );
       if (!revokedStatus) {
         throw new InternalServerErrorException(
-          'Configuracion de estado de sesion incompleta',
+          'Configuración de estado de sesión incompleta',
         );
       }
 
@@ -70,10 +71,14 @@ export class IdentitySecurityService {
 
     await this.cacheService.del(`cache:user:profile:${userId}`);
 
+    await this.cacheService.invalidateGroup(
+      COURSE_CACHE_KEYS.GLOBAL_PROFESSOR_LIST_GROUP,
+    );
+
     this.logger.log({
       level: 'info',
       context: IdentitySecurityService.name,
-      message: 'Invalidacion de identidad ejecutada',
+      message: 'Invalidación de identidad ejecutada',
       userId,
       revokeSessions,
       sessionsAffected: activeSessions.length,

@@ -4,6 +4,7 @@ import {
   IsOptional,
   IsNumberString,
   MaxLength,
+  IsDateString,
 } from 'class-validator';
 
 export class UploadMaterialDto {
@@ -17,11 +18,11 @@ export class UploadMaterialDto {
   displayName: string;
 
   @IsOptional()
-  @IsString()
+  @IsDateString()
   visibleFrom?: string;
 
   @IsOptional()
-  @IsString()
+  @IsDateString()
   visibleUntil?: string;
 
   @IsOptional()

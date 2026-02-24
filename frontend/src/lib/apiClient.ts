@@ -193,6 +193,19 @@ export class ApiClient {
         }
       }
 
+      // Manejar respuestas sin cuerpo (204 No Content)
+      if (response.status === 204 || response.headers.get('content-length') === '0') {
+        if (!response.ok) {
+          throw new Error('Error en la petición');
+        }
+        return {
+          statusCode: response.status,
+          message: 'OK',
+          data: null as unknown as T,
+          timestamp: new Date().toISOString(),
+        } as ApiResponse<T>;
+      }
+
       // Parsear respuesta
       const data = await response.json();
 

@@ -63,8 +63,8 @@ export class EvaluationRepository {
       .leftJoinAndSelect(
         'evaluation.enrollmentEvaluations',
         'access',
-        'access.enrollmentId IN (SELECT id FROM enrollment WHERE user_id = :userId AND course_cycle_id = :courseCycleId AND cancelled_at IS NULL)',
-        { userId, courseCycleId },
+        'access.enrollmentId IN (SELECT id FROM enrollment WHERE user_id = :userId AND cancelled_at IS NULL)',
+        { userId },
       )
       .where('evaluation.courseCycleId = :courseCycleId', { courseCycleId })
       .orderBy('evaluation.number', 'ASC')

@@ -16,6 +16,7 @@ describe('Courses Content Logic (Integration)', () => {
   let cacheService: RedisCacheService;
   let courseCycleRepository: CourseCycleRepository;
   let evaluationRepository: EvaluationRepository;
+  let courseCycleProfessorRepository: CourseCycleProfessorRepository;
 
   const mockCycleId = 'cycle-123';
   const mockUserId = 'user-abc';
@@ -55,6 +56,16 @@ describe('Courses Content Logic (Integration)', () => {
     },
   ];
 
+  const mockProfessors = [
+    { id: 'prof-1', firstName: 'Juan', lastName1: 'Pérez' },
+    { id: 'prof-2', firstName: 'María', lastName1: 'García' },
+  ];
+
+  const mockAssignments = [
+    { professor: mockProfessors[0] },
+    { professor: mockProfessors[1] },
+  ];
+
   beforeEach(async () => {
     const moduleRef: TestingModule = await Test.createTestingModule({
       providers: [
@@ -78,23 +89,29 @@ describe('Courses Content Logic (Integration)', () => {
         {
           provide: CourseCycleRepository,
           useValue: {
-            findById: jest.fn().mockResolvedValue({}),
+            findById: jest.fn().mockResolvedValue({ id: mockCycleId }),
             findFullById: jest.fn().mockResolvedValue(mockFullCycle),
           },
         },
         {
           provide: CourseCycleProfessorRepository,
-          useValue: {},
+          useValue: {
+            findByCourseCycleId: jest.fn().mockResolvedValue(mockAssignments),
+          },
         },
         {
           provide: EvaluationRepository,
           useValue: {
             findAllWithUserAccess: jest.fn().mockResolvedValue(mockEvaluations),
+            findTypeByCode: jest.fn(),
+            create: jest.fn(),
           },
         },
         {
           provide: CyclesService,
-          useValue: {},
+          useValue: {
+            findOne: jest.fn(),
+          },
         },
         {
           provide: RedisCacheService,
@@ -113,6 +130,44 @@ describe('Courses Content Logic (Integration)', () => {
     );
     evaluationRepository =
       moduleRef.get<EvaluationRepository>(EvaluationRepository);
+    courseCycleProfessorRepository =
+      moduleRef.get<CourseCycleProfessorRepository>(
+        CourseCycleProfessorRepository,
+      );
+  });
+
+  describe('getProfessorsByCourseCycle', () => {
+    it('should return professors from repository and set cache', async () => {
+      const result =
+        await coursesService.getProfessorsByCourseCycle(mockCycleId);
+
+      expect(result).toHaveLength(2);
+      expect(result[0].firstName).toBe('Juan');
+      expect(
+        courseCycleProfessorRepository.findByCourseCycleId,
+      ).toHaveBeenCalledWith(mockCycleId);
+      expect(cacheService.set).toHaveBeenCalled();
+    });
+
+    it('should return professors from cache if available', async () => {
+      (cacheService.get as jest.Mock).mockResolvedValue(mockProfessors);
+
+      const result =
+        await coursesService.getProfessorsByCourseCycle(mockCycleId);
+
+      expect(result).toEqual(mockProfessors);
+      expect(
+        courseCycleProfessorRepository.findByCourseCycleId,
+      ).not.toHaveBeenCalled();
+    });
+
+    it('should throw NotFoundException if cycle does not exist', async () => {
+      (courseCycleRepository.findById as jest.Mock).mockResolvedValue(null);
+
+      await expect(
+        coursesService.getProfessorsByCourseCycle('invalid-id'),
+      ).rejects.toThrow(NotFoundException);
+    });
   });
 
   describe('getCourseContent', () => {

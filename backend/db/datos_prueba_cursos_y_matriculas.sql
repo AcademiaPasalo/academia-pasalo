@@ -99,14 +99,18 @@ SET @course_qui_id = LAST_INSERT_ID();
 INSERT INTO course_cycle (course_id, academic_cycle_id) VALUES (@course_qui_id, @current_cycle_id);
 SET @cc_qui_id = LAST_INSERT_ID();
 
+-- Obtener ID del docente real (docentepasalo@gmail.com)
+SET @docente_user_id = (SELECT id FROM user WHERE email = 'docentepasalo@gmail.com' LIMIT 1);
+
 -- -----------------------------------------------------------------------------
 -- 4. ASIGNACIÓN DE PROFESORES A LOS CURSOS (COURSE_CYCLE_PROFESSOR)
 -- -----------------------------------------------------------------------------
 
--- Álgebra: 2 Profesores
+-- Álgebra: 2 Profesores + docentepasalo (docente real)
 INSERT INTO course_cycle_professor (course_cycle_id, professor_user_id, assigned_at) VALUES
 (@cc_alg_id, @prof_alg1, NOW()),
-(@cc_alg_id, @prof_alg2, NOW());
+(@cc_alg_id, @prof_alg2, NOW()),
+(@cc_alg_id, @docente_user_id, NOW());
 
 -- Cálculo: 2 Profesores
 INSERT INTO course_cycle_professor (course_cycle_id, professor_user_id, assigned_at) VALUES
@@ -219,7 +223,6 @@ AND (et.code = 'PC' AND ev.number = 1);
 -- 8. ASIGNAR ROL DE ADMINISTRADOR AL DOCENTE
 -- -----------------------------------------------------------------------------
 
-SET @docente_user_id = (SELECT id FROM user WHERE email = 'docentepasalo@gmail.com' LIMIT 1);
 SET @role_admin_id   = (SELECT id FROM role WHERE code = 'ADMIN' LIMIT 1);
 
 INSERT IGNORE INTO user_role (user_id, role_id) VALUES (@docente_user_id, @role_admin_id);
@@ -369,6 +372,30 @@ INSERT INTO class_event (evaluation_id, session_number, title, topic, start_date
 -- EX2: Mar 26, 31
 (@eval_qui_ex2, 1, 'Clase 16: Termodinámica Básica',          'Termodinámica',               '2026-03-26 13:00:00', '2026-03-26 15:00:00', 'https://meet.google.com/test-qui-016', NULL, @rec_na, FALSE, @prof_qui, NOW()),
 (@eval_qui_ex2, 2, 'Clase 17: Repaso General de Química',     'Repaso general',              '2026-03-31 13:00:00', '2026-03-31 15:00:00', 'https://meet.google.com/test-qui-017', NULL, @rec_na, FALSE, @prof_qui, NOW());
+
+-- ── EVENTOS ADICIONALES: DOCENTE PASALO (ÁLGEBRA) ──
+-- Clases cada 2 días desde Feb 20 hasta Mar 20, horario 16:00-18:00 UTC (11:00 AM - 1:00 PM Perú)
+-- Creados por docentepasalo@gmail.com
+INSERT INTO class_event (evaluation_id, session_number, title, topic, start_datetime, end_datetime, live_meeting_url, recording_url, recording_status_id, is_cancelled, created_by, created_at) VALUES
+-- PC2: Feb 20
+(@eval_alg_pc2, 4, '4° Clase - PC2', 'Repaso de vectores en el plano',        '2026-02-20 16:00:00', '2026-02-20 18:00:00', 'https://meet.google.com/test-doc-001', NULL, @rec_na, FALSE, @docente_user_id, NOW()),
+-- EX1: Feb 22, 24, 26, 28, Mar 2, 4
+(@eval_alg_ex1, 4, '4° Clase - EX1', 'Producto escalar y sus aplicaciones',   '2026-02-22 16:00:00', '2026-02-22 18:00:00', 'https://meet.google.com/test-doc-002', NULL, @rec_na, FALSE, @docente_user_id, NOW()),
+(@eval_alg_ex1, 5, '5° Clase - EX1', 'Proyecciones y ángulos entre vectores', '2026-02-24 16:00:00', '2026-02-24 18:00:00', 'https://meet.google.com/test-doc-003', NULL, @rec_na, FALSE, @docente_user_id, NOW()),
+(@eval_alg_ex1, 6, '6° Clase - EX1', 'Rectas en R²: formas paramétricas',    '2026-02-26 16:00:00', '2026-02-26 18:00:00', 'https://meet.google.com/test-doc-004', NULL, @rec_na, FALSE, @docente_user_id, NOW()),
+(@eval_alg_ex1, 7, '7° Clase - EX1', 'Rectas en R²: ecuación general',       '2026-02-28 16:00:00', '2026-02-28 18:00:00', 'https://meet.google.com/test-doc-005', NULL, @rec_na, FALSE, @docente_user_id, NOW()),
+(@eval_alg_ex1, 8, '8° Clase - EX1', 'Intersección y distancia entre rectas', '2026-03-02 16:00:00', '2026-03-02 18:00:00', 'https://meet.google.com/test-doc-006', NULL, @rec_na, FALSE, @docente_user_id, NOW()),
+(@eval_alg_ex1, 9, '9° Clase - EX1', 'Repaso para Examen 1',                 '2026-03-04 16:00:00', '2026-03-04 18:00:00', 'https://meet.google.com/test-doc-007', NULL, @rec_na, FALSE, @docente_user_id, NOW()),
+-- PC3: Mar 6, 8, 10, 12, 14
+(@eval_alg_pc3, 4, '4° Clase - PC3', 'Planos en R³: ecuación general',       '2026-03-06 16:00:00', '2026-03-06 18:00:00', 'https://meet.google.com/test-doc-008', NULL, @rec_na, FALSE, @docente_user_id, NOW()),
+(@eval_alg_pc3, 5, '5° Clase - PC3', 'Intersección de planos',               '2026-03-08 16:00:00', '2026-03-08 18:00:00', 'https://meet.google.com/test-doc-009', NULL, @rec_na, FALSE, @docente_user_id, NOW()),
+(@eval_alg_pc3, 6, '6° Clase - PC3', 'Espacios vectoriales: definición',     '2026-03-10 16:00:00', '2026-03-10 18:00:00', 'https://meet.google.com/test-doc-010', NULL, @rec_na, FALSE, @docente_user_id, NOW()),
+(@eval_alg_pc3, 7, '7° Clase - PC3', 'Combinaciones lineales',               '2026-03-12 16:00:00', '2026-03-12 18:00:00', 'https://meet.google.com/test-doc-011', NULL, @rec_na, FALSE, @docente_user_id, NOW()),
+(@eval_alg_pc3, 8, '8° Clase - PC3', 'Dependencia e independencia lineal',   '2026-03-14 16:00:00', '2026-03-14 18:00:00', 'https://meet.google.com/test-doc-012', NULL, @rec_na, FALSE, @docente_user_id, NOW()),
+-- PC4: Mar 16, 18, 20
+(@eval_alg_pc4, 4, '4° Clase - PC4', 'Base de un espacio vectorial',         '2026-03-16 16:00:00', '2026-03-16 18:00:00', 'https://meet.google.com/test-doc-013', NULL, @rec_na, FALSE, @docente_user_id, NOW()),
+(@eval_alg_pc4, 5, '5° Clase - PC4', 'Dimensión y rango',                    '2026-03-18 16:00:00', '2026-03-18 18:00:00', 'https://meet.google.com/test-doc-014', NULL, @rec_na, FALSE, @docente_user_id, NOW()),
+(@eval_alg_pc4, 6, '6° Clase - PC4', 'Intro a transformaciones lineales',    '2026-03-20 16:00:00', '2026-03-20 18:00:00', 'https://meet.google.com/test-doc-015', NULL, @rec_na, FALSE, @docente_user_id, NOW());
 
 -- -----------------------------------------------------------------------------
 -- 10. ASIGNACIÓN DE PROFESORES A EVENTOS DE CLASE (CLASS_EVENT_PROFESSOR)

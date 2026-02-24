@@ -15,8 +15,14 @@ import { UnifiedAuditHistoryDto } from '@modules/audit/dto/unified-audit-history
 import { QUEUES } from '@infrastructure/queue/queue.constants';
 import { JobScheduler } from '@infrastructure/queue/queue.interfaces';
 import { technicalSettings } from '@config/technical-settings';
-import { AUDIT_JOB_NAMES } from '@modules/audit/interfaces/audit.constants';
+import {
+  AUDIT_SOURCES,
+  AUDIT_LABELS,
+  AUDIT_EXCEL_CONFIG,
+  AUDIT_JOB_NAMES,
+} from '@modules/audit/interfaces/audit.constants';
 import type { EntityManager } from 'typeorm';
+import { User } from '@modules/users/domain/user.entity';
 
 @Injectable()
 export class AuditService implements OnApplicationBootstrap {
@@ -34,7 +40,28 @@ export class AuditService implements OnApplicationBootstrap {
     await this.setupRepeatableJobs();
   }
 
-  private async setupRepeatableJobs() {
+  private resolveUserRole(user?: User): string {
+    if (!user) return AUDIT_LABELS.UNKNOWN_ROLE;
+
+    if (user.lastActiveRole?.name) {
+      return user.lastActiveRole.name;
+    }
+
+    if (user.roles && user.roles.length > 0) {
+      const firstRole = user.roles[0];
+      return firstRole?.name || AUDIT_LABELS.UNKNOWN_ROLE;
+    }
+
+    return AUDIT_LABELS.UNKNOWN_ROLE;
+  }
+
+  private resolveUserName(user?: User): string {
+    if (!user) return AUDIT_LABELS.UNKNOWN_USER;
+    const fullName = `${user.firstName} ${user.lastName1 || ''}`.trim();
+    return fullName || AUDIT_LABELS.UNKNOWN_USER;
+  }
+
+  async setupRepeatableJobs() {
     const jobName = AUDIT_JOB_NAMES.CLEANUP_OLD_LOGS;
     const cronPattern = technicalSettings.audit.cleanupCronPattern;
 
@@ -157,12 +184,12 @@ export class AuditService implements OnApplicationBootstrap {
         id: `sec-${e.id}`,
         datetime: e.eventDatetime,
         userId: e.userId,
-        userName: e.user
-          ? `${e.user.firstName} ${e.user.lastName1 || ''}`.trim()
-          : 'Usuario',
-        actionCode: e.securityEventType?.code || 'UNKNOWN',
-        actionName: e.securityEventType?.name || 'Evento Seguridad',
-        source: 'SECURITY' as const,
+        userName: this.resolveUserName(e.user),
+        userEmail: e.user?.email || AUDIT_LABELS.NOT_AVAILABLE,
+        userRole: this.resolveUserRole(e.user),
+        actionCode: e.securityEventType?.code || AUDIT_LABELS.UNKNOWN_ACTION,
+        actionName: e.securityEventType?.name || AUDIT_LABELS.SOURCE_SECURITY,
+        source: AUDIT_SOURCES.SECURITY,
         ipAddress: e.ipAddress,
         userAgent: e.userAgent,
         metadata: e.metadata || undefined,
@@ -171,12 +198,12 @@ export class AuditService implements OnApplicationBootstrap {
         id: `aud-${l.id}`,
         datetime: l.eventDatetime,
         userId: l.userId,
-        userName: l.user
-          ? `${l.user.firstName} ${l.user.lastName1 || ''}`.trim()
-          : 'Usuario',
-        actionCode: l.auditAction?.code || 'UNKNOWN',
-        actionName: l.auditAction?.name || 'Acción Sistema',
-        source: 'AUDIT' as const,
+        userName: this.resolveUserName(l.user),
+        userEmail: l.user?.email || AUDIT_LABELS.NOT_AVAILABLE,
+        userRole: this.resolveUserRole(l.user),
+        actionCode: l.auditAction?.code || AUDIT_LABELS.UNKNOWN_ACTION,
+        actionName: l.auditAction?.name || AUDIT_LABELS.SOURCE_AUDIT,
+        source: AUDIT_SOURCES.AUDIT,
         entityType: l.entityType || undefined,
         entityId: l.entityId || undefined,
       })),
@@ -198,32 +225,66 @@ export class AuditService implements OnApplicationBootstrap {
     );
 
     const workbook = new Workbook();
-    const worksheet = workbook.addWorksheet('Historial');
+    const worksheet = workbook.addWorksheet(AUDIT_EXCEL_CONFIG.SHEET_NAME);
 
     worksheet.columns = [
-      { header: 'FECHA Y HORA', key: 'datetime', width: 25 },
-      { header: 'USUARIO', key: 'userName', width: 30 },
-      { header: 'ACCIÓN', key: 'actionName', width: 35 },
-      { header: 'CÓDIGO', key: 'actionCode', width: 25 },
-      { header: 'FUENTE', key: 'source', width: 15 },
-      { header: 'ENTIDAD', key: 'entityType', width: 20 },
-      { header: 'ID ENTIDAD', key: 'entityId', width: 15 },
-      { header: 'IP', key: 'ipAddress', width: 20 },
-      { header: 'NAVEGADOR', key: 'userAgent', width: 50 },
+      {
+        header: AUDIT_EXCEL_CONFIG.COLUMNS.DATETIME,
+        key: 'datetime',
+        width: 25,
+      },
+      {
+        header: AUDIT_EXCEL_CONFIG.COLUMNS.USER_NAME,
+        key: 'userName',
+        width: 30,
+      },
+      {
+        header: AUDIT_EXCEL_CONFIG.COLUMNS.USER_EMAIL,
+        key: 'userEmail',
+        width: 35,
+      },
+      {
+        header: AUDIT_EXCEL_CONFIG.COLUMNS.USER_ROLE,
+        key: 'userRole',
+        width: 20,
+      },
+      {
+        header: AUDIT_EXCEL_CONFIG.COLUMNS.ACTION_NAME,
+        key: 'actionName',
+        width: 35,
+      },
+      {
+        header: AUDIT_EXCEL_CONFIG.COLUMNS.ACTION_CODE,
+        key: 'actionCode',
+        width: 25,
+      },
+      { header: AUDIT_EXCEL_CONFIG.COLUMNS.SOURCE, key: 'source', width: 15 },
+      { header: AUDIT_EXCEL_CONFIG.COLUMNS.IP, key: 'ipAddress', width: 20 },
+      {
+        header: AUDIT_EXCEL_CONFIG.COLUMNS.USER_AGENT,
+        key: 'userAgent',
+        width: 50,
+      },
     ];
 
-    worksheet.getRow(1).font = { bold: true, color: { argb: 'FFFFFFFF' } };
+    worksheet.getRow(1).font = {
+      bold: true,
+      color: { argb: AUDIT_EXCEL_CONFIG.HEADER_FONT_COLOR },
+    };
     worksheet.getRow(1).fill = {
       type: 'pattern',
       pattern: 'solid',
-      fgColor: { argb: 'FF2D5F9E' },
+      fgColor: { argb: AUDIT_EXCEL_CONFIG.HEADER_FILL_COLOR },
     };
 
     history.forEach((row) => {
       worksheet.addRow({
         ...row,
-        source: row.source === 'SECURITY' ? 'SEGURIDAD' : 'AUDITORÍA',
-        datetime: row.datetime.toLocaleString('es-PE'),
+        source:
+          row.source === AUDIT_SOURCES.SECURITY
+            ? AUDIT_LABELS.SOURCE_SECURITY
+            : AUDIT_LABELS.SOURCE_AUDIT,
+        datetime: row.datetime.toLocaleString(AUDIT_EXCEL_CONFIG.LOCALE_ES_PE),
       });
     });
 

@@ -140,9 +140,9 @@ export class SessionService {
 
       return {
         session,
-        sessionStatus: (concurrentSession
+        sessionStatus: concurrentSession
           ? SESSION_STATUS_CODES.PENDING_CONCURRENT_RESOLUTION
-          : SESSION_STATUS_CODES.ACTIVE) as SessionStatusCode,
+          : SESSION_STATUS_CODES.ACTIVE,
         concurrentSessionId: concurrentSession ? concurrentSession.id : null,
       };
     };

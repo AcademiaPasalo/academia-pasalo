@@ -11,6 +11,7 @@ import { ClassEventsController } from '@modules/events/presentation/class-events
 import { EvaluationsModule } from '@modules/evaluations/evaluations.module';
 import { EnrollmentsModule } from '@modules/enrollments/enrollments.module';
 import { UsersModule } from '@modules/users/users.module';
+import { CoursesModule } from '@modules/courses/courses.module';
 import { AuthModule } from '@modules/auth/auth.module';
 import { RedisCacheModule } from '@infrastructure/cache/redis-cache.module';
 
@@ -25,6 +26,7 @@ import { RedisCacheModule } from '@infrastructure/cache/redis-cache.module';
     EvaluationsModule,
     EnrollmentsModule,
     UsersModule,
+    CoursesModule,
     RedisCacheModule,
   ],
   providers: [

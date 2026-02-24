@@ -38,6 +38,19 @@ cp .env.example .env
 
 Abra el archivo `.env` recién creado y complete los valores correspondientes a su entorno local (Base de Datos, Google OAuth, etc.).
 
+### Storage provider (LOCAL vs GDRIVE)
+
+El backend usa `STORAGE_PROVIDER` para definir donde guardar archivos.
+
+- `STORAGE_PROVIDER=LOCAL`
+  - recomendado para desarrollo y `npm run test:e2e`
+  - no requiere credenciales de Google Drive
+- `STORAGE_PROVIDER=GDRIVE`
+  - recomendado para produccion
+  - requiere:
+    - `GOOGLE_APPLICATION_CREDENTIALS`
+    - `GOOGLE_DRIVE_ROOT_FOLDER_ID`
+
 ### 4. Base de Datos (MySQL)
 
 Este proyecto **NO** utiliza sincronización automática (`synchronize: true`) por seguridad y control estricto del esquema.
@@ -90,8 +103,11 @@ El proyecto cuenta con suites de pruebas unitarias y de extremo a extremo (E2E) 
 # Pruebas Unitarias
 npm run test
 
-# Pruebas E2E (Seguridad y Flujos Críticos)
+# Pruebas E2E normales (forzado a LOCAL)
 npm run test:e2e
+
+# Prueba E2E live de Drive (forzado a GDRIVE)
+npm run test:e2e:drive-live
 ```
 
 ## Infraestructura y Futuro

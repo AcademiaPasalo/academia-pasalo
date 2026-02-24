@@ -36,6 +36,9 @@ export interface ClassEvent {
   canCopyRecordingLink: boolean;
   courseName: string;
   courseCode: string;
+  courseCycleId: string;
+  evaluationId: string;
+  evaluationName: string;
   creator: ClassEventCreator;
   professors: ClassEventProfessor[];
   createdAt: string;

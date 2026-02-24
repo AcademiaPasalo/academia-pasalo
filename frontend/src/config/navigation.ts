@@ -35,23 +35,23 @@ export const navigationConfig: Record<UserRole, SidebarNavItem[]> = {
       label: 'Inicio',
       href: '/plataforma/inicio'
     },
-    {
+    /*{
       icon: 'class',
       label: 'Mis Cursos',
       href: '#',
       expandable: true,
       subItems: []
-    },
+    },*/
     {
       icon: 'event',
       label: 'Calendario',
       href: '/plataforma/calendario'
     },
-    {
+    /*{
       icon: 'notifications',
       label: 'Notificaciones',
       href: '/plataforma/notificaciones'
-    }
+    }*/
   ],
 
   TEACHER: [
@@ -60,6 +60,11 @@ export const navigationConfig: Record<UserRole, SidebarNavItem[]> = {
       label: 'Inicio',
       href: '/plataforma/inicio'
     },
+    {
+      icon: 'event',
+      label: 'Calendario',
+      href: '/plataforma/calendario'
+    },
   ],
 
   ADMIN: [
@@ -67,23 +72,6 @@ export const navigationConfig: Record<UserRole, SidebarNavItem[]> = {
       icon: 'home',
       label: 'Inicio',
       href: '/plataforma/inicio'
-    },
-    {
-      icon: 'class',
-      label: 'Mis Cursos',
-      href: '#',
-      expandable: true,
-      subItems: []
-    },
-    {
-      icon: 'event',
-      label: 'Calendario',
-      href: '/plataforma/calendario'
-    },
-    {
-      icon: 'notifications',
-      label: 'Notificaciones',
-      href: '/plataforma/notificaciones'
     },
     {
       icon: 'shield',

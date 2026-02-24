@@ -24,9 +24,9 @@ export class HealthController {
           await this.cacheService.set('health:check', 'ok', 10);
           const result = await this.cacheService.get('health:check');
           if (result !== 'ok')
-            throw new Error('La verificaci�n de Redis fall�');
+            throw new Error('La verificación de Redis falló');
           return { redis: { status: 'up' } };
-        } catch (error) {
+        } catch {
           return {
             redis: {
               status: 'down',

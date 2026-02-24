@@ -18,6 +18,7 @@ import {
   DatabaseError,
   MySqlErrorCode,
 } from '@common/interfaces/database-error.interface';
+import { getErrnoFromDbError } from '@common/utils/mysql-error.util';
 
 @Injectable()
 export class UsersService {
@@ -47,8 +48,7 @@ export class UsersService {
         updatedAt: null,
       });
     } catch (error) {
-      const dbError = error as DatabaseError;
-      const errno = dbError.errno ?? dbError.driverError?.errno;
+      const errno = getErrnoFromDbError(error as DatabaseError);
       if (errno === MySqlErrorCode.DUPLICATE_ENTRY) {
         throw new ConflictException('El correo electrónico ya está registrado');
       }
@@ -108,8 +108,7 @@ export class UsersService {
       try {
         updatedUser = await this.userRepository.save(user, manager);
       } catch (error) {
-        const dbError = error as DatabaseError;
-        const errno = dbError.errno ?? dbError.driverError?.errno;
+        const errno = getErrnoFromDbError(error as DatabaseError);
         if (errno === MySqlErrorCode.DUPLICATE_ENTRY) {
           throw new ConflictException(
             'El correo electrónico ya está registrado',
@@ -161,8 +160,7 @@ export class UsersService {
       try {
         updatedUser = await this.userRepository.save(user, manager);
       } catch (error) {
-        const dbError = error as DatabaseError;
-        const errno = dbError.errno ?? dbError.driverError?.errno;
+        const errno = getErrnoFromDbError(error as DatabaseError);
         if (errno === MySqlErrorCode.DUPLICATE_ENTRY) {
           throw new ConflictException('El usuario ya tiene este rol asignado');
         }
@@ -206,8 +204,7 @@ export class UsersService {
       try {
         updatedUser = await this.userRepository.save(user, manager);
       } catch (error) {
-        const dbError = error as DatabaseError;
-        const errno = dbError.errno ?? dbError.driverError?.errno;
+        const errno = getErrnoFromDbError(error as DatabaseError);
 
         if (
           errno === MySqlErrorCode.LOCK_WAIT_TIMEOUT ||
@@ -251,20 +248,21 @@ export class UsersService {
     currentUser: User,
     updateUserDto: UpdateUserDto,
   ): boolean {
-    if (
-      typeof updateUserDto.email === 'string' &&
-      updateUserDto.email !== currentUser.email
-    ) {
-      return true;
-    }
+    const fieldsToCompare: (keyof UpdateUserDto)[] = [
+      'email',
+      'firstName',
+      'lastName1',
+      'lastName2',
+      'phone',
+      'career',
+      'profilePhotoUrl',
+      'isActive',
+    ];
 
-    if (
-      typeof updateUserDto.isActive === 'boolean' &&
-      updateUserDto.isActive !== currentUser.isActive
-    ) {
-      return true;
-    }
-
-    return false;
+    return fieldsToCompare.some((field) => {
+      const newValue = updateUserDto[field];
+      if (newValue === undefined) return false;
+      return newValue !== currentUser[field];
+    });
   }
 }

@@ -18,12 +18,15 @@ export class ClassEventResponseDto {
   canJoinLive: boolean;
   canWatchRecording: boolean;
   canCopyLiveLink: boolean;
-    canCopyRecordingLink: boolean;
-    courseName: string;
-    courseCode: string;
-    evaluationName: string;
-    creator: {
-      id: string;    firstName: string;
+  canCopyRecordingLink: boolean;
+  courseName: string;
+  courseCode: string;
+  courseCycleId: string;
+  evaluationId: string;
+  evaluationName: string;
+  creator: {
+    id: string;
+    firstName: string;
     lastName1: string;
     lastName2: string;
     profilePhotoUrl: string | null;
@@ -50,8 +53,8 @@ export class ClassEventResponseDto {
       topic: event.topic,
       startDatetime: event.startDatetime,
       endDatetime: event.endDatetime,
-      liveMeetingUrl: access.canJoinLive ? event.liveMeetingUrl : null,
-      recordingUrl: access.canWatchRecording ? event.recordingUrl : null,
+      liveMeetingUrl: event.liveMeetingUrl,
+      recordingUrl: event.recordingUrl,
       isCancelled: event.isCancelled,
       status,
       canJoinLive: access.canJoinLive,
@@ -60,6 +63,8 @@ export class ClassEventResponseDto {
       canCopyRecordingLink: access.canCopyRecordingLink,
       courseName: event.evaluation?.courseCycle?.course?.name || '',
       courseCode: event.evaluation?.courseCycle?.course?.code || '',
+      courseCycleId: event.evaluation?.courseCycleId || '',
+      evaluationId: event.evaluationId || '',
       evaluationName: event.evaluation
         ? `${event.evaluation.evaluationType?.code || ''}${event.evaluation.number || ''}`.trim()
         : '',

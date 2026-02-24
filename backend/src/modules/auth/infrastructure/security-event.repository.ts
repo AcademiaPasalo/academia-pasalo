@@ -56,7 +56,9 @@ export class SecurityEventRepository {
     const query = this.ormRepository
       .createQueryBuilder('e')
       .leftJoinAndSelect('e.securityEventType', 'et')
-      .leftJoinAndSelect('e.user', 'u');
+      .leftJoinAndSelect('e.user', 'u')
+      .leftJoinAndSelect('u.lastActiveRole', 'lar')
+      .leftJoinAndSelect('u.roles', 'r');
 
     if (filters.startDate) {
       query.andWhere('e.eventDatetime >= :startDate', {

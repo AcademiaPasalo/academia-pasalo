@@ -15,11 +15,12 @@ import type { Response } from 'express';
 import { MaterialsService } from '@modules/materials/application/materials.service';
 import { UploadMaterialDto } from '@modules/materials/dto/upload-material.dto';
 import { CreateMaterialFolderDto } from '@modules/materials/dto/create-material-folder.dto';
+import { CreateFolderTemplateDto } from '@modules/materials/dto/create-folder-template.dto';
 import { RequestDeletionDto } from '@modules/materials/dto/request-deletion.dto';
 import { Auth } from '@common/decorators/auth.decorator';
 import { Roles } from '@common/decorators/roles.decorator';
 import { CurrentUser } from '@common/decorators/current-user.decorator';
-import { User } from '@modules/users/domain/user.entity';
+import type { UserWithSession } from '@modules/auth/strategies/jwt.strategy';
 import { ResponseMessage } from '@common/decorators/response-message.decorator';
 import { ROLE_CODES } from '@common/constants/role-codes.constants';
 
@@ -33,10 +34,21 @@ export class MaterialsController {
   @HttpCode(HttpStatus.CREATED)
   @ResponseMessage('Carpeta creada exitosamente')
   async createFolder(
-    @CurrentUser() user: User,
+    @CurrentUser() user: UserWithSession,
     @Body() dto: CreateMaterialFolderDto,
   ) {
-    return await this.materialsService.createFolder(user.id, dto);
+    return await this.materialsService.createFolder(user, dto);
+  }
+
+  @Post('folders/template')
+  @Roles(ROLE_CODES.ADMIN, ROLE_CODES.PROFESSOR, ROLE_CODES.SUPER_ADMIN)
+  @HttpCode(HttpStatus.CREATED)
+  @ResponseMessage('Estructura de carpetas creada exitosamente')
+  async createFolderTemplate(
+    @CurrentUser() user: UserWithSession,
+    @Body() dto: CreateFolderTemplateDto,
+  ) {
+    return await this.materialsService.createFolderTemplate(user, dto);
   }
 
   @Post()
@@ -45,11 +57,11 @@ export class MaterialsController {
   @HttpCode(HttpStatus.CREATED)
   @ResponseMessage('Material subido exitosamente')
   async upload(
-    @CurrentUser() user: User,
+    @CurrentUser() user: UserWithSession,
     @Body() dto: UploadMaterialDto,
     @UploadedFile() file: Express.Multer.File,
   ) {
-    return await this.materialsService.uploadMaterial(user.id, dto, file);
+    return await this.materialsService.uploadMaterial(user, dto, file);
   }
 
   @Post(':id/versions')
@@ -58,11 +70,11 @@ export class MaterialsController {
   @HttpCode(HttpStatus.CREATED)
   @ResponseMessage('Nueva versión subida exitosamente')
   async addVersion(
-    @CurrentUser() user: User,
+    @CurrentUser() user: UserWithSession,
     @Param('id') materialId: string,
     @UploadedFile() file: Express.Multer.File,
   ) {
-    return await this.materialsService.addVersion(user.id, materialId, file);
+    return await this.materialsService.addVersion(user, materialId, file);
   }
 
   @Get('folders/evaluation/:evaluationId')
@@ -74,7 +86,7 @@ export class MaterialsController {
   )
   @ResponseMessage('Carpetas raíz obtenidas exitosamente')
   async getRootFolders(
-    @CurrentUser() user: User,
+    @CurrentUser() user: UserWithSession,
     @Param('evaluationId') evaluationId: string,
   ) {
     return await this.materialsService.getRootFolders(user, evaluationId);
@@ -89,7 +101,7 @@ export class MaterialsController {
   )
   @ResponseMessage('Contenido de carpeta obtenido exitosamente')
   async getFolderContents(
-    @CurrentUser() user: User,
+    @CurrentUser() user: UserWithSession,
     @Param('folderId') folderId: string,
   ) {
     return await this.materialsService.getFolderContents(user, folderId);
@@ -104,7 +116,7 @@ export class MaterialsController {
   )
   @ResponseMessage('Materiales de sesion obtenidos exitosamente')
   async getClassEventMaterials(
-    @CurrentUser() user: User,
+    @CurrentUser() user: UserWithSession,
     @Param('classEventId') classEventId: string,
   ) {
     return await this.materialsService.getClassEventMaterials(
@@ -121,7 +133,7 @@ export class MaterialsController {
     ROLE_CODES.SUPER_ADMIN,
   )
   async download(
-    @CurrentUser() user: User,
+    @CurrentUser() user: UserWithSession,
     @Param('id') materialId: string,
     @Res({ passthrough: true }) res: Response,
   ) {
@@ -143,9 +155,9 @@ export class MaterialsController {
   @HttpCode(HttpStatus.OK)
   @ResponseMessage('Solicitud de eliminación registrada')
   async requestDeletion(
-    @CurrentUser() user: User,
+    @CurrentUser() user: UserWithSession,
     @Body() dto: RequestDeletionDto,
   ) {
-    await this.materialsService.requestDeletion(user.id, dto);
+    await this.materialsService.requestDeletion(user, dto);
   }
 }

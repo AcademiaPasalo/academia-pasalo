@@ -49,10 +49,10 @@ export class AuthSettingsService {
   }
 
   invalidateCache(key: string) {
-    this.settingsService.invalidateCache(key);
+    return this.settingsService.invalidateCache(key);
   }
 
   invalidateAllCache() {
-    this.settingsService.invalidateAllCache();
+    return this.settingsService.invalidateAllCache();
   }
 }

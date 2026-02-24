@@ -10,27 +10,20 @@ import { FileResourceRepository } from '@modules/materials/infrastructure/file-r
 import { FileVersionRepository } from '@modules/materials/infrastructure/file-version.repository';
 import { MaterialCatalogRepository } from '@modules/materials/infrastructure/material-catalog.repository';
 import { DeletionRequestRepository } from '@modules/materials/infrastructure/deletion-request.repository';
-import { UserRepository } from '@modules/users/infrastructure/user.repository';
+import { CourseCycleProfessorRepository } from '@modules/courses/infrastructure/course-cycle-professor.repository';
 import { AuditService } from '@modules/audit/application/audit.service';
-import {
-  AUDIT_ACTION_CODES,
-  AUDIT_ENTITY_TYPES,
-} from '@modules/audit/interfaces/audit.constants';
+import { AUDIT_ENTITY_TYPES } from '@modules/audit/interfaces/audit.constants';
 import { ClassEventRepository } from '@modules/events/infrastructure/class-event.repository';
 import { MaterialFolder } from '@modules/materials/domain/material-folder.entity';
-import { User } from '@modules/users/domain/user.entity';
+import { UserWithSession } from '@modules/auth/strategies/jwt.strategy';
 import { MaterialStatus } from '@modules/materials/domain/material-status.entity';
 import { FolderStatus } from '@modules/materials/domain/folder-status.entity';
 import { DeletionRequestStatus } from '@modules/materials/domain/deletion-request-status.entity';
 import { Material } from '@modules/materials/domain/material.entity';
 import { FileResource } from '@modules/materials/domain/file-resource.entity';
 import { ROLE_CODES } from '@common/constants/role-codes.constants';
-import {
-  DELETION_REQUEST_STATUS_CODES,
-  FOLDER_STATUS_CODES,
-  MATERIAL_CACHE_KEYS,
-  MATERIAL_STATUS_CODES,
-} from '@modules/materials/domain/material.constants';
+import { MATERIAL_CACHE_KEYS } from '@modules/materials/domain/material.constants';
+import { ClassEvent } from '@modules/events/domain/class-event.entity';
 
 const mockFolder = (
   id = '1',
@@ -52,6 +45,18 @@ const mockFile = () =>
     buffer: Buffer.from('%PDF-1.4 content'),
   }) as Express.Multer.File;
 
+const mockStudent: UserWithSession = {
+  id: 'user-1',
+  activeRole: ROLE_CODES.STUDENT,
+  roles: [{ code: ROLE_CODES.STUDENT }],
+} as UserWithSession;
+
+const mockProfessor: UserWithSession = {
+  id: 'prof-1',
+  activeRole: ROLE_CODES.PROFESSOR,
+  roles: [{ code: ROLE_CODES.PROFESSOR }],
+} as UserWithSession;
+
 describe('MaterialsService', () => {
   let service: MaterialsService;
   let dataSource: jest.Mocked<DataSource>;
@@ -61,8 +66,8 @@ describe('MaterialsService', () => {
   let resourceRepo: jest.Mocked<FileResourceRepository>;
   let catalogRepo: jest.Mocked<MaterialCatalogRepository>;
   let deletionRepo: jest.Mocked<DeletionRequestRepository>;
+  let courseCycleProfessorRepo: jest.Mocked<CourseCycleProfessorRepository>;
   let accessEngine: jest.Mocked<AccessEngineService>;
-  let userRepo: jest.Mocked<UserRepository>;
   let auditService: jest.Mocked<AuditService>;
   let cacheService: jest.Mocked<RedisCacheService>;
   let classEventRepo: jest.Mocked<ClassEventRepository>;
@@ -81,6 +86,7 @@ describe('MaterialsService', () => {
             calculateHash: jest.fn(),
             saveFile: jest.fn(),
             deleteFile: jest.fn(),
+            getFileStream: jest.fn(),
           },
         },
         {
@@ -111,11 +117,12 @@ describe('MaterialsService', () => {
             findById: jest.fn(),
             findByFolderId: jest.fn(),
             findByClassEventId: jest.fn(),
+            countByFolderIds: jest.fn().mockResolvedValue({}),
           },
         },
         {
           provide: FileResourceRepository,
-          useValue: { create: jest.fn(), findByHash: jest.fn() },
+          useValue: { create: jest.fn(), findByHashAndSize: jest.fn() },
         },
         {
           provide: FileVersionRepository,
@@ -134,8 +141,11 @@ describe('MaterialsService', () => {
           useValue: { create: jest.fn() },
         },
         {
-          provide: UserRepository,
-          useValue: { findById: jest.fn() },
+          provide: CourseCycleProfessorRepository,
+          useValue: {
+            isProfessorAssigned: jest.fn(),
+            isProfessorAssignedToEvaluation: jest.fn(),
+          },
         },
         {
           provide: AuditService,
@@ -156,16 +166,37 @@ describe('MaterialsService', () => {
     resourceRepo = module.get(FileResourceRepository);
     catalogRepo = module.get(MaterialCatalogRepository);
     deletionRepo = module.get(DeletionRequestRepository);
+    courseCycleProfessorRepo = module.get(CourseCycleProfessorRepository);
     accessEngine = module.get(AccessEngineService);
-    userRepo = module.get(UserRepository);
     auditService = module.get(AuditService);
     cacheService = module.get(RedisCacheService);
     classEventRepo = module.get(ClassEventRepository);
+    (
+      courseCycleProfessorRepo.isProfessorAssignedToEvaluation as jest.Mock
+    ).mockResolvedValue(true);
 
-    userRepo.findById.mockResolvedValue({
-      id: 'user-1',
-      roles: [{ code: ROLE_CODES.STUDENT }],
-    } as User);
+    dataSource.transaction.mockImplementation(
+      (arg1: unknown, arg2?: unknown) => {
+        const runInTransaction = (typeof arg1 === 'function' ? arg1 : arg2) as (
+          manager: EntityManager,
+        ) => Promise<unknown>;
+        if (!runInTransaction) return Promise.resolve();
+
+        const mockManager = {
+          save: jest.fn((entity: unknown) =>
+            Promise.resolve({ ...(entity as object), id: 'saved-id' }),
+          ),
+          create: jest.fn((entity: unknown, data: object) => ({
+            ...data,
+            id: 'created-id',
+          })),
+          findOne: jest.fn().mockResolvedValue({ id: 'default-id' }),
+          getRepository: jest.fn(),
+        } as unknown as EntityManager;
+
+        return runInTransaction(mockManager);
+      },
+    );
   });
 
   describe('createFolder', () => {
@@ -175,7 +206,7 @@ describe('MaterialsService', () => {
       } as FolderStatus);
       folderRepo.create.mockResolvedValue(mockFolder('1'));
 
-      const result = await service.createFolder('user1', {
+      const result = await service.createFolder(mockProfessor, {
         evaluationId: '100',
         name: 'Root Folder',
       });
@@ -183,51 +214,106 @@ describe('MaterialsService', () => {
       expect(result).toBeDefined();
       expect(folderRepo.create).toHaveBeenCalled();
     });
+
+    it('should reject folder creation when visibility range is invalid', async () => {
+      catalogRepo.findFolderStatusByCode.mockResolvedValue({
+        id: '1',
+      } as FolderStatus);
+      await expect(
+        service.createFolder(mockProfessor, {
+          evaluationId: '100',
+          name: 'Invalid',
+          visibleFrom: '2026-12-31T00:00:00.000Z',
+          visibleUntil: '2026-01-01T00:00:00.000Z',
+        }),
+      ).rejects.toThrow('Rango de visibilidad inv');
+    });
+
+    it('should reject creating a third-level folder (depth > 2)', async () => {
+      catalogRepo.findFolderStatusByCode.mockResolvedValue({
+        id: '1',
+      } as FolderStatus);
+      folderRepo.findById.mockResolvedValue(
+        mockFolder('child-1', '100', 'root-1'),
+      );
+
+      await expect(
+        service.createFolder(mockProfessor, {
+          evaluationId: '100',
+          parentFolderId: 'child-1',
+          name: 'Grandchild Folder',
+        }),
+      ).rejects.toThrow('No se permite crear subcarpetas');
+    });
+  });
+
+  describe('createFolderTemplate', () => {
+    it('should create root and first-level subfolders successfully', async () => {
+      catalogRepo.findFolderStatusByCode.mockResolvedValue({
+        id: '1',
+      } as FolderStatus);
+
+      const result = await service.createFolderTemplate(mockProfessor, {
+        evaluationId: '100',
+        rootName: 'Curso 2026-1',
+        subfolderNames: ['PC1', 'PC2', 'EX1'],
+      });
+
+      expect(result.rootFolder).toBeDefined();
+      expect(result.subFolders).toHaveLength(3);
+      expect(cacheService.del).toHaveBeenCalledWith(
+        MATERIAL_CACHE_KEYS.ROOTS('100'),
+      );
+    });
+
+    it('should reject template creation when subfolder names are duplicated', async () => {
+      catalogRepo.findFolderStatusByCode.mockResolvedValue({
+        id: '1',
+      } as FolderStatus);
+
+      await expect(
+        service.createFolderTemplate(mockProfessor, {
+          evaluationId: '100',
+          rootName: 'Curso 2026-1',
+          subfolderNames: ['PC1', 'pc1'],
+        }),
+      ).rejects.toThrow('no pueden repetirse');
+    });
+
+    it('should reject template creation when any subfolder name is empty', async () => {
+      catalogRepo.findFolderStatusByCode.mockResolvedValue({
+        id: '1',
+      } as FolderStatus);
+
+      await expect(
+        service.createFolderTemplate(mockProfessor, {
+          evaluationId: '100',
+          rootName: 'Curso 2026-1',
+          subfolderNames: ['PC1', '   '],
+        }),
+      ).rejects.toThrow('deben tener contenido');
+    });
   });
 
   describe('uploadMaterial', () => {
     it('should upload a new file successfully', async () => {
       const file = mockFile();
-      const mockManager = {
-        save: jest.fn((entity: unknown) =>
-          Promise.resolve({ ...(entity as object), id: 'saved-id' }),
-        ),
-        create: jest.fn((entity: unknown, data: object) => ({
-          ...data,
-          id: 'created-id',
-        })),
-        findOne: jest.fn(),
-        getRepository: jest.fn(),
-      } as unknown as EntityManager;
 
       catalogRepo.findMaterialStatusByCode.mockResolvedValue({
         id: '1',
       } as MaterialStatus);
       folderRepo.findById.mockResolvedValue(mockFolder());
 
-      dataSource.transaction.mockImplementation(
-        (
-          cbOrIsolation:
-            | string
-            | ((manager: EntityManager) => Promise<unknown>),
-          cb?: (manager: EntityManager) => Promise<unknown>,
-        ) => {
-          if (typeof cbOrIsolation === 'function') {
-            return cbOrIsolation(mockManager);
-          }
-          if (cb) {
-            return cb(mockManager);
-          }
-          return Promise.resolve();
-        },
-      );
-
       storageService.calculateHash.mockResolvedValue('hash123');
-      resourceRepo.findByHash.mockResolvedValue(null);
-      storageService.saveFile.mockResolvedValue('/path/to/file');
+      resourceRepo.findByHashAndSize.mockResolvedValue(null);
+      storageService.saveFile.mockResolvedValue({
+        storageProvider: 'LOCAL',
+        storageKey: 'test.pdf',
+        storageUrl: '/path/to/file',
+      });
 
       const result = await service.uploadMaterial(
-        'user1',
+        mockProfessor,
         { materialFolderId: '1', displayName: 'Doc' },
         file,
       );
@@ -235,11 +321,11 @@ describe('MaterialsService', () => {
       expect(storageService.saveFile).toHaveBeenCalled();
       expect(result).toBeDefined();
       expect(auditService.logAction).toHaveBeenCalledWith(
-        'user1',
+        'prof-1',
         'FILE_UPLOAD',
         AUDIT_ENTITY_TYPES.MATERIAL,
         'saved-id',
-        mockManager,
+        expect.anything(),
       );
     });
 
@@ -252,11 +338,11 @@ describe('MaterialsService', () => {
       classEventRepo.findByIdSimple.mockResolvedValue({
         id: '55',
         evaluationId: '999',
-      } as never);
+      } as ClassEvent);
 
       await expect(
         service.uploadMaterial(
-          'user1',
+          mockProfessor,
           {
             materialFolderId: '1',
             displayName: 'Doc',
@@ -265,74 +351,340 @@ describe('MaterialsService', () => {
           file,
         ),
       ).rejects.toThrow(
-        'Inconsistencia: La sesion no pertenece a la misma evaluacion de la carpeta',
+        'Inconsistencia: La sesión no pertenece a la misma evaluación de la carpeta',
+      );
+    });
+
+    it('should deduplicate when resource already exists and avoid physical upload', async () => {
+      const file = mockFile();
+      catalogRepo.findMaterialStatusByCode.mockResolvedValue({
+        id: '1',
+      } as MaterialStatus);
+      folderRepo.findById.mockResolvedValue(mockFolder());
+      storageService.calculateHash.mockResolvedValue('hash-existing');
+      resourceRepo.findByHashAndSize.mockResolvedValue({
+        id: 'res-existing',
+        storageProvider: 'GDRIVE',
+        storageKey: 'drive-key',
+        storageUrl: null,
+      } as unknown as FileResource);
+
+      await service.uploadMaterial(
+        mockProfessor,
+        { materialFolderId: '1', displayName: 'Doc' },
+        file,
+      );
+
+      expect(storageService.saveFile).not.toHaveBeenCalled();
+    });
+
+    it('should rollback uploaded file when transaction fails after save', async () => {
+      const file = mockFile();
+
+      catalogRepo.findMaterialStatusByCode.mockResolvedValue({
+        id: '1',
+      } as MaterialStatus);
+      folderRepo.findById.mockResolvedValue(mockFolder());
+      storageService.calculateHash.mockResolvedValue('hash123');
+      resourceRepo.findByHashAndSize.mockResolvedValue(null);
+      storageService.saveFile.mockResolvedValue({
+        storageProvider: 'LOCAL',
+        storageKey: 'rollback.pdf',
+        storageUrl: '/path/rollback.pdf',
+      });
+      dataSource.transaction.mockImplementation(async (cb: any) => {
+        const manager = {
+          save: jest.fn((entity: unknown) =>
+            Promise.resolve({ ...(entity as object), id: 'saved-id' }),
+          ),
+          create: jest.fn((_: unknown, data: object) => data),
+          findOne: jest.fn().mockResolvedValue({ id: 'default-id' }),
+        } as any;
+        await cb(manager);
+        throw new Error('db-failure');
+      });
+
+      await expect(
+        service.uploadMaterial(
+          mockProfessor,
+          { materialFolderId: '1', displayName: 'Doc' },
+          file,
+        ),
+      ).rejects.toThrow('db-failure');
+
+      expect(storageService.deleteFile).toHaveBeenCalledWith(
+        'rollback.pdf',
+        'LOCAL',
+        '/path/rollback.pdf',
+      );
+    });
+
+    it('should recover from concurrent dedup collision on file_resource and clean orphan physical file', async () => {
+      const file = mockFile();
+      catalogRepo.findMaterialStatusByCode.mockResolvedValue({
+        id: '1',
+      } as MaterialStatus);
+      folderRepo.findById.mockResolvedValue(mockFolder());
+      storageService.calculateHash.mockResolvedValue('hash-collision');
+      resourceRepo.findByHashAndSize
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce({
+          id: 'res-dedup',
+          storageProvider: 'GDRIVE',
+          storageKey: 'drive-key',
+          storageUrl: null,
+        } as unknown as FileResource);
+      storageService.saveFile.mockResolvedValue({
+        storageProvider: 'LOCAL',
+        storageKey: 'collision.pdf',
+        storageUrl: '/tmp/collision.pdf',
+      });
+
+      dataSource.transaction.mockImplementation(async (cb: any) => {
+        const duplicateErr = { errno: 1062 };
+        const manager = {
+          create: jest.fn((_: unknown, data: object) => data),
+          findOne: jest
+            .fn()
+            .mockResolvedValue({ id: 'ver-1', versionNumber: 1 }),
+          save: jest
+            .fn()
+            .mockRejectedValueOnce(duplicateErr)
+            .mockResolvedValueOnce({ id: 'saved-id', materialFolderId: '1' }),
+        } as any;
+        return await cb(manager);
+      });
+
+      const result = await service.uploadMaterial(
+        mockProfessor,
+        { materialFolderId: '1', displayName: 'Doc' },
+        file,
+      );
+
+      expect(result).toBeDefined();
+      expect(storageService.deleteFile).toHaveBeenCalledWith(
+        'collision.pdf',
+        'LOCAL',
+        '/tmp/collision.pdf',
       );
     });
   });
 
   describe('addVersion', () => {
+    it('should reject addVersion when mime type is not allowed', async () => {
+      const file = {
+        ...mockFile(),
+        mimetype: 'application/x-msdownload',
+      } as Express.Multer.File;
+
+      await expect(
+        service.addVersion(mockProfessor, 'mat-1', file),
+      ).rejects.toThrow('Tipo de archivo no permitido');
+    });
+
+    it('should reject addVersion when pdf magic header is invalid', async () => {
+      const file = {
+        ...mockFile(),
+        buffer: Buffer.from('NOTPDF'),
+      } as Express.Multer.File;
+
+      await expect(
+        service.addVersion(mockProfessor, 'mat-1', file),
+      ).rejects.toThrow('El archivo no es un PDF');
+    });
+
     it('should invalidate folder cache using materialFolderId', async () => {
       const file = mockFile();
       const persistedMaterial = {
         id: 'mat-1',
         materialFolderId: 'folder-77',
         fileVersionId: 'ver-1',
+        materialFolder: { evaluationId: '100' },
       } as Material;
 
-      const mockManager = {
-        findOne: jest
-          .fn()
-          .mockResolvedValueOnce(persistedMaterial)
-          .mockResolvedValueOnce({ id: 'ver-1', versionNumber: 1 }),
-        create: jest.fn((_: unknown, data: object) => data),
-        save: jest
-          .fn()
-          .mockResolvedValueOnce({ id: 'ver-2', versionNumber: 2 })
-          .mockResolvedValueOnce(persistedMaterial),
-      } as unknown as EntityManager;
-
       dataSource.transaction.mockImplementation(
-        (
-          cbOrIsolation:
-            | string
-            | ((manager: EntityManager) => Promise<unknown>),
-          cb?: (manager: EntityManager) => Promise<unknown>,
-        ) => {
-          if (typeof cbOrIsolation === 'function') {
-            return cbOrIsolation(mockManager);
-          }
-          if (cb) {
-            return cb(mockManager);
-          }
-          return Promise.resolve();
+        (arg1: unknown, arg2?: unknown) => {
+          const runInTransaction = (
+            typeof arg1 === 'function' ? arg1 : arg2
+          ) as (manager: EntityManager) => Promise<unknown>;
+
+          const mockManager = {
+            findOne: jest
+              .fn()
+              .mockResolvedValueOnce(persistedMaterial)
+              .mockResolvedValueOnce({ id: 'resource-1' })
+              .mockResolvedValueOnce({ id: 'ver-1', versionNumber: 1 })
+              .mockResolvedValueOnce({ id: 'ver-1', versionNumber: 1 }),
+            create: jest.fn((_: unknown, data: object) => data),
+            save: jest
+              .fn()
+              .mockResolvedValueOnce({ id: 'ver-2', versionNumber: 2 })
+              .mockResolvedValueOnce(persistedMaterial),
+          } as unknown as EntityManager;
+
+          return runInTransaction
+            ? runInTransaction(mockManager)
+            : Promise.resolve();
         },
       );
 
       storageService.calculateHash.mockResolvedValue('hash-v2');
-      resourceRepo.findByHash.mockResolvedValue({
+      resourceRepo.findByHashAndSize.mockResolvedValue({
         id: 'resource-1',
         storageUrl: '/path/file.pdf',
       } as FileResource);
 
-      await service.addVersion('user1', 'mat-1', file);
+      await service.addVersion(mockProfessor, 'mat-1', file);
 
       expect(cacheService.del).toHaveBeenCalledWith(
         MATERIAL_CACHE_KEYS.CONTENTS('folder-77'),
       );
     });
+
+    it('should deduplicate on addVersion when resource already exists', async () => {
+      const file = mockFile();
+      const persistedMaterial = {
+        id: 'mat-1',
+        materialFolderId: 'folder-77',
+        fileVersionId: 'ver-1',
+        materialFolder: { evaluationId: '100' },
+      } as Material;
+
+      dataSource.transaction.mockImplementation(
+        (arg1: unknown, arg2?: unknown) => {
+          const runInTransaction = (
+            typeof arg1 === 'function' ? arg1 : arg2
+          ) as (manager: EntityManager) => Promise<unknown>;
+          const mockManager = {
+            findOne: jest
+              .fn()
+              .mockResolvedValueOnce(persistedMaterial)
+              .mockResolvedValueOnce({ id: 'res-existing' })
+              .mockResolvedValueOnce({ id: 'ver-2', versionNumber: 2 })
+              .mockResolvedValueOnce({ id: 'ver-2', versionNumber: 2 }),
+            create: jest.fn((_: unknown, data: object) => data),
+            save: jest
+              .fn()
+              .mockResolvedValueOnce({ id: 'ver-3', versionNumber: 3 })
+              .mockResolvedValueOnce(persistedMaterial),
+          } as unknown as EntityManager;
+          return runInTransaction
+            ? runInTransaction(mockManager)
+            : Promise.resolve();
+        },
+      );
+
+      storageService.calculateHash.mockResolvedValue('hash-existing-v3');
+      resourceRepo.findByHashAndSize.mockResolvedValue({
+        id: 'res-existing',
+        storageProvider: 'GDRIVE',
+        storageKey: 'drive-key',
+        storageUrl: null,
+      } as unknown as FileResource);
+
+      await service.addVersion(mockProfessor, 'mat-1', file);
+
+      expect(storageService.saveFile).not.toHaveBeenCalled();
+    });
+
+    it('should recover from concurrent dedup collision on addVersion and clean orphan physical file', async () => {
+      const file = mockFile();
+      const persistedMaterial = {
+        id: 'mat-1',
+        materialFolderId: 'folder-77',
+        fileVersionId: 'ver-1',
+        materialFolder: { evaluationId: '100' },
+      } as Material;
+
+      storageService.calculateHash.mockResolvedValue('hash-collision-v2');
+      resourceRepo.findByHashAndSize
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce({
+          id: 'res-dedup-v2',
+          storageProvider: 'GDRIVE',
+          storageKey: 'drive-key-v2',
+          storageUrl: null,
+        } as unknown as FileResource);
+      storageService.saveFile.mockResolvedValue({
+        storageProvider: 'LOCAL',
+        storageKey: 'collision-v2.pdf',
+        storageUrl: '/tmp/collision-v2.pdf',
+      });
+
+      dataSource.transaction.mockImplementation(async (cb: any) => {
+        const duplicateErr = { errno: 1062 };
+        const manager = {
+          create: jest.fn((_: unknown, data: object) => data),
+          findOne: jest
+            .fn()
+            .mockResolvedValueOnce(persistedMaterial)
+            .mockResolvedValueOnce({ id: 'res-dedup-v2' })
+            .mockResolvedValueOnce({ id: 'ver-1', versionNumber: 1 })
+            .mockResolvedValueOnce({ id: 'ver-1', versionNumber: 1 }),
+          save: jest
+            .fn()
+            .mockRejectedValueOnce(duplicateErr)
+            .mockResolvedValueOnce({ id: 'ver-2', versionNumber: 2 })
+            .mockResolvedValueOnce(persistedMaterial),
+        } as any;
+        return await cb(manager);
+      });
+
+      const result = await service.addVersion(mockProfessor, 'mat-1', file);
+
+      expect(result).toBeDefined();
+      expect(storageService.deleteFile).toHaveBeenCalledWith(
+        'collision-v2.pdf',
+        'LOCAL',
+        '/tmp/collision-v2.pdf',
+      );
+    });
+
+    it('should retry when file_version collides concurrently and use next available version', async () => {
+      const file = mockFile();
+      const persistedMaterial = {
+        id: 'mat-1',
+        materialFolderId: 'folder-77',
+        fileVersionId: 'ver-1',
+        materialFolder: { evaluationId: '100' },
+      } as Material;
+
+      storageService.calculateHash.mockResolvedValue('hash-existing-v3');
+      resourceRepo.findByHashAndSize.mockResolvedValue({
+        id: 'res-existing',
+        storageProvider: 'GDRIVE',
+        storageKey: 'drive-key',
+        storageUrl: null,
+      } as unknown as FileResource);
+
+      dataSource.transaction.mockImplementation(async (cb: any) => {
+        const duplicateErr = { errno: 1062 };
+        const manager = {
+          create: jest.fn((_: unknown, data: object) => data),
+          findOne: jest
+            .fn()
+            .mockResolvedValueOnce(persistedMaterial)
+            .mockResolvedValueOnce({ id: 'res-existing' })
+            .mockResolvedValueOnce({ id: 'ver-2', versionNumber: 2 })
+            .mockResolvedValueOnce({ id: 'ver-2', versionNumber: 2 })
+            .mockResolvedValueOnce({ id: 'ver-3', versionNumber: 3 }),
+          save: jest
+            .fn()
+            .mockRejectedValueOnce(duplicateErr)
+            .mockResolvedValueOnce({ id: 'ver-4', versionNumber: 4 })
+            .mockResolvedValueOnce(persistedMaterial),
+        } as any;
+        return await cb(manager);
+      });
+
+      const result = await service.addVersion(mockProfessor, 'mat-1', file);
+
+      expect(result).toBeDefined();
+      expect(storageService.saveFile).not.toHaveBeenCalled();
+    });
   });
 
   describe('Access Control', () => {
-    const mockStudent = {
-      id: 'user-1',
-      roles: [{ code: ROLE_CODES.STUDENT }],
-    } as User;
-
-    const mockProfessor = {
-      id: 'prof-1',
-      roles: [{ code: ROLE_CODES.PROFESSOR }],
-    } as User;
-
     it('getRootFolders should check access and return folders', async () => {
       accessEngine.hasAccess.mockResolvedValue(true);
       catalogRepo.findFolderStatusByCode.mockResolvedValue({
@@ -347,16 +699,17 @@ describe('MaterialsService', () => {
 
     it('should deny access to professor if assignment is revoked', async () => {
       folderRepo.findById.mockResolvedValue(mockFolder('folder-1', '100'));
-      dataSource.query.mockResolvedValue([]); // Empty result means no ACTIVE assignment found
+      (
+        courseCycleProfessorRepo.isProfessorAssignedToEvaluation as jest.Mock
+      ).mockResolvedValue(false);
 
       await expect(
         service.getFolderContents(mockProfessor, 'folder-1'),
       ).rejects.toThrow('No tienes permiso para ver materiales de este curso');
 
-      expect(dataSource.query).toHaveBeenCalledWith(
-        expect.stringContaining('ccp.revoked_at IS NULL'),
-        expect.any(Array),
-      );
+      expect(
+        courseCycleProfessorRepo.isProfessorAssignedToEvaluation,
+      ).toHaveBeenCalledWith('100', 'prof-1');
     });
 
     it('should allow access to professor if assignment is active', async () => {
@@ -364,14 +717,48 @@ describe('MaterialsService', () => {
       catalogRepo.findFolderStatusByCode.mockResolvedValue({
         id: '1',
       } as FolderStatus);
+      catalogRepo.findMaterialStatusByCode.mockResolvedValue({
+        id: '1',
+      } as MaterialStatus);
       folderRepo.findSubFolders.mockResolvedValue([]);
       materialRepo.findByFolderId.mockResolvedValue([]);
 
-      dataSource.query.mockResolvedValue([{ 1: 1 }]); // Found active assignment
+      (
+        courseCycleProfessorRepo.isProfessorAssignedToEvaluation as jest.Mock
+      ).mockResolvedValue(true);
 
       const result = await service.getFolderContents(mockProfessor, 'folder-1');
 
       expect(result).toBeDefined();
+      expect(materialRepo.findByFolderId).toHaveBeenCalledWith('folder-1', '1');
+    });
+
+    it('should return subfolder material count with explicit zeros', async () => {
+      folderRepo.findById.mockResolvedValue(mockFolder('folder-1', '100'));
+      catalogRepo.findFolderStatusByCode.mockResolvedValue({
+        id: '1',
+      } as FolderStatus);
+      catalogRepo.findMaterialStatusByCode.mockResolvedValue({
+        id: '1',
+      } as MaterialStatus);
+      folderRepo.findSubFolders.mockResolvedValue([
+        mockFolder('child-a', '100', 'folder-1'),
+        mockFolder('child-b', '100', 'folder-1'),
+      ]);
+      materialRepo.findByFolderId.mockResolvedValue([]);
+      (materialRepo.countByFolderIds as jest.Mock).mockResolvedValue({
+        'child-a': 2,
+      });
+      (
+        courseCycleProfessorRepo.isProfessorAssignedToEvaluation as jest.Mock
+      ).mockResolvedValue(true);
+
+      const result = await service.getFolderContents(mockProfessor, 'folder-1');
+
+      expect(result.subfolderMaterialCount).toEqual({
+        'child-a': 2,
+        'child-b': 0,
+      });
     });
   });
 
@@ -380,9 +767,13 @@ describe('MaterialsService', () => {
       catalogRepo.findDeletionRequestStatusByCode.mockResolvedValue({
         id: '1',
       } as DeletionRequestStatus);
-      materialRepo.findById.mockResolvedValue({ id: 'mat1' } as Material);
+      materialRepo.findById.mockResolvedValue({
+        id: 'mat1',
+        materialFolderId: 'folder-1',
+      } as Material);
+      folderRepo.findById.mockResolvedValue(mockFolder('folder-1', '100'));
 
-      await service.requestDeletion('user1', {
+      await service.requestDeletion(mockProfessor, {
         entityType: AUDIT_ENTITY_TYPES.MATERIAL,
         entityId: 'mat1',
         reason: 'bad',
@@ -397,19 +788,90 @@ describe('MaterialsService', () => {
       classEventRepo.findByIdSimple.mockResolvedValue({
         id: '55',
         evaluationId: '100',
-      } as never);
+      } as ClassEvent);
+      catalogRepo.findMaterialStatusByCode.mockResolvedValue({
+        id: '1',
+      } as MaterialStatus);
       accessEngine.hasAccess.mockResolvedValue(true);
       materialRepo.findByClassEventId.mockResolvedValue([
         { id: 'mat-1', displayName: 'Sesion 1' } as Material,
       ]);
 
-      const result = await service.getClassEventMaterials(
-        { id: 'user-1', roles: [{ code: ROLE_CODES.STUDENT }] } as User,
-        '55',
-      );
+      const result = await service.getClassEventMaterials(mockStudent, '55');
 
       expect(result).toHaveLength(1);
-      expect(materialRepo.findByClassEventId).toHaveBeenCalledWith('55');
+      expect(materialRepo.findByClassEventId).toHaveBeenCalledWith('55', '1');
+    });
+
+    it('should throw NotFound when class event does not exist', async () => {
+      classEventRepo.findByIdSimple.mockResolvedValue(null);
+
+      await expect(
+        service.getClassEventMaterials(mockStudent, '999'),
+      ).rejects.toThrow('Sesión de clase no encontrada');
+    });
+  });
+
+  describe('download', () => {
+    it('should stream resource using storage provider metadata', async () => {
+      const mockStream = { on: jest.fn() } as any;
+      materialRepo.findById.mockResolvedValue({
+        id: 'mat-1',
+        materialFolderId: 'folder-1',
+        displayName: 'Documento',
+        fileResource: {
+          originalName: 'original.pdf',
+          mimeType: 'application/pdf',
+          storageProvider: 'GDRIVE',
+          storageKey: 'drive-123',
+          storageUrl: null,
+        },
+      } as unknown as Material);
+      folderRepo.findById.mockResolvedValue(mockFolder('folder-1', '100'));
+      accessEngine.hasAccess.mockResolvedValue(true);
+      storageService.getFileStream.mockResolvedValue(mockStream);
+
+      const result = await service.download(mockStudent, 'mat-1');
+
+      expect(storageService.getFileStream).toHaveBeenCalledWith(
+        'drive-123',
+        'GDRIVE',
+        null,
+      );
+      expect(result.stream).toBe(mockStream);
+      expect(result.fileName).toBe('Documento');
+      expect(result.mimeType).toBe('application/pdf');
+    });
+
+    it('should throw when material has no physical resource relation', async () => {
+      materialRepo.findById.mockResolvedValue({
+        id: 'mat-1',
+        materialFolderId: 'folder-1',
+        fileResource: null,
+      } as unknown as Material);
+      folderRepo.findById.mockResolvedValue(mockFolder('folder-1', '100'));
+      accessEngine.hasAccess.mockResolvedValue(true);
+
+      await expect(service.download(mockStudent, 'mat-1')).rejects.toThrow(
+        'Integridad de datos corrupta: Material sin recurso',
+      );
+    });
+  });
+
+  describe('requestDeletion - folder flow', () => {
+    it('should create deletion request for folder entity', async () => {
+      catalogRepo.findDeletionRequestStatusByCode.mockResolvedValue({
+        id: '1',
+      } as DeletionRequestStatus);
+      folderRepo.findById.mockResolvedValue(mockFolder('folder-1', '100'));
+
+      await service.requestDeletion(mockProfessor, {
+        entityType: 'material_folder' as any,
+        entityId: 'folder-1',
+        reason: 'cleanup',
+      });
+
+      expect(deletionRepo.create).toHaveBeenCalled();
     });
   });
 
@@ -420,32 +882,45 @@ describe('MaterialsService', () => {
         id: 'mat-concurrent',
         materialFolderId: 'folder-1',
         fileVersionId: 'ver-1',
+        materialFolder: { evaluationId: '100' },
       } as Material;
 
-      // Mock de una transacción que tarda un poco para simular concurrencia
-      dataSource.transaction.mockImplementation(async (cb: any) => {
-        const mockManager = {
-          findOne: jest
-            .fn()
-            .mockResolvedValueOnce(persistedMaterial)
-            .mockResolvedValueOnce({ id: 'ver-1', versionNumber: 1 }),
-          create: jest.fn((_: any, data: any) => data),
-          save: jest
-            .fn()
-            .mockImplementation((entity) =>
-              Promise.resolve({ ...entity, id: 'new-ver' }),
-            ),
-        } as any;
-        return await cb(mockManager);
-      });
+      dataSource.transaction.mockImplementation(
+        async (arg1: unknown, arg2?: unknown) => {
+          const runInTransaction = (
+            typeof arg1 === 'function' ? arg1 : arg2
+          ) as (manager: EntityManager) => Promise<unknown>;
+          const mockManager = {
+            findOne: jest.fn().mockResolvedValue(persistedMaterial),
+            create: jest.fn((_: unknown, data: object) => data),
+            save: jest
+              .fn()
+              .mockImplementation((entity: object) =>
+                Promise.resolve({ ...entity, id: 'new-ver' }),
+              ),
+          } as unknown as EntityManager;
+          return await runInTransaction(mockManager);
+        },
+      );
 
       storageService.calculateHash.mockResolvedValue('hash-concurrent');
-      resourceRepo.findByHash.mockResolvedValue(null);
-      storageService.saveFile.mockResolvedValue('/path/concurrent.pdf');
+      resourceRepo.findByHashAndSize.mockResolvedValue(null);
+      storageService.saveFile.mockResolvedValue({
+        storageProvider: 'LOCAL',
+        storageKey: 'concurrent.pdf',
+        storageUrl: '/path/concurrent.pdf',
+      });
 
-      // Ejecutamos dos subidas al mismo tiempo
-      const promise1 = service.addVersion('user1', 'mat-concurrent', file);
-      const promise2 = service.addVersion('user1', 'mat-concurrent', file);
+      const promise1 = service.addVersion(
+        mockProfessor,
+        'mat-concurrent',
+        file,
+      );
+      const promise2 = service.addVersion(
+        mockProfessor,
+        'mat-concurrent',
+        file,
+      );
 
       const [res1, res2] = await Promise.all([promise1, promise2]);
 

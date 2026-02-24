@@ -3,7 +3,7 @@
 // ============================================
 
 import { apiClient } from '@/lib/apiClient';
-import type { ApiResponse, Evaluation } from '@/types/api';
+import type { Evaluation } from '@/types/api';
 
 export const evaluationsService = {
   /**
@@ -17,20 +17,20 @@ export const evaluationsService = {
     startDate: string;
     endDate: string;
   }): Promise<Evaluation> {
-    const response = await apiClient.post<ApiResponse<Evaluation>>(
+    const response = await apiClient.post<Evaluation>(
       '/evaluations',
       data
     );
-    return response.data.data;
+    return response.data;
   },
 
   /**
-   * Listar evaluaciones de un curso en un ciclo específico (ADMIN/SUPER_ADMIN)
+   * Listar evaluaciones de un curso en un ciclo específico
    */
   async findByCourseCycle(courseCycleId: string): Promise<Evaluation[]> {
-    const response = await apiClient.get<ApiResponse<Evaluation[]>>(
+    const response = await apiClient.get<Evaluation[]>(
       `/evaluations/course-cycle/${courseCycleId}`
     );
-    return response.data.data;
+    return response.data;
   },
 };
