@@ -34,7 +34,7 @@ INSERT INTO evaluation_type (code, name) VALUES
 ('BANCO_ENUNCIADOS', 'Banco de Enunciados');
 
 INSERT INTO academic_cycle (code, start_date, end_date, created_at)
-VALUES ('2026-0', '2026-01-09', '2026-03-06', NOW());
+VALUES ('2026-0', '2026-01-09', '2026-03-31', NOW());
 
 INSERT INTO system_setting (setting_key, setting_value, description, created_at)
 VALUES ('ACTIVE_CYCLE_ID', '1', 'ID del ciclo académico actual y activo en el sistema', NOW());
