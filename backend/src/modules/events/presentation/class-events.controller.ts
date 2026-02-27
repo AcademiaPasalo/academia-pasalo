@@ -11,6 +11,7 @@ import {
   Query,
 } from '@nestjs/common';
 import { ClassEventsService } from '@modules/events/application/class-events.service';
+import { ClassEventsQueryService } from '@modules/events/application/class-events-query.service';
 import { CreateClassEventDto } from '@modules/events/dto/create-class-event.dto';
 import { UpdateClassEventDto } from '@modules/events/dto/update-class-event.dto';
 import { AssignProfessorDto } from '@modules/events/dto/assign-professor.dto';
@@ -27,14 +28,19 @@ import { ROLE_CODES } from '@common/constants/role-codes.constants';
 @Controller('class-events')
 @Auth()
 export class ClassEventsController {
-  constructor(private readonly classEventsService: ClassEventsService) {}
+  constructor(
+    private readonly classEventsService: ClassEventsService,
+    private readonly classEventsQueryService: ClassEventsQueryService,
+  ) {}
 
   private mapEventsToResponse(
     events: Awaited<ReturnType<ClassEventsService['getEventsByEvaluation']>>,
   ): ClassEventResponseDto[] {
+    const now = new Date();
+    const access = this.classEventsService.getEventAccess();
+
     return events.map((event) => {
-      const status = this.classEventsService.calculateEventStatus(event);
-      const access = this.classEventsService.getEventAccess();
+      const status = this.classEventsService.calculateEventStatus(event, now);
       return ClassEventResponseDto.fromEntity(event, status, access);
     });
   }
@@ -89,7 +95,7 @@ export class ClassEventsController {
       ? new Date(endDate)
       : new Date(start.getTime() + 7 * 24 * 60 * 60 * 1000);
 
-    const events = await this.classEventsService.getMySchedule(
+    const events = await this.classEventsQueryService.getMySchedule(
       user.id,
       start,
       end,
@@ -102,8 +108,10 @@ export class ClassEventsController {
   @ResponseMessage('Capas de calendario obtenidas exitosamente')
   async getDiscoveryLayers(
     @Param('courseCycleId') courseCycleId: string,
-  ): Promise<Awaited<ReturnType<ClassEventsService['getDiscoveryLayers']>>> {
-    return await this.classEventsService.getDiscoveryLayers(courseCycleId);
+  ): Promise<
+    Awaited<ReturnType<ClassEventsQueryService['getDiscoveryLayers']>>
+  > {
+    return await this.classEventsQueryService.getDiscoveryLayers(courseCycleId);
   }
 
   @Get('global/sessions')
@@ -111,8 +119,10 @@ export class ClassEventsController {
   @ResponseMessage('Sesiones globales obtenidas exitosamente')
   async getGlobalSessions(
     @Query() query: GlobalSessionsQueryDto,
-  ): Promise<Awaited<ReturnType<ClassEventsService['getGlobalSessions']>>> {
-    return await this.classEventsService.getGlobalSessions(
+  ): Promise<
+    Awaited<ReturnType<ClassEventsQueryService['getGlobalSessions']>>
+  > {
+    return await this.classEventsQueryService.getGlobalSessions(
       query.courseCycleIds,
       new Date(query.startDate),
       new Date(query.endDate),
