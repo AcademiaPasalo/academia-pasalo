@@ -213,9 +213,9 @@ export const technicalSettings = {
     // src/infrastructure/queue/queue.module.ts
     backoffType: 'exponential' as const,
     // src/infrastructure/queue/queue.module.ts
-    removeOnComplete: true,
+    removeOnCompleteCount: 50,
     // src/infrastructure/queue/queue.module.ts
-    removeOnFail: false,
+    removeOnFailCount: 100,
   },
 
   audit: {
@@ -241,7 +241,7 @@ export const technicalSettings = {
     // src/modules/notifications/infrastructure/processors/notification-dispatch.processor.ts
     retentionMinSafeDays: 30,
     // src/modules/notifications/infrastructure/processors/notification-dispatch.processor.ts
-    cleanupBatchSize: 5000,
+    cleanupBatchSize: 1000,
     // src/modules/notifications/infrastructure/processors/notification-dispatch.processor.ts
     maxCleanupBatchesPerRun: 100,
     // src/modules/notifications/infrastructure/processors/notification-dispatch.processor.ts
@@ -254,7 +254,7 @@ export const technicalSettings = {
     reminderMinEnqueueMs: 120000, // 2 minutos — delay mínimo para encolar recordatorio
     // src/modules/notifications/infrastructure/processors/notification-dispatch.processor.ts
     workerLockDurationMs: 120000, // 2 minutos — lockDuration del worker BullMQ
-    // src/modules/notifications/infrastructure/notification.repository.ts
+    // src/modules/notifications/dto/get-notifications-query.dto.ts
     defaultPageLimit: 20,
     // src/modules/notifications/infrastructure/user-notification.repository.ts
     unreadCountCacheTtlSeconds: 60,

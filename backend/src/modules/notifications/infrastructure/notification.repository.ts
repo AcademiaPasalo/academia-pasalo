@@ -22,7 +22,7 @@ export class NotificationRepository {
 
   async deleteOlderThan(
     date: Date,
-    batchSize = technicalSettings.notifications.cleanupBatchSize,
+    batchSize: number = technicalSettings.notifications.cleanupBatchSize,
   ): Promise<number> {
     let totalDeleted = 0;
     let batchDeleted = 0;
@@ -30,6 +30,8 @@ export class NotificationRepository {
     const maxBatches = technicalSettings.notifications.maxCleanupBatchesPerRun;
 
     do {
+      // user_notification hijos se eliminan automáticamente via ON DELETE CASCADE
+      // definida en fk_un_notification. Esta operación depende de esa constraint.
       const result: MysqlDeleteResult = await this.repository.query(
         'DELETE FROM notification WHERE created_at < ? LIMIT ?',
         [date, batchSize],

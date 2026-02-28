@@ -342,7 +342,7 @@ CREATE TABLE notification_type (
   code VARCHAR(50)  NOT NULL,
   name VARCHAR(100) NOT NULL,
   CONSTRAINT uq_notification_type_code UNIQUE (code)
-)
+);
 
 CREATE TABLE notification (
   id                   BIGINT       PRIMARY KEY AUTO_INCREMENT,
@@ -354,7 +354,7 @@ CREATE TABLE notification (
   created_at           DATETIME     NOT NULL,
   CONSTRAINT fk_notification_type
     FOREIGN KEY (notification_type_id) REFERENCES notification_type(id)
-)
+);
 
 CREATE TABLE user_notification (
   user_id         BIGINT   NOT NULL,
@@ -366,7 +366,7 @@ CREATE TABLE user_notification (
     FOREIGN KEY (user_id) REFERENCES user(id),
   CONSTRAINT fk_un_notification
     FOREIGN KEY (notification_id) REFERENCES notification(id) ON DELETE CASCADE
-)
+);
 
 CREATE TABLE audit_log (
   id BIGINT PRIMARY KEY AUTO_INCREMENT,

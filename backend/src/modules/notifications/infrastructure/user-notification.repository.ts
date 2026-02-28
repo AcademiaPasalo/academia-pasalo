@@ -43,7 +43,7 @@ export class UserNotificationRepository {
     const query = this.repository
       .createQueryBuilder('un')
       .innerJoinAndSelect('un.notification', 'n')
-      .leftJoinAndSelect('n.notificationType', 'nt')
+      .innerJoinAndSelect('n.notificationType', 'nt')
       .where('un.userId = :userId', { userId });
 
     if (onlyUnread) {
@@ -59,8 +59,6 @@ export class UserNotificationRepository {
 
   async countUnread(userId: string): Promise<number> {
     const cacheKey = NOTIFICATION_CACHE_KEYS.UNREAD_COUNT(userId);
-    // Se cachea como { value: number } para evitar que RedisCacheService.get()
-    // devuelva null cuando el conteo es 0 (JSON.parse("0") === 0, que es falsy).
     const cached = await this.cacheService.get<{ value: number }>(cacheKey);
 
     if (cached !== null && cached !== undefined) {

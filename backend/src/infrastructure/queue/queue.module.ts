@@ -21,8 +21,10 @@ import { technicalSettings } from '@config/technical-settings';
           ),
         },
         defaultJobOptions: {
-          removeOnComplete: technicalSettings.queue.removeOnComplete,
-          removeOnFail: technicalSettings.queue.removeOnFail,
+          removeOnComplete: {
+            count: technicalSettings.queue.removeOnCompleteCount,
+          },
+          removeOnFail: { count: technicalSettings.queue.removeOnFailCount },
           attempts: technicalSettings.queue.defaultAttempts,
           backoff: {
             type: technicalSettings.queue.backoffType,

@@ -28,6 +28,7 @@ import {
 import { ClassEventsPermissionService } from '@modules/events/application/class-events-permission.service';
 import { ClassEventsSchedulingService } from '@modules/events/application/class-events-scheduling.service';
 import { ClassEventsCacheService } from '@modules/events/application/class-events-cache.service';
+import { NotificationsDispatchService } from '@modules/notifications/application/notifications-dispatch.service';
 
 @Injectable()
 export class ClassEventsService {
@@ -47,6 +48,7 @@ export class ClassEventsService {
     private readonly schedulingService: ClassEventsSchedulingService,
     private readonly cacheModuleService: ClassEventsCacheService,
     private readonly cacheService: RedisCacheService,
+    private readonly notificationsDispatchService: NotificationsDispatchService,
   ) {}
 
   async createEvent(
@@ -164,6 +166,13 @@ export class ClassEventsService {
       undefined,
       categoryCycleContext,
     );
+
+    void this.notificationsDispatchService.dispatchClassScheduled(created.id);
+    void this.notificationsDispatchService.scheduleClassReminder(
+      created.id,
+      created.startDatetime,
+    );
+
     return created;
   }
 
@@ -319,6 +328,14 @@ export class ClassEventsService {
       categoryCycleContext,
     );
 
+    void this.notificationsDispatchService.dispatchClassUpdated(eventId);
+    if (startDatetime !== undefined) {
+      void this.notificationsDispatchService.scheduleClassReminder(
+        eventId,
+        updated.startDatetime,
+      );
+    }
+
     return updated;
   }
 
@@ -350,6 +367,9 @@ export class ClassEventsService {
       event.evaluationId,
       eventId,
     );
+
+    void this.notificationsDispatchService.dispatchClassCancelled(eventId);
+    void this.notificationsDispatchService.cancelClassReminder(eventId);
   }
 
   async assignProfessor(

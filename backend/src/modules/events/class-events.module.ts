@@ -18,6 +18,7 @@ import { UsersModule } from '@modules/users/users.module';
 import { CoursesModule } from '@modules/courses/courses.module';
 import { AuthModule } from '@modules/auth/auth.module';
 import { RedisCacheModule } from '@infrastructure/cache/redis-cache.module';
+import { NotificationsModule } from '@modules/notifications/notifications.module';
 
 @Module({
   imports: [
@@ -32,6 +33,7 @@ import { RedisCacheModule } from '@infrastructure/cache/redis-cache.module';
     UsersModule,
     CoursesModule,
     RedisCacheModule,
+    NotificationsModule,
   ],
   providers: [
     ClassEventRepository,

@@ -25,6 +25,7 @@ import { StorageModule } from '@infrastructure/storage/storage.module';
 import { EnrollmentsModule } from '@modules/enrollments/enrollments.module';
 import { CoursesModule } from '@modules/courses/courses.module';
 import { ClassEventsModule } from '@modules/events/class-events.module';
+import { NotificationsModule } from '@modules/notifications/notifications.module';
 
 @Module({
   imports: [
@@ -43,6 +44,7 @@ import { ClassEventsModule } from '@modules/events/class-events.module';
     CoursesModule,
     ClassEventsModule,
     AuditModule,
+    NotificationsModule,
   ],
   controllers: [MaterialsController, MaterialsAdminController],
   providers: [

@@ -16,6 +16,7 @@ import { MaterialsModule } from '@modules/materials/materials.module';
 import { FeedbackModule } from '@modules/feedback/feedback.module';
 import { SettingsModule } from '@modules/settings/settings.module';
 import { ClassEventsModule } from '@modules/events/class-events.module';
+import { NotificationsModule } from '@modules/notifications/notifications.module';
 import { DatabaseModule } from '@infrastructure/database/database.module';
 import { RedisCacheModule } from '@infrastructure/cache/redis-cache.module';
 import { StorageModule } from '@infrastructure/storage/storage.module';
@@ -50,6 +51,7 @@ import { technicalSettings } from '@config/technical-settings';
     MaterialsModule,
     FeedbackModule,
     ClassEventsModule,
+    NotificationsModule,
     HealthModule,
   ],
   controllers: [AppController],

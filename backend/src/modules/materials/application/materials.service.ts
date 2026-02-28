@@ -49,6 +49,7 @@ import {
   DELETION_REQUEST_STATUS_CODES,
   STORAGE_PROVIDER_CODES,
 } from '@modules/materials/domain/material.constants';
+import { NotificationsDispatchService } from '@modules/notifications/application/notifications-dispatch.service';
 
 @Injectable()
 export class MaterialsService {
@@ -70,6 +71,7 @@ export class MaterialsService {
     private readonly courseCycleProfessorRepository: CourseCycleProfessorRepository,
     private readonly auditService: AuditService,
     private readonly classEventRepository: ClassEventRepository,
+    private readonly notificationsDispatchService: NotificationsDispatchService,
   ) {}
 
   async createFolder(
@@ -379,6 +381,12 @@ export class MaterialsService {
       if (dto.classEventId) {
         await this.invalidateClassEventMaterialsCache(dto.classEventId);
       }
+
+      void this.notificationsDispatchService.dispatchNewMaterial(
+        result.id,
+        dto.materialFolderId,
+      );
+
       return result;
     } catch (error) {
       if (isNewFile && savedResource) await this.rollbackFile(savedResource);
