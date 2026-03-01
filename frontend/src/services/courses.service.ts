@@ -10,6 +10,11 @@ import type {
   CycleLevel,
   CourseCycle,
 } from '@/types/api';
+import type {
+  CurrentCycleResponse,
+  PreviousCyclesResponse,
+  PreviousCycleContentResponse,
+} from '@/types/curso';
 
 export const coursesService = {
   /**
@@ -95,6 +100,49 @@ export const coursesService = {
       lastName1: string;
       profilePhotoUrl: string | null;
     }>>(`/courses/cycle/${courseCycleId}/professors`);
+    return response.data;
+  },
+
+  /**
+   * Obtener evaluaciones del ciclo vigente para un alumno (STUDENT)
+   */
+  async getCurrentCycleContent(courseCycleId: string): Promise<CurrentCycleResponse> {
+    const response = await apiClient.get<CurrentCycleResponse>(
+      `/courses/cycle/${courseCycleId}/current`
+    );
+    return response.data;
+  },
+
+  /**
+   * Obtener lista de ciclos anteriores disponibles (STUDENT)
+   */
+  async getPreviousCycles(courseCycleId: string): Promise<PreviousCyclesResponse> {
+    const response = await apiClient.get<PreviousCyclesResponse>(
+      `/courses/cycle/${courseCycleId}/previous-cycles`
+    );
+    return response.data;
+  },
+
+  /**
+   * Obtener contenido de un ciclo anterior específico (STUDENT)
+   */
+  async getPreviousCycleContent(
+    courseCycleId: string,
+    cycleCode: string
+  ): Promise<PreviousCycleContentResponse> {
+    const response = await apiClient.get<PreviousCycleContentResponse>(
+      `/courses/cycle/${courseCycleId}/previous-cycles/${cycleCode}/content`
+    );
+    return response.data;
+  },
+
+  /**
+   * Obtener contenido de un curso-ciclo (PROFESSOR/ADMIN/SUPER_ADMIN)
+   */
+  async getCourseContent(courseCycleId: string): Promise<CurrentCycleResponse> {
+    const response = await apiClient.get<CurrentCycleResponse>(
+      `/courses/cycle/${courseCycleId}/content`
+    );
     return response.data;
   },
 };

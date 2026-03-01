@@ -1,6 +1,5 @@
 import { Metadata } from 'next';
 import RoleBasedContent from '@/components/RoleBasedContent';
-import { getCursoNombre } from '@/services/cursoService';
 
 interface CursoPageProps {
   params: Promise<{
@@ -8,22 +7,16 @@ interface CursoPageProps {
   }>;
 }
 
-// Generar metadata dinámica usando el servicio de cursos
-export async function generateMetadata({ params }: CursoPageProps): Promise<Metadata> {
-  const { id } = await params;
-  const cursoName = getCursoNombre(id);
-
-  return {
-    title: `${cursoName} | Pásalo a la Primera`,
-    description: `Contenido y materiales del curso ${cursoName}`,
-  };
-}
+export const metadata: Metadata = {
+  title: 'Curso | Pásalo a la Primera',
+  description: 'Contenido y materiales del curso',
+};
 
 export default async function CursoPage({ params }: CursoPageProps) {
   const { id } = await params;
-  
+
   return (
-    <RoleBasedContent 
+    <RoleBasedContent
       componentProps={{ cursoId: id }}
     />
   );

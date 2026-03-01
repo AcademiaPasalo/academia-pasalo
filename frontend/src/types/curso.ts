@@ -1,6 +1,11 @@
 /**
- * Tipos para el sistema de cursos
+ * Tipos para el sistema de cursos - Mapeados a la API del backend
  */
+
+// ============================================
+// LEGACY TYPES (usados por data/cursos.ts y cursoService.ts)
+// TODO: Remover cuando se elimine el mock data
+// ============================================
 
 export interface Curso {
   id: string;
@@ -18,44 +23,88 @@ export interface Curso {
 
 export interface CursoDetalle extends Curso {
   contenido: {
-    unidades: Unidad[];
-    evaluaciones: Evaluacion[];
-    materiales: Material[];
+    unidades: Array<{
+      id: string;
+      titulo: string;
+      descripcion: string;
+      orden: number;
+      temas: Array<{
+        id: string;
+        titulo: string;
+        descripcion: string;
+        orden: number;
+        tipo: 'video' | 'lectura' | 'ejercicio' | 'examen';
+        completado?: boolean;
+      }>;
+    }>;
+    evaluaciones: Array<{
+      id: string;
+      titulo: string;
+      tipo: 'tarea' | 'examen' | 'proyecto' | 'quiz';
+      fecha: string;
+      calificacion?: number;
+      estado: 'pendiente' | 'entregado' | 'calificado' | 'vencido';
+    }>;
+    materiales: Array<{
+      id: string;
+      titulo: string;
+      tipo: 'pdf' | 'video' | 'presentacion' | 'documento';
+      url: string;
+      fechaSubida: string;
+    }>;
   };
   progreso?: number;
   calificacion?: number;
 }
 
-export interface Unidad {
+// ============================================
+// CICLO VIGENTE - GET /courses/cycle/:id/current
+// ============================================
+
+export type EvaluationLabel = 'Completado' | 'En curso' | 'Próximamente' | 'Bloqueado';
+
+export interface CycleEvaluation {
   id: string;
-  titulo: string;
-  descripcion: string;
-  orden: number;
-  temas: Tema[];
+  evaluationTypeCode: string; // PC, EX, etc.
+  shortName: string;          // PC1, EX1, etc.
+  fullName: string;           // "Práctica Calificada 1", "Examen Parcial"
+  label: EvaluationLabel;
 }
 
-export interface Tema {
-  id: string;
-  titulo: string;
-  descripcion: string;
-  orden: number;
-  tipo: 'video' | 'lectura' | 'ejercicio' | 'examen';
-  completado?: boolean;
+export interface CurrentCycleResponse {
+  courseCycleId: string;
+  cycleCode: string;         // "2026-1"
+  canViewPreviousCycles: boolean;
+  evaluations: CycleEvaluation[];
 }
 
-export interface Evaluacion {
-  id: string;
-  titulo: string;
-  tipo: 'tarea' | 'examen' | 'proyecto' | 'quiz';
-  fecha: string;
-  calificacion?: number;
-  estado: 'pendiente' | 'entregado' | 'calificado' | 'vencido';
+// ============================================
+// CICLOS ANTERIORES - GET /courses/cycle/:id/previous-cycles
+// ============================================
+
+export interface PreviousCycle {
+  cycleCode: string; // "2025-2", "2025-1"
 }
 
-export interface Material {
+export interface PreviousCyclesResponse {
+  cycles: PreviousCycle[];
+}
+
+// ============================================
+// CONTENIDO CICLO ANTERIOR - GET /courses/cycle/:id/previous-cycles/:cycleCode/content
+// ============================================
+
+export type PreviousCycleLabel = 'Archivado' | 'Bloqueado';
+
+export interface PreviousCycleEvaluation {
   id: string;
-  titulo: string;
-  tipo: 'pdf' | 'video' | 'presentacion' | 'documento';
-  url: string;
-  fechaSubida: string;
+  evaluationTypeCode: string;
+  shortName: string;
+  fullName: string;
+  label: PreviousCycleLabel;
+}
+
+export interface PreviousCycleContentResponse {
+  cycleCode: string;
+  evaluations: PreviousCycleEvaluation[];
 }
