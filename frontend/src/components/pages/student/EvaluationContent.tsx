@@ -492,7 +492,7 @@ export default function EvaluationContent({
 
             {/* Error */}
             {errorEvents && (
-              <div className="self-stretch p-12 bg-bg-secondary rounded-2xl border border-stroke-primary flex flex-col items-center justify-center gap-4">
+              <div className="bg-white self-stretch p-12 rounded-2xl border border-stroke-primary flex flex-col items-center justify-center gap-4">
                 <Icon
                   name="error"
                   size={64}
@@ -555,9 +555,9 @@ export default function EvaluationContent({
               </span>
             </div>
 
-            <div className="self-stretch p-12 bg-bg-secondary rounded-2xl border border-stroke-primary flex flex-col items-center justify-center gap-4">
+            <div className="self-stretch p-12 bg-white rounded-2xl border border-stroke-primary flex flex-col items-center justify-center gap-4">
               <Icon
-                name="folder_open"
+                name="folder"
                 size={64}
                 className="text-icon-tertiary"
               />
