@@ -99,6 +99,12 @@ describe('NotificationsDispatchService', () => {
         },
       );
     });
+
+    it('no propaga el error si la queue falla', async () => {
+      (mockQueue.add as jest.Mock).mockRejectedValue(new Error('fail'));
+
+      await expect(service.dispatchClassUpdated('e2')).resolves.toBeUndefined();
+    });
   });
 
   describe('dispatchClassCancelled', () => {
@@ -113,6 +119,14 @@ describe('NotificationsDispatchService', () => {
         },
       );
     });
+
+    it('no propaga el error si la queue falla', async () => {
+      (mockQueue.add as jest.Mock).mockRejectedValue(new Error('fail'));
+
+      await expect(
+        service.dispatchClassCancelled('e3'),
+      ).resolves.toBeUndefined();
+    });
   });
 
   describe('scheduleClassReminder', () => {
@@ -125,7 +139,7 @@ describe('NotificationsDispatchService', () => {
       expect(mockQueue.add).not.toHaveBeenCalled();
     });
 
-    it('encola el reminder con el jobId correcto y el delay calculado', async () => {
+    it('encola el reminder con reminderMinutes en el payload, jobId correcto y delay calculado', async () => {
       mockSettingsService.getString.mockResolvedValue('30');
       const thirtyOneMinutesFromNow = Date.now() + 31 * 60 * 1000;
       const startDatetime = new Date(thirtyOneMinutesFromNow + 30 * 60 * 1000);
@@ -134,12 +148,21 @@ describe('NotificationsDispatchService', () => {
 
       expect(mockQueue.add).toHaveBeenCalledWith(
         NOTIFICATION_JOB_NAMES.CLASS_REMINDER,
-        { classEventId: 'event-5' },
+        { classEventId: 'event-5', reminderMinutes: 30 },
         expect.objectContaining({
           jobId: 'class-reminder-event-5',
           delay: expect.any(Number),
         }),
       );
+    });
+
+    it('omite el reminder si reminderMinutes está fuera del rango permitido', async () => {
+      mockSettingsService.getString.mockResolvedValue('5');
+      const startDatetime = new Date(Date.now() + 60 * 60 * 1000);
+
+      await service.scheduleClassReminder('event-4', startDatetime);
+
+      expect(mockQueue.add).not.toHaveBeenCalled();
     });
 
     it('usa el valor por defecto si SettingsService lanza error', async () => {

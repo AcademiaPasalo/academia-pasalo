@@ -7,9 +7,9 @@ export class GetNotificationsQueryDto {
   @IsOptional()
   @Transform(({ value }) => {
     if (value === undefined) return undefined;
-    if (value === 'true') return true;
-    if (value === 'false') return false;
-    return 'INVALID';
+    if (value === 'true' || value === true) return true;
+    if (value === 'false' || value === false) return false;
+    return undefined;
   })
   @IsBoolean({ message: 'onlyUnread debe ser "true" o "false"' })
   onlyUnread?: boolean;

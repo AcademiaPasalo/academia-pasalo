@@ -86,12 +86,30 @@ describe('NotificationResponseDto', () => {
       expect(dto.typeName).toBe('Nuevo material disponible');
     });
 
-    it('devuelve una instancia plana (no NotificationResponseDto)', () => {
+    it('devuelve un objeto plano, no una instancia de NotificationResponseDto', () => {
       const un = makeUserNotification();
       const dto = NotificationResponseDto.fromEntity(un);
 
       expect(dto).toBeDefined();
-      expect(typeof dto).toBe('object');
+      expect(dto).not.toBeInstanceOf(NotificationResponseDto);
+    });
+
+    it('lanza InternalServerErrorException si notification no está cargada', () => {
+      const un = makeUserNotification();
+      (un as any).notification = undefined;
+
+      expect(() => NotificationResponseDto.fromEntity(un)).toThrow(
+        'fromEntity requiere que las relaciones notification y notificationType estén cargadas',
+      );
+    });
+
+    it('lanza InternalServerErrorException si notificationType no está cargada', () => {
+      const un = makeUserNotification();
+      (un.notification as any).notificationType = undefined;
+
+      expect(() => NotificationResponseDto.fromEntity(un)).toThrow(
+        'fromEntity requiere que las relaciones notification y notificationType estén cargadas',
+      );
     });
   });
 });

@@ -15,6 +15,7 @@ import { Evaluation } from '@modules/evaluations/domain/evaluation.entity';
 import { ROLE_CODES } from '@common/constants/role-codes.constants';
 import { ForbiddenException } from '@nestjs/common';
 import { CLASS_EVENT_STATUS } from '@modules/events/domain/class-event.constants';
+import { NotificationsDispatchService } from '@modules/notifications/application/notifications-dispatch.service';
 
 describe('ClassEventsService', () => {
   let service: ClassEventsService;
@@ -142,6 +143,16 @@ describe('ClassEventsService', () => {
             get: jest.fn().mockResolvedValue(null),
             set: jest.fn().mockResolvedValue(undefined),
             del: jest.fn().mockResolvedValue(undefined),
+          },
+        },
+        {
+          provide: NotificationsDispatchService,
+          useValue: {
+            dispatchClassScheduled: jest.fn().mockResolvedValue(undefined),
+            dispatchClassUpdated: jest.fn().mockResolvedValue(undefined),
+            dispatchClassCancelled: jest.fn().mockResolvedValue(undefined),
+            scheduleClassReminder: jest.fn().mockResolvedValue(undefined),
+            cancelClassReminder: jest.fn().mockResolvedValue(undefined),
           },
         },
       ],

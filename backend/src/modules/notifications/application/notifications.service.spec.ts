@@ -113,6 +113,19 @@ describe('NotificationsService', () => {
     });
   });
 
+  describe('onApplicationBootstrap — validateReminderSettings', () => {
+    it('no loguea error cuando reminderDefaultMinutes está en rango', () => {
+      const errorSpy = jest
+        .spyOn((service as any).logger, 'error')
+        .mockImplementation(() => undefined);
+
+      (service as any).validateReminderSettings();
+
+      expect(errorSpy).not.toHaveBeenCalled();
+      errorSpy.mockRestore();
+    });
+  });
+
   describe('getMyNotifications', () => {
     it('delega al repositorio con los parámetros correctos', async () => {
       const items: UserNotification[] = [];
@@ -151,7 +164,11 @@ describe('NotificationsService', () => {
     });
 
     it('llama a markAsRead del repositorio cuando la notificación existe', async () => {
-      const un = { userId: 'u1', notificationId: 'n1' } as UserNotification;
+      const un = {
+        userId: 'u1',
+        notificationId: 'n1',
+        isRead: false,
+      } as UserNotification;
       mockUserNotifRepo.findOne.mockResolvedValue(un);
       mockUserNotifRepo.markAsRead.mockResolvedValue(undefined);
 

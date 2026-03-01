@@ -11,29 +11,18 @@ import { Enrollment } from '@modules/enrollments/domain/enrollment.entity';
 import { EnrollmentStatus } from '@modules/enrollments/domain/enrollment-status.entity';
 import { Material } from '@modules/materials/domain/material.entity';
 import { CourseCycleProfessor } from '@modules/courses/domain/course-cycle-professor.entity';
+import { RedisCacheService } from '@infrastructure/cache/redis-cache.service';
 import { ENROLLMENT_STATUS_CODES } from '@modules/enrollments/domain/enrollment.constants';
-
-export interface ClassEventContext {
-  classEventId: string;
-  classTitle: string;
-  startDatetime: Date;
-  courseCycleId: string;
-  courseName: string;
-  recipientUserIds: string[];
-}
-
-export interface MaterialContext {
-  materialId: string;
-  folderId: string;
-  materialDisplayName: string;
-  courseName: string;
-  recipientUserIds: string[];
-}
+import { NOTIFICATION_CACHE_KEYS } from '@modules/notifications/domain/notification.constants';
+import { technicalSettings } from '@config/technical-settings';
+import {
+  ClassEventContext,
+  MaterialContext,
+} from '@modules/notifications/interfaces';
 
 @Injectable()
 export class NotificationRecipientsService {
   private readonly logger = new Logger(NotificationRecipientsService.name);
-  private activeEnrollmentStatusId: string | null = null;
 
   constructor(
     @InjectRepository(ClassEvent)
@@ -53,6 +42,8 @@ export class NotificationRecipientsService {
 
     @InjectRepository(CourseCycleProfessor)
     private readonly courseCycleProfessorRepo: Repository<CourseCycleProfessor>,
+
+    private readonly cacheService: RedisCacheService,
   ) {}
 
   async resolveClassEventContext(
@@ -187,8 +178,11 @@ export class NotificationRecipientsService {
   }
 
   private async resolveActiveEnrollmentStatusId(): Promise<string> {
-    if (this.activeEnrollmentStatusId !== null) {
-      return this.activeEnrollmentStatusId;
+    const cacheKey = NOTIFICATION_CACHE_KEYS.ACTIVE_ENROLLMENT_STATUS_ID;
+    const cached = await this.cacheService.get<string>(cacheKey);
+
+    if (cached) {
+      return cached;
     }
 
     const status = await this.enrollmentStatusRepo.findOne({
@@ -207,8 +201,14 @@ export class NotificationRecipientsService {
       );
     }
 
-    this.activeEnrollmentStatusId = status.id;
-    return this.activeEnrollmentStatusId;
+    await this.cacheService.set(
+      cacheKey,
+      status.id,
+      technicalSettings.cache.notifications
+        .activeEnrollmentStatusCacheTtlSeconds,
+    );
+
+    return status.id;
   }
 
   private mergeUniqueUserIds(...lists: Array<{ userId: string }[]>): string[] {

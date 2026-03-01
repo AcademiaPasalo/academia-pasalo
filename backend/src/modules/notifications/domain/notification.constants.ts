@@ -19,6 +19,8 @@ export const NOTIFICATION_CACHE_KEYS = {
   UNREAD_COUNT: (userId: string) =>
     `cache:notifications:unread-count:${userId}`,
   TYPE_BY_CODE: (code: string) => `cache:notifications:type:${code}`,
+  ACTIVE_ENROLLMENT_STATUS_ID:
+    'cache:notifications:active-enrollment-status-id',
 } as const;
 
 export const NOTIFICATION_SYSTEM_SETTING_KEYS = {

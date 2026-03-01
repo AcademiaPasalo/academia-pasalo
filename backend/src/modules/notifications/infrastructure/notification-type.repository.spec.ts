@@ -6,6 +6,7 @@ import { RedisCacheService } from '@infrastructure/cache/redis-cache.service';
 import { NOTIFICATION_CACHE_KEYS } from '@modules/notifications/domain/notification.constants';
 
 const mockRepo = {
+  create: jest.fn((plain) => plain),
   findOne: jest.fn(),
 };
 
@@ -37,12 +38,12 @@ describe('NotificationTypeRepository', () => {
         id: '1',
         code: 'NEW_MATERIAL',
         name: 'Nuevo Material',
-      } as NotificationType;
+      };
       mockCache.get.mockResolvedValue(cached);
 
       const result = await repo.findByCode('NEW_MATERIAL');
 
-      expect(result).toBe(cached);
+      expect(result).toEqual(cached);
       expect(mockRepo.findOne).not.toHaveBeenCalled();
     });
 
@@ -64,7 +65,7 @@ describe('NotificationTypeRepository', () => {
       });
       expect(mockCache.set).toHaveBeenCalledWith(
         NOTIFICATION_CACHE_KEYS.TYPE_BY_CODE('CLASS_REMINDER'),
-        notifType,
+        { id: '2', code: 'CLASS_REMINDER', name: 'Recordatorio' },
         expect.any(Number),
       );
     });

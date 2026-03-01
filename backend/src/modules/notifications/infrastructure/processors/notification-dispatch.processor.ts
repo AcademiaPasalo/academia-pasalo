@@ -1,5 +1,6 @@
 import { Processor, WorkerHost } from '@nestjs/bullmq';
 import { Logger } from '@nestjs/common';
+import { DataSource } from 'typeorm';
 import { Job, UnrecoverableError } from 'bullmq';
 import { QUEUES } from '@infrastructure/queue/queue.constants';
 import { technicalSettings } from '@config/technical-settings';
@@ -8,6 +9,8 @@ import { NotificationRepository } from '@modules/notifications/infrastructure/no
 import { NotificationTypeRepository } from '@modules/notifications/infrastructure/notification-type.repository';
 import { UserNotificationRepository } from '@modules/notifications/infrastructure/user-notification.repository';
 import { NotificationRecipientsService } from '@modules/notifications/application/notification-recipients.service';
+import { Notification } from '@modules/notifications/domain/notification.entity';
+import { UserNotification } from '@modules/notifications/domain/user-notification.entity';
 import {
   NOTIFICATION_JOB_NAMES,
   NOTIFICATION_MESSAGES,
@@ -17,26 +20,12 @@ import {
   NotificationTypeCode,
 } from '@modules/notifications/domain/notification.constants';
 
-interface DispatchClassPayload {
-  type:
-    | typeof NOTIFICATION_TYPE_CODES.CLASS_SCHEDULED
-    | typeof NOTIFICATION_TYPE_CODES.CLASS_UPDATED
-    | typeof NOTIFICATION_TYPE_CODES.CLASS_CANCELLED;
-  classEventId: string;
-}
-
-interface DispatchMaterialPayload {
-  type: typeof NOTIFICATION_TYPE_CODES.NEW_MATERIAL;
-  materialId: string;
-  folderId: string;
-}
-
-type DispatchPayload = DispatchClassPayload | DispatchMaterialPayload;
-
-interface ClassReminderPayload {
-  classEventId: string;
-  reminderMinutes: number;
-}
+import {
+  DispatchPayload,
+  DispatchClassPayload,
+  DispatchMaterialPayload,
+  ClassReminderPayload,
+} from '@modules/notifications/interfaces';
 
 @Processor(QUEUES.NOTIFICATIONS, {
   lockDuration: technicalSettings.notifications.workerLockDurationMs,
@@ -45,6 +34,7 @@ export class NotificationDispatchProcessor extends WorkerHost {
   private readonly logger = new Logger(NotificationDispatchProcessor.name);
 
   constructor(
+    private readonly dataSource: DataSource,
     private readonly notificationRepository: NotificationRepository,
     private readonly notificationTypeRepository: NotificationTypeRepository,
     private readonly userNotificationRepository: UserNotificationRepository,
@@ -90,9 +80,28 @@ export class NotificationDispatchProcessor extends WorkerHost {
 
     if (type === NOTIFICATION_TYPE_CODES.NEW_MATERIAL) {
       await this.handleNewMaterial(job.data);
-    } else {
-      await this.handleClassEvent(job.data);
+      return;
     }
+
+    if (
+      type === NOTIFICATION_TYPE_CODES.CLASS_SCHEDULED ||
+      type === NOTIFICATION_TYPE_CODES.CLASS_UPDATED ||
+      type === NOTIFICATION_TYPE_CODES.CLASS_CANCELLED
+    ) {
+      await this.handleClassEvent(job.data);
+      return;
+    }
+
+    const msg = `Error de integridad: tipo de notificación desconocido '${String(
+      type,
+    )}' recibido en el job de dispatch`;
+    this.logger.error({
+      context: NotificationDispatchProcessor.name,
+      message: msg,
+      jobId: job.id,
+      type,
+    });
+    throw new UnrecoverableError(msg);
   }
 
   private async handleNewMaterial(
@@ -128,26 +137,38 @@ export class NotificationDispatchProcessor extends WorkerHost {
       context.courseName,
     );
 
-    const notification = await this.notificationRepository.create({
+    const notificationData: Partial<Notification> = {
       notificationTypeId: notificationType.id,
       title,
       message,
       entityType: NOTIFICATION_ENTITY_TYPES.MATERIAL_FOLDER,
       entityId: context.folderId,
       createdAt: new Date(),
-    });
+    };
 
-    await this.userNotificationRepository.bulkCreate(
-      context.recipientUserIds.map((userId) => ({
-        userId,
-        notificationId: notification.id,
-      })),
+    const notificationId = await this.dataSource.transaction(
+      async (manager) => {
+        const entity = manager.create(Notification, notificationData);
+        const saved = await manager.save(entity);
+
+        await manager.insert(
+          UserNotification,
+          context.recipientUserIds.map((userId) => ({
+            userId,
+            notificationId: saved.id,
+            isRead: false,
+            readAt: null as Date | null,
+          })),
+        );
+
+        return saved.id;
+      },
     );
 
     this.logger.log({
       context: NotificationDispatchProcessor.name,
       message: 'NEW_MATERIAL: notificación creada y distribuida',
-      notificationId: notification.id,
+      notificationId,
       materialId,
       folderId,
       recipientCount: context.recipientUserIds.length,
@@ -177,26 +198,38 @@ export class NotificationDispatchProcessor extends WorkerHost {
     const template = NOTIFICATION_MESSAGES[type];
     const message = template.message(context.classTitle, fechaFormateada);
 
-    const notification = await this.notificationRepository.create({
+    const notificationData: Partial<Notification> = {
       notificationTypeId: notificationType.id,
       title: template.title,
       message,
       entityType: NOTIFICATION_ENTITY_TYPES.CLASS_EVENT,
       entityId: classEventId,
       createdAt: new Date(),
-    });
+    };
 
-    await this.userNotificationRepository.bulkCreate(
-      context.recipientUserIds.map((userId) => ({
-        userId,
-        notificationId: notification.id,
-      })),
+    const notificationId = await this.dataSource.transaction(
+      async (manager) => {
+        const entity = manager.create(Notification, notificationData);
+        const saved = await manager.save(entity);
+
+        await manager.insert(
+          UserNotification,
+          context.recipientUserIds.map((userId) => ({
+            userId,
+            notificationId: saved.id,
+            isRead: false,
+            readAt: null as Date | null,
+          })),
+        );
+
+        return saved.id;
+      },
     );
 
     this.logger.log({
       context: NotificationDispatchProcessor.name,
       message: 'Notificación de clase creada y distribuida',
-      notificationId: notification.id,
+      notificationId,
       classEventId,
       type,
       recipientCount: context.recipientUserIds.length,
@@ -237,26 +270,38 @@ export class NotificationDispatchProcessor extends WorkerHost {
       NOTIFICATION_MESSAGES[NOTIFICATION_TYPE_CODES.CLASS_REMINDER];
     const message = template.message(context.classTitle, reminderMinutes);
 
-    const notification = await this.notificationRepository.create({
+    const notificationData: Partial<Notification> = {
       notificationTypeId: notificationType.id,
       title: template.title,
       message,
       entityType: NOTIFICATION_ENTITY_TYPES.CLASS_EVENT,
       entityId: classEventId,
       createdAt: new Date(),
-    });
+    };
 
-    await this.userNotificationRepository.bulkCreate(
-      context.recipientUserIds.map((userId) => ({
-        userId,
-        notificationId: notification.id,
-      })),
+    const notificationId = await this.dataSource.transaction(
+      async (manager) => {
+        const entity = manager.create(Notification, notificationData);
+        const saved = await manager.save(entity);
+
+        await manager.insert(
+          UserNotification,
+          context.recipientUserIds.map((userId) => ({
+            userId,
+            notificationId: saved.id,
+            isRead: false,
+            readAt: null as Date | null,
+          })),
+        );
+
+        return saved.id;
+      },
     );
 
     this.logger.log({
       context: NotificationDispatchProcessor.name,
       message: 'CLASS_REMINDER: notificación creada y distribuida',
-      notificationId: notification.id,
+      notificationId,
       classEventId,
       reminderMinutes,
       recipientCount: context.recipientUserIds.length,

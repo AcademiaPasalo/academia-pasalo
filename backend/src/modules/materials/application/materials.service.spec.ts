@@ -24,6 +24,7 @@ import { FileResource } from '@modules/materials/domain/file-resource.entity';
 import { ROLE_CODES } from '@common/constants/role-codes.constants';
 import { MATERIAL_CACHE_KEYS } from '@modules/materials/domain/material.constants';
 import { ClassEvent } from '@modules/events/domain/class-event.entity';
+import { NotificationsDispatchService } from '@modules/notifications/application/notifications-dispatch.service';
 
 const mockFolder = (
   id = '1',
@@ -154,6 +155,12 @@ describe('MaterialsService', () => {
         {
           provide: ClassEventRepository,
           useValue: { findByIdSimple: jest.fn() },
+        },
+        {
+          provide: NotificationsDispatchService,
+          useValue: {
+            dispatchNewMaterial: jest.fn().mockResolvedValue(undefined),
+          },
         },
       ],
     }).compile();

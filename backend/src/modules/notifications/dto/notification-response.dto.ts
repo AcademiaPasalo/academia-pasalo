@@ -1,3 +1,4 @@
+import { InternalServerErrorException } from '@nestjs/common';
 import { UserNotification } from '@modules/notifications/domain/user-notification.entity';
 
 export class NotificationResponseDto {
@@ -13,6 +14,12 @@ export class NotificationResponseDto {
   createdAt: Date;
 
   static fromEntity(un: UserNotification): NotificationResponseDto {
+    if (!un.notification || !un.notification.notificationType) {
+      throw new InternalServerErrorException(
+        'fromEntity requiere que las relaciones notification y notificationType estén cargadas',
+      );
+    }
+
     return {
       notificationId: un.notificationId,
       type: un.notification.notificationType.code,

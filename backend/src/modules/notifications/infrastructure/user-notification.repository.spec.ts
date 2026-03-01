@@ -62,9 +62,10 @@ describe('UserNotificationRepository', () => {
   describe('findByUserPaginated', () => {
     it('construye la query sin filtro de isRead cuando onlyUnread=false', async () => {
       const getMany = jest.fn().mockResolvedValue([]);
+      const leftJoinAndSelect = jest.fn().mockReturnThis();
       const qb = {
         innerJoinAndSelect: jest.fn().mockReturnThis(),
-        leftJoinAndSelect: jest.fn().mockReturnThis(),
+        leftJoinAndSelect,
         where: jest.fn().mockReturnThis(),
         andWhere: jest.fn().mockReturnThis(),
         orderBy: jest.fn().mockReturnThis(),
@@ -77,6 +78,7 @@ describe('UserNotificationRepository', () => {
       await repo.findByUserPaginated('user-1', false, 20, 0);
 
       expect(mockRepo.createQueryBuilder).toHaveBeenCalledWith('un');
+      expect(leftJoinAndSelect).not.toHaveBeenCalled();
       expect(qb.andWhere).not.toHaveBeenCalled();
       expect(qb.orderBy).toHaveBeenCalledWith('n.createdAt', 'DESC');
       expect(qb.limit).toHaveBeenCalledWith(20);
@@ -86,9 +88,10 @@ describe('UserNotificationRepository', () => {
     it('agrega filtro andWhere cuando onlyUnread=true', async () => {
       const getMany = jest.fn().mockResolvedValue([]);
       const andWhere = jest.fn().mockReturnThis();
+      const leftJoinAndSelect = jest.fn().mockReturnThis();
       const qb = {
         innerJoinAndSelect: jest.fn().mockReturnThis(),
-        leftJoinAndSelect: jest.fn().mockReturnThis(),
+        leftJoinAndSelect,
         where: jest.fn().mockReturnThis(),
         andWhere,
         orderBy: jest.fn().mockReturnThis(),
@@ -100,6 +103,7 @@ describe('UserNotificationRepository', () => {
 
       await repo.findByUserPaginated('user-1', true, 10, 0);
 
+      expect(leftJoinAndSelect).not.toHaveBeenCalled();
       expect(andWhere).toHaveBeenCalledWith('un.isRead = :isRead', {
         isRead: false,
       });
@@ -108,7 +112,7 @@ describe('UserNotificationRepository', () => {
 
   describe('countUnread', () => {
     it('devuelve el valor desde caché cuando existe (incluyendo 0)', async () => {
-      mockCache.get.mockResolvedValue({ value: 0 });
+      mockCache.get.mockResolvedValue(0);
 
       const result = await repo.countUnread('user-1');
 
@@ -117,7 +121,7 @@ describe('UserNotificationRepository', () => {
     });
 
     it('devuelve el valor desde caché cuando es mayor que 0', async () => {
-      mockCache.get.mockResolvedValue({ value: 5 });
+      mockCache.get.mockResolvedValue(5);
 
       const result = await repo.countUnread('user-1');
 
@@ -138,7 +142,7 @@ describe('UserNotificationRepository', () => {
       });
       expect(mockCache.set).toHaveBeenCalledWith(
         NOTIFICATION_CACHE_KEYS.UNREAD_COUNT('user-1'),
-        { value: 3 },
+        3,
         expect.any(Number),
       );
     });
@@ -162,7 +166,7 @@ describe('UserNotificationRepository', () => {
       await repo.markAsRead('user-1', 'notif-1');
 
       expect(mockRepo.update).toHaveBeenCalledWith(
-        { userId: 'user-1', notificationId: 'notif-1' },
+        { userId: 'user-1', notificationId: 'notif-1', isRead: false },
         { isRead: true, readAt: expect.any(Date) },
       );
       expect(mockCache.del).toHaveBeenCalledWith(

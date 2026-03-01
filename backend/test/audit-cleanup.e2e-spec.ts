@@ -97,9 +97,11 @@ describe('Audit Cleanup Process (Integration)', () => {
       [user.user.id],
     );
 
-    const keptLog = remainingLogs.find((l:any) => l.entity_type === 'TEST_KEEP');
+    const keptLog = remainingLogs.find(
+      (l: any) => l.entity_type === 'TEST_KEEP',
+    );
     const deletedLog = remainingLogs.find(
-      (l:any) => l.entity_type === 'TEST_DELETE',
+      (l: any) => l.entity_type === 'TEST_DELETE',
     );
 
     expect(keptLog).toBeDefined();

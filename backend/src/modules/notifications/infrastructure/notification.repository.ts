@@ -4,9 +4,7 @@ import { Repository } from 'typeorm';
 import { Notification } from '@modules/notifications/domain/notification.entity';
 import { technicalSettings } from '@config/technical-settings';
 
-interface MysqlDeleteResult {
-  affectedRows: number;
-}
+import { MysqlDeleteResult } from '@modules/notifications/interfaces';
 
 @Injectable()
 export class NotificationRepository {

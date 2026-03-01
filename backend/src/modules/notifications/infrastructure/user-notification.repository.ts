@@ -9,7 +9,7 @@ import { technicalSettings } from '@config/technical-settings';
 @Injectable()
 export class UserNotificationRepository {
   private static readonly CACHE_TTL_SECONDS =
-    technicalSettings.notifications.unreadCountCacheTtlSeconds;
+    technicalSettings.cache.notifications.unreadCountCacheTtlSeconds;
 
   constructor(
     @InjectRepository(UserNotification)
@@ -59,10 +59,10 @@ export class UserNotificationRepository {
 
   async countUnread(userId: string): Promise<number> {
     const cacheKey = NOTIFICATION_CACHE_KEYS.UNREAD_COUNT(userId);
-    const cached = await this.cacheService.get<{ value: number }>(cacheKey);
+    const cached = await this.cacheService.get<number>(cacheKey);
 
     if (cached !== null && cached !== undefined) {
-      return cached.value;
+      return cached;
     }
 
     const count = await this.repository.count({
@@ -71,7 +71,7 @@ export class UserNotificationRepository {
 
     await this.cacheService.set(
       cacheKey,
-      { value: count },
+      count,
       UserNotificationRepository.CACHE_TTL_SECONDS,
     );
 
@@ -80,7 +80,7 @@ export class UserNotificationRepository {
 
   async markAsRead(userId: string, notificationId: string): Promise<void> {
     await this.repository.update(
-      { userId, notificationId },
+      { userId, notificationId, isRead: false },
       { isRead: true, readAt: new Date() },
     );
 

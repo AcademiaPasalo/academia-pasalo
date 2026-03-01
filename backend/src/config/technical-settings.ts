@@ -127,6 +127,15 @@ export const technicalSettings = {
       // src/modules/materials/application/materials.service.ts
       materialsExplorerCacheTtlSeconds: 300, // 5m
     },
+
+    notifications: {
+      // src/modules/notifications/infrastructure/notification-type.repository.ts
+      notificationTypeCacheTtlSeconds: 21600, // 6h — catálogo estático
+      // src/modules/notifications/application/notification-recipients.service.ts
+      activeEnrollmentStatusCacheTtlSeconds: 21600, // 6h — catálogo estático
+      // src/modules/notifications/infrastructure/user-notification.repository.ts
+      unreadCountCacheTtlSeconds: 60,
+    },
   },
 
   database: {
@@ -232,8 +241,6 @@ export const technicalSettings = {
   },
 
   notifications: {
-    // src/modules/notifications/infrastructure/notification-type.repository.ts
-    notificationTypeCacheTtlSeconds: 21600, // 6h — catálogo estático
     // src/modules/notifications/application/notifications.service.ts
     cleanupCronPattern: '0 0 2 1 * *',
     // src/modules/notifications/infrastructure/processors/notification-dispatch.processor.ts
@@ -244,11 +251,11 @@ export const technicalSettings = {
     cleanupBatchSize: 1000,
     // src/modules/notifications/infrastructure/processors/notification-dispatch.processor.ts
     maxCleanupBatchesPerRun: 100,
-    // src/modules/notifications/infrastructure/processors/notification-dispatch.processor.ts
+    // src/modules/notifications/application/notifications-dispatch.service.ts
     reminderDefaultMinutes: 1440,
-    // src/modules/notifications/infrastructure/processors/notification-dispatch.processor.ts
+    // src/modules/notifications/application/notifications-dispatch.service.ts
     reminderMinMinutes: 30,
-    // src/modules/notifications/infrastructure/processors/notification-dispatch.processor.ts
+    // src/modules/notifications/application/notifications-dispatch.service.ts
     reminderMaxMinutes: 10080,
     // src/modules/notifications/application/notifications-dispatch.service.ts
     reminderMinEnqueueMs: 120000, // 2 minutos — delay mínimo para encolar recordatorio
@@ -256,7 +263,5 @@ export const technicalSettings = {
     workerLockDurationMs: 120000, // 2 minutos — lockDuration del worker BullMQ
     // src/modules/notifications/dto/get-notifications-query.dto.ts
     defaultPageLimit: 20,
-    // src/modules/notifications/infrastructure/user-notification.repository.ts
-    unreadCountCacheTtlSeconds: 60,
   },
 } as const;

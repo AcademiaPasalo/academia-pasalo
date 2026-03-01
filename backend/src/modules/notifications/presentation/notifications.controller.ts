@@ -45,6 +45,12 @@ export class NotificationsController {
     return { count };
   }
 
+  @Patch('read-all')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async markAllAsRead(@CurrentUser() user: User): Promise<void> {
+    await this.notificationsService.markAllAsRead(user.id);
+  }
+
   @Patch(':id/read')
   @HttpCode(HttpStatus.NO_CONTENT)
   async markAsRead(
@@ -52,11 +58,5 @@ export class NotificationsController {
     @Param('id') notificationId: string,
   ): Promise<void> {
     await this.notificationsService.markAsRead(user.id, notificationId);
-  }
-
-  @Patch('read-all')
-  @HttpCode(HttpStatus.NO_CONTENT)
-  async markAllAsRead(@CurrentUser() user: User): Promise<void> {
-    await this.notificationsService.markAllAsRead(user.id);
   }
 }

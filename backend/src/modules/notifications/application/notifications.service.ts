@@ -25,6 +25,26 @@ export class NotificationsService implements OnApplicationBootstrap {
 
   async onApplicationBootstrap(): Promise<void> {
     await this.setupCleanupScheduler();
+    this.validateReminderSettings();
+  }
+
+  private validateReminderSettings(): void {
+    const { reminderDefaultMinutes, reminderMinMinutes, reminderMaxMinutes } =
+      technicalSettings.notifications;
+
+    if (
+      reminderDefaultMinutes < reminderMinMinutes ||
+      reminderDefaultMinutes > reminderMaxMinutes
+    ) {
+      this.logger.error({
+        context: NotificationsService.name,
+        message:
+          'reminderDefaultMinutes está fuera del rango permitido [min, max]. Revise technical-settings.ts.',
+        reminderDefaultMinutes,
+        reminderMinMinutes,
+        reminderMaxMinutes,
+      });
+    }
   }
 
   private async setupCleanupScheduler(): Promise<void> {
@@ -53,6 +73,13 @@ export class NotificationsService implements OnApplicationBootstrap {
           {},
           { repeat: { pattern: cronPattern } },
         );
+      } else {
+        this.logger.debug({
+          context: NotificationsService.name,
+          message:
+            'Scheduler de cleanup ya registrado con el patrón actual. Sin cambios.',
+          pattern: cronPattern,
+        });
       }
     } else {
       await this.notificationsQueue.add(

@@ -9,6 +9,7 @@ import { Enrollment } from '@modules/enrollments/domain/enrollment.entity';
 import { EnrollmentStatus } from '@modules/enrollments/domain/enrollment-status.entity';
 import { Material } from '@modules/materials/domain/material.entity';
 import { CourseCycleProfessor } from '@modules/courses/domain/course-cycle-professor.entity';
+import { RedisCacheService } from '@infrastructure/cache/redis-cache.service';
 import { ENROLLMENT_STATUS_CODES } from '@modules/enrollments/domain/enrollment.constants';
 
 function makeQb(getRawOneResult: unknown, getRawManyResult: unknown[] = []) {
@@ -33,6 +34,10 @@ const mockEnrollmentRepo = { createQueryBuilder: jest.fn() };
 const mockEnrollmentStatusRepo = { findOne: jest.fn() };
 const mockMaterialRepo = { createQueryBuilder: jest.fn() };
 const mockCourseCycleProfRepo = { createQueryBuilder: jest.fn() };
+const mockCache = {
+  get: jest.fn(),
+  set: jest.fn(),
+};
 
 describe('NotificationRecipientsService', () => {
   let service: NotificationRecipientsService;
@@ -44,6 +49,9 @@ describe('NotificationRecipientsService', () => {
 
   beforeEach(async () => {
     jest.clearAllMocks();
+
+    mockCache.get.mockResolvedValue(null);
+    mockCache.set.mockResolvedValue(undefined);
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -69,6 +77,7 @@ describe('NotificationRecipientsService', () => {
           provide: getRepositoryToken(CourseCycleProfessor),
           useValue: mockCourseCycleProfRepo,
         },
+        { provide: RedisCacheService, useValue: mockCache },
       ],
     }).compile();
 
@@ -126,6 +135,10 @@ describe('NotificationRecipientsService', () => {
       const studQb = makeQb(null, []);
       mockClassEventProfRepo.createQueryBuilder.mockReturnValue(profQb);
       mockEnrollmentRepo.createQueryBuilder.mockReturnValue(studQb);
+
+      mockCache.get
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce(activeStatus.id);
 
       await service.resolveClassEventContext('evt-1');
       await service.resolveClassEventContext('evt-1');

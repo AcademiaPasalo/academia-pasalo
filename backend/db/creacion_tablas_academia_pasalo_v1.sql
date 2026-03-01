@@ -520,8 +520,9 @@ ON audit_log(user_id, event_datetime);
 
 CREATE INDEX idx_notification_created_at ON notification(created_at);
 
-CREATE INDEX idx_user_notification_unread ON user_notification(user_id, is_read);
-CREATE INDEX idx_user_notification_date   ON user_notification(user_id, notification_id DESC);
+CREATE INDEX idx_user_notification_unread          ON user_notification(user_id, is_read);
+CREATE INDEX idx_user_notification_date            ON user_notification(user_id, notification_id DESC);
+CREATE INDEX idx_user_notification_notification_id ON user_notification(notification_id);
 
 CREATE INDEX idx_deletion_request_status
 ON deletion_request(deletion_request_status_id);
