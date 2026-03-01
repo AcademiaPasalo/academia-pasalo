@@ -4,17 +4,21 @@ import {
   EventSubscriber,
   InsertEvent,
   DataSource,
+  IsNull,
+  MoreThan,
 } from 'typeorm';
 import { Evaluation } from '@modules/evaluations/domain/evaluation.entity';
 import { Enrollment } from '@modules/enrollments/domain/enrollment.entity';
 import { EnrollmentEvaluation } from '@modules/enrollments/domain/enrollment-evaluation.entity';
 import { EnrollmentType } from '@modules/enrollments/domain/enrollment-type.entity';
 import { EvaluationType } from '@modules/evaluations/domain/evaluation-type.entity';
+import { CourseCycle } from '@modules/courses/domain/course-cycle.entity';
 import { Injectable } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { ENROLLMENT_TYPE_CODES } from '@modules/enrollments/domain/enrollment.constants';
 import { EVALUATION_TYPE_CODES } from '@modules/evaluations/domain/evaluation.constants';
-import { getEpoch } from '@common/utils/date.util';
+import { toUtcEndOfDay, toUtcStartOfDay } from '@common/utils/date.util';
+import { technicalSettings } from '@config/technical-settings';
 
 @EventSubscriber()
 @Injectable()
@@ -64,123 +68,120 @@ export class EvaluationSubscriber implements EntitySubscriberInterface<Evaluatio
       );
     }
 
-    const BATCH_SIZE = 100;
-    let offset = 0;
-    let hasMore = true;
+    const courseCycle = await manager.findOne(CourseCycle, {
+      where: { id: evaluation.courseCycleId },
+      relations: { academicCycle: true },
+    });
+
+    if (!courseCycle?.academicCycle) {
+      this.logger.error({
+        message:
+          'Error de integridad: Curso/ciclo académico no encontrado en subscriber',
+        evaluationId: evaluation.id,
+        courseCycleId: evaluation.courseCycleId,
+      });
+      throw new InternalServerErrorException(
+        'Error de integridad al procesar la evaluación',
+      );
+    }
+
+    const unifiedAccessStartDate = toUtcStartOfDay(
+      courseCycle.academicCycle.startDate,
+    );
+    const unifiedAccessEndDate = toUtcEndOfDay(
+      courseCycle.academicCycle.endDate,
+    );
+
+    const BATCH_SIZE = Math.max(
+      1,
+      technicalSettings.database.batching.evaluationSubscriberBatchSize,
+    );
     let totalProcessed = 0;
 
     if (evaluationType.code === EVALUATION_TYPE_CODES.BANCO_ENUNCIADOS) {
-      while (hasMore) {
+      let lastEnrollmentId = '0';
+
+      while (true) {
         const enrollmentsBatch = await manager.find(Enrollment, {
-          where: { courseCycleId: evaluation.courseCycleId },
+          where: {
+            courseCycleId: evaluation.courseCycleId,
+            cancelledAt: IsNull(),
+            id: MoreThan(lastEnrollmentId),
+          },
           order: { id: 'ASC' },
-          skip: offset,
           take: BATCH_SIZE,
         });
 
         if (enrollmentsBatch.length === 0) {
-          hasMore = false;
           break;
         }
 
-        const enrollmentIds = enrollmentsBatch.map((e) => e.id);
-
-        const allExistingAccess = await manager
-          .createQueryBuilder(EnrollmentEvaluation, 'ee')
-          .innerJoinAndSelect('ee.evaluation', 'ev')
-          .innerJoinAndSelect('ev.evaluationType', 'et')
-          .where('ee.enrollmentId IN (:...ids)', { ids: enrollmentIds })
-          .andWhere('et.code != :bancoCode', {
-            bancoCode: EVALUATION_TYPE_CODES.BANCO_ENUNCIADOS,
-          })
-          .getMany();
-
-        const accessMap = new Map<string, Evaluation[]>();
-        for (const access of allExistingAccess) {
-          if (!accessMap.has(access.enrollmentId)) {
-            accessMap.set(access.enrollmentId, []);
-          }
-          accessMap.get(access.enrollmentId)?.push(access.evaluation);
-        }
-
-        const accessEntries: EnrollmentEvaluation[] = [];
+        const accessEntries: Array<Partial<EnrollmentEvaluation>> = [];
 
         for (const enrollment of enrollmentsBatch) {
-          let accessEndDate = evaluation.endDate;
-
-          if (enrollment.enrollmentTypeId !== fullType.id) {
-            const academicEvaluations = accessMap.get(enrollment.id) || [];
-
-            if (academicEvaluations.length > 0) {
-              const maxAcademicEndDate = academicEvaluations.reduce(
-                (max, current) => {
-                  return getEpoch(current.endDate) > getEpoch(max)
-                    ? current.endDate
-                    : max;
-                },
-                new Date(0),
-              );
-              accessEndDate = maxAcademicEndDate;
-            }
-          }
-
-          const accessEntry = new EnrollmentEvaluation();
-          accessEntry.enrollmentId = enrollment.id;
-          accessEntry.evaluationId = evaluation.id;
-          accessEntry.accessStartDate = evaluation.startDate;
-          accessEntry.accessEndDate = accessEndDate;
-          accessEntry.isActive = true;
-          accessEntries.push(accessEntry);
+          accessEntries.push({
+            enrollmentId: enrollment.id,
+            evaluationId: evaluation.id,
+            accessStartDate: new Date(unifiedAccessStartDate),
+            accessEndDate: new Date(unifiedAccessEndDate),
+            isActive: true,
+          });
         }
 
         if (accessEntries.length > 0) {
-          await manager.save(EnrollmentEvaluation, accessEntries);
+          await manager
+            .createQueryBuilder()
+            .insert()
+            .into(EnrollmentEvaluation)
+            .values(accessEntries)
+            .orIgnore()
+            .execute();
         }
 
         totalProcessed += enrollmentsBatch.length;
-        offset += BATCH_SIZE;
-
-        if (enrollmentsBatch.length < BATCH_SIZE) {
-          hasMore = false;
-        }
+        lastEnrollmentId = enrollmentsBatch[enrollmentsBatch.length - 1].id;
       }
     } else {
-      while (hasMore) {
+      let lastEnrollmentId = '0';
+
+      while (true) {
         const fullEnrollmentsBatch = await manager.find(Enrollment, {
           where: {
             courseCycleId: evaluation.courseCycleId,
             enrollmentTypeId: fullType.id,
+            cancelledAt: IsNull(),
+            id: MoreThan(lastEnrollmentId),
           },
           order: { id: 'ASC' },
-          skip: offset,
           take: BATCH_SIZE,
         });
 
         if (fullEnrollmentsBatch.length === 0) {
-          hasMore = false;
           break;
         }
 
-        const accessEntries = fullEnrollmentsBatch.map((enrollment) => {
-          const accessEntry = new EnrollmentEvaluation();
-          accessEntry.enrollmentId = enrollment.id;
-          accessEntry.evaluationId = evaluation.id;
-          accessEntry.accessStartDate = evaluation.startDate;
-          accessEntry.accessEndDate = evaluation.endDate;
-          accessEntry.isActive = true;
-          return accessEntry;
-        });
+        const accessEntries: Array<Partial<EnrollmentEvaluation>> =
+          fullEnrollmentsBatch.map((enrollment) => ({
+            enrollmentId: enrollment.id,
+            evaluationId: evaluation.id,
+            accessStartDate: new Date(unifiedAccessStartDate),
+            accessEndDate: new Date(unifiedAccessEndDate),
+            isActive: true,
+          }));
 
         if (accessEntries.length > 0) {
-          await manager.save(EnrollmentEvaluation, accessEntries);
+          await manager
+            .createQueryBuilder()
+            .insert()
+            .into(EnrollmentEvaluation)
+            .values(accessEntries)
+            .orIgnore()
+            .execute();
         }
 
         totalProcessed += fullEnrollmentsBatch.length;
-        offset += BATCH_SIZE;
-
-        if (fullEnrollmentsBatch.length < BATCH_SIZE) {
-          hasMore = false;
-        }
+        lastEnrollmentId =
+          fullEnrollmentsBatch[fullEnrollmentsBatch.length - 1].id;
       }
     }
 

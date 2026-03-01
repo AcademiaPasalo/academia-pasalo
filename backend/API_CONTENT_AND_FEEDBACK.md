@@ -219,6 +219,7 @@ Flujo recomendado para frontend cuando el alumno abre un curso:
           "evaluationTypeCode": "PC | EX | ...",
           "shortName": "PC1",
           "fullName": "Práctica Calificada 1",
+          "hasAccess": true,
           "label": "Completado | En curso | Próximamente | Bloqueado"
         }
       ]
@@ -226,11 +227,15 @@ Flujo recomendado para frontend cuando el alumno abre un curso:
     ```
 
 Reglas de `label` en ciclo vigente:
-1. `Completado`: fecha actual > fin de evaluación.
+1. `Completado`: fecha actual > fin de evaluacion.
 2. `En curso`: fecha actual entre inicio y fin.
-3. `Próximamente`: futura y con acceso.
-4. `Bloqueado`: futura y sin acceso.
+3. `Proximamente`: fecha futura y con acceso activo.
+4. `Bloqueado`: sin acceso activo a esa evaluacion.
 
+Nota de negocio:
+- `Completado`, `En curso` y `Proximamente` son etiquetas informativas de estado academico.
+- La etiqueta no bloquea contenido por si sola; el bloqueo real depende de `hasActiveAccess`.
+- Con la regla actual de matriculas, toda evaluacion concedida mantiene acceso hasta fin de ciclo.
 **Endpoint 2: Lista de Ciclos Anteriores**
 - **Endpoint:** `GET /courses/cycle/:courseCycleId/previous-cycles`
 - **Roles:** `STUDENT`
@@ -264,6 +269,7 @@ Cuando el tab es visible, la lista devuelve todos los ciclos anteriores del curs
           "evaluationTypeCode": "PC | EX | ...",
           "shortName": "PC1",
           "fullName": "Práctica Calificada 1",
+          "hasAccess": false,
           "label": "Archivado | Bloqueado"
         }
       ]
@@ -314,7 +320,10 @@ Define una nueva evaluación dentro de un curso/ciclo.
       "endDate": "ISO-8601"
     }
     ```
-- **Automatización:** Al crearla, todos los alumnos con matrícula `FULL` reciben acceso automáticamente.
+- **Automatizacion:** al crear una evaluacion nueva, el subscriber concede acceso automatico segun tipo.
+  - `BANCO_ENUNCIADOS`: para toda matricula activa del curso/ciclo.
+  - Resto de evaluaciones: solo para matriculas activas `FULL`.
+  - En todos los casos, `accessStartDate` queda en inicio de ciclo academico y `accessEndDate` en fin de ciclo academico del curso base.
 
 ### 2. Listar Evaluaciones de un Curso
 - **Endpoint:** `GET /evaluations/course-cycle/:courseCycleId`
@@ -439,6 +448,10 @@ Permite navegar la jerarquía de una evaluación. Requiere matrícula en la eval
 - **POST /feedback/admin/:testimonyId/feature:** Destacar testimonio en la web.
     * `body: { isActive: boolean, displayOrder: number }`
     * **Efecto:** Invalida automáticamente el caché público.
+
+
+
+
 
 
 

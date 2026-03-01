@@ -15,6 +15,9 @@ export class StudentEvaluationCardDto {
   fullName: string;
 
   @Expose()
+  hasAccess: boolean;
+
+  @Expose()
   label: StudentEvaluationLabel;
 }
 

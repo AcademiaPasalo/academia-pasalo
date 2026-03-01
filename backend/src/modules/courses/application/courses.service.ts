@@ -558,6 +558,7 @@ export class CoursesService {
           evaluationTypeCode: evaluation.evaluationType.code,
           shortName: this.buildEvaluationShortName(evaluation),
           fullName: this.buildEvaluationFullName(evaluation),
+          hasAccess,
           label,
         };
       }),
@@ -628,15 +629,21 @@ export class CoursesService {
 
     return {
       cycleCode: previousCycleCode,
-      evaluations: evaluations.map((evaluation) => ({
-        id: evaluation.id,
-        evaluationTypeCode: evaluation.evaluationType.code,
-        shortName: this.buildEvaluationShortName(evaluation),
-        fullName: this.buildEvaluationFullName(evaluation),
-        label: this.hasActiveAccess(evaluation as EvaluationWithAccess)
-          ? STUDENT_EVALUATION_LABELS.ARCHIVED
-          : STUDENT_EVALUATION_LABELS.LOCKED,
-      })),
+      evaluations: evaluations.map((evaluation) => {
+        const hasAccess = this.hasActiveAccess(
+          evaluation as EvaluationWithAccess,
+        );
+        return {
+          id: evaluation.id,
+          evaluationTypeCode: evaluation.evaluationType.code,
+          shortName: this.buildEvaluationShortName(evaluation),
+          fullName: this.buildEvaluationFullName(evaluation),
+          hasAccess,
+          label: hasAccess
+            ? STUDENT_EVALUATION_LABELS.ARCHIVED
+            : STUDENT_EVALUATION_LABELS.LOCKED,
+        };
+      }),
     };
   }
 

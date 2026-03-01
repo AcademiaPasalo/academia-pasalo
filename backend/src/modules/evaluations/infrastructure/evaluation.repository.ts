@@ -25,7 +25,7 @@ export class EvaluationRepository {
     return await this.evaluationOrm.find({
       where: { courseCycleId },
       relations: ['evaluationType'],
-      order: { number: 'ASC' },
+      order: { startDate: 'ASC', number: 'ASC', id: 'ASC' },
     });
   }
 
@@ -71,7 +71,9 @@ export class EvaluationRepository {
         { userId },
       )
       .where('evaluation.courseCycleId = :courseCycleId', { courseCycleId })
-      .orderBy('evaluation.number', 'ASC')
+      .orderBy('evaluation.startDate', 'ASC')
+      .addOrderBy('evaluation.number', 'ASC')
+      .addOrderBy('evaluation.id', 'ASC')
       .getMany();
   }
 }

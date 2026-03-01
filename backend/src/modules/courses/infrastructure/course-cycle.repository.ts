@@ -110,6 +110,7 @@ export class CourseCycleRepository {
     currentCycleStartDate: Date,
     userId: string,
   ): Promise<CourseCycle[]> {
+    const now = new Date();
     return await this.ormRepository
       .createQueryBuilder('cc')
       .innerJoinAndSelect('cc.academicCycle', 'ac')
@@ -124,13 +125,15 @@ export class CourseCycleRepository {
           INNER JOIN enrollment_evaluation ee
             ON ee.evaluation_id = ev.id
             AND ee.is_active = 1
+            AND ee.access_start_date <= :now
+            AND ee.access_end_date >= :now
           INNER JOIN enrollment e
             ON e.id = ee.enrollment_id
             AND e.user_id = :userId
             AND e.cancelled_at IS NULL
           WHERE ev.course_cycle_id = cc.id
         )`,
-        { userId },
+        { userId, now },
       )
       .orderBy('ac.startDate', 'DESC')
       .getMany();
@@ -141,6 +144,7 @@ export class CourseCycleRepository {
     currentCycleStartDate: Date,
     userId: string,
   ): Promise<boolean> {
+    const now = new Date();
     const row = await this.ormRepository
       .createQueryBuilder('cc')
       .select('1', 'exists')
@@ -156,13 +160,15 @@ export class CourseCycleRepository {
           INNER JOIN enrollment_evaluation ee
             ON ee.evaluation_id = ev.id
             AND ee.is_active = 1
+            AND ee.access_start_date <= :now
+            AND ee.access_end_date >= :now
           INNER JOIN enrollment e
             ON e.id = ee.enrollment_id
             AND e.user_id = :userId
             AND e.cancelled_at IS NULL
           WHERE ev.course_cycle_id = cc.id
         )`,
-        { userId },
+        { userId, now },
       )
       .limit(1)
       .getRawOne<{ exists: string }>();

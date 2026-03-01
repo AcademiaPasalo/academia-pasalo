@@ -23,6 +23,7 @@ SET @type_ciencias_id  = (SELECT id FROM course_type WHERE code = 'CIENCIAS' LIM
 SET @level_1_id        = (SELECT id FROM cycle_level WHERE level_number = 1 LIMIT 1);
 SET @status_active_id  = (SELECT id FROM enrollment_status WHERE code = 'ACTIVE' LIMIT 1);
 SET @type_full_id      = (SELECT id FROM enrollment_type WHERE code = 'FULL' LIMIT 1);
+SET @type_partial_id   = (SELECT id FROM enrollment_type WHERE code = 'PARTIAL' LIMIT 1);
 SET @target_student_id = 1;
 SET @docente_user_id   = (SELECT id FROM user WHERE email = 'docentepasalo@gmail.com' LIMIT 1);
 
@@ -77,8 +78,8 @@ INSERT INTO course_cycle_professor (course_cycle_id, professor_user_id, assigned
 INSERT INTO enrollment (user_id, course_cycle_id, enrollment_status_id, enrollment_type_id, enrolled_at) VALUES
 (@target_student_id, @cc_alg_id, @status_active_id, @type_full_id, NOW()),
 (@target_student_id, @cc_cal_id, @status_active_id, @type_full_id, NOW()),
-(@target_student_id, @cc_fis_id, @status_active_id, @type_full_id, NOW()),
-(@target_student_id, @cc_qui_id, @status_active_id, @type_full_id, NOW());
+(@target_student_id, @cc_fis_id, @status_active_id, @type_partial_id, NOW()),
+(@target_student_id, @cc_qui_id, @status_active_id, @type_partial_id, NOW());
 
 -- -----------------------------------------------------------------------------
 -- 5. EVALUACIONES
@@ -109,9 +110,33 @@ JOIN (
 WHERE cc.id IN (@cc_alg_id, @cc_cal_id, @cc_fis_id, @cc_qui_id);
 
 INSERT INTO enrollment_evaluation (enrollment_id, evaluation_id, access_start_date, access_end_date, is_active)
-SELECT e.id, ev.id, ev.start_date, ev.end_date, TRUE
+SELECT
+  e.id,
+  ev.id,
+  ac.start_date,
+  ac.end_date,
+  TRUE
 FROM enrollment e
-JOIN evaluation ev ON ev.course_cycle_id = e.course_cycle_id;
+JOIN course_cycle cc ON cc.id = e.course_cycle_id
+JOIN academic_cycle ac ON ac.id = cc.academic_cycle_id
+JOIN enrollment_type et ON et.id = e.enrollment_type_id
+JOIN evaluation ev ON ev.course_cycle_id = e.course_cycle_id
+WHERE e.user_id = @target_student_id
+  AND (
+    et.code = 'FULL'
+    OR (
+      e.course_cycle_id = @cc_fis_id
+      AND ev.evaluation_type_id = @t_pc
+      AND ev.number = 4
+    )
+    OR (
+      e.course_cycle_id = @cc_qui_id
+      AND (
+        (ev.evaluation_type_id = @t_pc AND ev.number IN (3, 4))
+        OR (ev.evaluation_type_id = @t_ex AND ev.number = 2)
+      )
+    )
+  );
 
 -- -----------------------------------------------------------------------------
 -- 6. SESIONES (REGLA: INICIO >= 08:00, FIN <= 23:00)

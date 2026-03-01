@@ -17,7 +17,11 @@ import { Evaluation } from '@modules/evaluations/domain/evaluation.entity';
 import { RedisCacheService } from '@infrastructure/cache/redis-cache.service';
 import { MyEnrollmentsResponseDto } from '@modules/enrollments/dto/my-enrollments-response.dto';
 import { technicalSettings } from '@config/technical-settings';
-import { getEpoch } from '@common/utils/date.util';
+import {
+  getEpoch,
+  toUtcEndOfDay,
+  toUtcStartOfDay,
+} from '@common/utils/date.util';
 import {
   ENROLLMENT_CACHE_KEYS,
   ENROLLMENT_STATUS_CODES,
@@ -159,7 +163,7 @@ export class EnrollmentsService {
       }
 
       const now = new Date();
-      const cycleEndDate = new Date(courseCycle.academicCycle.endDate);
+      const cycleEndDate = toUtcEndOfDay(courseCycle.academicCycle.endDate);
 
       if (getEpoch(cycleEndDate) < getEpoch(now)) {
         this.logger.warn({
@@ -216,22 +220,20 @@ export class EnrollmentsService {
       });
 
       if (allEvaluations.length > 0) {
-        const currentCycleEvaluations = allEvaluations.filter(
-          (e) => e.courseCycleId === dto.courseCycleId,
-        );
         let evaluationsToGrant: Evaluation[] = [];
-        let bankAccessLimitDate: Date | null = null;
 
         if (type.code === ENROLLMENT_TYPE_CODES.FULL) {
           evaluationsToGrant = allEvaluations;
         } else {
-          const requestedIds = dto.evaluationIds || [];
+          const requestedIds = new Set(dto.evaluationIds || []);
           const academicEvaluations = allEvaluations.filter((e) =>
-            requestedIds.includes(e.id),
+            requestedIds.has(e.id),
           );
           const bankEvaluation = allEvaluations.find(
             (e) =>
-              e.evaluationType.code === EVALUATION_TYPE_CODES.BANCO_ENUNCIADOS,
+              e.evaluationType.code ===
+                EVALUATION_TYPE_CODES.BANCO_ENUNCIADOS &&
+              e.courseCycleId === dto.courseCycleId,
           );
 
           if (academicEvaluations.length === 0) {
@@ -240,61 +242,30 @@ export class EnrollmentsService {
             );
           }
 
-          const maxAcademicEndDate = academicEvaluations.reduce(
-            (max, current) => {
-              const currentEndDate = new Date(current.endDate);
-              return getEpoch(currentEndDate) > getEpoch(max)
-                ? currentEndDate
-                : max;
-            },
-            new Date(0),
-          );
-
           evaluationsToGrant = [...academicEvaluations];
 
-          if (bankEvaluation) {
+          if (
+            bankEvaluation &&
+            !evaluationsToGrant.some(
+              (evaluation) => evaluation.id === bankEvaluation.id,
+            )
+          ) {
             evaluationsToGrant.push(bankEvaluation);
-            bankAccessLimitDate = maxAcademicEndDate;
           }
         }
 
+        const unifiedAccessStartDate = toUtcStartOfDay(
+          courseCycle.academicCycle.startDate,
+        );
+        const unifiedAccessEndDate = toUtcEndOfDay(
+          courseCycle.academicCycle.endDate,
+        );
         const accessEntries = evaluationsToGrant.map((evaluation) => {
-          let accessEnd = new Date(evaluation.endDate);
-
-          const isHistorical = evaluation.courseCycleId !== dto.courseCycleId;
-
-          if (
-            evaluation.evaluationType.code ===
-              EVALUATION_TYPE_CODES.BANCO_ENUNCIADOS &&
-            bankAccessLimitDate
-          ) {
-            accessEnd = bankAccessLimitDate;
-          } else if (type.code === ENROLLMENT_TYPE_CODES.FULL) {
-            const cycleEnd = new Date(courseCycle.academicCycle.endDate);
-            accessEnd =
-              getEpoch(accessEnd) > getEpoch(cycleEnd) ? accessEnd : cycleEnd;
-          } else if (isHistorical) {
-            const simil = currentCycleEvaluations.find(
-              (c) =>
-                String(c.evaluationTypeId) ===
-                  String(evaluation.evaluationTypeId) &&
-                c.number === evaluation.number,
-            );
-
-            if (simil) {
-              accessEnd = new Date(simil.endDate);
-            } else {
-              const cycleEnd = new Date(courseCycle.academicCycle.endDate);
-              accessEnd =
-                getEpoch(accessEnd) > getEpoch(cycleEnd) ? accessEnd : cycleEnd;
-            }
-          }
-
           return {
             enrollmentId: enrollment.id,
             evaluationId: evaluation.id,
-            accessStartDate: new Date(evaluation.startDate),
-            accessEndDate: accessEnd,
+            accessStartDate: new Date(unifiedAccessStartDate),
+            accessEndDate: new Date(unifiedAccessEndDate),
             isActive: true,
           };
         });

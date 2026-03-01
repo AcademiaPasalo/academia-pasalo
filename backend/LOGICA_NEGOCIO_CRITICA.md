@@ -1,59 +1,62 @@
-# Lógica de Negocio Crítica y Seguridad - Documentación Técnica
+# Logica de Negocio Critica y Seguridad - Documentacion Tecnica
 
-Este documento detalla la implementación técnica de los flujos más complejos del sistema, explicando cómo se orquestan los archivos, qué tablas se afectan y cómo se garantiza la integridad de los datos.
+Este documento detalla la implementacion tecnica de los flujos mas complejos del sistema, explicando como se orquestan los archivos, que tablas se afectan y como se garantiza la integridad de los datos.
 
-## 1. Sistema de Matrículas Dinámicas y Reactivas
+## 1. Sistema de Matriculas Dinamicas y Reactivas
 
 ### Problema
-En sistemas tradicionales, la matrícula es una "foto estática". Si un profesor agregaba un examen nuevo después de que el alumno pagó el "Curso Completo", el alumno no tenía acceso.
+En sistemas tradicionales, la matricula es una foto estatica. Si un profesor agregaba un examen nuevo despues de que el alumno pago el Curso Completo, el alumno no tenia acceso.
 
-### Solución Técnica
-Implementamos un sistema híbrido que combina una transacción inicial con un patrón Observador (Subscriber) para garantizar consistencia eventual inmediata.
+### Solucion Tecnica
+Implementamos un sistema hibrido que combina una transaccion inicial con un patron Observador (Subscriber) para garantizar consistencia eventual inmediata.
 
-#### A. Flujo de Matrícula (EnrollmentsService)
+#### A. Flujo de Matricula (EnrollmentsService)
 **Archivos:** `src/modules/enrollments/application/enrollments.service.ts`
 
-1. **Intención de Compra:** Se recibe `enrollmentTypeCode` ('FULL' o 'PARTIAL').
-2. **Transacción ACID:** Todo ocurre dentro de `dataSource.transaction`.
-3. **Lógica de Selección:**
-   - Si es **FULL**: Se buscan todas las evaluaciones del ciclo actual Y ciclos históricos especificados.
-   - Si es **PARTIAL**: Se validan los IDs de evaluaciones enviados, que pueden pertenecer al ciclo actual O a ciclos históricos especificados en `historicalCourseCycleIds`.
-4. **Cálculo de Vigencia (Clamping):**
-   - Para el **Banco de Enunciados** (que dura todo el ciclo), si la matrícula es PARTIAL, el sistema calcula la fecha de fin de la evaluación académica más tardía comprada y fuerza la fecha de fin del Banco a esa fecha.
-   - **Query Implícita (Lógica):** `MAX(evaluation.end_date)` de las evaluaciones compradas.
+1. **Intencion de Compra:** Se recibe `enrollmentTypeCode` ('FULL' o 'PARTIAL').
+2. **Transaccion ACID:** Todo ocurre dentro de `dataSource.transaction`.
+3. **Logica de Seleccion:**
+   - Si es **FULL**: Se buscan todas las evaluaciones del ciclo actual y ciclos historicos especificados.
+   - Si es **PARTIAL**: Se validan los IDs de evaluaciones enviados, que pueden pertenecer al ciclo actual o a ciclos historicos especificados en `historicalCourseCycleIds`.
+4. **Vigencia Unificada:**
+   - Toda evaluacion concedida (FULL o PARTIAL) persiste una ventana unica de acceso en `enrollment_evaluation`.
+   - `access_start_date` = inicio del ciclo academico del `courseCycle` base de la matricula.
+   - `access_end_date` = fin del ciclo academico del `courseCycle` base de la matricula.
+   - Ya no existe clamping por evaluacion mas lejana ni fallback por simil historico para calcular la fecha fin.
 5. **Persistencia:** Se inserta en `enrollment` y masivamente en `enrollment_evaluation`.
 
 **Tablas Afectadas:**
 - `enrollment` (Cabecera)
-- `enrollment_evaluation` (Detalle - Única fuente de verdad de acceso)
+- `enrollment_evaluation` (Detalle - unica fuente de verdad de acceso)
 
-#### B. Reactividad Automática (EvaluationSubscriber)
+#### B. Reactividad Automatica (EvaluationSubscriber)
 **Archivos:** `src/modules/evaluations/infrastructure/evaluation.subscriber.ts`
 
 1. **Trigger:** Se dispara `afterInsert` cada vez que se crea una `Evaluation`.
-2. **Detección:** El sistema busca todos los registros en `enrollment` asociados al `course_cycle_id` de la nueva evaluación que tengan `enrollment_type.code = 'FULL'`.
-3. **Inyección de Permisos:**
+2. **Deteccion por tipo de evaluacion:**
+   - Si la nueva evaluacion es `BANCO_ENUNCIADOS`, se otorga acceso automatico a toda matricula activa del curso/ciclo.
+   - Si no es banco, se otorga acceso automatico solo a matriculas activas de tipo `FULL`.
+3. **Inyeccion de Permisos:**
    - Itera sobre los alumnos encontrados.
-   - Crea automáticamente el registro en `enrollment_evaluation` para la nueva evaluación.
+   - Crea automaticamente el registro en `enrollment_evaluation` para la nueva evaluacion.
 4. **Resultado:** El alumno ve el nuevo examen en tiempo real sin que el administrador toque nada.
 
 ---
 
-## 2. Acceso Histórico (Valor Agregado)
+## 2. Acceso Historico (Valor Agregado)
 
-### Lógica
+### Logica
 Permitir que un alumno matriculado acceda a evaluaciones de ciclos anteriores (ej. 2025-2) para practicar.
 
 **Archivos:** `src/modules/enrollments/application/enrollments.service.ts`
 
-1. **Aplicación:** Funciona tanto para matrículas **FULL** como **PARTIAL** mediante el campo `historicalCourseCycleIds`.
-2. **Búsqueda de Ciclos:** El servicio busca en `course_cycle` los ciclos especificados que compartan el mismo `course_id` y cuya `start_date` sea menor a la actual.
+1. **Aplicacion:** Funciona tanto para matriculas **FULL** como **PARTIAL** mediante el campo `historicalCourseCycleIds`.
+2. **Busqueda de Ciclos:** El servicio busca en `course_cycle` los ciclos especificados que compartan el mismo `course_id` y cuya `start_date` sea menor a la actual.
 3. **Diferencia por Tipo:**
-   - **FULL**: Accede a TODAS las evaluaciones de los ciclos históricos.
-   - **PARTIAL**: Accede SOLO a las evaluaciones específicas indicadas en `evaluationIds` (pueden ser de ciclos pasados).
-4. **Extensión de Vigencia:**
-   - Las evaluaciones pasadas ya vencieron (su `end_date` es antigua).
-   - El sistema sobrescribe la `access_end_date` en la tabla `enrollment_evaluation` usando la `end_date` del **ciclo académico actual**.
+   - **FULL**: Accede a todas las evaluaciones de los ciclos historicos.
+   - **PARTIAL**: Accede solo a las evaluaciones especificas indicadas en `evaluationIds` (pueden ser de ciclos pasados).
+4. **Vigencia en historico:**
+   - Aunque la evaluacion historica tenga `end_date` antigua, la vigencia de acceso se guarda hasta el fin del ciclo academico actual del curso base matriculado.
 5. **Resultado:** El alumno ve material antiguo habilitado hasta que termine su ciclo actual.
 
 ---
