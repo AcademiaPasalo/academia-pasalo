@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useBreadcrumb } from "@/contexts/BreadcrumbContext";
 import { classEventService } from "@/services/classEvent.service";
 import { materialsService } from "@/services/materials.service";
 import type { ClassEvent } from "@/types/classEvent";
@@ -11,6 +12,7 @@ interface EvaluationContentProps {
   evaluationId: string;
   evaluationName: string;
   evaluationFullName: string;
+  courseName: string;
   onBack: () => void;
 }
 
@@ -29,24 +31,29 @@ function formatDate(iso: string): string {
     year: "numeric",
     timeZone: "America/Lima",
   });
-  // Capitalizar primera letra
   return formatted.charAt(0).toUpperCase() + formatted.slice(1);
 }
 
-function formatTime(iso: string): string {
-  const date = new Date(iso);
-  return date
-    .toLocaleTimeString("es-PE", {
-      hour: "numeric",
-      minute: "2-digit",
-      hour12: true,
-      timeZone: "America/Lima",
-    })
-    .toUpperCase();
-}
-
 function formatTimeRange(start: string, end: string): string {
-  return `${formatTime(start)} - ${formatTime(end)}`;
+  const startDate = new Date(start);
+  const endDate = new Date(end);
+  const opts: Intl.DateTimeFormatOptions = {
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+    timeZone: "America/Lima",
+  };
+  // Solo mostrar am/pm en la hora final (ej. "8:00 - 10:00 am")
+  const startStr = startDate
+    .toLocaleTimeString("es-PE", opts)
+    .replace(/ a\.\s?m\.| p\.\s?m\./i, "")
+    .trim();
+  const endStr = endDate
+    .toLocaleTimeString("es-PE", opts)
+    .replace(/a\.\s?m\./i, "am")
+    .replace(/p\.\s?m\./i, "pm")
+    .trim();
+  return `${startStr} - ${endStr}`;
 }
 
 function calcDuration(start: string, end: string): string {
@@ -55,46 +62,69 @@ function calcDuration(start: string, end: string): string {
   const hours = Math.floor(totalMinutes / 60);
   const minutes = totalMinutes % 60;
 
-  if (hours === 0) return `${minutes} min`;
-  if (minutes === 0) return `${hours} hr${hours > 1 ? "s" : ""}`;
-  return `${hours} hr${hours > 1 ? "s" : ""} ${minutes} min`;
+  if (hours === 0) return `${minutes}m`;
+  if (minutes === 0) return `${hours}h`;
+  return `${hours}h ${minutes}m`;
 }
 
 function formatFileSize(sizeBytes: string): string {
   const bytes = parseInt(sizeBytes, 10);
   if (isNaN(bytes) || bytes === 0) return "0 B";
   if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(2)} MB`;
+  return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
 }
 
-function getFileIcon(mimeType: string): string {
-  if (mimeType.includes("pdf")) return "picture_as_pdf";
+function getFileExtension(fileName: string): string {
+  const dotIndex = fileName.lastIndexOf(".");
+  if (dotIndex === -1) return "";
+  return fileName.substring(dotIndex);
+}
+
+function getFileNameWithoutExtension(fileName: string): string {
+  const dotIndex = fileName.lastIndexOf(".");
+  if (dotIndex === -1) return fileName;
+  return fileName.substring(0, dotIndex);
+}
+
+function getFileIconColor(mimeType: string): string {
+  if (mimeType.includes("pdf")) return "bg-red-600";
   if (mimeType.includes("word") || mimeType.includes("document"))
-    return "article";
+    return "bg-sky-600";
   if (mimeType.includes("sheet") || mimeType.includes("excel"))
-    return "table_chart";
+    return "bg-green-600";
   if (mimeType.includes("presentation") || mimeType.includes("powerpoint"))
-    return "slideshow";
-  if (mimeType.startsWith("image/")) return "image";
-  if (mimeType.startsWith("video/")) return "videocam";
-  return "description";
+    return "bg-orange-500";
+  if (mimeType.startsWith("image/")) return "bg-purple-500";
+  return "bg-gray-500";
+}
+
+function getFileExtLabel(mimeType: string): string {
+  if (mimeType.includes("pdf")) return "PDF";
+  if (mimeType.includes("word") || mimeType.includes("document")) return "DOC";
+  if (mimeType.includes("sheet") || mimeType.includes("excel")) return "XLS";
+  if (mimeType.includes("presentation") || mimeType.includes("powerpoint"))
+    return "PPT";
+  if (mimeType.startsWith("image/")) return "IMG";
+  return "FILE";
 }
 
 // ============================================
-// Material File Card
+// Material File Card (matches Figma)
 // ============================================
 
 function MaterialCard({ material }: { material: ClassEventMaterial }) {
   const [downloading, setDownloading] = useState(false);
 
+  const fileName =
+    material.displayName || material.fileResource.originalName;
+  const nameWithoutExt = getFileNameWithoutExtension(fileName);
+  const ext = getFileExtension(fileName);
+
   const handleDownload = async () => {
     setDownloading(true);
     try {
-      await materialsService.downloadMaterial(
-        material.id,
-        material.displayName || material.fileResource.originalName,
-      );
+      await materialsService.downloadMaterial(material.id, fileName);
     } catch (err) {
       console.error("Error al descargar:", err);
     } finally {
@@ -103,45 +133,64 @@ function MaterialCard({ material }: { material: ClassEventMaterial }) {
   };
 
   return (
-    <div className="flex items-center gap-3 p-3 bg-bg-primary rounded-xl outline outline-1 outline-offset-[-1px] outline-stroke-primary">
-      {/* File icon */}
-      <div className="p-2 bg-bg-accent-light rounded-lg flex items-center justify-center">
-        <Icon
-          name={getFileIcon(material.fileResource.mimeType)}
-          size={20}
-          className="text-icon-accent-primary"
-        />
+    <div className="self-stretch p-3 bg-bg-secondary rounded-lg inline-flex justify-start items-center gap-3">
+      {/* File type icon */}
+      <div className="flex-1 flex justify-start items-center gap-1">
+        <div className="w-8 h-8 relative overflow-hidden flex items-center justify-center">
+          <div
+            className={`w-5 h-7 rounded-sm ${getFileIconColor(material.fileResource.mimeType)} flex items-center justify-center`}
+          >
+            <span className="text-white text-[6px] font-bold">
+              {getFileExtLabel(material.fileResource.mimeType)}
+            </span>
+          </div>
+        </div>
+
+        {/* File info */}
+        <div className="flex-1 inline-flex flex-col justify-start items-start gap-1">
+          <div className="self-stretch inline-flex justify-start items-start">
+            <span className="text-text-primary text-sm font-normal leading-4 line-clamp-1">
+              {nameWithoutExt}
+            </span>
+            <span className="text-text-primary text-sm font-normal leading-4">
+              {ext}
+            </span>
+          </div>
+          <div className="self-stretch inline-flex justify-start items-center gap-2">
+            <span className="text-text-tertiary text-[10px] font-normal leading-3">
+              {formatFileSize(material.fileResource.sizeBytes)}
+            </span>
+          </div>
+        </div>
       </div>
 
-      {/* File info */}
-      <div className="flex-1 flex flex-col gap-0.5 min-w-0">
-        <span className="text-text-primary text-sm font-medium leading-4 truncate">
-          {material.displayName || material.fileResource.originalName}
-        </span>
-        <span className="text-text-tertiary text-xs font-normal leading-3">
-          {formatFileSize(material.fileResource.sizeBytes)}
-        </span>
+      {/* Action buttons */}
+      <div className="flex justify-start items-center gap-1">
+        <button
+          className="p-1 rounded-full flex justify-center items-center"
+          title="Ver"
+        >
+          <Icon name="visibility" size={20} className="text-icon-tertiary" />
+        </button>
+        <button
+          onClick={handleDownload}
+          disabled={downloading}
+          className="p-1 rounded-full flex justify-center items-center disabled:opacity-50"
+          title="Descargar"
+        >
+          <Icon
+            name={downloading ? "hourglass_empty" : "download"}
+            size={20}
+            className="text-icon-tertiary"
+          />
+        </button>
       </div>
-
-      {/* Download button */}
-      <button
-        onClick={handleDownload}
-        disabled={downloading}
-        className="p-2 rounded-lg hover:bg-bg-secondary transition-colors disabled:opacity-50"
-        title="Descargar"
-      >
-        <Icon
-          name={downloading ? "hourglass_empty" : "download"}
-          size={20}
-          className="text-icon-accent-primary"
-        />
-      </button>
     </div>
   );
 }
 
 // ============================================
-// Class Session Card
+// Class Session Card (matches Figma)
 // ============================================
 
 function ClassSessionCard({
@@ -164,73 +213,86 @@ function ClassSessionCard({
   };
 
   return (
-    <div className="self-stretch p-6 bg-bg-primary rounded-2xl outline outline-1 outline-offset-[-1px] outline-stroke-primary flex flex-col gap-5">
-      {/* Header: CLASE N + Duration badge */}
-      <div className="flex items-center justify-between">
-        <span className="text-text-primary text-lg font-semibold leading-5">
-          CLASE {event.sessionNumber}
-        </span>
-        <div className="px-2.5 py-1.5 bg-bg-accent-light rounded-full flex items-center gap-1">
-          <Icon name="watch_later" size={14} className="text-icon-accent-primary" />
-          <span className="text-text-accent-primary text-xs font-medium leading-3">
-            {duration}
-          </span>
+    <div className="self-stretch p-6 bg-bg-primary rounded-2xl outline outline-1 outline-offset-[-1px] outline-stroke-primary flex flex-col justify-start items-start gap-4">
+      {/* Content section */}
+      <div className="self-stretch flex flex-col justify-start items-start gap-2">
+        {/* Header + Topic */}
+        <div className="self-stretch flex flex-col justify-start items-start gap-1">
+          <div className="self-stretch inline-flex justify-between items-center">
+            <div className="flex justify-start items-start gap-1">
+              <span className="text-text-accent-primary text-sm font-semibold leading-4">
+                CLASE
+              </span>
+              <span className="text-text-accent-primary text-sm font-semibold leading-4">
+                {event.sessionNumber}
+              </span>
+            </div>
+            <div className="flex justify-start items-start">
+              <div className="px-2 py-1 bg-bg-info-primary-light rounded-full flex justify-center items-center gap-1">
+                <span className="text-text-info-primary text-[10px] font-semibold leading-3">
+                  {duration}
+                </span>
+              </div>
+            </div>
+          </div>
+          <div className="self-stretch text-text-primary text-lg font-semibold leading-5">
+            {event.topic}
+          </div>
+        </div>
+
+        {/* Date & Time */}
+        <div className="self-stretch flex flex-col justify-start items-start gap-1">
+          <div className="self-stretch inline-flex justify-start items-center gap-1">
+            <Icon
+              name="calendar_today"
+              size={14}
+              className="text-icon-secondary"
+            />
+            <span className="text-text-tertiary text-xs font-normal leading-4">
+              {formatDate(event.startDatetime)}
+            </span>
+          </div>
+          <div className="self-stretch inline-flex justify-start items-center gap-1">
+            <Icon
+              name="schedule"
+              size={14}
+              className="text-icon-secondary"
+            />
+            <span className="text-text-secondary text-xs font-normal leading-3">
+              {formatTimeRange(event.startDatetime, event.endDatetime)}
+            </span>
+          </div>
         </div>
       </div>
 
-      {/* Topic */}
-      <div className="text-text-secondary text-sm font-normal leading-5">
-        {event.topic}
-      </div>
-
-      {/* Date & Time */}
-      <div className="flex flex-col gap-2">
-        <div className="flex items-center gap-2">
-          <Icon
-            name="calendar_today"
-            size={18}
-            className="text-icon-secondary"
-          />
-          <span className="text-text-secondary text-sm font-normal leading-4">
-            {formatDate(event.startDatetime)}
-          </span>
-        </div>
-        <div className="flex items-center gap-2">
-          <Icon
-            name="watch_later"
-            size={18}
-            className="text-icon-secondary"
-          />
-          <span className="text-text-secondary text-sm font-normal leading-4">
-            {formatTimeRange(event.startDatetime, event.endDatetime)}
-          </span>
-        </div>
-      </div>
-
-      {/* Ver Grabación button */}
-      <div>
+      {/* Ver Grabación button (full width) */}
+      <div className="self-stretch flex flex-col justify-start items-end gap-2.5">
         <button
           onClick={handleWatchRecording}
           disabled={!canWatch}
-          className={`px-4 py-2.5 rounded-xl inline-flex items-center gap-2 transition-colors ${
+          className={`self-stretch px-4 py-3 rounded-lg inline-flex justify-center items-center gap-1.5 transition-colors ${
             canWatch
-              ? "bg-bg-accent-solid text-text-white hover:bg-bg-accent-solid-hover"
-              : "bg-bg-disabled text-text-disabled cursor-not-allowed"
+              ? "bg-bg-accent-primary-solid hover:bg-bg-accent-solid-hover"
+              : "bg-bg-disabled cursor-not-allowed"
           }`}
         >
           <Icon
-            name="play_circle"
-            size={18}
+            name="play_arrow"
+            size={16}
             className={canWatch ? "text-icon-white" : "text-icon-disabled"}
           />
-          <span className="text-sm font-medium leading-4">Ver Grabación</span>
+          <span
+            className={`text-sm font-medium leading-4 ${canWatch ? "text-text-white" : "text-text-disabled"}`}
+          >
+            Ver Grabación
+          </span>
         </button>
       </div>
 
       {/* Materials section */}
       {(materials.length > 0 || loadingMaterials) && (
-        <div className="border-l-2 border-stroke-accent-primary pl-4 flex flex-col gap-3">
-          <span className="text-text-primary text-sm font-semibold leading-4">
+        <div className="self-stretch pl-3 border-l-2 border-stroke-primary flex flex-col justify-start items-start gap-3">
+          <span className="self-stretch text-text-quartiary text-sm font-semibold leading-4">
             Materiales de clase
           </span>
           {loadingMaterials ? (
@@ -241,7 +303,7 @@ function ClassSessionCard({
               </span>
             </div>
           ) : (
-            <div className="flex flex-col gap-2">
+            <div className="self-stretch flex flex-col justify-start items-start gap-2">
               {materials.map((material) => (
                 <MaterialCard key={material.id} material={material} />
               ))}
@@ -261,8 +323,10 @@ export default function EvaluationContent({
   evaluationId,
   evaluationName,
   evaluationFullName,
+  courseName,
   onBack,
 }: EvaluationContentProps) {
+  const { setBreadcrumbItems } = useBreadcrumb();
   const [activeTab, setActiveTab] = useState<EvalTabOption>("sesiones");
   const [events, setEvents] = useState<ClassEvent[]>([]);
   const [loadingEvents, setLoadingEvents] = useState(true);
@@ -275,6 +339,16 @@ export default function EvaluationContent({
   const [loadingMaterialsMap, setLoadingMaterialsMap] = useState<
     Record<string, boolean>
   >({});
+
+  // Breadcrumb: Cursos > Nombre del curso > Ciclo Vigente > PC1
+  useEffect(() => {
+    setBreadcrumbItems([
+      { label: "Cursos" },
+      { label: courseName },
+      { label: "Ciclo Vigente" },
+      { label: evaluationName },
+    ]);
+  }, [setBreadcrumbItems, courseName, evaluationName]);
 
   // Cargar sesiones de clase
   useEffect(() => {
@@ -336,14 +410,14 @@ export default function EvaluationContent({
       <div className="self-stretch px-12 mb-6">
         <button
           onClick={onBack}
-          className="p-1 rounded-lg hover:bg-bg-secondary transition-colors inline-flex items-center gap-1"
+          className="p-1 rounded-lg hover:bg-bg-secondary transition-colors inline-flex justify-center items-center gap-2"
         >
           <Icon
             name="arrow_back"
             size={20}
             className="text-icon-accent-primary"
           />
-          <span className="text-text-accent-primary text-sm font-medium leading-4">
+          <span className="text-text-accent-primary text-base font-medium leading-4">
             Volver al Ciclo Vigente
           </span>
         </button>
@@ -353,18 +427,17 @@ export default function EvaluationContent({
           BANNER
           ======================================== */}
       <div
-        className="self-stretch mx-12 mb-8 px-8 py-6 rounded-2xl flex flex-col justify-center items-start gap-1"
+        className="self-stretch mx-12 mb-8 p-10 rounded-2xl inline-flex flex-col justify-center items-start gap-2 overflow-hidden"
         style={{
           background:
-            "linear-gradient(135deg, var(--muted-indigo-800) 0%, var(--muted-indigo-200) 100%)",
+            "linear-gradient(to right, var(--muted-indigo-800), var(--muted-indigo-700), var(--muted-indigo-200))",
         }}
       >
-        <span className="text-white text-2xl font-bold leading-7">
-          {evaluationName}
-        </span>
-        <span className="text-white/80 text-sm font-normal leading-5">
-          {evaluationFullName}
-        </span>
+        <div className="self-stretch flex flex-col justify-center items-start gap-1">
+          <span className="self-stretch text-white text-3xl font-semibold leading-10">
+            {evaluationName}
+          </span>
+        </div>
       </div>
 
       {/* ========================================
@@ -372,26 +445,28 @@ export default function EvaluationContent({
           ======================================== */}
       <div className="self-stretch px-12 inline-flex flex-col justify-start items-start gap-8">
         {/* Sub-tabs */}
-        <div className="w-[400px] p-1 bg-bg-primary rounded-xl outline outline-1 outline-offset-[-1px] outline-stroke-primary inline-flex justify-start items-start gap-2">
+        <div className="w-[491px] p-1 bg-bg-primary rounded-xl outline outline-1 outline-offset-[-1px] outline-stroke-primary inline-flex justify-start items-start gap-2">
           {evalTabs.map((tab) => (
             <button
               key={tab.key}
               onClick={() => setActiveTab(tab.key)}
-              className={`flex-1 px-2 py-2.5 rounded-lg flex justify-center items-center gap-2 transition-colors ${
+              className={`flex-1 px-2 py-2.5 rounded-lg flex justify-start items-center gap-2 transition-colors ${
                 activeTab === tab.key
                   ? "bg-bg-accent-primary-solid"
                   : "bg-bg-primary hover:bg-bg-secondary"
               }`}
             >
-              <span
-                className={`text-center text-[15px] leading-4 whitespace-nowrap ${
-                  activeTab === tab.key
-                    ? "text-text-white"
-                    : "text-text-secondary"
-                }`}
-              >
-                {tab.label}
-              </span>
+              <div className="flex-1 flex justify-start items-center gap-2">
+                <span
+                  className={`flex-1 text-center text-base leading-4 whitespace-nowrap ${
+                    activeTab === tab.key
+                      ? "text-text-white font-medium"
+                      : "text-text-secondary font-normal"
+                  }`}
+                >
+                  {tab.label}
+                </span>
+              </div>
             </button>
           ))}
         </div>
@@ -455,7 +530,7 @@ export default function EvaluationContent({
 
             {/* Session Cards */}
             {!loadingEvents && !errorEvents && events.length > 0 && (
-              <div className="self-stretch flex flex-col gap-6">
+              <div className="self-stretch flex flex-col justify-start items-start gap-6">
                 {events.map((event) => (
                   <ClassSessionCard
                     key={event.id}

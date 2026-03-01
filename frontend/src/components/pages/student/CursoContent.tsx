@@ -408,7 +408,7 @@ function BancoCategoryCard({
         <div
           className={`p-3 ${category.iconBg} rounded-xl flex justify-start items-center`}
         >
-          <Icon name={category.icon} size={24} className={category.iconColor} />
+          <Icon name="folder" size={24} className={category.iconColor} />
         </div>
       </div>
 
@@ -494,7 +494,7 @@ export default function CursoContent({ cursoId }: CursoContentProps) {
         if (found) {
           setEnrollment(found);
           setBreadcrumbItems([
-            { icon: "home", label: "Inicio", href: "/plataforma/inicio" },
+            { label: "Cursos" },
             { label: found.courseCycle.course.name },
           ]);
         } else {
@@ -650,7 +650,7 @@ export default function CursoContent({ cursoId }: CursoContentProps) {
   const cycleLevelName = enrollment.courseCycle.course.cycleLevel?.name || "";
 
   // Tab config
-  const tabs: { key: TabOption; label: string }[] = [
+  const tabs: { key: TabOption; label: string; disabled?: boolean }[] = [
     { key: "vigente", label: "Ciclo Vigente" },
     { key: "anteriores", label: "Ciclos Pasados" },
     { key: "banco", label: "Banco de Enunciados" },
@@ -663,7 +663,11 @@ export default function CursoContent({ cursoId }: CursoContentProps) {
         evaluationId={selectedEvaluation.id}
         evaluationName={selectedEvaluation.shortName}
         evaluationFullName={selectedEvaluation.fullName}
-        onBack={() => setSelectedEvaluation(null)}
+        courseName={courseName}
+        onBack={() => {
+          setSelectedEvaluation(null);
+          setBreadcrumbItems([{ label: "Cursos" }, { label: courseName }]);
+        }}
       />
     );
   }
@@ -755,19 +759,24 @@ export default function CursoContent({ cursoId }: CursoContentProps) {
           {tabs.map((tab) => (
             <button
               key={tab.key}
-              onClick={() => setActiveTab(tab.key)}
+              disabled={tab.disabled}
+              onClick={() => !tab.disabled && setActiveTab(tab.key)}
               className={`flex-1 px-2 py-2.5 rounded-lg flex justify-start items-center gap-2 transition-colors ${
-                activeTab === tab.key
-                  ? "bg-bg-accent-primary-solid"
-                  : "bg-bg-primary hover:bg-bg-secondary"
+                tab.disabled
+                  ? "bg-bg-primary cursor-not-allowed opacity-50"
+                  : activeTab === tab.key
+                    ? "bg-bg-accent-primary-solid"
+                    : "bg-bg-primary hover:bg-bg-secondary"
               }`}
             >
               <div className="flex-1 flex justify-start items-center gap-2">
                 <span
                   className={`flex-1 text-center text-[15px] leading-4 whitespace-nowrap ${
-                    activeTab === tab.key
-                      ? "text-text-white"
-                      : "text-text-secondary"
+                    tab.disabled
+                      ? "text-text-disabled"
+                      : activeTab === tab.key
+                        ? "text-text-white"
+                        : "text-text-secondary"
                   }`}
                 >
                   {tab.label}
@@ -913,7 +922,7 @@ export default function CursoContent({ cursoId }: CursoContentProps) {
                     ))}
                   </div>
                 ) : (
-                  <div className="self-stretch p-12 bg-bg-secondary rounded-2xl border border-stroke-primary flex flex-col items-center justify-center gap-4">
+                  <div className="self-stretch p-12 bg-white rounded-2xl border border-stroke-primary flex flex-col items-center justify-center gap-4">
                     <Icon
                       name="history"
                       size={64}
