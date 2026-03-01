@@ -14,6 +14,7 @@ const mockMaterialsService = {
   getClassEventMaterials: jest.fn(),
   addVersion: jest.fn(),
   download: jest.fn(),
+  getMaterialLastModified: jest.fn(),
   requestDeletion: jest.fn(),
 };
 
@@ -84,6 +85,17 @@ describe('MaterialsController RBAC Security', () => {
         materialsController.requestDeletion,
       );
       expect(roles).toContain(ROLE_CODES.PROFESSOR);
+      expect(roles).not.toContain(ROLE_CODES.STUDENT);
+    });
+
+    it('endpoint "getMaterialLastModified" should restrict access to PROFESSOR, ADMIN, SUPER_ADMIN', () => {
+      const roles = Reflect.getMetadata(
+        'roles',
+        materialsController.getMaterialLastModified,
+      );
+      expect(roles).toContain(ROLE_CODES.PROFESSOR);
+      expect(roles).toContain(ROLE_CODES.ADMIN);
+      expect(roles).toContain(ROLE_CODES.SUPER_ADMIN);
       expect(roles).not.toContain(ROLE_CODES.STUDENT);
     });
   });

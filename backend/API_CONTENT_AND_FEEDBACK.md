@@ -372,6 +372,20 @@ Permite navegar la jerarquía de una evaluación. Requiere matrícula en la eval
     * `body: { file: Buffer, materialFolderId: string, displayName: string, classEventId?: string }`
 - **POST /materials/:id/versions:** Actualizar versión de archivo existente.
     * `body: { file: Buffer }`
+- **GET /materials/:id/last-modified:** Consultar fecha/hora de ultima modificacion de un material.
+    * **Roles:** `PROFESSOR`, `ADMIN`, `SUPER_ADMIN`
+    * **Path Params:**
+      - `id`: string (materialId)
+    * **Response (`data`):**
+      - `materialId`: string
+      - `lastModifiedAt`: string ISO-8601 (`updatedAt` del material; si es `null`, usa `createdAt`)
+    * **Errores esperados:**
+      - `403`: usuario sin permiso sobre la evaluacion/curso del material
+      - `404`: material no existe o no tiene carpeta contenedora valida
+    * **Notas de integracion frontend:**
+      - Endpoint de solo lectura para mostrar "Ultima actualizacion" en cards, tablas o panel de detalle.
+      - No requiere payload en body.
+      - Recomendado llamar bajo demanda al abrir detalle de material, o en batch solo si UI realmente lo necesita.
 - **POST /materials/request-deletion:** Flujo seguro de borrado.
     * `body: { entityType: 'material', entityId: string, reason: string }`
 
@@ -425,7 +439,6 @@ Permite navegar la jerarquía de una evaluación. Requiere matrícula en la eval
 - **POST /feedback/admin/:testimonyId/feature:** Destacar testimonio en la web.
     * `body: { isActive: boolean, displayOrder: number }`
     * **Efecto:** Invalida automáticamente el caché público.
-
 
 
 

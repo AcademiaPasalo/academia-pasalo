@@ -150,6 +150,19 @@ export class MaterialsController {
     return stream;
   }
 
+  @Get(':id/last-modified')
+  @Roles(ROLE_CODES.PROFESSOR, ROLE_CODES.ADMIN, ROLE_CODES.SUPER_ADMIN)
+  @ResponseMessage('Ultima modificacion del recurso obtenida exitosamente')
+  async getMaterialLastModified(
+    @CurrentUser() user: UserWithSession,
+    @Param('id') materialId: string,
+  ) {
+    return await this.materialsService.getMaterialLastModified(
+      user,
+      materialId,
+    );
+  }
+
   @Post('request-deletion')
   @Roles(ROLE_CODES.PROFESSOR, ROLE_CODES.ADMIN, ROLE_CODES.SUPER_ADMIN)
   @HttpCode(HttpStatus.OK)

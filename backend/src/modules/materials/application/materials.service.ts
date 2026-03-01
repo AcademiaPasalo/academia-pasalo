@@ -753,6 +753,38 @@ export class MaterialsService {
     };
   }
 
+  async getMaterialLastModified(
+    user: UserWithSession,
+    materialId: string,
+  ): Promise<{
+    materialId: string;
+    lastModifiedAt: Date;
+  }> {
+    const material = await this.materialRepository.findById(materialId);
+    if (!material) {
+      throw new NotFoundException('Material no encontrado');
+    }
+
+    const folder = await this.folderRepository.findById(
+      material.materialFolderId,
+    );
+    if (!folder) {
+      throw new NotFoundException('Carpeta contenedora no encontrada');
+    }
+
+    await this.checkAuthorizedAccess(
+      user,
+      folder.evaluationId,
+      folder,
+      material,
+    );
+
+    return {
+      materialId: material.id,
+      lastModifiedAt: material.updatedAt ?? material.createdAt,
+    };
+  }
+
   async requestDeletion(
     user: UserWithSession,
     dto: RequestDeletionDto,

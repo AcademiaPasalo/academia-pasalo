@@ -910,6 +910,49 @@ describe('MaterialsService', () => {
     });
   });
 
+  describe('getMaterialLastModified', () => {
+    it('should return updatedAt when present', async () => {
+      const updatedAt = new Date('2026-03-02T12:00:00.000Z');
+      const createdAt = new Date('2026-03-01T12:00:00.000Z');
+      materialRepo.findById.mockResolvedValue({
+        id: 'mat-1',
+        materialFolderId: 'folder-1',
+        createdAt,
+        updatedAt,
+      } as Material);
+      folderRepo.findById.mockResolvedValue(mockFolder('folder-1', '100'));
+      accessEngine.hasAccess.mockResolvedValue(true);
+
+      const result = await service.getMaterialLastModified(
+        mockProfessor,
+        'mat-1',
+      );
+
+      expect(result.materialId).toBe('mat-1');
+      expect(result.lastModifiedAt).toEqual(updatedAt);
+    });
+
+    it('should fallback to createdAt when updatedAt is null', async () => {
+      const createdAt = new Date('2026-03-01T12:00:00.000Z');
+      materialRepo.findById.mockResolvedValue({
+        id: 'mat-1',
+        materialFolderId: 'folder-1',
+        createdAt,
+        updatedAt: null,
+      } as Material);
+      folderRepo.findById.mockResolvedValue(mockFolder('folder-1', '100'));
+      accessEngine.hasAccess.mockResolvedValue(true);
+
+      const result = await service.getMaterialLastModified(
+        mockProfessor,
+        'mat-1',
+      );
+
+      expect(result.materialId).toBe('mat-1');
+      expect(result.lastModifiedAt).toEqual(createdAt);
+    });
+  });
+
   describe('Concurrencia en addVersion', () => {
     it('debe manejar múltiples subidas concurrentes manteniendo la integridad del bloqueo pesimista', async () => {
       const file = mockFile();
