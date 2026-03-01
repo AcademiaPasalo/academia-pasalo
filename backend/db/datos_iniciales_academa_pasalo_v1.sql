@@ -146,7 +146,9 @@ INSERT INTO notification_type (code, name) VALUES
 ('CLASS_SCHEDULED', 'Nueva Clase Programada'),
 ('CLASS_UPDATED',   'Clase Actualizada'),
 ('CLASS_CANCELLED', 'Clase Cancelada'),
-('CLASS_REMINDER',  'Recordatorio de Clase');
+('CLASS_REMINDER',  'Recordatorio de Clase'),
+('DELETION_REQUEST_APPROVED', 'Solicitud de Eliminación Aprobada'),
+('DELETION_REQUEST_REJECTED', 'Solicitud de Eliminación Rechazada');
 
 INSERT INTO system_setting (setting_key, setting_value, description, created_at) VALUES
 ('NOTIFICATION_CLEANUP_RETENTION_DAYS', '180', 'Días de retención de notificaciones antes de la depuración automática mensual.', NOW()),

@@ -373,14 +373,14 @@ Permite navegar la jerarquía de una evaluación. Requiere matrícula en la eval
 - **POST /materials/:id/versions:** Actualizar versión de archivo existente.
     * `body: { file: Buffer }`
 - **POST /materials/request-deletion:** Flujo seguro de borrado.
-    * `body: { entityType: 'material' | 'folder', entityId: string, reason: string }`
+    * `body: { entityType: 'material', entityId: string, reason: string }`
 
 ### 4. Gestión Administrativa Avanzada (Moderación)
 - **GET /admin/materials/requests/pending:** Listar solicitudes de eliminación pendientes.
     * **Roles:** `ADMIN`, `SUPER_ADMIN`
 - **POST /admin/materials/requests/:id/review:** Aprobar o rechazar solicitud.
     * **Roles:** `ADMIN`, `SUPER_ADMIN`
-    * `body: { action: 'APPROVE' | 'REJECT', rejectReason?: string }`
+    * `body: { action: 'APPROVE' | 'REJECT', adminComment?: string }`
 - **DELETE /admin/materials/:id/hard-delete:** Eliminación física permanente (irreversible).
     * **Roles:** `SUPER_ADMIN`
 
@@ -425,7 +425,6 @@ Permite navegar la jerarquía de una evaluación. Requiere matrícula en la eval
 - **POST /feedback/admin/:testimonyId/feature:** Destacar testimonio en la web.
     * `body: { isActive: boolean, displayOrder: number }`
     * **Efecto:** Invalida automáticamente el caché público.
-
 
 
 

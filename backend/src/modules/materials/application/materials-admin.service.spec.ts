@@ -7,6 +7,7 @@ import { MaterialCatalogRepository } from '../infrastructure/material-catalog.re
 import { StorageService } from '@infrastructure/storage/storage.service';
 import { AuditService } from '@modules/audit/application/audit.service';
 import { RedisCacheService } from '@infrastructure/cache/redis-cache.service';
+import { NotificationsDispatchService } from '@modules/notifications/application/notifications-dispatch.service';
 import { Material } from '../domain/material.entity';
 import { DeletionReviewAction } from '../dto/review-deletion-request.dto';
 import { DeletionRequest } from '../domain/deletion-request.entity';
@@ -69,6 +70,17 @@ describe('MaterialsAdminService', () => {
           provide: RedisCacheService,
           useValue: { del: jest.fn() },
         },
+        {
+          provide: NotificationsDispatchService,
+          useValue: {
+            dispatchDeletionRequestApproved: jest
+              .fn()
+              .mockResolvedValue(undefined),
+            dispatchDeletionRequestRejected: jest
+              .fn()
+              .mockResolvedValue(undefined),
+          },
+        },
       ],
     }).compile();
 
@@ -86,10 +98,10 @@ describe('MaterialsAdminService', () => {
       const mockRequest = {
         id: 'req-1',
         entityId: 'mat-1',
+        entityType: 'material',
         deletionRequestStatusId: 'status-pending',
       } as DeletionRequest;
 
-      requestRepo.findById.mockResolvedValue(mockRequest);
       materialRepo.findById.mockResolvedValue(mockMaterial);
       catalogRepo.findDeletionRequestStatusByCode.mockImplementation(
         async (code) => {
@@ -106,6 +118,7 @@ describe('MaterialsAdminService', () => {
 
       dataSource.transaction.mockImplementation(async (cb: any) => {
         const manager = {
+          findOne: jest.fn().mockResolvedValue(mockRequest),
           update: jest.fn().mockResolvedValue({}),
         } as any;
         return cb(manager);
@@ -124,11 +137,11 @@ describe('MaterialsAdminService', () => {
     });
 
     it('should throw when request is not pending anymore', async () => {
-      requestRepo.findById.mockResolvedValue({
+      const reviewedRequest = {
         id: 'req-1',
         entityId: 'mat-1',
         deletionRequestStatusId: 'status-approved',
-      } as DeletionRequest);
+      } as DeletionRequest;
       catalogRepo.findDeletionRequestStatusByCode.mockImplementation(
         async (code) => {
           if (code === DELETION_REQUEST_STATUS_CODES.PENDING)
@@ -136,12 +149,46 @@ describe('MaterialsAdminService', () => {
           return null;
         },
       );
+      dataSource.transaction.mockImplementation(async (cb: any) => {
+        const manager = {
+          findOne: jest.fn().mockResolvedValue(reviewedRequest),
+        } as any;
+        return cb(manager);
+      });
 
       await expect(
         service.reviewRequest('admin-1', 'req-1', {
           action: DeletionReviewAction.APPROVE,
         }),
       ).rejects.toThrow('ya fue revisada');
+    });
+
+    it('should reject unsupported entity type requests', async () => {
+      const legacyRequest = {
+        id: 'req-legacy-folder',
+        entityId: 'folder-1',
+        entityType: 'material_folder',
+        deletionRequestStatusId: 'status-pending',
+      } as DeletionRequest;
+      catalogRepo.findDeletionRequestStatusByCode.mockImplementation(
+        async (code) => {
+          if (code === DELETION_REQUEST_STATUS_CODES.PENDING)
+            return { id: 'status-pending' } as any;
+          return null;
+        },
+      );
+      dataSource.transaction.mockImplementation(async (cb: any) => {
+        const manager = {
+          findOne: jest.fn().mockResolvedValue(legacyRequest),
+        } as any;
+        return cb(manager);
+      });
+
+      await expect(
+        service.reviewRequest('admin-1', 'req-legacy-folder', {
+          action: DeletionReviewAction.APPROVE,
+        }),
+      ).rejects.toThrow('solo se admiten materiales');
     });
   });
 

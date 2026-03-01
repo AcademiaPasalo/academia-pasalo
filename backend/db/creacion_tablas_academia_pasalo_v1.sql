@@ -330,6 +330,7 @@ CREATE TABLE deletion_request (
   reason VARCHAR(500),
   reviewed_by BIGINT,
   reviewed_at DATETIME,
+  review_comment VARCHAR(500),
   created_at DATETIME NOT NULL,
   updated_at DATETIME,
   FOREIGN KEY (requested_by) REFERENCES user(id),

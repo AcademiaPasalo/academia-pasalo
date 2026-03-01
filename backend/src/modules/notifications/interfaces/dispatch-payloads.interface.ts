@@ -12,7 +12,18 @@ export interface DispatchMaterialPayload {
   folderId: string;
 }
 
-export type DispatchPayload = DispatchClassPayload | DispatchMaterialPayload;
+export interface DispatchDeletionReviewPayload {
+  type:
+    | (typeof import('@modules/notifications/domain/notification.constants').NOTIFICATION_TYPE_CODES)['DELETION_REQUEST_APPROVED']
+    | (typeof import('@modules/notifications/domain/notification.constants').NOTIFICATION_TYPE_CODES)['DELETION_REQUEST_REJECTED'];
+  requestId: string;
+  adminComment?: string;
+}
+
+export type DispatchPayload =
+  | DispatchClassPayload
+  | DispatchMaterialPayload
+  | DispatchDeletionReviewPayload;
 
 export interface ClassReminderPayload {
   classEventId: string;

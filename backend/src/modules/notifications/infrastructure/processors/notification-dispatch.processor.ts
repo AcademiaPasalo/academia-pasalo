@@ -11,6 +11,8 @@ import { UserNotificationRepository } from '@modules/notifications/infrastructur
 import { NotificationRecipientsService } from '@modules/notifications/application/notification-recipients.service';
 import { Notification } from '@modules/notifications/domain/notification.entity';
 import { UserNotification } from '@modules/notifications/domain/user-notification.entity';
+import { DeletionRequest } from '@modules/materials/domain/deletion-request.entity';
+import { Material } from '@modules/materials/domain/material.entity';
 import {
   NOTIFICATION_JOB_NAMES,
   NOTIFICATION_MESSAGES,
@@ -24,6 +26,7 @@ import {
   DispatchPayload,
   DispatchClassPayload,
   DispatchMaterialPayload,
+  DispatchDeletionReviewPayload,
   ClassReminderPayload,
 } from '@modules/notifications/interfaces';
 
@@ -89,6 +92,14 @@ export class NotificationDispatchProcessor extends WorkerHost {
       type === NOTIFICATION_TYPE_CODES.CLASS_CANCELLED
     ) {
       await this.handleClassEvent(job.data);
+      return;
+    }
+
+    if (
+      type === NOTIFICATION_TYPE_CODES.DELETION_REQUEST_APPROVED ||
+      type === NOTIFICATION_TYPE_CODES.DELETION_REQUEST_REJECTED
+    ) {
+      await this.handleDeletionReview(job.data);
       return;
     }
 
@@ -305,6 +316,81 @@ export class NotificationDispatchProcessor extends WorkerHost {
       classEventId,
       reminderMinutes,
       recipientCount: context.recipientUserIds.length,
+    });
+  }
+
+  private async handleDeletionReview(
+    payload: DispatchDeletionReviewPayload,
+  ): Promise<void> {
+    const request = await this.dataSource
+      .getRepository(DeletionRequest)
+      .findOne({
+        where: { id: payload.requestId },
+      });
+
+    if (!request) {
+      const msg = `No existe la solicitud de eliminación ${payload.requestId} para notificación`;
+      this.logger.error({
+        context: NotificationDispatchProcessor.name,
+        message: msg,
+        requestId: payload.requestId,
+        type: payload.type,
+      });
+      throw new UnrecoverableError(msg);
+    }
+
+    const material = await this.dataSource.getRepository(Material).findOne({
+      where: { id: request.entityId },
+    });
+    const materialLabel = material?.displayName || `ID ${request.entityId}`;
+
+    const notificationType = await this.resolveNotificationTypeOrFail(
+      payload.type,
+    );
+    const template = NOTIFICATION_MESSAGES[payload.type];
+    const message =
+      payload.type === NOTIFICATION_TYPE_CODES.DELETION_REQUEST_REJECTED
+        ? NOTIFICATION_MESSAGES[
+            NOTIFICATION_TYPE_CODES.DELETION_REQUEST_REJECTED
+          ].message(materialLabel, payload.adminComment)
+        : NOTIFICATION_MESSAGES[
+            NOTIFICATION_TYPE_CODES.DELETION_REQUEST_APPROVED
+          ].message(materialLabel);
+
+    const notificationData: Partial<Notification> = {
+      notificationTypeId: notificationType.id,
+      title: template.title,
+      message,
+      entityType: NOTIFICATION_ENTITY_TYPES.DELETION_REQUEST,
+      entityId: request.id,
+      createdAt: new Date(),
+    };
+
+    const notificationId = await this.dataSource.transaction(
+      async (manager) => {
+        const entity = manager.create(Notification, notificationData);
+        const saved = await manager.save(entity);
+
+        await manager.insert(UserNotification, [
+          {
+            userId: request.requestedById,
+            notificationId: saved.id,
+            isRead: false,
+            readAt: null as Date | null,
+          },
+        ]);
+
+        return saved.id;
+      },
+    );
+
+    this.logger.log({
+      context: NotificationDispatchProcessor.name,
+      message: 'Notificación de revisión de solicitud creada y distribuida',
+      notificationId,
+      requestId: request.id,
+      type: payload.type,
+      recipientUserId: request.requestedById,
     });
   }
 

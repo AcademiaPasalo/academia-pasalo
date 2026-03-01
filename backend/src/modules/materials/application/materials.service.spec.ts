@@ -139,7 +139,10 @@ describe('MaterialsService', () => {
         },
         {
           provide: DeletionRequestRepository,
-          useValue: { create: jest.fn() },
+          useValue: {
+            create: jest.fn(),
+            findPendingByMaterialId: jest.fn().mockResolvedValue(null),
+          },
         },
         {
           provide: CourseCycleProfessorRepository,
@@ -198,6 +201,7 @@ describe('MaterialsService', () => {
             id: 'created-id',
           })),
           findOne: jest.fn().mockResolvedValue({ id: 'default-id' }),
+          query: jest.fn().mockResolvedValue([{ id: 'mat1' }]),
           getRepository: jest.fn(),
         } as unknown as EntityManager;
 
@@ -787,6 +791,47 @@ describe('MaterialsService', () => {
       });
 
       expect(deletionRepo.create).toHaveBeenCalled();
+      expect(auditService.logAction).toHaveBeenCalled();
+    });
+
+    it('should reject non-material deletion requests', async () => {
+      catalogRepo.findDeletionRequestStatusByCode.mockResolvedValue({
+        id: '1',
+      } as DeletionRequestStatus);
+
+      await expect(
+        service.requestDeletion(mockProfessor, {
+          entityType: 'material_folder' as any,
+          entityId: 'folder-1',
+          reason: 'cleanup',
+        }),
+      ).rejects.toThrow(/Solo se admiten solicitudes de eliminacion/);
+    });
+
+    it('should reject when material already has a pending deletion request', async () => {
+      catalogRepo.findDeletionRequestStatusByCode.mockResolvedValue({
+        id: 'status-pending',
+      } as DeletionRequestStatus);
+      materialRepo.findById.mockResolvedValue({
+        id: 'mat1',
+        materialFolderId: 'folder-1',
+      } as Material);
+      folderRepo.findById.mockResolvedValue(mockFolder('folder-1', '100'));
+      deletionRepo.findPendingByMaterialId.mockResolvedValue({
+        id: 'req-pending',
+      } as any);
+
+      await expect(
+        service.requestDeletion(mockProfessor, {
+          entityType: AUDIT_ENTITY_TYPES.MATERIAL,
+          entityId: 'mat1',
+          reason: 'duplicated',
+        }),
+      ).rejects.toThrow(
+        /Ya existe una solicitud de eliminacion pendiente para este material/,
+      );
+
+      expect(deletionRepo.create).not.toHaveBeenCalled();
     });
   });
 
@@ -862,23 +907,6 @@ describe('MaterialsService', () => {
       await expect(service.download(mockStudent, 'mat-1')).rejects.toThrow(
         'Integridad de datos corrupta: Material sin recurso',
       );
-    });
-  });
-
-  describe('requestDeletion - folder flow', () => {
-    it('should create deletion request for folder entity', async () => {
-      catalogRepo.findDeletionRequestStatusByCode.mockResolvedValue({
-        id: '1',
-      } as DeletionRequestStatus);
-      folderRepo.findById.mockResolvedValue(mockFolder('folder-1', '100'));
-
-      await service.requestDeletion(mockProfessor, {
-        entityType: 'material_folder' as any,
-        entityId: 'folder-1',
-        reason: 'cleanup',
-      });
-
-      expect(deletionRepo.create).toHaveBeenCalled();
     });
   });
 
