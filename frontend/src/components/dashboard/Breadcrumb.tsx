@@ -57,14 +57,18 @@ export default function Breadcrumb({
                 className="flex items-center gap-1 hover:text-accent-solid transition-colors"
               >
                 <span
-                  className={`font-medium ${index === items.length - 1 ? "text-accent-solid" : "text-secondary"}`}
+                  className={`${index === items.length - 1 ? "font-medium text-secondary" : "font-normal text-tertiary"}`}
                 >
                   {item.label}
                 </span>
               </a>
             ) : (
               <div className="flex items-center gap-1">
-                <span className="font-medium text-secondary">{item.label}</span>
+                <span
+                  className={`${index === items.length - 1 ? "font-medium text-secondary" : "font-normal text-tertiary"}`}
+                >
+                  {item.label}
+                </span>
               </div>
             )}
           </div>

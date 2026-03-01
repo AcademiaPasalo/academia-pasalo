@@ -12,6 +12,7 @@ import Icon from '@/components/ui/Icon';
 import StudentInicioContent from '@/components/pages/student/InicioContent';
 import StudentCursoContent from '@/components/pages/student/CursoContent';
 import StudentCalendarioContent from '@/components/pages/student/CalendarioContent';
+import StudentEvaluationContent from '@/components/pages/student/EvaluationContent';
 
 // Importar componentes de docente
 import TeacherInicioContent from '@/components/pages/teacher/InicioContent';
@@ -31,6 +32,7 @@ const componentMap: Record<string, React.ComponentType<any>> = {
   'student/InicioContent': StudentInicioContent,
   'student/CursoContent': StudentCursoContent,
   'student/CalendarioContent': StudentCalendarioContent,
+  'student/EvaluationContent': StudentEvaluationContent,
   
   // Docente
   'teacher/InicioContent': TeacherInicioContent,

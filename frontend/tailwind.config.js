@@ -124,12 +124,17 @@ module.exports = {
           primary: "var(--bg-primary)",
           secondary: "var(--bg-secondary)",
           tertiary: "var(--bg-tertiary)",
+          quartiary: "var(--bg-quartiary)",
           "accent-solid": "var(--bg-accent-solid)",
           "accent-solid-hover": "var(--bg-accent-solid-hover)",
           "accent-light": "var(--bg-accent-light)",
+          "accent-primary-solid": "var(--bg-accent-solid)",
           "error-solid": "var(--bg-error-solid)",
           "success-solid": "var(--bg-success-solid)",
+          "success-light": "var(--bg-success-light)",
           "warning-solid": "var(--bg-warning-solid)",
+          "info-primary-light": "var(--bg-info-primary-light)",
+          "info-secondary-light": "var(--bg-info-secondary-light)",
           disabled: "var(--bg-disabled)",
         },
 
@@ -146,6 +151,8 @@ module.exports = {
           "error-primary": "var(--text-error-primary)",
           "success-primary": "var(--text-success-primary)",
           "warning-primary": "var(--text-warning-primary)",
+          "info-primary": "var(--text-info-primary)",
+          "info-secondary": "var(--text-info-secondary)",
         },
 
         // Semantic colors - Stroke/Border
@@ -166,6 +173,9 @@ module.exports = {
           "accent-primary": "var(--icon-accent-primary)",
           white: "var(--icon-white)",
           disabled: "var(--icon-disabled)",
+          "success-primary": "var(--icon-success-primary)",
+          "info-primary": "var(--icon-info-primary)",
+          "info-secondary": "var(--icon-info-secondary)",
         },
       },
       fontFamily: {
