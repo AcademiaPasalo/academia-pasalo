@@ -4,6 +4,8 @@ export const NOTIFICATION_TYPE_CODES = {
   CLASS_UPDATED: 'CLASS_UPDATED',
   CLASS_CANCELLED: 'CLASS_CANCELLED',
   CLASS_REMINDER: 'CLASS_REMINDER',
+  DELETION_REQUEST_APPROVED: 'DELETION_REQUEST_APPROVED',
+  DELETION_REQUEST_REJECTED: 'DELETION_REQUEST_REJECTED',
 } as const;
 
 export type NotificationTypeCode =
@@ -31,6 +33,7 @@ export const NOTIFICATION_SYSTEM_SETTING_KEYS = {
 export const NOTIFICATION_ENTITY_TYPES = {
   MATERIAL_FOLDER: 'material_folder',
   CLASS_EVENT: 'class_event',
+  DELETION_REQUEST: 'deletion_request',
 } as const;
 
 export const NOTIFICATION_MESSAGES = {
@@ -58,5 +61,17 @@ export const NOTIFICATION_MESSAGES = {
     title: 'Recordatorio de clase',
     message: (classTitle: string, minutosRestantes: number) =>
       `Tienes una clase '${classTitle}' en ${minutosRestantes} minutos.`,
+  },
+  [NOTIFICATION_TYPE_CODES.DELETION_REQUEST_APPROVED]: {
+    title: 'Solicitud de eliminación aprobada',
+    message: (displayName: string) =>
+      `Tu solicitud de eliminación del material '${displayName}' fue aprobada.`,
+  },
+  [NOTIFICATION_TYPE_CODES.DELETION_REQUEST_REJECTED]: {
+    title: 'Solicitud de eliminación rechazada',
+    message: (displayName: string, adminComment?: string) =>
+      adminComment && adminComment.trim().length > 0
+        ? `Tu solicitud de eliminación del material '${displayName}' fue rechazada. Motivo: ${adminComment.trim()}.`
+        : `Tu solicitud de eliminación del material '${displayName}' fue rechazada.`,
   },
 } as const;

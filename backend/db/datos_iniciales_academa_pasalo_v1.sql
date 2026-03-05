@@ -33,11 +33,20 @@ INSERT INTO evaluation_type (code, name) VALUES
 ('TUTORING', 'Tutoría Especializada'),
 ('BANCO_ENUNCIADOS', 'Banco de Enunciados');
 
-INSERT INTO academic_cycle (code, start_date, end_date, created_at)
-VALUES ('2026-0', '2026-01-09', '2026-03-31', NOW());
+INSERT INTO academic_cycle (code, start_date, end_date, created_at) VALUES
+('2024-1', '2024-01-08', '2024-03-31', NOW()),
+('2024-2', '2024-04-01', '2024-06-30', NOW()),
+('2025-1', '2025-01-06', '2025-03-31', NOW()),
+('2025-2', '2025-04-01', '2025-06-30', NOW()),
+('2026-0', '2026-01-09', '2026-03-31', NOW());
 
 INSERT INTO system_setting (setting_key, setting_value, description, created_at)
-VALUES ('ACTIVE_CYCLE_ID', '1', 'ID del ciclo académico actual y activo en el sistema', NOW());
+VALUES (
+  'ACTIVE_CYCLE_ID',
+  (SELECT id FROM academic_cycle WHERE code = '2026-0' LIMIT 1),
+  'ID del ciclo academico actual y activo en el sistema',
+  NOW()
+);
 
 INSERT INTO folder_status (code, name) VALUES
 ('ACTIVE', 'Activa'),
@@ -146,7 +155,9 @@ INSERT INTO notification_type (code, name) VALUES
 ('CLASS_SCHEDULED', 'Nueva Clase Programada'),
 ('CLASS_UPDATED',   'Clase Actualizada'),
 ('CLASS_CANCELLED', 'Clase Cancelada'),
-('CLASS_REMINDER',  'Recordatorio de Clase');
+('CLASS_REMINDER',  'Recordatorio de Clase'),
+('DELETION_REQUEST_APPROVED', 'Solicitud de Eliminación Aprobada'),
+('DELETION_REQUEST_REJECTED', 'Solicitud de Eliminación Rechazada');
 
 INSERT INTO system_setting (setting_key, setting_value, description, created_at) VALUES
 ('NOTIFICATION_CLEANUP_RETENTION_DAYS', '180', 'Días de retención de notificaciones antes de la depuración automática mensual.', NOW()),

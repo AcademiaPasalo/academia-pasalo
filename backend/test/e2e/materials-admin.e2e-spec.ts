@@ -164,6 +164,18 @@ describe('E2E: Materials Admin Full Flow', () => {
     requestIdToApprove = req.id;
   });
 
+  it('professor cannot create duplicate pending deletion request for same material', async () => {
+    await request(app.getHttpServer())
+      .post('/api/v1/materials/request-deletion')
+      .set('Authorization', `Bearer ${professor.token}`)
+      .send({
+        entityType: 'material',
+        entityId: materialToDeleteId,
+        reason: 'Duplicated pending request',
+      })
+      .expect(400);
+  });
+
   it('professor can create another request for rejection scenario', async () => {
     const secondUpload = await request(app.getHttpServer())
       .post('/api/v1/materials')

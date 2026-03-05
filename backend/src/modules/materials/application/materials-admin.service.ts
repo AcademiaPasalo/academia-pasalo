@@ -28,6 +28,7 @@ import {
   AUDIT_ENTITY_TYPES,
 } from '@modules/audit/interfaces/audit.constants';
 import { RedisCacheService } from '@infrastructure/cache/redis-cache.service';
+import { NotificationsDispatchService } from '@modules/notifications/application/notifications-dispatch.service';
 import {
   DELETION_REQUEST_STATUS_CODES,
   MATERIAL_CACHE_KEYS,
@@ -46,6 +47,7 @@ export class MaterialsAdminService {
     private readonly storageService: StorageService,
     private readonly auditService: AuditService,
     private readonly cacheService: RedisCacheService,
+    private readonly notificationsDispatchService: NotificationsDispatchService,
   ) {}
 
   async findAllPendingRequests(): Promise<DeletionRequest[]> {
@@ -133,35 +135,79 @@ export class MaterialsAdminService {
     requestId: string,
     dto: ReviewDeletionRequestDto,
   ): Promise<void> {
-    const request = await this.requestRepository.findById(requestId);
-    if (!request) throw new NotFoundException('Solicitud no encontrada');
-
     const pendingStatus =
       await this.catalogRepository.findDeletionRequestStatusByCode(
         DELETION_REQUEST_STATUS_CODES.PENDING,
       );
-    if (request.deletionRequestStatusId !== pendingStatus?.id) {
-      throw new BadRequestException('Esta solicitud ya fue revisada');
+    if (!pendingStatus) {
+      throw new InternalServerErrorException(
+        `Error de configuración: Estado ${DELETION_REQUEST_STATUS_CODES.PENDING} faltante`,
+      );
     }
 
+    let reviewedEntityId: string | null = null;
+    let materialToInvalidate: Material | null = null;
+
     await this.dataSource.transaction(async (manager) => {
+      const lockedRequest = await manager.findOne(DeletionRequest, {
+        where: { id: requestId },
+        lock: { mode: 'pessimistic_write' },
+      });
+      if (!lockedRequest) {
+        throw new NotFoundException('Solicitud no encontrada');
+      }
+
+      if (lockedRequest.deletionRequestStatusId !== pendingStatus.id) {
+        throw new BadRequestException('Esta solicitud ya fue revisada');
+      }
+
+      if (lockedRequest.entityType !== AUDIT_ENTITY_TYPES.MATERIAL) {
+        throw new BadRequestException(
+          'Tipo de solicitud no soportado: solo se admiten materiales',
+        );
+      }
+
+      reviewedEntityId = lockedRequest.entityId;
+
       if (dto.action === DeletionReviewAction.APPROVE) {
-        await this.handleApproval(
+        materialToInvalidate = await this.handleApproval(
           requestId,
-          request.entityId,
+          lockedRequest.entityId,
           adminId,
+          dto.adminComment,
           manager,
         );
       } else {
-        await this.handleRejection(requestId, adminId, manager);
+        await this.handleRejection(
+          requestId,
+          adminId,
+          dto.adminComment,
+          manager,
+        );
       }
     });
+
+    if (materialToInvalidate) {
+      await this.invalidateMaterialCaches(materialToInvalidate);
+    }
+
+    if (dto.action === DeletionReviewAction.APPROVE) {
+      void this.notificationsDispatchService.dispatchDeletionRequestApproved(
+        requestId,
+      );
+    } else {
+      void this.notificationsDispatchService.dispatchDeletionRequestRejected(
+        requestId,
+        dto.adminComment,
+      );
+    }
 
     this.logger.log({
       message: `Solicitud ${dto.action}`,
       requestId,
       adminId,
-      entityId: request.entityId,
+      entityId: reviewedEntityId,
+      adminComment: dto.adminComment || null,
     });
   }
 
@@ -169,8 +215,9 @@ export class MaterialsAdminService {
     requestId: string,
     materialId: string,
     adminId: string,
+    adminComment: string | undefined,
     manager: EntityManager,
-  ) {
+  ): Promise<Material> {
     const material = await this.materialRepository.findById(materialId);
     if (!material) throw new NotFoundException('Material no encontrado');
 
@@ -193,6 +240,7 @@ export class MaterialsAdminService {
       deletionRequestStatusId: approvedStatus.id,
       reviewedById: adminId,
       reviewedAt: new Date(),
+      reviewComment: adminComment?.trim() || null,
       updatedAt: new Date(),
     });
 
@@ -210,12 +258,13 @@ export class MaterialsAdminService {
       manager,
     );
 
-    await this.invalidateMaterialCaches(material);
+    return material;
   }
 
   private async handleRejection(
     requestId: string,
     adminId: string,
+    adminComment: string | undefined,
     manager: EntityManager,
   ) {
     const rejectedStatus =
@@ -231,6 +280,7 @@ export class MaterialsAdminService {
       deletionRequestStatusId: rejectedStatus.id,
       reviewedById: adminId,
       reviewedAt: new Date(),
+      reviewComment: adminComment?.trim() || null,
       updatedAt: new Date(),
     });
   }

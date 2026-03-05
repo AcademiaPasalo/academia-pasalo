@@ -26,6 +26,11 @@ export const routeAccessConfig: Record<string, RouteAccess> = {
     component: 'CursoContent',
     redirectOnDenied: '/plataforma/inicio'
   },
+  '/plataforma/curso/[id]/evaluacion/[id]': {
+    allowedRoles: ['STUDENT'],
+    component: 'EvaluationContent',
+    redirectOnDenied: '/plataforma/inicio'
+  },
   '/plataforma/calendario': {
     allowedRoles: ['STUDENT', 'TEACHER', 'ADMIN'],
     component: 'CalendarioContent',
@@ -75,6 +80,9 @@ export const roleBasedComponents: Record<string, Partial<Record<UserRole, string
     STUDENT: 'student/CursoContent',
     TEACHER: 'teacher/CursoContent',
     ADMIN: 'admin/CursoContent'
+  },
+  '/plataforma/curso/[id]/evaluacion/[id]': {
+    STUDENT: 'student/EvaluationContent'
   },
   '/plataforma/calendario': {
     STUDENT: 'student/CalendarioContent',

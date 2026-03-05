@@ -46,6 +46,14 @@ export class DeletionRequest {
   @Column({ name: 'reviewed_at', type: 'datetime', nullable: true })
   reviewedAt: Date | null;
 
+  @Column({
+    name: 'review_comment',
+    type: 'varchar',
+    length: 500,
+    nullable: true,
+  })
+  reviewComment: string | null;
+
   @Column({ name: 'created_at', type: 'datetime' })
   createdAt: Date;
 

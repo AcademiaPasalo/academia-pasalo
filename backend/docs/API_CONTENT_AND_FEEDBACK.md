@@ -219,6 +219,7 @@ Flujo recomendado para frontend cuando el alumno abre un curso:
           "evaluationTypeCode": "PC | EX | ...",
           "shortName": "PC1",
           "fullName": "Práctica Calificada 1",
+          "hasAccess": true,
           "label": "Completado | En curso | Próximamente | Bloqueado"
         }
       ]
@@ -226,11 +227,15 @@ Flujo recomendado para frontend cuando el alumno abre un curso:
     ```
 
 Reglas de `label` en ciclo vigente:
-1. `Completado`: fecha actual > fin de evaluación.
+1. `Completado`: fecha actual > fin de evaluacion.
 2. `En curso`: fecha actual entre inicio y fin.
-3. `Próximamente`: futura y con acceso.
-4. `Bloqueado`: futura y sin acceso.
+3. `Proximamente`: fecha futura y con acceso activo.
+4. `Bloqueado`: sin acceso activo a esa evaluacion.
 
+Nota de negocio:
+- `Completado`, `En curso` y `Proximamente` son etiquetas informativas de estado academico.
+- La etiqueta no bloquea contenido por si sola; el bloqueo real depende de `hasActiveAccess`.
+- Con la regla actual de matriculas, toda evaluacion concedida mantiene acceso hasta fin de ciclo.
 **Endpoint 2: Lista de Ciclos Anteriores**
 - **Endpoint:** `GET /courses/cycle/:courseCycleId/previous-cycles`
 - **Roles:** `STUDENT`
@@ -264,6 +269,7 @@ Cuando el tab es visible, la lista devuelve todos los ciclos anteriores del curs
           "evaluationTypeCode": "PC | EX | ...",
           "shortName": "PC1",
           "fullName": "Práctica Calificada 1",
+          "hasAccess": false,
           "label": "Archivado | Bloqueado"
         }
       ]
@@ -314,7 +320,10 @@ Define una nueva evaluación dentro de un curso/ciclo.
       "endDate": "ISO-8601"
     }
     ```
-- **Automatización:** Al crearla, todos los alumnos con matrícula `FULL` reciben acceso automáticamente.
+- **Automatizacion:** al crear una evaluacion nueva, el subscriber concede acceso automatico segun tipo.
+  - `BANCO_ENUNCIADOS`: para toda matricula activa del curso/ciclo.
+  - Resto de evaluaciones: solo para matriculas activas `FULL`.
+  - En todos los casos, `accessStartDate` queda en inicio de ciclo academico y `accessEndDate` en fin de ciclo academico del curso base.
 
 ### 2. Listar Evaluaciones de un Curso
 - **Endpoint:** `GET /evaluations/course-cycle/:courseCycleId`
@@ -372,15 +381,29 @@ Permite navegar la jerarquía de una evaluación. Requiere matrícula en la eval
     * `body: { file: Buffer, materialFolderId: string, displayName: string, classEventId?: string }`
 - **POST /materials/:id/versions:** Actualizar versión de archivo existente.
     * `body: { file: Buffer }`
+- **GET /materials/:id/last-modified:** Consultar fecha/hora de ultima modificacion de un material.
+    * **Roles:** `PROFESSOR`, `ADMIN`, `SUPER_ADMIN`
+    * **Path Params:**
+      - `id`: string (materialId)
+    * **Response (`data`):**
+      - `materialId`: string
+      - `lastModifiedAt`: string ISO-8601 (`updatedAt` del material; si es `null`, usa `createdAt`)
+    * **Errores esperados:**
+      - `403`: usuario sin permiso sobre la evaluacion/curso del material
+      - `404`: material no existe o no tiene carpeta contenedora valida
+    * **Notas de integracion frontend:**
+      - Endpoint de solo lectura para mostrar "Ultima actualizacion" en cards, tablas o panel de detalle.
+      - No requiere payload en body.
+      - Recomendado llamar bajo demanda al abrir detalle de material, o en batch solo si UI realmente lo necesita.
 - **POST /materials/request-deletion:** Flujo seguro de borrado.
-    * `body: { entityType: 'material' | 'folder', entityId: string, reason: string }`
+    * `body: { entityType: 'material', entityId: string, reason: string }`
 
 ### 4. Gestión Administrativa Avanzada (Moderación)
 - **GET /admin/materials/requests/pending:** Listar solicitudes de eliminación pendientes.
     * **Roles:** `ADMIN`, `SUPER_ADMIN`
 - **POST /admin/materials/requests/:id/review:** Aprobar o rechazar solicitud.
     * **Roles:** `ADMIN`, `SUPER_ADMIN`
-    * `body: { action: 'APPROVE' | 'REJECT', rejectReason?: string }`
+    * `body: { action: 'APPROVE' | 'REJECT', adminComment?: string }`
 - **DELETE /admin/materials/:id/hard-delete:** Eliminación física permanente (irreversible).
     * **Roles:** `SUPER_ADMIN`
 
@@ -435,3 +458,117 @@ Permite navegar la jerarquía de una evaluación. Requiere matrícula en la eval
 
 
 
+
+
+
+---
+
+## UPDATE FRONTEND CONTRACT - FASES 2, 3 Y 4 (2026-03-02)
+
+Esta seccion resume los contratos actuales para frontend de forma estricta y sin ambiguedades.
+
+### 1) Admin - Definir estructura por course_cycle
+
+- Endpoint: `PUT /courses/cycle/:courseCycleId/evaluation-structure`
+- Roles: `ADMIN`, `SUPER_ADMIN`
+- Body:
+```json
+{
+  "evaluationTypeIds": ["1", "2", "6"]
+}
+```
+- Validaciones backend:
+1. `courseCycleId` debe existir.
+2. `evaluationTypeIds` no puede ser vacio.
+3. No se permiten ids duplicados.
+4. Todos los ids deben existir en `evaluation_type`.
+5. Si la estructura enviada es igual a la actual, no se hacen escrituras (idempotente).
+- Respuesta 200:
+```json
+{
+  "courseCycleId": "4",
+  "evaluationTypeIds": ["1", "2", "6"]
+}
+```
+- Errores esperados:
+1. `400` payload invalido (vacio, duplicados, ids inexistentes, ids vacios).
+2. `404` course_cycle no existe.
+3. `403` si rol no autorizado.
+
+### 2) Alumno - Obtener estructura del tab Banco
+
+- Endpoint: `GET /courses/cycle/:courseCycleId/bank-structure`
+- Roles: `STUDENT`
+- Reglas de acceso:
+1. Requiere matricula activa en ese `courseCycleId`.
+2. Si no tiene matricula activa: `403`.
+- Respuesta 200:
+```json
+{
+  "courseCycleId": "4",
+  "cycleCode": "2026-0",
+  "items": [
+    {
+      "evaluationTypeId": "2",
+      "evaluationTypeCode": "EX",
+      "evaluationTypeName": "Examen"
+    },
+    {
+      "evaluationTypeId": "1",
+      "evaluationTypeCode": "PC",
+      "evaluationTypeName": "Practica Calificada"
+    }
+  ]
+}
+```
+- Nota frontend:
+1. Mostrar cards segun `items`.
+2. No hardcodear tipos.
+3. El orden llega desde backend (por code).
+
+### 3) Admin - Crear evaluacion con validacion estricta de estructura
+
+- Endpoint: `POST /evaluations`
+- Roles: `ADMIN`, `SUPER_ADMIN`
+- Body:
+```json
+{
+  "courseCycleId": "4",
+  "evaluationTypeId": "1",
+  "number": 3,
+  "startDate": "2026-03-10T05:00:00.000Z",
+  "endDate": "2026-03-10T23:59:59.000Z"
+}
+```
+- Reglas nuevas obligatorias:
+1. `evaluationTypeId` debe existir en la estructura activa del `course_cycle`.
+2. Si el `course_cycle` no tiene estructura activa: `400`.
+3. Si el tipo no esta permitido en la estructura: `400`.
+4. Se mantiene validacion de fechas dentro del ciclo academico.
+- Errores esperados:
+1. `400` tipo no permitido, estructura vacia, fechas invalidas, typeId vacio.
+2. `404` course_cycle no existe.
+
+### 4) Impacto esperado en frontend
+
+1. En admin, configurar estructura por ciclo antes de crear evaluaciones nuevas.
+2. En alumno, usar `bank-structure` para render del tab Banco.
+3. No inferir acceso por labels.
+4. Seguir usando `hasAccess` para habilitar o deshabilitar acciones por evaluacion.
+
+### 5) Cache y consistencia
+
+1. Cuando admin actualiza `evaluation-structure`, backend invalida:
+   - cache de contenido por ciclo
+   - cache de bank structure por ciclo
+2. Cuando admin crea evaluacion (`POST /evaluations`), backend invalida cache de contenido por ciclo.
+3. Con esto, frontend debe ver cambios sin esperar TTL largo.
+
+### 6) SQL de desarrollo actualizado
+
+Se actualizo `db/datos_prueba_cursos_y_matriculas.sql` para poblar `course_cycle_allowed_evaluation_type` en ciclos actual e historicos para los cursos de prueba.
+
+Objetivo:
+1. Permitir que `bank-structure` devuelva data real desde seed.
+2. Permitir que `POST /evaluations` valide contra estructura activa desde seed.
+3. Mantener entorno reproducible al recrear schema+data.

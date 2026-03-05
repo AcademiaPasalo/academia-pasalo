@@ -24,6 +24,8 @@ describe('E2E: Admin course cycles listing', () => {
 
   let courseCycleCurrentId: string;
   let courseCyclePastId: string;
+  let pcTypeId: string;
+  let exTypeId: string;
 
   const addDays = (base: Date, days: number): string => {
     const d = new Date(base);
@@ -48,6 +50,7 @@ describe('E2E: Admin course cycles listing', () => {
     seeder = new TestSeeder(dataSource, app);
 
     await dataSource.query('SET FOREIGN_KEY_CHECKS = 0');
+    await dataSource.query('DELETE FROM course_cycle_allowed_evaluation_type');
     await dataSource.query('DELETE FROM enrollment_evaluation');
     await dataSource.query('DELETE FROM enrollment');
     await dataSource.query('DELETE FROM evaluation');
@@ -163,6 +166,34 @@ describe('E2E: Admin course cycles listing', () => {
        WHERE course_cycle_id = ? AND professor_user_id = ?`,
       [ccCurrent.id, professorB.user.id],
     );
+
+    const pcRows = await dataSource.query<Array<{ id: string }>>(
+      `SELECT id FROM evaluation_type WHERE code = 'PC' LIMIT 1`,
+    );
+    if (pcRows.length === 0) {
+      await dataSource.query(
+        `INSERT INTO evaluation_type (code, name) VALUES ('PC', 'Practica Calificada')`,
+      );
+    }
+
+    const exRows = await dataSource.query<Array<{ id: string }>>(
+      `SELECT id FROM evaluation_type WHERE code = 'EX' LIMIT 1`,
+    );
+    if (exRows.length === 0) {
+      await dataSource.query(
+        `INSERT INTO evaluation_type (code, name) VALUES ('EX', 'Examen')`,
+      );
+    }
+
+    const selectedPcRows = await dataSource.query<Array<{ id: string }>>(
+      `SELECT id FROM evaluation_type WHERE code = 'PC' LIMIT 1`,
+    );
+    const selectedExRows = await dataSource.query<Array<{ id: string }>>(
+      `SELECT id FROM evaluation_type WHERE code = 'EX' LIMIT 1`,
+    );
+
+    pcTypeId = selectedPcRows[0].id;
+    exTypeId = selectedExRows[0].id;
   });
 
   afterAll(async () => {
@@ -208,5 +239,110 @@ describe('E2E: Admin course cycles listing', () => {
       .get('/api/v1/courses/course-cycles?page=0&pageSize=101')
       .set('Authorization', `Bearer ${admin.token}`)
       .expect(400);
+  });
+
+  it('admin can replace evaluation structure for a course cycle', async () => {
+    const res = await request(app.getHttpServer())
+      .put(`/api/v1/courses/cycle/${courseCycleCurrentId}/evaluation-structure`)
+      .set('Authorization', `Bearer ${admin.token}`)
+      .send({ evaluationTypeIds: [pcTypeId, exTypeId] })
+      .expect(200);
+
+    expect(res.body.data.courseCycleId).toBe(courseCycleCurrentId);
+    expect(res.body.data.evaluationTypeIds).toEqual([pcTypeId, exTypeId]);
+
+    const rows = await dataSource.query<
+      Array<{ evaluation_type_id: string; is_active: number }>
+    >(
+      `SELECT evaluation_type_id, is_active
+       FROM course_cycle_allowed_evaluation_type
+       WHERE course_cycle_id = ?`,
+      [courseCycleCurrentId],
+    );
+
+    const activeIds = rows
+      .filter((row) => Number(row.is_active) === 1)
+      .map((row) => String(row.evaluation_type_id))
+      .sort();
+
+    expect(activeIds).toEqual([pcTypeId, exTypeId].sort());
+  });
+
+  it('rejects duplicated evaluationTypeIds', async () => {
+    await request(app.getHttpServer())
+      .put(`/api/v1/courses/cycle/${courseCycleCurrentId}/evaluation-structure`)
+      .set('Authorization', `Bearer ${admin.token}`)
+      .send({ evaluationTypeIds: [pcTypeId, pcTypeId] })
+      .expect(400);
+  });
+
+  it('rejects unknown evaluationTypeIds', async () => {
+    await request(app.getHttpServer())
+      .put(`/api/v1/courses/cycle/${courseCycleCurrentId}/evaluation-structure`)
+      .set('Authorization', `Bearer ${admin.token}`)
+      .send({ evaluationTypeIds: [pcTypeId, '999999999999'] })
+      .expect(400);
+  });
+
+  it('rejects empty evaluationTypeIds payload', async () => {
+    await request(app.getHttpServer())
+      .put(`/api/v1/courses/cycle/${courseCycleCurrentId}/evaluation-structure`)
+      .set('Authorization', `Bearer ${admin.token}`)
+      .send({ evaluationTypeIds: [] })
+      .expect(400);
+  });
+
+  it('rejects blank evaluationTypeIds values', async () => {
+    await request(app.getHttpServer())
+      .put(`/api/v1/courses/cycle/${courseCycleCurrentId}/evaluation-structure`)
+      .set('Authorization', `Bearer ${admin.token}`)
+      .send({ evaluationTypeIds: [pcTypeId, '   '] })
+      .expect(400);
+  });
+
+  it('returns 404 when course cycle does not exist', async () => {
+    await request(app.getHttpServer())
+      .put('/api/v1/courses/cycle/999999999999/evaluation-structure')
+      .set('Authorization', `Bearer ${admin.token}`)
+      .send({ evaluationTypeIds: [pcTypeId] })
+      .expect(404);
+  });
+
+  it('student cannot update evaluation structure', async () => {
+    await request(app.getHttpServer())
+      .put(`/api/v1/courses/cycle/${courseCycleCurrentId}/evaluation-structure`)
+      .set('Authorization', `Bearer ${student.token}`)
+      .send({ evaluationTypeIds: [pcTypeId] })
+      .expect(403);
+  });
+
+  it('is idempotent for repeated payload', async () => {
+    await request(app.getHttpServer())
+      .put(`/api/v1/courses/cycle/${courseCycleCurrentId}/evaluation-structure`)
+      .set('Authorization', `Bearer ${admin.token}`)
+      .send({ evaluationTypeIds: [pcTypeId, exTypeId] })
+      .expect(200);
+
+    await request(app.getHttpServer())
+      .put(`/api/v1/courses/cycle/${courseCycleCurrentId}/evaluation-structure`)
+      .set('Authorization', `Bearer ${admin.token}`)
+      .send({ evaluationTypeIds: [pcTypeId, exTypeId] })
+      .expect(200);
+
+    const rows = await dataSource.query<
+      Array<{ evaluation_type_id: string; is_active: number }>
+    >(
+      `SELECT evaluation_type_id, is_active
+       FROM course_cycle_allowed_evaluation_type
+       WHERE course_cycle_id = ?`,
+      [courseCycleCurrentId],
+    );
+
+    const activeIds = rows
+      .filter((row) => Number(row.is_active) === 1)
+      .map((row) => String(row.evaluation_type_id))
+      .sort();
+
+    expect(activeIds).toEqual([pcTypeId, exTypeId].sort());
   });
 });

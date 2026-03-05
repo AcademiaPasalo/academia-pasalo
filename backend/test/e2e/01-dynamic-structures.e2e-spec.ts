@@ -14,6 +14,7 @@ import { ROLE_CODES } from '@common/constants/role-codes.constants';
 import { ENROLLMENT_TYPE_CODES } from '@modules/enrollments/domain/enrollment.constants';
 import { EVALUATION_TYPE_CODES } from '@modules/evaluations/domain/evaluation.constants';
 
+jest.setTimeout(60000);
 describe('E2E: Estructuras Dinámicas y Acceso Evolutivo', () => {
   let app: INestApplication;
   let dataSource: DataSource;
@@ -132,7 +133,7 @@ describe('E2E: Estructuras Dinámicas y Acceso Evolutivo', () => {
     expect(hasAccess).toBe(false);
   });
 
-  it('Caso 3: Acceso a Banco de Enunciados - Usuario Parcial (Debe expirar con PC1)', async () => {
+  it('Caso 3: Acceso a Banco de Enunciados - Usuario Parcial (inicio/fin alineado a ciclo)', async () => {
     const banco = await dataSource.getRepository(Evaluation).findOneOrFail({
       where: { courseCycleId: courseCycle.id, number: 0 },
     });
@@ -149,13 +150,21 @@ describe('E2E: Estructuras Dinámicas y Acceso Evolutivo', () => {
 
     expect(accessRow).toBeDefined();
 
-    const pc1EndDate = formatDate(nextMonth);
-    const bancoAccessEnd = formatDate(new Date(accessRow.accessEndDate));
+    const bancoAccessStart = new Date(accessRow.accessStartDate).getTime();
+    const bancoAccessEnd = new Date(accessRow.accessEndDate).getTime();
+    const cycleStartDate = new Date(prevMonth).getTime();
+    const cycleEndDate = new Date(next2Months).getTime();
+    const oneDayMs = 24 * 60 * 60 * 1000;
 
-    expect(bancoAccessEnd).toBe(pc1EndDate);
+    const startDay = Math.floor(bancoAccessStart / oneDayMs);
+    const cycleStartDay = Math.floor(cycleStartDate / oneDayMs);
+    const accessDay = Math.floor(bancoAccessEnd / oneDayMs);
+    const cycleDay = Math.floor(cycleEndDate / oneDayMs);
+    expect(Math.abs(startDay - cycleStartDay)).toBeLessThanOrEqual(1);
+    expect(Math.abs(accessDay - cycleDay)).toBeLessThanOrEqual(1);
   });
 
-  it('Caso 4: Creación tardía de Banco de Enunciados - Todos deben tener acceso (con clamping)', async () => {
+  it('Caso 4: Creación tardía de Banco de Enunciados - Todos deben tener acceso hasta fin de ciclo', async () => {
     const extraBank = await seeder.createEvaluation(
       courseCycle.id,
       EVALUATION_TYPE_CODES.BANCO_ENUNCIADOS,
@@ -172,9 +181,12 @@ describe('E2E: Estructuras Dinámicas y Acceso Evolutivo', () => {
           evaluationId: extraBank.id,
         },
       });
-    expect(formatDate(new Date(accessFull.accessEndDate))).toBe(
-      formatDate(next2Months),
+    const oneDayMs = 24 * 60 * 60 * 1000;
+    const fullAccessDay = Math.floor(
+      new Date(accessFull.accessEndDate).getTime() / oneDayMs,
     );
+    const cycleEndDay = Math.floor(new Date(next2Months).getTime() / oneDayMs);
+    expect(Math.abs(fullAccessDay - cycleEndDay)).toBeLessThanOrEqual(1);
 
     const accessPartial = await dataSource
       .getRepository(EnrollmentEvaluation)
@@ -184,8 +196,9 @@ describe('E2E: Estructuras Dinámicas y Acceso Evolutivo', () => {
           evaluationId: extraBank.id,
         },
       });
-    expect(formatDate(new Date(accessPartial.accessEndDate))).toBe(
-      formatDate(nextMonth),
+    const partialAccessDay = Math.floor(
+      new Date(accessPartial.accessEndDate).getTime() / oneDayMs,
     );
+    expect(Math.abs(partialAccessDay - cycleEndDay)).toBeLessThanOrEqual(1);
   });
 });

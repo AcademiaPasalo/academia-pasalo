@@ -17,12 +17,17 @@ USE academia_pasalo;
 -- -----------------------------------------------------------------------------
 SET @current_cycle_id = (SELECT CAST(setting_value AS UNSIGNED) FROM system_setting WHERE setting_key = 'ACTIVE_CYCLE_ID' LIMIT 1);
 SET @current_cycle_id = IFNULL(@current_cycle_id, (SELECT id FROM academic_cycle ORDER BY id DESC LIMIT 1));
+SET @cycle_2025_2_id = (SELECT id FROM academic_cycle WHERE code = '2025-2' LIMIT 1);
+SET @cycle_2025_1_id = (SELECT id FROM academic_cycle WHERE code = '2025-1' LIMIT 1);
+SET @cycle_2024_2_id = (SELECT id FROM academic_cycle WHERE code = '2024-2' LIMIT 1);
+SET @cycle_2024_1_id = (SELECT id FROM academic_cycle WHERE code = '2024-1' LIMIT 1);
 
 SET @role_professor_id = (SELECT id FROM role WHERE code = 'PROFESSOR' LIMIT 1);
 SET @type_ciencias_id  = (SELECT id FROM course_type WHERE code = 'CIENCIAS' LIMIT 1);
 SET @level_1_id        = (SELECT id FROM cycle_level WHERE level_number = 1 LIMIT 1);
 SET @status_active_id  = (SELECT id FROM enrollment_status WHERE code = 'ACTIVE' LIMIT 1);
 SET @type_full_id      = (SELECT id FROM enrollment_type WHERE code = 'FULL' LIMIT 1);
+SET @type_partial_id   = (SELECT id FROM enrollment_type WHERE code = 'PARTIAL' LIMIT 1);
 SET @target_student_id = 1;
 SET @docente_user_id   = (SELECT id FROM user WHERE email = 'docentepasalo@gmail.com' LIMIT 1);
 
@@ -58,14 +63,29 @@ SET @course_cal_id = (SELECT id FROM course WHERE code = 'MATE102');
 SET @course_fis_id = (SELECT id FROM course WHERE code = 'FIS101');
 SET @course_qui_id = (SELECT id FROM course WHERE code = 'QUI101');
 
-INSERT INTO course_cycle (course_id, academic_cycle_id) VALUES 
-(@course_alg_id, @current_cycle_id), (@course_cal_id, @current_cycle_id),
-(@course_fis_id, @current_cycle_id), (@course_qui_id, @current_cycle_id);
+INSERT INTO course_cycle (course_id, academic_cycle_id)
+SELECT c.id, ac.id
+FROM course c
+JOIN academic_cycle ac
+  ON ac.id IN (
+    @current_cycle_id,
+    @cycle_2025_2_id,
+    @cycle_2025_1_id,
+    @cycle_2024_2_id,
+    @cycle_2024_1_id
+  )
+WHERE c.id IN (@course_alg_id, @course_cal_id, @course_fis_id, @course_qui_id)
+  AND NOT EXISTS (
+    SELECT 1
+    FROM course_cycle cc
+    WHERE cc.course_id = c.id
+      AND cc.academic_cycle_id = ac.id
+  );
 
-SET @cc_alg_id = (SELECT id FROM course_cycle WHERE course_id = @course_alg_id);
-SET @cc_cal_id = (SELECT id FROM course_cycle WHERE course_id = @course_cal_id);
-SET @cc_fis_id = (SELECT id FROM course_cycle WHERE course_id = @course_fis_id);
-SET @cc_qui_id = (SELECT id FROM course_cycle WHERE course_id = @course_qui_id);
+SET @cc_alg_id = (SELECT id FROM course_cycle WHERE course_id = @course_alg_id AND academic_cycle_id = @current_cycle_id LIMIT 1);
+SET @cc_cal_id = (SELECT id FROM course_cycle WHERE course_id = @course_cal_id AND academic_cycle_id = @current_cycle_id LIMIT 1);
+SET @cc_fis_id = (SELECT id FROM course_cycle WHERE course_id = @course_fis_id AND academic_cycle_id = @current_cycle_id LIMIT 1);
+SET @cc_qui_id = (SELECT id FROM course_cycle WHERE course_id = @course_qui_id AND academic_cycle_id = @current_cycle_id LIMIT 1);
 
 INSERT INTO course_cycle_professor (course_cycle_id, professor_user_id, assigned_at) VALUES
 (@cc_alg_id, @prof_alg, NOW()), (@cc_alg_id, @docente_user_id, NOW()),
@@ -77,8 +97,8 @@ INSERT INTO course_cycle_professor (course_cycle_id, professor_user_id, assigned
 INSERT INTO enrollment (user_id, course_cycle_id, enrollment_status_id, enrollment_type_id, enrolled_at) VALUES
 (@target_student_id, @cc_alg_id, @status_active_id, @type_full_id, NOW()),
 (@target_student_id, @cc_cal_id, @status_active_id, @type_full_id, NOW()),
-(@target_student_id, @cc_fis_id, @status_active_id, @type_full_id, NOW()),
-(@target_student_id, @cc_qui_id, @status_active_id, @type_full_id, NOW());
+(@target_student_id, @cc_fis_id, @status_active_id, @type_partial_id, NOW()),
+(@target_student_id, @cc_qui_id, @status_active_id, @type_partial_id, NOW());
 
 -- -----------------------------------------------------------------------------
 -- 5. EVALUACIONES
@@ -94,24 +114,113 @@ SET @d5_s = '2026-03-09 05:00:00'; SET @d5_e = '2026-03-22 23:59:59';
 SET @d6_s = '2026-03-23 05:00:00'; SET @d6_e = '2026-03-31 23:59:59';
 
 INSERT INTO evaluation (course_cycle_id, evaluation_type_id, number, start_date, end_date)
-SELECT cc.id, type.id, num.n, dates.start, dates.end
+SELECT
+  cc.id,
+  type.id,
+  num.n,
+  CASE
+    WHEN type.code = 'PC' AND num.n = 1 THEN TIMESTAMP(DATE_ADD(ac.start_date, INTERVAL 3 DAY), '05:00:00')
+    WHEN type.code = 'PC' AND num.n = 2 THEN TIMESTAMP(DATE_ADD(ac.start_date, INTERVAL 17 DAY), '05:00:00')
+    WHEN type.code = 'EX' AND num.n = 1 THEN TIMESTAMP(DATE_ADD(ac.start_date, INTERVAL 31 DAY), '05:00:00')
+    WHEN type.code = 'PC' AND num.n = 3 THEN TIMESTAMP(DATE_ADD(ac.start_date, INTERVAL 45 DAY), '05:00:00')
+    WHEN type.code = 'PC' AND num.n = 4 THEN TIMESTAMP(DATE_ADD(ac.start_date, INTERVAL 59 DAY), '05:00:00')
+    WHEN type.code = 'EX' AND num.n = 2 THEN TIMESTAMP(DATE_ADD(ac.start_date, INTERVAL 73 DAY), '05:00:00')
+  END AS start_date,
+  CASE
+    WHEN type.code = 'PC' AND num.n = 1 THEN TIMESTAMP(DATE_ADD(ac.start_date, INTERVAL 16 DAY), '23:59:59')
+    WHEN type.code = 'PC' AND num.n = 2 THEN TIMESTAMP(DATE_ADD(ac.start_date, INTERVAL 30 DAY), '23:59:59')
+    WHEN type.code = 'EX' AND num.n = 1 THEN TIMESTAMP(DATE_ADD(ac.start_date, INTERVAL 44 DAY), '23:59:59')
+    WHEN type.code = 'PC' AND num.n = 3 THEN TIMESTAMP(DATE_ADD(ac.start_date, INTERVAL 58 DAY), '23:59:59')
+    WHEN type.code = 'PC' AND num.n = 4 THEN TIMESTAMP(DATE_ADD(ac.start_date, INTERVAL 72 DAY), '23:59:59')
+    WHEN type.code = 'EX' AND num.n = 2 THEN TIMESTAMP(DATE_ADD(ac.start_date, INTERVAL 83 DAY), '23:59:59')
+  END AS end_date
 FROM course_cycle cc
+INNER JOIN academic_cycle ac ON ac.id = cc.academic_cycle_id
 CROSS JOIN (SELECT @t_pc AS id, 'PC' AS code UNION SELECT @t_ex, 'EX') type
 CROSS JOIN (SELECT 1 AS n UNION SELECT 2 UNION SELECT 3 UNION SELECT 4) num
-JOIN (
-    SELECT 'PC' AS code, 1 AS n, @d1_s AS start, @d1_e AS end UNION
-    SELECT 'PC', 2, @d2_s, @d2_e UNION
-    SELECT 'EX', 1, @d3_s, @d3_e UNION
-    SELECT 'PC', 3, @d4_s, @d4_e UNION
-    SELECT 'PC', 4, @d5_s, @d5_e UNION
-    SELECT 'EX', 2, @d6_s, @d6_e
-) dates ON type.code = dates.code AND num.n = dates.n
-WHERE cc.id IN (@cc_alg_id, @cc_cal_id, @cc_fis_id, @cc_qui_id);
+WHERE cc.course_id IN (@course_alg_id, @course_cal_id, @course_fis_id, @course_qui_id)
+  AND cc.academic_cycle_id IN (
+    @current_cycle_id,
+    @cycle_2025_2_id,
+    @cycle_2025_1_id,
+    @cycle_2024_2_id,
+    @cycle_2024_1_id
+  )
+  AND (
+    (type.code = 'PC' AND num.n IN (1, 2, 3, 4))
+    OR (type.code = 'EX' AND num.n IN (1, 2))
+  );
+
+-- -----------------------------------------------------------------------------
+-- 5.1 ESTRUCTURA DE TIPOS PERMITIDOS POR COURSE_CYCLE (BANCO DINAMICO)
+-- -----------------------------------------------------------------------------
+-- Se habilitan tipos dinamicos por course_cycle para tabs de banco y validacion
+-- estricta en POST /evaluations.
+-- Se incluyen solo tipos que existan en el catalogo.
+INSERT INTO course_cycle_allowed_evaluation_type (
+  course_cycle_id,
+  evaluation_type_id,
+  is_active,
+  created_at,
+  updated_at
+)
+SELECT
+  cc.id,
+  et.id,
+  TRUE,
+  NOW(),
+  NULL
+FROM course_cycle cc
+INNER JOIN evaluation_type et
+  ON et.code IN ('PC', 'EX', 'TA', 'PD')
+WHERE cc.course_id IN (@course_alg_id, @course_cal_id, @course_fis_id, @course_qui_id)
+  AND cc.academic_cycle_id IN (
+    @current_cycle_id,
+    @cycle_2025_2_id,
+    @cycle_2025_1_id,
+    @cycle_2024_2_id,
+    @cycle_2024_1_id
+  )
+  AND NOT EXISTS (
+    SELECT 1
+    FROM course_cycle_allowed_evaluation_type ccaet
+    WHERE ccaet.course_cycle_id = cc.id
+      AND ccaet.evaluation_type_id = et.id
+  );
 
 INSERT INTO enrollment_evaluation (enrollment_id, evaluation_id, access_start_date, access_end_date, is_active)
-SELECT e.id, ev.id, ev.start_date, ev.end_date, TRUE
+SELECT
+  e.id,
+  ev.id,
+  ac.start_date,
+  ac.end_date,
+  TRUE
 FROM enrollment e
-JOIN evaluation ev ON ev.course_cycle_id = e.course_cycle_id;
+JOIN course_cycle cc_enr ON cc_enr.id = e.course_cycle_id
+JOIN academic_cycle ac ON ac.id = cc_enr.academic_cycle_id
+JOIN enrollment_type et ON et.id = e.enrollment_type_id
+JOIN evaluation ev ON 1 = 1
+JOIN course_cycle cc_eval ON cc_eval.id = ev.course_cycle_id
+WHERE e.user_id = @target_student_id
+  AND (
+    (et.code = 'FULL' AND cc_eval.course_id = cc_enr.course_id)
+    OR (
+      cc_eval.id = e.course_cycle_id
+      AND
+      e.course_cycle_id = @cc_fis_id
+      AND ev.evaluation_type_id = @t_pc
+      AND ev.number = 4
+    )
+    OR (
+      cc_eval.id = e.course_cycle_id
+      AND
+      e.course_cycle_id = @cc_qui_id
+      AND (
+        (ev.evaluation_type_id = @t_pc AND ev.number IN (3, 4))
+        OR (ev.evaluation_type_id = @t_ex AND ev.number = 2)
+      )
+    )
+  );
 
 -- -----------------------------------------------------------------------------
 -- 6. SESIONES (REGLA: INICIO >= 08:00, FIN <= 23:00)
@@ -137,7 +246,8 @@ BEGIN
         FROM evaluation ev
         JOIN course_cycle cc ON ev.course_cycle_id = cc.id
         JOIN course c ON cc.course_id = c.id
-        JOIN evaluation_type et ON ev.evaluation_type_id = et.id;
+        JOIN evaluation_type et ON ev.evaluation_type_id = et.id
+        WHERE cc.academic_cycle_id = @current_cycle_id;
         
     DECLARE CONTINUE HANDLER FOR NOT FOUND SET done = TRUE;
 

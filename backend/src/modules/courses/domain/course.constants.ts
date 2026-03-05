@@ -1,6 +1,10 @@
 export const COURSE_CACHE_KEYS = {
   COURSE_CONTENT: (courseCycleId: string, userId: string) =>
     `cache:content:cycle:${courseCycleId}:user:${userId}`,
+  CONTENT_BY_CYCLE_GROUP: (courseCycleId: string) =>
+    `cache:content:cycle:${courseCycleId}:user:*`,
+  BANK_STRUCTURE: (courseCycleId: string) =>
+    `cache:bank-structure:cycle:${courseCycleId}`,
   COURSE_CYCLE_EXISTS: (courseCycleId: string) =>
     `cache:course-cycle:exists:${courseCycleId}`,
   PROFESSOR_ASSIGNMENT_COURSE_CYCLE: (courseCycleId: string, userId: string) =>

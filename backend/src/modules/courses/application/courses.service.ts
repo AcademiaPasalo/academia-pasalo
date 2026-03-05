@@ -13,6 +13,7 @@ import { CourseTypeRepository } from '@modules/courses/infrastructure/course-typ
 import { CycleLevelRepository } from '@modules/courses/infrastructure/cycle-level.repository';
 import { CourseCycleRepository } from '@modules/courses/infrastructure/course-cycle.repository';
 import { CourseCycleProfessorRepository } from '@modules/courses/infrastructure/course-cycle-professor.repository';
+import { CourseCycleAllowedEvaluationTypeRepository } from '@modules/courses/infrastructure/course-cycle-allowed-evaluation-type.repository';
 import { EvaluationRepository } from '@modules/evaluations/infrastructure/evaluation.repository';
 import { CyclesService } from '@modules/cycles/application/cycles.service';
 import { RedisCacheService } from '@infrastructure/cache/redis-cache.service';
@@ -33,6 +34,7 @@ import {
 } from '@modules/courses/dto/course-content.dto';
 import {
   StudentCurrentCycleContentResponseDto,
+  StudentBankStructureResponseDto,
   StudentPreviousCycleContentResponseDto,
   StudentPreviousCycleListResponseDto,
 } from '@modules/courses/dto/student-course-view.dto';
@@ -71,6 +73,8 @@ export class CoursesService {
   private readonly logger = new Logger(CoursesService.name);
   private readonly CONTENT_CACHE_TTL =
     technicalSettings.cache.courses.courseContentCacheTtlSeconds;
+  private readonly BANK_STRUCTURE_CACHE_TTL =
+    technicalSettings.cache.courses.courseContentCacheTtlSeconds;
   private readonly PROFESSOR_ASSIGNMENT_CACHE_TTL =
     technicalSettings.cache.courses.professorAssignmentCacheTtlSeconds;
   private readonly COURSE_CYCLE_EXISTS_CACHE_TTL =
@@ -83,6 +87,7 @@ export class CoursesService {
     private readonly cycleLevelRepository: CycleLevelRepository,
     private readonly courseCycleRepository: CourseCycleRepository,
     private readonly courseCycleProfessorRepository: CourseCycleProfessorRepository,
+    private readonly courseCycleAllowedEvaluationTypeRepository: CourseCycleAllowedEvaluationTypeRepository,
     private readonly evaluationRepository: EvaluationRepository,
     private readonly cyclesService: CyclesService,
     private readonly cacheService: RedisCacheService,
@@ -378,6 +383,84 @@ export class CoursesService {
     return await this.cycleLevelRepository.findAll();
   }
 
+  async updateCourseCycleEvaluationStructure(
+    courseCycleId: string,
+    rawEvaluationTypeIds: string[],
+  ): Promise<{ courseCycleId: string; evaluationTypeIds: string[] }> {
+    const cycle = await this.courseCycleRepository.findById(courseCycleId);
+    if (!cycle) {
+      throw new NotFoundException('Ciclo del curso no encontrado');
+    }
+
+    const evaluationTypeIds = rawEvaluationTypeIds.map((id) => id.trim());
+    if (evaluationTypeIds.length === 0) {
+      throw new BadRequestException(
+        'Debes enviar al menos un tipo de evaluacion.',
+      );
+    }
+    if (evaluationTypeIds.some((id) => id.length === 0)) {
+      throw new BadRequestException(
+        'Los ids de tipo de evaluacion no pueden estar vacios.',
+      );
+    }
+
+    const uniqueIds = [...new Set(evaluationTypeIds)];
+    if (uniqueIds.length !== evaluationTypeIds.length) {
+      throw new BadRequestException(
+        'No se permiten ids de tipo de evaluacion duplicados.',
+      );
+    }
+
+    const existingTypes =
+      await this.evaluationRepository.findTypesByIds(evaluationTypeIds);
+    if (existingTypes.length !== evaluationTypeIds.length) {
+      const existingIds = new Set(existingTypes.map((type) => String(type.id)));
+      const missingIds = evaluationTypeIds.filter((id) => !existingIds.has(id));
+      throw new BadRequestException(
+        `Tipos de evaluacion no encontrados: ${missingIds.join(', ')}`,
+      );
+    }
+
+    const currentAllowed =
+      await this.courseCycleAllowedEvaluationTypeRepository.findActiveByCourseCycleId(
+        courseCycleId,
+      );
+    const currentIds = new Set(
+      currentAllowed.map((row) => String(row.evaluationTypeId)),
+    );
+    const requestedIds = new Set(evaluationTypeIds);
+    const unchanged =
+      currentIds.size === requestedIds.size &&
+      [...requestedIds].every((id) => currentIds.has(id));
+
+    if (unchanged) {
+      return {
+        courseCycleId,
+        evaluationTypeIds,
+      };
+    }
+
+    await this.dataSource.transaction(async (manager) => {
+      await this.courseCycleAllowedEvaluationTypeRepository.replaceAllowedTypes(
+        courseCycleId,
+        evaluationTypeIds,
+        manager,
+      );
+    });
+
+    await this.cacheService.invalidateGroup(
+      COURSE_CACHE_KEYS.CONTENT_BY_CYCLE_GROUP(courseCycleId),
+    );
+    await this.cacheService.del(
+      COURSE_CACHE_KEYS.BANK_STRUCTURE(courseCycleId),
+    );
+
+    return {
+      courseCycleId,
+      evaluationTypeIds,
+    };
+  }
+
   async getCourseContent(
     courseCycleId: string,
     userId: string,
@@ -558,6 +641,7 @@ export class CoursesService {
           evaluationTypeCode: evaluation.evaluationType.code,
           shortName: this.buildEvaluationShortName(evaluation),
           fullName: this.buildEvaluationFullName(evaluation),
+          hasAccess,
           label,
         };
       }),
@@ -628,15 +712,65 @@ export class CoursesService {
 
     return {
       cycleCode: previousCycleCode,
-      evaluations: evaluations.map((evaluation) => ({
-        id: evaluation.id,
-        evaluationTypeCode: evaluation.evaluationType.code,
-        shortName: this.buildEvaluationShortName(evaluation),
-        fullName: this.buildEvaluationFullName(evaluation),
-        label: this.hasActiveAccess(evaluation as EvaluationWithAccess)
-          ? STUDENT_EVALUATION_LABELS.ARCHIVED
-          : STUDENT_EVALUATION_LABELS.LOCKED,
-      })),
+      evaluations: evaluations.map((evaluation) => {
+        const hasAccess = this.hasActiveAccess(
+          evaluation as EvaluationWithAccess,
+        );
+        return {
+          id: evaluation.id,
+          evaluationTypeCode: evaluation.evaluationType.code,
+          shortName: this.buildEvaluationShortName(evaluation),
+          fullName: this.buildEvaluationFullName(evaluation),
+          hasAccess,
+          label: hasAccess
+            ? STUDENT_EVALUATION_LABELS.ARCHIVED
+            : STUDENT_EVALUATION_LABELS.LOCKED,
+        };
+      }),
+    };
+  }
+
+  async getStudentBankStructure(
+    courseCycleId: string,
+    userId: string,
+  ): Promise<StudentBankStructureResponseDto> {
+    const accessContext = await this.getStudentCourseAccessContext(
+      courseCycleId,
+      userId,
+    );
+
+    const cacheKey = COURSE_CACHE_KEYS.BANK_STRUCTURE(courseCycleId);
+    let items = await this.cacheService.get<
+      Array<{
+        evaluationTypeId: string;
+        evaluationTypeCode: string;
+        evaluationTypeName: string;
+      }>
+    >(cacheKey);
+
+    if (!items) {
+      const structure =
+        await this.courseCycleAllowedEvaluationTypeRepository.findActiveWithTypeByCourseCycleId(
+          courseCycleId,
+        );
+
+      items = structure.map((item) => ({
+        evaluationTypeId: String(item.evaluationTypeId),
+        evaluationTypeCode: item.evaluationType.code,
+        evaluationTypeName: item.evaluationType.name,
+      }));
+
+      await this.cacheService.set(
+        cacheKey,
+        items,
+        this.BANK_STRUCTURE_CACHE_TTL,
+      );
+    }
+
+    return {
+      courseCycleId: accessContext.cycle.id,
+      cycleCode: accessContext.cycle.academicCycle.code,
+      items,
     };
   }
 

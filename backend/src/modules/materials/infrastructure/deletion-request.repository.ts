@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { EntityManager, Repository } from 'typeorm';
 import { DeletionRequest } from '@modules/materials/domain/deletion-request.entity';
 
 @Injectable()
@@ -10,9 +10,15 @@ export class DeletionRequestRepository {
     private readonly ormRepository: Repository<DeletionRequest>,
   ) {}
 
-  async create(request: Partial<DeletionRequest>): Promise<DeletionRequest> {
-    const newRequest = this.ormRepository.create(request);
-    return await this.ormRepository.save(newRequest);
+  async create(
+    request: Partial<DeletionRequest>,
+    manager?: EntityManager,
+  ): Promise<DeletionRequest> {
+    const repo = manager
+      ? manager.getRepository(DeletionRequest)
+      : this.ormRepository;
+    const newRequest = repo.create(request);
+    return await repo.save(newRequest);
   }
 
   async findById(id: string): Promise<DeletionRequest | null> {
@@ -33,6 +39,23 @@ export class DeletionRequestRepository {
         deletionRequestStatus: true,
       },
       order: { createdAt: 'ASC' },
+    });
+  }
+
+  async findPendingByMaterialId(
+    materialId: string,
+    pendingStatusId: string,
+    manager?: EntityManager,
+  ): Promise<DeletionRequest | null> {
+    const repo = manager
+      ? manager.getRepository(DeletionRequest)
+      : this.ormRepository;
+    return await repo.findOne({
+      where: {
+        entityType: 'material',
+        entityId: materialId,
+        deletionRequestStatusId: pendingStatusId,
+      },
     });
   }
 }

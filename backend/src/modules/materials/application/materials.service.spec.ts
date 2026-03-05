@@ -139,7 +139,10 @@ describe('MaterialsService', () => {
         },
         {
           provide: DeletionRequestRepository,
-          useValue: { create: jest.fn() },
+          useValue: {
+            create: jest.fn(),
+            findPendingByMaterialId: jest.fn().mockResolvedValue(null),
+          },
         },
         {
           provide: CourseCycleProfessorRepository,
@@ -198,6 +201,7 @@ describe('MaterialsService', () => {
             id: 'created-id',
           })),
           findOne: jest.fn().mockResolvedValue({ id: 'default-id' }),
+          query: jest.fn().mockResolvedValue([{ id: 'mat1' }]),
           getRepository: jest.fn(),
         } as unknown as EntityManager;
 
@@ -787,6 +791,47 @@ describe('MaterialsService', () => {
       });
 
       expect(deletionRepo.create).toHaveBeenCalled();
+      expect(auditService.logAction).toHaveBeenCalled();
+    });
+
+    it('should reject non-material deletion requests', async () => {
+      catalogRepo.findDeletionRequestStatusByCode.mockResolvedValue({
+        id: '1',
+      } as DeletionRequestStatus);
+
+      await expect(
+        service.requestDeletion(mockProfessor, {
+          entityType: 'material_folder' as any,
+          entityId: 'folder-1',
+          reason: 'cleanup',
+        }),
+      ).rejects.toThrow(/Solo se admiten solicitudes de eliminacion/);
+    });
+
+    it('should reject when material already has a pending deletion request', async () => {
+      catalogRepo.findDeletionRequestStatusByCode.mockResolvedValue({
+        id: 'status-pending',
+      } as DeletionRequestStatus);
+      materialRepo.findById.mockResolvedValue({
+        id: 'mat1',
+        materialFolderId: 'folder-1',
+      } as Material);
+      folderRepo.findById.mockResolvedValue(mockFolder('folder-1', '100'));
+      deletionRepo.findPendingByMaterialId.mockResolvedValue({
+        id: 'req-pending',
+      } as any);
+
+      await expect(
+        service.requestDeletion(mockProfessor, {
+          entityType: AUDIT_ENTITY_TYPES.MATERIAL,
+          entityId: 'mat1',
+          reason: 'duplicated',
+        }),
+      ).rejects.toThrow(
+        /Ya existe una solicitud de eliminacion pendiente para este material/,
+      );
+
+      expect(deletionRepo.create).not.toHaveBeenCalled();
     });
   });
 
@@ -865,20 +910,46 @@ describe('MaterialsService', () => {
     });
   });
 
-  describe('requestDeletion - folder flow', () => {
-    it('should create deletion request for folder entity', async () => {
-      catalogRepo.findDeletionRequestStatusByCode.mockResolvedValue({
-        id: '1',
-      } as DeletionRequestStatus);
+  describe('getMaterialLastModified', () => {
+    it('should return updatedAt when present', async () => {
+      const updatedAt = new Date('2026-03-02T12:00:00.000Z');
+      const createdAt = new Date('2026-03-01T12:00:00.000Z');
+      materialRepo.findById.mockResolvedValue({
+        id: 'mat-1',
+        materialFolderId: 'folder-1',
+        createdAt,
+        updatedAt,
+      } as Material);
       folderRepo.findById.mockResolvedValue(mockFolder('folder-1', '100'));
+      accessEngine.hasAccess.mockResolvedValue(true);
 
-      await service.requestDeletion(mockProfessor, {
-        entityType: 'material_folder' as any,
-        entityId: 'folder-1',
-        reason: 'cleanup',
-      });
+      const result = await service.getMaterialLastModified(
+        mockProfessor,
+        'mat-1',
+      );
 
-      expect(deletionRepo.create).toHaveBeenCalled();
+      expect(result.materialId).toBe('mat-1');
+      expect(result.lastModifiedAt).toEqual(updatedAt);
+    });
+
+    it('should fallback to createdAt when updatedAt is null', async () => {
+      const createdAt = new Date('2026-03-01T12:00:00.000Z');
+      materialRepo.findById.mockResolvedValue({
+        id: 'mat-1',
+        materialFolderId: 'folder-1',
+        createdAt,
+        updatedAt: null,
+      } as Material);
+      folderRepo.findById.mockResolvedValue(mockFolder('folder-1', '100'));
+      accessEngine.hasAccess.mockResolvedValue(true);
+
+      const result = await service.getMaterialLastModified(
+        mockProfessor,
+        'mat-1',
+      );
+
+      expect(result.materialId).toBe('mat-1');
+      expect(result.lastModifiedAt).toEqual(createdAt);
     });
   });
 

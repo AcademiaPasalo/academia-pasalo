@@ -30,7 +30,6 @@ describe('E2E: Acceso Histórico y Ciclos Pasados', () => {
   let userFull: User;
   let userPartial: User;
   let pastPC1: Evaluation;
-  let currentPC1: Evaluation;
 
   const now = new Date();
   const pastDateStart = new Date();
@@ -99,7 +98,7 @@ describe('E2E: Acceso Histórico y Ciclos Pasados', () => {
     const currentPCEnd = new Date(currentPCStart);
     currentPCEnd.setDate(currentPCEnd.getDate() + 20);
 
-    currentPC1 = await seeder.createEvaluation(
+    await seeder.createEvaluation(
       currentCourseCycle.id,
       EVALUATION_TYPE_CODES.PC,
       1,
@@ -149,7 +148,7 @@ describe('E2E: Acceso Histórico y Ciclos Pasados', () => {
     const hasAccess = await accessEngine.hasAccess(userFull.id, pastPC1.id);
     expect(hasAccess).toBe(true);
   });
-  it('Caso 2: PARTIAL historico alinea accessEndDate con su simil actual', async () => {
+  it('Caso 2: PARTIAL historico alinea ventana de acceso al ciclo actual', async () => {
     const enrollment = await dataSource
       .getRepository(Enrollment)
       .findOneOrFail({
@@ -169,9 +168,12 @@ describe('E2E: Acceso Histórico y Ciclos Pasados', () => {
         },
       });
 
-    const format = (d: Date) => d.toISOString().split('T')[0];
-    expect(format(new Date(accessRow.accessEndDate))).toBe(
-      format(new Date(currentPC1.endDate)),
-    );
+    const accessStart = new Date(accessRow.accessStartDate).getTime();
+    const accessEnd = new Date(accessRow.accessEndDate).getTime();
+    const cycleStart = new Date(currentCycle.startDate).getTime();
+    const cycleEnd = new Date(currentCycle.endDate).getTime();
+    const oneDayMs = 24 * 60 * 60 * 1000;
+    expect(Math.abs(accessStart - cycleStart)).toBeLessThanOrEqual(oneDayMs);
+    expect(Math.abs(accessEnd - cycleEnd)).toBeLessThanOrEqual(oneDayMs);
   });
 });

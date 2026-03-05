@@ -89,6 +89,42 @@ export class NotificationsDispatchService {
     }
   }
 
+  async dispatchDeletionRequestApproved(requestId: string): Promise<void> {
+    try {
+      await this.notificationsQueue.add(NOTIFICATION_JOB_NAMES.DISPATCH, {
+        type: NOTIFICATION_TYPE_CODES.DELETION_REQUEST_APPROVED,
+        requestId,
+      });
+    } catch (error) {
+      this.logger.warn({
+        context: NotificationsDispatchService.name,
+        message: 'No se pudo encolar la notificación DELETION_REQUEST_APPROVED',
+        requestId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+
+  async dispatchDeletionRequestRejected(
+    requestId: string,
+    adminComment?: string,
+  ): Promise<void> {
+    try {
+      await this.notificationsQueue.add(NOTIFICATION_JOB_NAMES.DISPATCH, {
+        type: NOTIFICATION_TYPE_CODES.DELETION_REQUEST_REJECTED,
+        requestId,
+        adminComment,
+      });
+    } catch (error) {
+      this.logger.warn({
+        context: NotificationsDispatchService.name,
+        message: 'No se pudo encolar la notificación DELETION_REQUEST_REJECTED',
+        requestId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+
   async scheduleClassReminder(
     classEventId: string,
     startDatetime: Date,

@@ -10,12 +10,14 @@ import { CreateEvaluationDto } from '@modules/evaluations/dto/create-evaluation.
 import { EvaluationRepository } from '@modules/evaluations/infrastructure/evaluation.repository';
 import { CourseCycleRepository } from '@modules/courses/infrastructure/course-cycle.repository';
 import { CourseCycleProfessorRepository } from '@modules/courses/infrastructure/course-cycle-professor.repository';
+import { CourseCycleAllowedEvaluationTypeRepository } from '@modules/courses/infrastructure/course-cycle-allowed-evaluation-type.repository';
 import { AcademicCycleRepository } from '@modules/cycles/infrastructure/academic-cycle.repository';
 import { ROLE_CODES } from '@common/constants/role-codes.constants';
 import { ACCESS_MESSAGES } from '@common/constants/access-messages.constants';
 import { RedisCacheService } from '@infrastructure/cache/redis-cache.service';
 import { COURSE_CACHE_KEYS } from '@modules/courses/domain/course.constants';
 import { technicalSettings } from '@config/technical-settings';
+import { DataSource } from 'typeorm';
 
 @Injectable()
 export class EvaluationsService {
@@ -26,58 +28,98 @@ export class EvaluationsService {
     technicalSettings.cache.courses.courseCycleExistsCacheTtlSeconds;
 
   constructor(
+    private readonly dataSource: DataSource,
     private readonly evaluationRepository: EvaluationRepository,
     private readonly courseCycleRepository: CourseCycleRepository,
     private readonly courseCycleProfessorRepository: CourseCycleProfessorRepository,
+    private readonly courseCycleAllowedEvaluationTypeRepository: CourseCycleAllowedEvaluationTypeRepository,
     private readonly academicCycleRepository: AcademicCycleRepository,
     private readonly cacheService: RedisCacheService,
   ) {}
 
   async create(dto: CreateEvaluationDto): Promise<Evaluation> {
-    const courseCycle = await this.courseCycleRepository.findById(
-      dto.courseCycleId,
-    );
-    if (!courseCycle) {
-      throw new NotFoundException('La instancia de curso-ciclo no existe.');
+    const evaluationTypeId = dto.evaluationTypeId.trim();
+    if (evaluationTypeId.length === 0) {
+      throw new BadRequestException('El tipo de evaluacion es obligatorio.');
     }
 
-    const academicCycle = await this.academicCycleRepository.findById(
-      courseCycle.academicCycleId,
-    );
-    if (!academicCycle) {
-      throw new NotFoundException('El ciclo académico vinculado no existe.');
-    }
-
-    const evalStart = new Date(dto.startDate);
-    const evalEnd = new Date(dto.endDate);
-    const cycleStart = new Date(academicCycle.startDate);
-    const cycleEnd = new Date(academicCycle.endDate);
-
-    if (evalStart < cycleStart || evalEnd > cycleEnd) {
-      throw new BadRequestException(
-        'Las fechas de la evaluación deben estar dentro del rango del ciclo académico.',
+    const evaluation = await this.dataSource.transaction(async (manager) => {
+      const courseCycle = await this.courseCycleRepository.findById(
+        dto.courseCycleId,
+        manager,
       );
-    }
+      if (!courseCycle) {
+        throw new NotFoundException('La instancia de curso-ciclo no existe.');
+      }
 
-    if (evalStart > evalEnd) {
-      throw new BadRequestException(
-        'La fecha de inicio no puede ser posterior a la fecha de fin.',
+      const academicCycle = await this.academicCycleRepository.findById(
+        courseCycle.academicCycleId,
+        manager,
       );
-    }
+      if (!academicCycle) {
+        throw new NotFoundException('El ciclo academico vinculado no existe.');
+      }
 
-    const evaluation = await this.evaluationRepository.create({
-      courseCycleId: dto.courseCycleId,
-      evaluationTypeId: dto.evaluationTypeId,
-      number: dto.number,
-      startDate: evalStart,
-      endDate: evalEnd,
+      const evalStart = new Date(dto.startDate);
+      const evalEnd = new Date(dto.endDate);
+      const cycleStart = new Date(academicCycle.startDate);
+      const cycleEnd = new Date(academicCycle.endDate);
+
+      if (evalStart < cycleStart || evalEnd > cycleEnd) {
+        throw new BadRequestException(
+          'Las fechas de la evaluacion deben estar dentro del rango del ciclo academico.',
+        );
+      }
+
+      if (evalStart > evalEnd) {
+        throw new BadRequestException(
+          'La fecha de inicio no puede ser posterior a la fecha de fin.',
+        );
+      }
+
+      const allowedTypes =
+        await this.courseCycleAllowedEvaluationTypeRepository.findActiveByCourseCycleId(
+          dto.courseCycleId,
+          manager,
+        );
+
+      if (allowedTypes.length === 0) {
+        throw new BadRequestException(
+          'El curso-ciclo no tiene estructura de evaluacion activa.',
+        );
+      }
+
+      const isAllowedType = allowedTypes.some(
+        (item) => String(item.evaluationTypeId) === evaluationTypeId,
+      );
+
+      if (!isAllowedType) {
+        throw new BadRequestException(
+          'El tipo de evaluacion no esta permitido para este curso-ciclo.',
+        );
+      }
+
+      return await this.evaluationRepository.create(
+        {
+          courseCycleId: dto.courseCycleId,
+          evaluationTypeId,
+          number: dto.number,
+          startDate: evalStart,
+          endDate: evalEnd,
+        },
+        manager,
+      );
     });
 
+    await this.cacheService.invalidateGroup(
+      COURSE_CACHE_KEYS.CONTENT_BY_CYCLE_GROUP(dto.courseCycleId),
+    );
+
     this.logger.log({
-      message: 'Evaluación académica creada exitosamente',
+      message: 'Evaluacion academica creada exitosamente',
       evaluationId: evaluation.id,
       courseCycleId: dto.courseCycleId,
-      typeId: dto.evaluationTypeId,
+      typeId: evaluationTypeId,
       timestamp: new Date().toISOString(),
     });
 

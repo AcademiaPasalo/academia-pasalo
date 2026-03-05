@@ -6,14 +6,15 @@
 import { useMemo, useEffect, useState } from 'react';
 import { usePathname } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
-import { getCursos } from '@/services/cursoService';
-import { 
-  getNavigationForRole, 
+import { enrollmentService } from '@/services/enrollment.service';
+import { Enrollment } from '@/types/enrollment';
+import {
+  getNavigationForRole,
   setActiveNavItem,
   roleAvatarColors,
   roleLabels,
   mapBackendRoleToUserRole,
-  type UserRole 
+  type UserRole
 } from '@/config/navigation';
 import type { SidebarNavItem, SidebarUser } from '@/components/dashboard/Sidebar';
 import type { TopBarUser } from '@/components/dashboard/TopBar';
@@ -59,7 +60,7 @@ export function useNavigation(): NavigationData | null {
 
   const primaryRole = getActiveRole();
 
-  // Cargar cursos dinámicamente
+  // Cargar cursos dinámicamente desde la API real
   useEffect(() => {
     async function loadCursos() {
       if (!isAuthenticated || !user) {
@@ -69,29 +70,33 @@ export function useNavigation(): NavigationData | null {
 
       try {
         const baseNavItems = getNavigationForRole(primaryRole);
-        
-        // Cargar cursos del estudiante
-        const cursos = await getCursos();
-        
-        // Actualizar el item "Mis Cursos" con los cursos reales
-        const updatedNavItems = baseNavItems.map(item => {
-          if (item.label === 'Mis Cursos' && item.expandable) {
-            return {
-              ...item,
-              subItems: cursos.map(curso => ({
-                icon: 'circle',
-                label: curso.nombre,
-                href: `/plataforma/curso/${curso.id}`
-              }))
-            };
-          }
-          return item;
-        });
 
-        setDynamicNavItems(updatedNavItems);
+        // Solo cargar cursos para STUDENT (otros roles no tienen "Mis Cursos")
+        if (primaryRole === 'STUDENT') {
+          const response = await enrollmentService.getMyCourses();
+          const enrollments: Enrollment[] = Array.isArray(response) ? response : response.data || [];
+
+          // Actualizar el item "Mis Cursos" con los cursos reales
+          const updatedNavItems = baseNavItems.map(item => {
+            if (item.label === 'Mis Cursos' && item.expandable) {
+              return {
+                ...item,
+                subItems: enrollments.map(enrollment => ({
+                  icon: 'circle',
+                  label: enrollment.courseCycle.course.name,
+                  href: `/plataforma/curso/${enrollment.courseCycle.id}`
+                }))
+              };
+            }
+            return item;
+          });
+
+          setDynamicNavItems(updatedNavItems);
+        } else {
+          setDynamicNavItems(baseNavItems);
+        }
       } catch (error) {
         console.error('Error al cargar cursos para navegación:', error);
-        // En caso de error, usar navegación base sin cursos
         setDynamicNavItems(getNavigationForRole(primaryRole));
       } finally {
         setIsLoadingCursos(false);

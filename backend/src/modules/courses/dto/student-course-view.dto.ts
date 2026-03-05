@@ -15,6 +15,9 @@ export class StudentEvaluationCardDto {
   fullName: string;
 
   @Expose()
+  hasAccess: boolean;
+
+  @Expose()
   label: StudentEvaluationLabel;
 }
 
@@ -51,4 +54,27 @@ export class StudentPreviousCycleContentResponseDto {
   @Expose()
   @Type(() => StudentEvaluationCardDto)
   evaluations: StudentEvaluationCardDto[];
+}
+
+export class StudentBankStructureItemDto {
+  @Expose()
+  evaluationTypeId: string;
+
+  @Expose()
+  evaluationTypeCode: string;
+
+  @Expose()
+  evaluationTypeName: string;
+}
+
+export class StudentBankStructureResponseDto {
+  @Expose()
+  courseCycleId: string;
+
+  @Expose()
+  cycleCode: string;
+
+  @Expose()
+  @Type(() => StudentBankStructureItemDto)
+  items: StudentBankStructureItemDto[];
 }

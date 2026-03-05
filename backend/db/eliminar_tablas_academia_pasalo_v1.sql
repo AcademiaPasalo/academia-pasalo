@@ -35,6 +35,7 @@ DROP TABLE IF EXISTS file_version;
 DROP TABLE IF EXISTS material_folder;
 DROP TABLE IF EXISTS enrollment;
 DROP TABLE IF EXISTS evaluation;
+DROP TABLE IF EXISTS course_cycle_allowed_evaluation_type;
 DROP TABLE IF EXISTS course_cycle;
 DROP TABLE IF EXISTS security_event;
 DROP TABLE IF EXISTS user_session;

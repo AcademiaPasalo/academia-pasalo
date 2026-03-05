@@ -3,6 +3,7 @@ import { CoursesService } from '../src/modules/courses/application/courses.servi
 import { RedisCacheService } from '../src/infrastructure/cache/redis-cache.service';
 import { CourseCycleRepository } from '../src/modules/courses/infrastructure/course-cycle.repository';
 import { CourseCycleProfessorRepository } from '../src/modules/courses/infrastructure/course-cycle-professor.repository';
+import { CourseCycleAllowedEvaluationTypeRepository } from '../src/modules/courses/infrastructure/course-cycle-allowed-evaluation-type.repository';
 import { EvaluationRepository } from '../src/modules/evaluations/infrastructure/evaluation.repository';
 import { CourseRepository } from '../src/modules/courses/infrastructure/course.repository';
 import { CourseTypeRepository } from '../src/modules/courses/infrastructure/course-type.repository';
@@ -97,6 +98,14 @@ describe('Courses Content Logic (Integration)', () => {
           provide: CourseCycleProfessorRepository,
           useValue: {
             findByCourseCycleId: jest.fn().mockResolvedValue(mockAssignments),
+          },
+        },
+        {
+          provide: CourseCycleAllowedEvaluationTypeRepository,
+          useValue: {
+            findActiveByCourseCycleId: jest.fn(),
+            findActiveWithTypeByCourseCycleId: jest.fn(),
+            replaceAllowedTypes: jest.fn(),
           },
         },
         {

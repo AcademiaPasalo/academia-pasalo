@@ -753,6 +753,38 @@ export class MaterialsService {
     };
   }
 
+  async getMaterialLastModified(
+    user: UserWithSession,
+    materialId: string,
+  ): Promise<{
+    materialId: string;
+    lastModifiedAt: Date;
+  }> {
+    const material = await this.materialRepository.findById(materialId);
+    if (!material) {
+      throw new NotFoundException('Material no encontrado');
+    }
+
+    const folder = await this.folderRepository.findById(
+      material.materialFolderId,
+    );
+    if (!folder) {
+      throw new NotFoundException('Carpeta contenedora no encontrada');
+    }
+
+    await this.checkAuthorizedAccess(
+      user,
+      folder.evaluationId,
+      folder,
+      material,
+    );
+
+    return {
+      materialId: material.id,
+      lastModifiedAt: material.updatedAt ?? material.createdAt,
+    };
+  }
+
   async requestDeletion(
     user: UserWithSession,
     dto: RequestDeletionDto,
@@ -766,33 +798,66 @@ export class MaterialsService {
         `Error de configuración: Estado ${DELETION_REQUEST_STATUS_CODES.PENDING} faltante`,
       );
 
-    if (dto.entityType === AUDIT_ENTITY_TYPES.MATERIAL) {
-      const exists = await this.materialRepository.findById(dto.entityId);
-      if (!exists) throw new NotFoundException('Material no encontrado');
-      const folder = await this.folderRepository.findById(
-        exists.materialFolderId,
+    if (dto.entityType !== AUDIT_ENTITY_TYPES.MATERIAL) {
+      throw new BadRequestException(
+        'Solo se admiten solicitudes de eliminacion para materiales',
       );
-      if (!folder)
-        throw new InternalServerErrorException(
-          'Integridad de datos corrupta: Material sin carpeta contenedora',
-        );
-      await this.assertCanManageEvaluation(user, folder.evaluationId);
-    } else {
-      const exists = await this.folderRepository.findById(dto.entityId);
-      if (!exists) throw new NotFoundException('Carpeta no encontrada');
-      await this.assertCanManageEvaluation(user, exists.evaluationId);
     }
+
+    const exists = await this.materialRepository.findById(dto.entityId);
+    if (!exists) throw new NotFoundException('Material no encontrado');
+    const folder = await this.folderRepository.findById(
+      exists.materialFolderId,
+    );
+    if (!folder)
+      throw new InternalServerErrorException(
+        'Integridad de datos corrupta: Material sin carpeta contenedora',
+      );
+    await this.assertCanManageEvaluation(user, folder.evaluationId);
 
     const now = new Date();
 
-    await this.deletionRequestRepository.create({
-      requestedById: user.id,
-      deletionRequestStatusId: pendingStatus.id,
-      entityType: dto.entityType,
-      entityId: dto.entityId,
-      reason: dto.reason,
-      createdAt: now,
-      updatedAt: now,
+    await this.dataSource.transaction(async (manager) => {
+      const lockRowsRaw: unknown = await manager.query(
+        'SELECT id FROM material WHERE id = ? FOR UPDATE',
+        [dto.entityId],
+      );
+      if (!Array.isArray(lockRowsRaw) || lockRowsRaw.length === 0) {
+        throw new NotFoundException('Material no encontrado');
+      }
+
+      const pendingRequest =
+        await this.deletionRequestRepository.findPendingByMaterialId(
+          dto.entityId,
+          pendingStatus.id,
+          manager,
+        );
+      if (pendingRequest) {
+        throw new BadRequestException(
+          'Ya existe una solicitud de eliminacion pendiente para este material',
+        );
+      }
+
+      await this.deletionRequestRepository.create(
+        {
+          requestedById: user.id,
+          deletionRequestStatusId: pendingStatus.id,
+          entityType: dto.entityType,
+          entityId: dto.entityId,
+          reason: dto.reason,
+          createdAt: now,
+          updatedAt: now,
+        },
+        manager,
+      );
+
+      await this.auditService.logAction(
+        user.id,
+        AUDIT_ACTION_CODES.FILE_DELETE_REQUEST,
+        AUDIT_ENTITY_TYPES.MATERIAL,
+        dto.entityId,
+        manager,
+      );
     });
   }
 

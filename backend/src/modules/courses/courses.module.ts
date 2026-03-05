@@ -5,11 +5,13 @@ import { CourseType } from '@modules/courses/domain/course-type.entity';
 import { CycleLevel } from '@modules/courses/domain/cycle-level.entity';
 import { CourseCycle } from '@modules/courses/domain/course-cycle.entity';
 import { CourseCycleProfessor } from '@modules/courses/domain/course-cycle-professor.entity';
+import { CourseCycleAllowedEvaluationType } from '@modules/courses/domain/course-cycle-allowed-evaluation-type.entity';
 import { CourseRepository } from '@modules/courses/infrastructure/course.repository';
 import { CourseTypeRepository } from '@modules/courses/infrastructure/course-type.repository';
 import { CycleLevelRepository } from '@modules/courses/infrastructure/cycle-level.repository';
 import { CourseCycleRepository } from '@modules/courses/infrastructure/course-cycle.repository';
 import { CourseCycleProfessorRepository } from '@modules/courses/infrastructure/course-cycle-professor.repository';
+import { CourseCycleAllowedEvaluationTypeRepository } from '@modules/courses/infrastructure/course-cycle-allowed-evaluation-type.repository';
 import { CoursesService } from '@modules/courses/application/courses.service';
 import { CoursesController } from '@modules/courses/presentation/courses.controller';
 import { AuthModule } from '@modules/auth/auth.module';
@@ -24,6 +26,7 @@ import { CyclesModule } from '@modules/cycles/cycles.module';
       CycleLevel,
       CourseCycle,
       CourseCycleProfessor,
+      CourseCycleAllowedEvaluationType,
     ]),
     AuthModule,
     forwardRef(() => EvaluationsModule),
@@ -36,6 +39,7 @@ import { CyclesModule } from '@modules/cycles/cycles.module';
     CycleLevelRepository,
     CourseCycleRepository,
     CourseCycleProfessorRepository,
+    CourseCycleAllowedEvaluationTypeRepository,
     CoursesService,
   ],
   exports: [
@@ -44,6 +48,7 @@ import { CyclesModule } from '@modules/cycles/cycles.module';
     CycleLevelRepository,
     CourseCycleRepository,
     CourseCycleProfessorRepository,
+    CourseCycleAllowedEvaluationTypeRepository,
     CoursesService,
   ],
 })

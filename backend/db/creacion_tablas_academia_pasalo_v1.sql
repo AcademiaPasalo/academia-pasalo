@@ -184,6 +184,18 @@ CREATE TABLE course_cycle (
   FOREIGN KEY (academic_cycle_id) REFERENCES academic_cycle(id)
 );
 
+CREATE TABLE course_cycle_allowed_evaluation_type (
+  id BIGINT PRIMARY KEY AUTO_INCREMENT,
+  course_cycle_id BIGINT NOT NULL,
+  evaluation_type_id BIGINT NOT NULL,
+  is_active BOOLEAN NOT NULL DEFAULT TRUE,
+  created_at DATETIME NOT NULL,
+  updated_at DATETIME,
+  CONSTRAINT uq_course_cycle_allowed_type UNIQUE (course_cycle_id, evaluation_type_id),
+  FOREIGN KEY (course_cycle_id) REFERENCES course_cycle(id),
+  FOREIGN KEY (evaluation_type_id) REFERENCES evaluation_type(id)
+);
+
 CREATE TABLE evaluation (
   id BIGINT PRIMARY KEY AUTO_INCREMENT,
   course_cycle_id BIGINT NOT NULL,
@@ -330,6 +342,7 @@ CREATE TABLE deletion_request (
   reason VARCHAR(500),
   reviewed_by BIGINT,
   reviewed_at DATETIME,
+  review_comment VARCHAR(500),
   created_at DATETIME NOT NULL,
   updated_at DATETIME,
   FOREIGN KEY (requested_by) REFERENCES user(id),
@@ -466,6 +479,9 @@ ON enrollment_evaluation(access_start_date, access_end_date);
 
 CREATE INDEX idx_course_cycle_course
 ON course_cycle(course_id, academic_cycle_id);
+
+CREATE INDEX idx_cc_allowed_type_lookup
+ON course_cycle_allowed_evaluation_type(course_cycle_id, is_active);
 
 CREATE INDEX idx_evaluation_course_cycle
 ON evaluation(course_cycle_id);

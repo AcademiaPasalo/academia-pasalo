@@ -45,6 +45,7 @@ describe('E2E: Gestion de Materiales y Seguridad', () => {
   let rootFolderId: string;
   let childFolderId: string;
   let templateRootFolderId: string;
+  let uploadedMaterialId: string;
   const storageMock = {
     calculateHash: jest.fn().mockResolvedValue('mock-sha256-hash'),
     saveFile: jest
@@ -248,13 +249,35 @@ describe('E2E: Gestion de Materiales y Seguridad', () => {
 
     it('Profesor asignado debe poder subir archivo', async () => {
       const buffer = Buffer.from('%PDF-1.4 content');
-      await request(app.getHttpServer())
+      const uploadRes = await request(app.getHttpServer())
         .post('/api/v1/materials')
         .set('Authorization', `Bearer ${professor.token}`)
         .attach('file', buffer, 'silabo.pdf')
         .field('materialFolderId', rootFolderId)
         .field('displayName', 'Silabo Oficial')
         .expect(201);
+
+      uploadedMaterialId = (uploadRes.body as MaterialUploadResponse).data.id;
+      expect(uploadedMaterialId).toBeDefined();
+    });
+
+    it('Profesor debe poder consultar ultima modificacion de un material', async () => {
+      const res = await request(app.getHttpServer())
+        .get(`/api/v1/materials/${uploadedMaterialId}/last-modified`)
+        .set('Authorization', `Bearer ${professor.token}`)
+        .expect(200);
+
+      expect(res.body.data.materialId).toBe(uploadedMaterialId);
+      expect(new Date(res.body.data.lastModifiedAt).toString()).not.toBe(
+        'Invalid Date',
+      );
+    });
+
+    it('Estudiante NO debe poder consultar ultima modificacion (403)', async () => {
+      await request(app.getHttpServer())
+        .get(`/api/v1/materials/${uploadedMaterialId}/last-modified`)
+        .set('Authorization', `Bearer ${studentWithAccess.token}`)
+        .expect(403);
     });
 
     it('Debe retornar conteo total de archivos al consultar contenido de carpeta', async () => {

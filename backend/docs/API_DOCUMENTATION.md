@@ -314,7 +314,7 @@ _Todos los endpoints requieren JWT y una sesión activa en BD._
 
 ---
 
-## ÉPICA 5: Matrículas (Enrollments)
+## EPICA 5: Matriculas (Enrollments)
 
 Base URL: `/api/v1/enrollments`
 
@@ -335,41 +335,39 @@ Base URL: `/api/v1/enrollments`
 
 #### Modelo de dominio (clave para Frontend)
 
-La matrícula SIEMPRE se registra sobre un `courseCycleId` (un curso específico dentro de un ciclo académico).
-La jerarquía correcta es:
+La matricula siempre se registra sobre un `courseCycleId` (un curso especifico dentro de un ciclo academico).
+La jerarquia correcta es:
 
 1. `academicCycle` (ej. 2026-1)
-2. `courseCycle` (ej. Álgebra en 2026-1)
+2. `courseCycle` (ej. Algebra en 2026-1)
 3. `evaluation` (PC1, PC2, Final) perteneciente a ese `courseCycle`
 
-No existe matrícula "directa a todo el ciclo académico" sin curso. Siempre hay un curso base (`courseCycleId`).
+No existe matricula directa a todo el ciclo academico sin curso. Siempre hay un curso base (`courseCycleId`).
 
-#### Tipos de Matrícula:
+#### Tipos de Matricula
 
-| Tipo        | `evaluationIds` | `historicalCourseCycleIds` | Comportamiento                                                                                              |
-| ----------- | --------------- | -------------------------- | ----------------------------------------------------------------------------------------------------------- |
-| **FULL**    | Ignorado        | Opcional                   | Acceso a TODAS las evaluaciones del `courseCycleId` base + acceso histórico de los `courseCycleId` enviados |
-| **PARTIAL** | **Requerido**   | Opcional                   | Acceso SOLO a las evaluaciones listadas en `evaluationIds` (del curso base o cursos históricos permitidos)  |
+| Tipo        | `evaluationIds` | `historicalCourseCycleIds` | Comportamiento |
+| ----------- | --------------- | -------------------------- | -------------- |
+| **FULL**    | Ignorado        | Opcional                   | Acceso a todas las evaluaciones del `courseCycleId` base + acceso historico de los `courseCycleId` enviados |
+| **PARTIAL** | **Requerido**   | Opcional                   | Acceso solo a las evaluaciones listadas en `evaluationIds` (del curso base o cursos historicos permitidos) |
 
-Reglas de validación recomendadas para el Frontend:
+Reglas de validacion recomendadas para Frontend:
 
 1. `FULL`: no enviar `evaluationIds`.
 2. `PARTIAL`: enviar al menos 1 `evaluationId`.
 3. Cada `evaluationId` debe pertenecer al `courseCycleId` base o a uno de `historicalCourseCycleIds`.
-4. `historicalCourseCycleIds` no crea matrícula independiente; solo amplia alcance para evaluaciones históricas.
+4. `historicalCourseCycleIds` no crea matricula independiente; solo amplia alcance para evaluaciones historicas.
 
 > [!IMPORTANT]
-> **Manejo de Fechas en Evaluaciones Históricas (PARTIAL)**
-> Si un alumno se matricula en una evaluación pasada (ej. PC1 2025-1) bajo modalidad `PARTIAL`:
->
-> 1. El sistema intentará igualar la fecha de acceso con su **símil del ciclo actual** (ej. PC1 2026-1).
-> 2. Si NO encuentra un símil, usará la **fecha fin del ciclo actual** como fallback.
->
-> **Para el Frontend:** Si observan que `accessEndDate` de la matrícula es posterior a `evaluation.endDate` (fecha original del examen), significa que el sistema extendió automáticamente el acceso (fallback). Se recomienda mostrar una advertencia al usuario indicando la fecha límite de su acceso y que no encontró su símil actual (caso muy extraño).
+> **Regla de Vigencia Unica**
+> Toda evaluacion concedida por la matricula (actual o historica, FULL o PARTIAL) usa la misma ventana de acceso del ciclo base.
+> `accessStartDate`: inicio del ciclo academico del `courseCycleId` base.
+> `accessEndDate`: fin del ciclo academico del `courseCycleId` base.
+> No existe clamping por evaluacion mas lejana ni fallback por simil para definir la fecha fin.
 
-#### Ejemplos de Uso:
+#### Ejemplos de Uso
 
-**1. FULL con acceso histórico:**
+**1. FULL con acceso historico:**
 
 ```json
 {
@@ -380,7 +378,7 @@ Reglas de validación recomendadas para el Frontend:
 }
 ```
 
-_Resultado: Acceso a todas las evaluaciones de Álgebra 2026-1 + todos los exámenes de Álgebra en 2025-2 y 2025-1._
+_Resultado: acceso a todas las evaluaciones de Algebra 2026-1 + todos los examenes de Algebra en 2025-2 y 2025-1._
 
 **2. PARTIAL solo ciclo actual:**
 
@@ -393,9 +391,9 @@ _Resultado: Acceso a todas las evaluaciones de Álgebra 2026-1 + todos los exám
 }
 ```
 
-_Resultado: Acceso solo a PC1 y PC2 de Álgebra 2026-1._
+_Resultado: acceso solo a PC1 y PC2 de Algebra 2026-1._
 
-**3. PARTIAL con evaluación de ciclo histórico:\*\***
+**3. PARTIAL con evaluacion de ciclo historico:**
 
 ```json
 {
@@ -407,13 +405,13 @@ _Resultado: Acceso solo a PC1 y PC2 de Álgebra 2026-1._
 }
 ```
 
-_Resultado: Acceso solo al examen final de Álgebra 2025-2 para práctica._
+_Resultado: acceso solo al examen final de Algebra 2025-2 para practica._
 
-### 2. Cancelar Matrícula
+### 2. Cancelar Matricula
 
 - **Endpoint:** `DELETE /:id`
 - **Roles:** `ADMIN`, `SUPER_ADMIN`
-- **Efecto:** Revoca accesos inmediatamente.
+- **Efecto:** revoca accesos inmediatamente.
 
 ---
 
@@ -611,3 +609,15 @@ El sistema no expone WebSocket ni Server-Sent Events. La actualización del esta
 | Código | Causa |
 |---|---|
 | `404 Not Found` | La notificación no existe o no pertenece al usuario autenticado. |
+
+---
+
+## Update 2026-03-02 - Cursos/Evaluaciones
+
+Para contratos actuales de frontend sobre:
+1. `PUT /courses/cycle/:courseCycleId/evaluation-structure`
+2. `GET /courses/cycle/:courseCycleId/bank-structure`
+3. `POST /evaluations` con validacion estricta por estructura
+
+Revisar en detalle: `docs/API_CONTENT_AND_FEEDBACK.md`, seccion:
+`UPDATE FRONTEND CONTRACT - FASES 2, 3 Y 4 (2026-03-02)`.

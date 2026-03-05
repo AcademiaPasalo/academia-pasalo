@@ -2,7 +2,9 @@ import {
   Controller,
   Get,
   Post,
+  Put,
   Delete,
+  Patch,
   Body,
   Param,
   Query,
@@ -18,6 +20,7 @@ import {
 import { CourseContentResponseDto } from '@modules/courses/dto/course-content.dto';
 import { MyCourseCycleResponseDto } from '@modules/courses/dto/my-course-cycle-response.dto';
 import {
+  StudentBankStructureResponseDto,
   StudentCurrentCycleContentResponseDto,
   StudentPreviousCycleContentResponseDto,
   StudentPreviousCycleListResponseDto,
@@ -27,6 +30,7 @@ import { CreateCourseDto } from '@modules/courses/dto/create-course.dto';
 import { UpdateCourseDto } from '@modules/courses/dto/update-course.dto';
 import { AssignCourseToCycleDto } from '@modules/courses/dto/assign-course-to-cycle.dto';
 import { AssignCourseCycleProfessorDto } from '@modules/courses/dto/assign-course-cycle-professor.dto';
+import { UpdateCourseCycleEvaluationStructureDto } from '@modules/courses/dto/update-course-cycle-evaluation-structure.dto';
 import {
   AdminCourseCycleListQueryDto,
   AdminCourseCycleListResponseDto,
@@ -38,7 +42,6 @@ import { User } from '@modules/users/domain/user.entity';
 import { ResponseMessage } from '@common/decorators/response-message.decorator';
 import { plainToInstance } from 'class-transformer';
 import { ROLE_CODES } from '@common/constants/role-codes.constants';
-import { Patch } from '@nestjs/common';
 import type { UserWithSession } from '@modules/auth/strategies/jwt.strategy';
 
 @Controller('courses')
@@ -117,6 +120,24 @@ export class CoursesController {
     });
   }
 
+  @Get('cycle/:id/bank-structure')
+  @Roles(ROLE_CODES.STUDENT)
+  @ResponseMessage(
+    'Estructura del banco de enunciados del curso obtenida exitosamente',
+  )
+  async getBankStructureForStudent(
+    @Param('id') courseCycleId: string,
+    @CurrentUser() user: User,
+  ) {
+    const structure = await this.coursesService.getStudentBankStructure(
+      courseCycleId,
+      user.id,
+    );
+    return plainToInstance(StudentBankStructureResponseDto, structure, {
+      excludeExtraneousValues: true,
+    });
+  }
+
   @Post()
   @Roles(ROLE_CODES.ADMIN, ROLE_CODES.SUPER_ADMIN)
   @HttpCode(HttpStatus.CREATED)
@@ -152,6 +173,19 @@ export class CoursesController {
       message: 'Curso asignado al ciclo exitosamente',
       data: result,
     };
+  }
+
+  @Put('cycle/:id/evaluation-structure')
+  @Roles(ROLE_CODES.ADMIN, ROLE_CODES.SUPER_ADMIN)
+  @ResponseMessage('Estructura de evaluacion actualizada exitosamente')
+  async updateEvaluationStructure(
+    @Param('id') courseCycleId: string,
+    @Body() dto: UpdateCourseCycleEvaluationStructureDto,
+  ) {
+    return await this.coursesService.updateCourseCycleEvaluationStructure(
+      courseCycleId,
+      dto.evaluationTypeIds,
+    );
   }
 
   @Get('cycle/:id/professors')

@@ -11,6 +11,7 @@ import { CourseTypeRepository } from '@modules/courses/infrastructure/course-typ
 import { CycleLevelRepository } from '@modules/courses/infrastructure/cycle-level.repository';
 import { CourseCycleRepository } from '@modules/courses/infrastructure/course-cycle.repository';
 import { CourseCycleProfessorRepository } from '@modules/courses/infrastructure/course-cycle-professor.repository';
+import { CourseCycleAllowedEvaluationTypeRepository } from '@modules/courses/infrastructure/course-cycle-allowed-evaluation-type.repository';
 import { EvaluationRepository } from '@modules/evaluations/infrastructure/evaluation.repository';
 import { CyclesService } from '@modules/cycles/application/cycles.service';
 import { RedisCacheService } from '@infrastructure/cache/redis-cache.service';
@@ -21,6 +22,7 @@ describe('CoursesService student views', () => {
   let dataSource: jest.Mocked<DataSource>;
   let courseCycleRepository: jest.Mocked<CourseCycleRepository>;
   let courseCycleProfessorRepository: jest.Mocked<CourseCycleProfessorRepository>;
+  let courseCycleAllowedEvaluationTypeRepository: jest.Mocked<CourseCycleAllowedEvaluationTypeRepository>;
   let evaluationRepository: jest.Mocked<EvaluationRepository>;
 
   const currentCycle = {
@@ -68,9 +70,18 @@ describe('CoursesService student views', () => {
           },
         },
         {
+          provide: CourseCycleAllowedEvaluationTypeRepository,
+          useValue: {
+            findActiveByCourseCycleId: jest.fn(),
+            findActiveWithTypeByCourseCycleId: jest.fn(),
+            replaceAllowedTypes: jest.fn(),
+          },
+        },
+        {
           provide: EvaluationRepository,
           useValue: {
             findAllWithUserAccess: jest.fn(),
+            findTypesByIds: jest.fn(),
           },
         },
         { provide: CyclesService, useValue: {} },
@@ -90,6 +101,9 @@ describe('CoursesService student views', () => {
     dataSource = module.get(DataSource);
     courseCycleRepository = module.get(CourseCycleRepository);
     courseCycleProfessorRepository = module.get(CourseCycleProfessorRepository);
+    courseCycleAllowedEvaluationTypeRepository = module.get(
+      CourseCycleAllowedEvaluationTypeRepository,
+    );
     evaluationRepository = module.get(EvaluationRepository);
   });
 
@@ -418,5 +432,168 @@ describe('CoursesService student views', () => {
     ).rejects.toThrow(BadRequestException);
 
     expect(courseCycleProfessorRepository.upsertAssign).not.toHaveBeenCalled();
+  });
+
+  it('should update evaluation structure for an existing course cycle', async () => {
+    (courseCycleRepository.findById as jest.Mock).mockResolvedValue({
+      id: 'cc-1',
+    });
+    (evaluationRepository.findTypesByIds as jest.Mock).mockResolvedValue([
+      { id: '1' },
+      { id: '2' },
+    ]);
+    (
+      courseCycleAllowedEvaluationTypeRepository.findActiveByCourseCycleId as jest.Mock
+    ).mockResolvedValue([{ evaluationTypeId: '9' }]);
+    (dataSource.transaction as jest.Mock).mockImplementation(async (cb) => {
+      await cb({});
+    });
+
+    const result = await service.updateCourseCycleEvaluationStructure('cc-1', [
+      '1',
+      '2',
+    ]);
+
+    expect(evaluationRepository.findTypesByIds).toHaveBeenCalledWith([
+      '1',
+      '2',
+    ]);
+    expect(
+      courseCycleAllowedEvaluationTypeRepository.replaceAllowedTypes,
+    ).toHaveBeenCalledWith('cc-1', ['1', '2'], expect.anything());
+    expect(result).toEqual({
+      courseCycleId: 'cc-1',
+      evaluationTypeIds: ['1', '2'],
+    });
+  });
+
+  it('should reject duplicated evaluation type ids', async () => {
+    (courseCycleRepository.findById as jest.Mock).mockResolvedValue({
+      id: 'cc-1',
+    });
+
+    await expect(
+      service.updateCourseCycleEvaluationStructure('cc-1', ['1', '1']),
+    ).rejects.toThrow(BadRequestException);
+
+    expect(evaluationRepository.findTypesByIds).not.toHaveBeenCalled();
+    expect(
+      courseCycleAllowedEvaluationTypeRepository.replaceAllowedTypes,
+    ).not.toHaveBeenCalled();
+  });
+
+  it('should reject unknown evaluation type ids', async () => {
+    (courseCycleRepository.findById as jest.Mock).mockResolvedValue({
+      id: 'cc-1',
+    });
+    (evaluationRepository.findTypesByIds as jest.Mock).mockResolvedValue([
+      { id: '1' },
+    ]);
+
+    await expect(
+      service.updateCourseCycleEvaluationStructure('cc-1', ['1', '999']),
+    ).rejects.toThrow(BadRequestException);
+
+    expect(
+      courseCycleAllowedEvaluationTypeRepository.replaceAllowedTypes,
+    ).not.toHaveBeenCalled();
+  });
+
+  it('should reject evaluation type ids with blank values after trim', async () => {
+    (courseCycleRepository.findById as jest.Mock).mockResolvedValue({
+      id: 'cc-1',
+    });
+
+    await expect(
+      service.updateCourseCycleEvaluationStructure('cc-1', ['1', '   ']),
+    ).rejects.toThrow(BadRequestException);
+
+    expect(evaluationRepository.findTypesByIds).not.toHaveBeenCalled();
+  });
+
+  it('should throw NotFoundException when course cycle does not exist on structure update', async () => {
+    (courseCycleRepository.findById as jest.Mock).mockResolvedValue(null);
+
+    await expect(
+      service.updateCourseCycleEvaluationStructure('missing', ['1']),
+    ).rejects.toThrow(NotFoundException);
+
+    expect(evaluationRepository.findTypesByIds).not.toHaveBeenCalled();
+  });
+
+  it('should return early when structure is unchanged', async () => {
+    (courseCycleRepository.findById as jest.Mock).mockResolvedValue({
+      id: 'cc-1',
+    });
+    (evaluationRepository.findTypesByIds as jest.Mock).mockResolvedValue([
+      { id: '1' },
+      { id: '2' },
+    ]);
+    (
+      courseCycleAllowedEvaluationTypeRepository.findActiveByCourseCycleId as jest.Mock
+    ).mockResolvedValue([{ evaluationTypeId: '1' }, { evaluationTypeId: '2' }]);
+
+    const result = await service.updateCourseCycleEvaluationStructure('cc-1', [
+      '1',
+      '2',
+    ]);
+
+    expect(result).toEqual({
+      courseCycleId: 'cc-1',
+      evaluationTypeIds: ['1', '2'],
+    });
+    expect(dataSource.transaction).not.toHaveBeenCalled();
+    expect(
+      courseCycleAllowedEvaluationTypeRepository.replaceAllowedTypes,
+    ).not.toHaveBeenCalled();
+  });
+
+  it('should return student bank structure when enrollment is active', async () => {
+    (courseCycleRepository.findFullById as jest.Mock).mockResolvedValue(
+      currentCycle,
+    );
+    (dataSource.query as jest.Mock).mockResolvedValue([
+      { typeCode: 'PARTIAL' },
+    ]);
+    (
+      courseCycleRepository.hasAccessiblePreviousByCourseIdAndUserId as jest.Mock
+    ).mockResolvedValue(false);
+    (
+      courseCycleAllowedEvaluationTypeRepository.findActiveWithTypeByCourseCycleId as jest.Mock
+    ).mockResolvedValue([
+      { evaluationTypeId: '2', evaluationType: { code: 'EX', name: 'Examen' } },
+      {
+        evaluationTypeId: '1',
+        evaluationType: { code: 'PC', name: 'Practica Calificada' },
+      },
+    ]);
+
+    const result = await service.getStudentBankStructure('100', '501');
+
+    expect(result.courseCycleId).toBe('100');
+    expect(result.cycleCode).toBe('2026-1');
+    expect(result.items).toEqual([
+      {
+        evaluationTypeId: '2',
+        evaluationTypeCode: 'EX',
+        evaluationTypeName: 'Examen',
+      },
+      {
+        evaluationTypeId: '1',
+        evaluationTypeCode: 'PC',
+        evaluationTypeName: 'Practica Calificada',
+      },
+    ]);
+  });
+
+  it('should reject student bank structure when user has no active enrollment', async () => {
+    (courseCycleRepository.findFullById as jest.Mock).mockResolvedValue(
+      currentCycle,
+    );
+    (dataSource.query as jest.Mock).mockResolvedValue([]);
+
+    await expect(service.getStudentBankStructure('100', '501')).rejects.toThrow(
+      ForbiddenException,
+    );
   });
 });

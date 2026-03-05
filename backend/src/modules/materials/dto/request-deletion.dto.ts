@@ -10,7 +10,7 @@ import { AUDIT_ENTITY_TYPES } from '@modules/audit/interfaces/audit.constants';
 export class RequestDeletionDto {
   @IsNotEmpty()
   @IsString()
-  @IsIn([AUDIT_ENTITY_TYPES.MATERIAL, AUDIT_ENTITY_TYPES.FOLDER])
+  @IsIn([AUDIT_ENTITY_TYPES.MATERIAL])
   entityType: string;
 
   @IsNotEmpty()

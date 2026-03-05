@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { EntityManager, Repository } from 'typeorm';
 import { AcademicCycle } from '@modules/cycles/domain/academic-cycle.entity';
 
 @Injectable()
@@ -16,8 +16,14 @@ export class AcademicCycleRepository {
     });
   }
 
-  async findById(id: string): Promise<AcademicCycle | null> {
-    return await this.ormRepository.findOne({
+  async findById(
+    id: string,
+    manager?: EntityManager,
+  ): Promise<AcademicCycle | null> {
+    const repo = manager
+      ? manager.getRepository(AcademicCycle)
+      : this.ormRepository;
+    return await repo.findOne({
       where: { id },
     });
   }
