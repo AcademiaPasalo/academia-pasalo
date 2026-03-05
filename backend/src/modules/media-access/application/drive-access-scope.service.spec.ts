@@ -28,6 +28,7 @@ describe('DriveAccessScopeService', () => {
       baseFolderName: 'ev_552',
       videosFolderName: 'videos',
       documentsFolderName: 'documentos',
+      archivedFolderName: 'archivado',
       viewerGroupEmail: 'ev-552-viewers@academiapasalo.com',
     });
     const persisted = {
@@ -37,6 +38,7 @@ describe('DriveAccessScopeService', () => {
       driveScopeFolderId: 'scope-folder-id',
       driveVideosFolderId: 'videos-folder-id',
       driveDocumentsFolderId: 'docs-folder-id',
+      driveArchivedFolderId: 'archived-folder-id',
       viewerGroupEmail: 'ev-552-viewers@academiapasalo.com',
       viewerGroupId: 'group-id',
       isActive: true,
@@ -60,6 +62,7 @@ describe('DriveAccessScopeService', () => {
       baseFolderName: 'ev_81',
       videosFolderName: 'videos',
       documentsFolderName: 'documentos',
+      archivedFolderName: 'archivado',
       viewerGroupEmail: 'ev-81-viewers@academiapasalo.com',
     });
     repository.findByEvaluationId.mockResolvedValue(null);
@@ -72,4 +75,3 @@ describe('DriveAccessScopeService', () => {
     expect(result.persisted).toBeNull();
   });
 });
-

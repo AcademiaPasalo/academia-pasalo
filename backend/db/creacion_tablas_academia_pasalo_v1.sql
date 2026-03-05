@@ -243,6 +243,7 @@ CREATE TABLE evaluation_drive_access (
   drive_scope_folder_id VARCHAR(128) NULL,
   drive_videos_folder_id VARCHAR(128) NULL,
   drive_documents_folder_id VARCHAR(128) NULL,
+  drive_archived_folder_id VARCHAR(128) NULL,
   viewer_group_email VARCHAR(320) NOT NULL,
   viewer_group_id VARCHAR(128) NULL,
   is_active BOOLEAN NOT NULL DEFAULT TRUE,

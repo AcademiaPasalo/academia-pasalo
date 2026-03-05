@@ -7,6 +7,7 @@ export type DriveEvaluationScopeNames = {
   baseFolderName: string;
   videosFolderName: string;
   documentsFolderName: string;
+  archivedFolderName: string;
   viewerGroupEmail: string;
 };
 
@@ -24,6 +25,7 @@ export class DriveScopeNamingService {
       baseFolderName: `ev_${normalizedEvaluationId}`,
       videosFolderName: 'videos',
       documentsFolderName: 'documentos',
+      archivedFolderName: 'archivado',
       viewerGroupEmail: `ev-${normalizedEvaluationId}-viewers@${workspaceDomain}`,
     };
   }
@@ -54,4 +56,3 @@ export class DriveScopeNamingService {
     return domain;
   }
 }
-

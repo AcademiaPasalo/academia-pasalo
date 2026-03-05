@@ -10,6 +10,7 @@ import { CyclesModule } from '@modules/cycles/cycles.module';
 import { AuthModule } from '@modules/auth/auth.module';
 
 import { EvaluationSubscriber } from '@modules/evaluations/infrastructure/evaluation.subscriber';
+import { MediaAccessModule } from '@modules/media-access/media-access.module';
 
 @Module({
   imports: [
@@ -17,6 +18,7 @@ import { EvaluationSubscriber } from '@modules/evaluations/infrastructure/evalua
     AuthModule,
     forwardRef(() => CoursesModule),
     CyclesModule,
+    MediaAccessModule,
   ],
   providers: [EvaluationRepository, EvaluationsService, EvaluationSubscriber],
   controllers: [EvaluationsController],

@@ -23,6 +23,7 @@ describe('DriveScopeNamingService', () => {
       baseFolderName: 'ev_552',
       videosFolderName: 'videos',
       documentsFolderName: 'documentos',
+      archivedFolderName: 'archivado',
       viewerGroupEmail: 'ev-552-viewers@academiapasalo.com',
     });
   });
@@ -61,4 +62,3 @@ describe('DriveScopeNamingService', () => {
     );
   });
 });
-

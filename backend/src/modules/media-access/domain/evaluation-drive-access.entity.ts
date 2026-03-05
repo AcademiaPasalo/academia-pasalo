@@ -1,4 +1,10 @@
-import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn } from 'typeorm';
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  ManyToOne,
+  JoinColumn,
+} from 'typeorm';
 import { Evaluation } from '@modules/evaluations/domain/evaluation.entity';
 
 @Entity('evaluation_drive_access')
@@ -16,10 +22,20 @@ export class EvaluationDriveAccess {
   @Column({ name: 'scope_key', type: 'varchar', length: 64 })
   scopeKey: string;
 
-  @Column({ name: 'drive_scope_folder_id', type: 'varchar', length: 128, nullable: true })
+  @Column({
+    name: 'drive_scope_folder_id',
+    type: 'varchar',
+    length: 128,
+    nullable: true,
+  })
   driveScopeFolderId: string | null;
 
-  @Column({ name: 'drive_videos_folder_id', type: 'varchar', length: 128, nullable: true })
+  @Column({
+    name: 'drive_videos_folder_id',
+    type: 'varchar',
+    length: 128,
+    nullable: true,
+  })
   driveVideosFolderId: string | null;
 
   @Column({
@@ -30,10 +46,23 @@ export class EvaluationDriveAccess {
   })
   driveDocumentsFolderId: string | null;
 
+  @Column({
+    name: 'drive_archived_folder_id',
+    type: 'varchar',
+    length: 128,
+    nullable: true,
+  })
+  driveArchivedFolderId: string | null;
+
   @Column({ name: 'viewer_group_email', type: 'varchar', length: 320 })
   viewerGroupEmail: string;
 
-  @Column({ name: 'viewer_group_id', type: 'varchar', length: 128, nullable: true })
+  @Column({
+    name: 'viewer_group_id',
+    type: 'varchar',
+    length: 128,
+    nullable: true,
+  })
   viewerGroupId: string | null;
 
   @Column({ name: 'is_active', type: 'boolean' })
@@ -45,4 +74,3 @@ export class EvaluationDriveAccess {
   @Column({ name: 'updated_at', type: 'datetime', nullable: true })
   updatedAt: Date | null;
 }
-

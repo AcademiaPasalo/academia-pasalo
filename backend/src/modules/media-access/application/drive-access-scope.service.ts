@@ -22,8 +22,9 @@ export class DriveAccessScopeService {
     evaluationId: string,
   ): Promise<DriveEvaluationScopeResolution> {
     const names = this.namingService.buildForEvaluation(evaluationId);
-    const persisted = await this.repository.findByEvaluationId(names.evaluationId);
+    const persisted = await this.repository.findByEvaluationId(
+      names.evaluationId,
+    );
     return { names, persisted };
   }
 }
-

@@ -227,6 +227,12 @@ export const technicalSettings = {
     removeOnFailCount: 100,
   },
 
+  mediaAccess: {
+    reconciliationCronPattern: '0 */30 * * * *',
+    reconciliationScopeBatchSize: 100,
+    reconciliationMutationDelayMs: 50,
+  },
+
   audit: {
     // src/modules/audit/application/audit.service.ts
     cleanupCronPattern: '0 0 3 1 * *',

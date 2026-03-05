@@ -14,6 +14,7 @@ import { EnrollmentsController } from './presentation/enrollments.controller';
 import { AuthModule } from '@modules/auth/auth.module';
 import { CoursesModule } from '@modules/courses/courses.module';
 import { EvaluationsModule } from '@modules/evaluations/evaluations.module';
+import { MediaAccessModule } from '@modules/media-access/media-access.module';
 
 @Module({
   imports: [
@@ -26,6 +27,7 @@ import { EvaluationsModule } from '@modules/evaluations/evaluations.module';
     AuthModule,
     CoursesModule,
     EvaluationsModule,
+    MediaAccessModule,
   ],
   controllers: [EnrollmentsController],
   providers: [
