@@ -12,6 +12,7 @@ describe('MediaAccessMembershipDispatchService', () => {
   beforeEach(() => {
     queue = {
       addBulk: jest.fn().mockResolvedValue([]),
+      add: jest.fn().mockResolvedValue({ id: 'job-recover' }),
     };
     service = new MediaAccessMembershipDispatchService(
       queue as unknown as Queue,
@@ -44,7 +45,7 @@ describe('MediaAccessMembershipDispatchService', () => {
     expect(jobs[0].data.evaluationId).toBe('200');
     expect(jobs[0].data.source).toBe('ENROLLMENT_CREATED');
     expect(jobs[0].data.requestedAt).toBeDefined();
-    expect(jobs[0].opts?.jobId).toBe('media-access:membership:GRANT:100:200');
+    expect(jobs[0].opts?.jobId).toBe('media-access__membership__GRANT__100__200');
     expect(jobs[0].opts?.removeOnComplete).toBe(true);
   });
 
@@ -72,5 +73,33 @@ describe('MediaAccessMembershipDispatchService', () => {
         'EVALUATION_CREATED',
       ),
     ).resolves.toBeUndefined();
+  });
+
+  it('encola recover scope con payload normalizado', async () => {
+    const result = await service.enqueueRecoverEvaluationScope({
+      evaluationId: ' 200 ',
+      requestedByUserId: ' 10 ',
+      reconcileMembers: true,
+      pruneExtraMembers: false,
+      source: ' ADMIN_MANUAL_RECOVERY ',
+    });
+
+    expect(result.jobId).toBe(
+      'media-access__recover-scope__200__reconcile__keep-extra',
+    );
+    expect(queue.add).toHaveBeenCalledTimes(1);
+    const [name, data, opts] = (queue.add as jest.Mock).mock.calls[0];
+    expect(name).toBe(MEDIA_ACCESS_JOB_NAMES.RECOVER_EVALUATION_SCOPE);
+    expect(data).toMatchObject({
+      evaluationId: '200',
+      requestedByUserId: '10',
+      reconcileMembers: true,
+      pruneExtraMembers: false,
+      source: 'ADMIN_MANUAL_RECOVERY',
+    });
+    expect(opts).toMatchObject({
+      jobId: 'media-access__recover-scope__200__reconcile__keep-extra',
+      removeOnComplete: true,
+    });
   });
 });

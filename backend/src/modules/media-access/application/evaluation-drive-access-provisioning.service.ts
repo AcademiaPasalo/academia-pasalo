@@ -28,7 +28,7 @@ export class EvaluationDriveAccessProvisioningService {
     });
     if (!evaluation) {
       throw new NotFoundException(
-        'Evaluacion no encontrada para provision Drive',
+        'Evaluación no encontrada para provisión Drive',
       );
     }
 
@@ -47,8 +47,8 @@ export class EvaluationDriveAccessProvisioningService {
 
     const group = await this.workspaceGroupsService.findOrCreateGroup({
       email: names.viewerGroupEmail,
-      name: `Evaluacion ${names.evaluationId} viewers`,
-      description: `Acceso viewer para contenido de evaluacion ${names.evaluationId}`,
+      name: `Evaluación ${names.evaluationId} viewers`,
+      description: `Acceso viewer para contenido de evaluación ${names.evaluationId}`,
     });
 
     const folders = await this.driveScopeProvisioningService.provisionFolders({

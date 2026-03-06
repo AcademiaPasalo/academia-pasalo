@@ -63,6 +63,8 @@ describe('E2E: Gestion de Materiales y Seguridad', () => {
     getFileStream: jest.fn().mockImplementation(async () => {
       return Readable.from(Buffer.from('%PDF-1.4 downloaded'));
     }),
+    isGoogleDriveStorageEnabled: jest.fn().mockReturnValue(false),
+    isDriveFileDirectlyInFolder: jest.fn().mockResolvedValue(true),
     onModuleInit: jest.fn(),
   };
 

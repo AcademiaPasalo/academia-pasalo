@@ -91,8 +91,8 @@ describe('EvaluationDriveAccessProvisioningService', () => {
 
     expect(workspaceGroupsService.findOrCreateGroup).toHaveBeenCalledWith({
       email: 'ev-552-viewers@academiapasalo.com',
-      name: 'Evaluacion 552 viewers',
-      description: 'Acceso viewer para contenido de evaluacion 552',
+      name: 'Evaluación 552 viewers',
+      description: 'Acceso viewer para contenido de evaluación 552',
     });
     expect(
       driveScopeProvisioningService.ensureGroupReaderPermission,

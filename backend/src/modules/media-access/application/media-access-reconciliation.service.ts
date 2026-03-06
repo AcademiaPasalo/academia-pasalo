@@ -45,6 +45,9 @@ export class MediaAccessReconciliationService implements OnApplicationBootstrap 
   ) {}
 
   async onApplicationBootstrap(): Promise<void> {
+    if (!technicalSettings.queue.enableRepeatSchedulers) {
+      return;
+    }
     await this.setupReconciliationScheduler();
   }
 
@@ -305,3 +308,5 @@ export class MediaAccessReconciliationService implements OnApplicationBootstrap 
     });
   }
 }
+
+

@@ -1,4 +1,4 @@
-import { Processor, WorkerHost } from '@nestjs/bullmq';
+import { OnWorkerEvent, Processor, WorkerHost } from '@nestjs/bullmq';
 import { Injectable, Logger } from '@nestjs/common';
 import { Job, UnrecoverableError } from 'bullmq';
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
@@ -9,11 +9,15 @@ import { EvaluationDriveAccess } from '@modules/media-access/domain/evaluation-d
 import {
   MEDIA_ACCESS_JOB_NAMES,
   MEDIA_ACCESS_MEMBERSHIP_ACTIONS,
+  MEDIA_ACCESS_SYNC_SOURCES,
 } from '@modules/media-access/domain/media-access.constants';
 import { WorkspaceGroupsService } from '@modules/media-access/application/workspace-groups.service';
 import { EvaluationDriveAccessProvisioningService } from '@modules/media-access/application/evaluation-drive-access-provisioning.service';
 import { EvaluationDriveAccessRepository } from '@modules/media-access/infrastructure/evaluation-drive-access.repository';
-import { MediaAccessMembershipSyncJobPayload } from '@modules/media-access/application/media-access-membership-dispatch.service';
+import {
+  MediaAccessMembershipSyncJobPayload,
+  MediaAccessRecoverScopeJobPayload,
+} from '@modules/media-access/application/media-access-membership-dispatch.service';
 import { MediaAccessReconciliationService } from '@modules/media-access/application/media-access-reconciliation.service';
 
 @Injectable()
@@ -45,6 +49,12 @@ export class MediaAccessMembershipProcessor extends WorkerHost {
       );
       return;
     }
+    if (job.name === MEDIA_ACCESS_JOB_NAMES.RECOVER_EVALUATION_SCOPE) {
+      await this.handleRecoverEvaluationScope(
+        job as Job<MediaAccessRecoverScopeJobPayload>,
+      );
+      return;
+    }
     this.logger.warn({
       context: MediaAccessMembershipProcessor.name,
       message: 'Job de media-access desconocido, ignorado',
@@ -54,6 +64,108 @@ export class MediaAccessMembershipProcessor extends WorkerHost {
     throw new UnrecoverableError(
       `Job media-access no soportado: ${String(job.name)}`,
     );
+  }
+
+  @OnWorkerEvent('error')
+  onWorkerError(error: Error): void {
+    this.logger.warn({
+      context: MediaAccessMembershipProcessor.name,
+      message: 'Worker media-access emitió error',
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
+
+  private async handleRecoverEvaluationScope(
+    job: Job<MediaAccessRecoverScopeJobPayload>,
+  ): Promise<void> {
+    const payload = job.data || ({} as MediaAccessRecoverScopeJobPayload);
+    const evaluationId = String(payload.evaluationId || '').trim();
+    const requestedByUserId = String(payload.requestedByUserId || '').trim();
+    const reconcileMembers = payload.reconcileMembers !== false;
+    const pruneExtraMembers = payload.pruneExtraMembers === true;
+    const source =
+      String(payload.source || '').trim() ||
+      MEDIA_ACCESS_SYNC_SOURCES.ADMIN_MANUAL_RECOVERY;
+
+    if (!evaluationId || !requestedByUserId) {
+      throw new UnrecoverableError(
+        'Payload incompleto para recover scope de media-access',
+      );
+    }
+    if (pruneExtraMembers && !reconcileMembers) {
+      throw new UnrecoverableError(
+        'Configuración inválida: pruneExtraMembers requiere reconcileMembers',
+      );
+    }
+
+    const scope = await this.provisioningService.provisionByEvaluationId(
+      evaluationId,
+    );
+    if (!scope.isActive || !scope.viewerGroupEmail) {
+      throw new UnrecoverableError(
+        `Scope Drive incompleto tras recover para evaluación ${evaluationId}`,
+      );
+    }
+
+    if (!reconcileMembers) {
+      this.logger.log({
+        context: MediaAccessMembershipProcessor.name,
+        message: 'Recover scope ejecutado sin reconciliación de miembros',
+        evaluationId,
+        requestedByUserId,
+        source,
+      });
+      return;
+    }
+
+    const expectedEmails = await this.listExpectedMemberEmails(evaluationId);
+    const currentMembers = await this.workspaceGroupsService.listGroupMembers(
+      scope.viewerGroupEmail,
+    );
+    const normalizedMembers = this.normalizeGroupMembers(currentMembers);
+    const currentEmails = Array.from(
+      new Set(normalizedMembers.map((member) => member.email)),
+    );
+    const removableEmails = new Set(
+      normalizedMembers
+        .filter((member) => this.isRemovableMemberRole(member.role))
+        .map((member) => member.email),
+    );
+
+    const currentEmailSet = new Set(currentEmails);
+    const expectedEmailSet = new Set(expectedEmails);
+    const toAdd = expectedEmails.filter((email) => !currentEmailSet.has(email));
+    const toRemove = pruneExtraMembers
+      ? currentEmails.filter(
+          (email) => removableEmails.has(email) && !expectedEmailSet.has(email),
+        )
+      : [];
+
+    for (const email of toAdd) {
+      await this.workspaceGroupsService.ensureMemberInGroup({
+        groupEmail: scope.viewerGroupEmail,
+        memberEmail: email,
+      });
+    }
+    for (const email of toRemove) {
+      await this.workspaceGroupsService.removeMemberFromGroup({
+        groupEmail: scope.viewerGroupEmail,
+        memberEmail: email,
+      });
+    }
+
+    this.logger.log({
+      context: MediaAccessMembershipProcessor.name,
+      message: 'Recover scope ejecutado con reconciliación de miembros',
+      evaluationId,
+      requestedByUserId,
+      source,
+      expectedMembers: expectedEmails.length,
+      currentMembers: currentEmails.length,
+      added: toAdd.length,
+      removed: toRemove.length,
+      pruneExtraMembers,
+    });
   }
 
   private async handleSyncMembership(
@@ -191,7 +303,7 @@ export class MediaAccessMembershipProcessor extends WorkerHost {
       await this.provisioningService.provisionByEvaluationId(evaluationId);
     if (!provisioned.isActive || !provisioned.viewerGroupEmail) {
       throw new UnrecoverableError(
-        `Scope Drive incompleto para evaluacion ${evaluationId}`,
+        `Scope Drive incompleto para evaluación ${evaluationId}`,
       );
     }
     return provisioned;
@@ -222,4 +334,54 @@ export class MediaAccessMembershipProcessor extends WorkerHost {
 
     return Number(result[0]?.hasAccess) === 1;
   }
+
+  private async listExpectedMemberEmails(
+    evaluationId: string,
+  ): Promise<string[]> {
+    const result = await this.dataSource.query<Array<{ email: string | null }>>(
+      `SELECT DISTINCT LOWER(TRIM(u.email)) AS email
+       FROM enrollment_evaluation ee
+       INNER JOIN enrollment e ON e.id = ee.enrollment_id
+       INNER JOIN user u ON u.id = e.user_id
+       WHERE ee.evaluation_id = ?
+         AND ee.is_active = 1
+         AND ee.access_start_date <= NOW()
+         AND ee.access_end_date >= NOW()
+         AND e.cancelled_at IS NULL
+         AND u.email IS NOT NULL
+         AND TRIM(u.email) <> ''
+       ORDER BY email ASC`,
+      [evaluationId],
+    );
+
+    return result
+      .map((row) => String(row.email || '').trim().toLowerCase())
+      .filter((email) => !!email);
+  }
+
+  private normalizeGroupMembers(
+    members: Array<{ email?: string; role?: string }>,
+  ): Array<{ email: string; role: string }> {
+    const deduplicated = new Map<string, { email: string; role: string }>();
+    for (const member of members || []) {
+      const email = String(member?.email || '').trim().toLowerCase();
+      if (!email) {
+        continue;
+      }
+      if (!deduplicated.has(email)) {
+        deduplicated.set(email, {
+          email,
+          role: String(member?.role || '').trim().toUpperCase(),
+        });
+      }
+    }
+    return Array.from(deduplicated.values());
+  }
+
+  private isRemovableMemberRole(role: string): boolean {
+    return role === 'MEMBER' || role === '';
+  }
 }
+
+
+

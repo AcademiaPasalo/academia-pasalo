@@ -42,6 +42,8 @@ import {
   buildDriveViewUrl,
   extractDriveFileIdFromUrl,
 } from '@modules/media-access/domain/media-access-url.util';
+import { DriveAccessScopeService } from '@modules/media-access/application/drive-access-scope.service';
+import { StorageService } from '@infrastructure/storage/storage.service';
 
 @Injectable()
 export class ClassEventsService {
@@ -62,6 +64,8 @@ export class ClassEventsService {
     private readonly cacheModuleService: ClassEventsCacheService,
     private readonly cacheService: RedisCacheService,
     private readonly notificationsDispatchService: NotificationsDispatchService,
+    private readonly driveAccessScopeService: DriveAccessScopeService,
+    private readonly storageService: StorageService,
   ) {}
 
   async createEvent(
@@ -249,6 +253,26 @@ export class ClassEventsService {
     if (!driveFileId) {
       throw new BadRequestException(
         'Grabacion sin ID de archivo Drive. Configure URL de Drive para control de acceso',
+      );
+    }
+    const scope = await this.driveAccessScopeService.resolveForEvaluation(
+      event.evaluationId,
+    );
+    const expectedVideosFolderId = scope.persisted?.driveVideosFolderId;
+    if (!expectedVideosFolderId) {
+      throw new ForbiddenException(
+        'El scope Drive de la evaluacion no esta provisionado para videos',
+      );
+    }
+
+    const isInExpectedFolder =
+      await this.storageService.isDriveFileDirectlyInFolder(
+        driveFileId,
+        expectedVideosFolderId,
+      );
+    if (!isInExpectedFolder) {
+      throw new ForbiddenException(
+        'La grabacion no pertenece al scope Drive autorizado para esta evaluacion',
       );
     }
 

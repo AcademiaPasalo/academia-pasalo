@@ -378,7 +378,7 @@ Permite navegar la jerarquía de una evaluación. Requiere matrícula en la eval
 ### 3. Gestión Administrativa (Upload/Config)
 - **POST /materials/folders:** Crear carpeta.
     * `body: { evaluationId: string, parentFolderId?: string, name: string, visibleFrom?: string, visibleUntil?: string }`
-    * Regla: solo se permiten 2 niveles (raíz y un nivel de subcarpeta). Un tercer nivel responde `400`.
+    * Regla: se permiten hasta 3 niveles maximos. Intentar crear un cuarto nivel responde `400`.
 - **POST /materials/folders/template:** Crear estructura fija de 2 niveles en una sola petición.
     * `body: { evaluationId: string, rootName: string, subfolderNames: string[], visibleFrom?: string, visibleUntil?: string }`
     * Validación: `subfolderNames` (1..50), sin vacíos, sin duplicados case-insensitive.
@@ -578,3 +578,4 @@ Objetivo:
 1. Permitir que `bank-structure` devuelva data real desde seed.
 2. Permitir que `POST /evaluations` valide contra estructura activa desde seed.
 3. Mantener entorno reproducible al recrear schema+data.
+

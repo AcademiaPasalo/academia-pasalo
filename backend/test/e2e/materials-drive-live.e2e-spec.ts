@@ -14,10 +14,11 @@ import { FileResource } from '@modules/materials/domain/file-resource.entity';
 import { DeletionRequest } from '@modules/materials/domain/deletion-request.entity';
 import { ROLE_CODES } from '@common/constants/role-codes.constants';
 import { EVALUATION_TYPE_CODES } from '@modules/evaluations/domain/evaluation.constants';
+import { StorageService } from '@infrastructure/storage/storage.service';
 
 const runLive = process.env.RUN_REAL_DRIVE_E2E === '1';
 const describeLive = runLive ? describe : describe.skip;
-jest.setTimeout(60000);
+jest.setTimeout(300000);
 
 interface MaterialResponse {
   data: {
@@ -30,6 +31,7 @@ describeLive('E2E Live: Materials + Google Drive', () => {
   let app: INestApplication;
   let dataSource: DataSource;
   let seeder: TestSeeder;
+  let storageService: StorageService;
 
   let admin: { user: User; token: string };
   let superAdmin: { user: User; token: string };
@@ -41,6 +43,7 @@ describeLive('E2E Live: Materials + Google Drive', () => {
   let materialAId: string;
   let materialBId: string;
   let sharedFileResourceId: string;
+  let driveDocumentsFolderId: string;
 
   const createdMaterials = new Set<string>();
   const runId = `drive-live-${Date.now()}`;
@@ -48,6 +51,29 @@ describeLive('E2E Live: Materials + Google Drive', () => {
   const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000);
   const nextMonth = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
   const formatDate = (d: Date) => d.toISOString().split('T')[0];
+  const sleep = (ms: number) =>
+    new Promise((resolve) => setTimeout(resolve, ms));
+
+  async function waitForDriveDocumentsFolderId(
+    evaluationId: string,
+  ): Promise<string> {
+    const maxAttempts = 240;
+    for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+      const scopeRows = (await dataSource.query(
+        'SELECT drive_documents_folder_id AS driveDocumentsFolderId FROM evaluation_drive_access WHERE evaluation_id = ? LIMIT 1',
+        [evaluationId],
+      )) as Array<{ driveDocumentsFolderId?: string | null }>;
+      const folderId = String(scopeRows[0]?.driveDocumentsFolderId || '').trim();
+      if (folderId) {
+        return folderId;
+      }
+      await sleep(1000);
+    }
+
+    throw new Error(
+      `No existe drive_documents_folder_id para la evaluacion ${evaluationId}`,
+    );
+  }
 
   async function requestAndHardDelete(materialId: string): Promise<void> {
     const exists = await dataSource
@@ -105,6 +131,7 @@ describeLive('E2E Live: Materials + Google Drive', () => {
     await app.init();
 
     dataSource = app.get(DataSource);
+    storageService = app.get(StorageService);
     seeder = new TestSeeder(dataSource, app);
     await seeder.ensureMaterialStatuses();
 
@@ -143,6 +170,17 @@ describeLive('E2E Live: Materials + Google Drive', () => {
       'INSERT INTO course_cycle_professor (course_cycle_id, professor_user_id, assigned_at) VALUES (?, ?, NOW())',
       [courseCycle.id, professor.user.id],
     );
+
+    await request(app.getHttpServer())
+      .post(`/api/v1/admin/media-access/evaluations/${evaluation.id}/recover-scope`)
+      .set('Authorization', `Bearer ${admin.token}`)
+      .send({
+        reconcileMembers: true,
+        pruneExtraMembers: false,
+      })
+      .expect(202);
+
+    driveDocumentsFolderId = await waitForDriveDocumentsFolderId(evaluation.id);
 
     const folderRes = await request(app.getHttpServer())
       .post('/api/v1/materials/folders')
@@ -189,6 +227,12 @@ describeLive('E2E Live: Materials + Google Drive', () => {
     });
     expect(material.fileResource.storageProvider).toBe('GDRIVE');
     expect(material.fileResource.storageKey).toBeTruthy();
+    await expect(
+      storageService.isDriveFileDirectlyInFolder(
+        material.fileResource.storageKey,
+        driveDocumentsFolderId,
+      ),
+    ).resolves.toBe(true);
   });
 
   it('dedup real: segundo upload reutiliza el mismo file_resource', async () => {

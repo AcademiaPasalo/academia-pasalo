@@ -70,6 +70,8 @@ describe('E2E: Materials Full Flows (Dedup + Versions + Integrity)', () => {
     getFileStream: jest
       .fn()
       .mockResolvedValue(Readable.from(Buffer.from('%PDF-1.4 e2e-download'))),
+    isGoogleDriveStorageEnabled: jest.fn().mockReturnValue(false),
+    isDriveFileDirectlyInFolder: jest.fn().mockResolvedValue(true),
     onModuleInit: jest.fn(),
   };
 

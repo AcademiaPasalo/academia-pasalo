@@ -18,9 +18,10 @@
     "test:watch": "jest --watch",
     "test:cov": "jest --coverage",
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
-    "test:e2e": "cross-env STORAGE_PROVIDER=LOCAL jest --config ./test/jest-e2e.json --runInBand",
-    "test:e2e:drive-live": "cross-env STORAGE_PROVIDER=GDRIVE RUN_REAL_DRIVE_E2E=1 node --experimental-vm-modules ./node_modules/jest/bin/jest.js --config ./test/jest-e2e.json --runInBand test/e2e/materials-drive-live.e2e-spec.ts",
-    "start:e2e": "npm run test:e2e"
+    "test:e2e": "cross-env STORAGE_PROVIDER=LOCAL DISABLE_REPEAT_SCHEDULERS=1 QUEUE_DEFAULT_ATTEMPTS=1 QUEUE_BACKOFF_DELAY_MS=0 jest --config ./test/jest-e2e.json --runInBand",
+    "test:e2e:drive-live": "cross-env STORAGE_PROVIDER=GDRIVE RUN_REAL_DRIVE_E2E=1 DISABLE_REPEAT_SCHEDULERS=1 QUEUE_DEFAULT_ATTEMPTS=1 QUEUE_BACKOFF_DELAY_MS=0 node --experimental-vm-modules ./node_modules/jest/bin/jest.js --config ./test/jest-e2e.json --runInBand test/e2e/materials-drive-live.e2e-spec.ts",
+    "start:e2e": "npm run test:e2e",
+    "drive:recover-scope": "ts-node -r tsconfig-paths/register scripts/recover-drive-evaluation-scope.ts"
   },
   "dependencies": {
     "@nestjs/bullmq": "^11.0.4",

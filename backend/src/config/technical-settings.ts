@@ -1,3 +1,12 @@
+const envNumberOrDefault = (envName: string, fallback: number): number => {
+  const raw = process.env[envName];
+  if (raw == null || String(raw).trim() === '') {
+    return fallback;
+  }
+  const parsed = Number(raw);
+  return Number.isFinite(parsed) ? parsed : fallback;
+};
+
 export const technicalSettings = {
   throttler: {
     // src/app.module.ts
@@ -69,6 +78,14 @@ export const technicalSettings = {
         maxLon: 180,
       },
     },
+  },
+
+  materials: {
+    // src/modules/materials/application/materials.service.ts
+    maxFolderDepth: Math.max(
+      2,
+      Math.floor(envNumberOrDefault('MATERIALS_MAX_FOLDER_DEPTH', 3)),
+    ),
   },
 
   cache: {
@@ -189,6 +206,11 @@ export const technicalSettings = {
       pdfMagicHeaderHex: '25504446',
     },
 
+    feedback: {
+      // src/modules/feedback/application/feedback.service.ts
+      feedbackDriveFolderName: 'feedback_images',
+    },
+
     storage: {
       // src/infrastructure/storage/storage.service.ts
       storagePathFallback: 'uploads',
@@ -215,10 +237,11 @@ export const technicalSettings = {
   },
 
   queue: {
+    enableRepeatSchedulers: process.env.DISABLE_REPEAT_SCHEDULERS !== '1',
     // src/infrastructure/queue/queue.module.ts
-    defaultAttempts: 3,
+    defaultAttempts: Math.max(1, envNumberOrDefault('QUEUE_DEFAULT_ATTEMPTS', 3)),
     // src/infrastructure/queue/queue.module.ts
-    backoffDelayMs: 5000,
+    backoffDelayMs: Math.max(0, envNumberOrDefault('QUEUE_BACKOFF_DELAY_MS', 5000)),
     // src/infrastructure/queue/queue.module.ts
     backoffType: 'exponential' as const,
     // src/infrastructure/queue/queue.module.ts

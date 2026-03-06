@@ -14,12 +14,14 @@ import { MediaAccessMembershipDispatchService } from '@modules/media-access/appl
 import { MediaAccessReconciliationService } from '@modules/media-access/application/media-access-reconciliation.service';
 import { MediaAccessMembershipProcessor } from '@modules/media-access/infrastructure/processors/media-access-membership.processor';
 import { QUEUES } from '@infrastructure/queue/queue.constants';
+import { MediaAccessAdminController } from '@modules/media-access/presentation/media-access-admin.controller';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([EvaluationDriveAccess, Evaluation, User]),
     BullModule.registerQueue({ name: QUEUES.MEDIA_ACCESS }),
   ],
+  controllers: [MediaAccessAdminController],
   providers: [
     DriveScopeNamingService,
     DriveAccessScopeService,

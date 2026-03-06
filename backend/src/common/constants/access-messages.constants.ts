@@ -4,7 +4,7 @@ export const ACCESS_MESSAGES = {
   COURSE_EVALUATIONS_FORBIDDEN:
     'No tienes permiso para consultar evaluaciones de este curso.',
   MATERIAL_FOLDER_DEPTH_EXCEEDED:
-    'No se permite crear subcarpetas a mas de un nivel desde la carpeta raiz de la evaluacion',
+    'No se permite crear subcarpetas por encima de la profundidad maxima configurada',
   MATERIAL_TEMPLATE_EMPTY_ROOT_NAME:
     'El nombre de la carpeta raiz es obligatorio.',
   MATERIAL_TEMPLATE_EMPTY_CHILD_NAME:

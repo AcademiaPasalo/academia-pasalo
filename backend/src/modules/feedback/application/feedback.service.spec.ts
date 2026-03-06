@@ -59,6 +59,8 @@ describe('FeedbackService', () => {
           provide: StorageService,
           useValue: {
             saveFile: jest.fn(),
+            isGoogleDriveStorageEnabled: jest.fn().mockReturnValue(false),
+            getOrCreateDriveFolderUnderRoot: jest.fn(),
           },
         },
         {

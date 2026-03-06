@@ -37,6 +37,9 @@ export class AuditService implements OnApplicationBootstrap {
   ) {}
 
   async onApplicationBootstrap() {
+    if (!technicalSettings.queue.enableRepeatSchedulers) {
+      return;
+    }
     await this.setupRepeatableJobs();
   }
 

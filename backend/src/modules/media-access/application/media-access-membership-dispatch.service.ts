@@ -21,6 +21,15 @@ export type MediaAccessMembershipSyncJobPayload = {
   requestedAt: string;
 };
 
+export type MediaAccessRecoverScopeJobPayload = {
+  evaluationId: string;
+  requestedByUserId: string;
+  reconcileMembers: boolean;
+  pruneExtraMembers: boolean;
+  source: string;
+  requestedAt: string;
+};
+
 @Injectable()
 export class MediaAccessMembershipDispatchService {
   private readonly logger = new Logger(
@@ -66,6 +75,50 @@ export class MediaAccessMembershipDispatchService {
       userIds.map((userId) => ({ userId, evaluationId })),
       source,
     );
+  }
+
+  async enqueueRecoverEvaluationScope(input: {
+    evaluationId: string;
+    requestedByUserId: string;
+    reconcileMembers?: boolean;
+    pruneExtraMembers?: boolean;
+    source?: string;
+  }): Promise<{ jobId: string }> {
+    const evaluationId = String(input.evaluationId || '').trim();
+    const requestedByUserId = String(input.requestedByUserId || '').trim();
+    if (!evaluationId || !requestedByUserId) {
+      throw new Error(
+        'evaluationId y requestedByUserId son obligatorios para recover scope',
+      );
+    }
+
+    const reconcileMembers = input.reconcileMembers !== false;
+    const pruneExtraMembers = input.pruneExtraMembers === true;
+    if (pruneExtraMembers && !reconcileMembers) {
+      throw new Error(
+        'No se puede podar miembros si reconcileMembers está desactivado',
+      );
+    }
+
+    const source = String(input.source || '').trim() || 'UNSPECIFIED';
+    const payload: MediaAccessRecoverScopeJobPayload = {
+      evaluationId,
+      requestedByUserId,
+      reconcileMembers,
+      pruneExtraMembers,
+      source,
+      requestedAt: new Date().toISOString(),
+    };
+    const jobId = this.buildRecoverScopeJobId(payload);
+    await this.mediaAccessQueue.add(
+      MEDIA_ACCESS_JOB_NAMES.RECOVER_EVALUATION_SCOPE,
+      payload,
+      {
+        jobId,
+        removeOnComplete: true,
+      },
+    );
+    return { jobId };
   }
 
   private async enqueueMembershipSyncJobs(
@@ -147,6 +200,20 @@ export class MediaAccessMembershipDispatchService {
       payload.action,
       payload.userId,
       payload.evaluationId,
-    ].join(':');
+    ].join('__');
+  }
+
+  private buildRecoverScopeJobId(
+    payload: MediaAccessRecoverScopeJobPayload,
+  ): string {
+    return [
+      'media-access',
+      'recover-scope',
+      payload.evaluationId,
+      payload.reconcileMembers ? 'reconcile' : 'no-reconcile',
+      payload.pruneExtraMembers ? 'prune' : 'keep-extra',
+    ].join('__');
   }
 }
+
+

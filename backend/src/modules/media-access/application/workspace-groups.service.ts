@@ -152,7 +152,7 @@ export class WorkspaceGroupsService {
       if (status !== 404) {
         throw error;
       }
-      // Idempotencia para revocación repetida.
+      // Idempotencia para revocacion repetida.
       return;
     }
 
@@ -329,3 +329,5 @@ export class WorkspaceGroupsService {
     return maybeError.response?.status ?? maybeError.code;
   }
 }
+
+

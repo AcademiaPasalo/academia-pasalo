@@ -16,6 +16,8 @@ import { ROLE_CODES } from '@common/constants/role-codes.constants';
 import { BadRequestException, ForbiddenException } from '@nestjs/common';
 import { CLASS_EVENT_STATUS } from '@modules/events/domain/class-event.constants';
 import { NotificationsDispatchService } from '@modules/notifications/application/notifications-dispatch.service';
+import { DriveAccessScopeService } from '@modules/media-access/application/drive-access-scope.service';
+import { StorageService } from '@infrastructure/storage/storage.service';
 import {
   MEDIA_ACCESS_MODES,
   MEDIA_VIDEO_LINK_MODES,
@@ -28,6 +30,8 @@ describe('ClassEventsService', () => {
   let permissionService: jest.Mocked<ClassEventsPermissionService>;
   let schedulingService: jest.Mocked<ClassEventsSchedulingService>;
   let cacheModuleService: jest.Mocked<ClassEventsCacheService>;
+  let driveAccessScopeService: jest.Mocked<DriveAccessScopeService>;
+  let storageService: jest.Mocked<StorageService>;
 
   const mockProfessor: UserWithSession = {
     id: 'prof-1',
@@ -159,6 +163,18 @@ describe('ClassEventsService', () => {
             cancelClassReminder: jest.fn().mockResolvedValue(undefined),
           },
         },
+        {
+          provide: DriveAccessScopeService,
+          useValue: {
+            resolveForEvaluation: jest.fn(),
+          },
+        },
+        {
+          provide: StorageService,
+          useValue: {
+            isDriveFileDirectlyInFolder: jest.fn(),
+          },
+        },
       ],
     }).compile();
 
@@ -168,6 +184,8 @@ describe('ClassEventsService', () => {
     permissionService = module.get(ClassEventsPermissionService);
     schedulingService = module.get(ClassEventsSchedulingService);
     cacheModuleService = module.get(ClassEventsCacheService);
+    driveAccessScopeService = module.get(DriveAccessScopeService);
+    storageService = module.get(StorageService);
 
     // Default mocks behavior
     permissionService.checkUserAuthorization.mockResolvedValue(true);
@@ -177,6 +195,12 @@ describe('ClassEventsService', () => {
     );
     permissionService.validateEventOwnership.mockReturnValue(undefined);
     permissionService.isAdminUser.mockReturnValue(false);
+    driveAccessScopeService.resolveForEvaluation.mockResolvedValue({
+      persisted: {
+        driveVideosFolderId: 'videos-folder-eval-1',
+      },
+    } as any);
+    storageService.isDriveFileDirectlyInFolder.mockResolvedValue(true);
   });
 
   describe('createEvent', () => {
@@ -319,6 +343,18 @@ describe('ClassEventsService', () => {
         ...mockEvent,
         recordingUrl: 'https://drive.google.com/file/d/drive-abc-1/view',
       } as ClassEvent);
+
+      await expect(
+        service.getAuthorizedRecordingLink(mockProfessor, 'event-1'),
+      ).rejects.toThrow(ForbiddenException);
+    });
+
+    it('debe lanzar ForbiddenException cuando el archivo no pertenece a la carpeta videos de la evaluacion', async () => {
+      classEventRepository.findById.mockResolvedValue({
+        ...mockEvent,
+        recordingUrl: 'https://drive.google.com/file/d/drive-abc-1/view',
+      } as ClassEvent);
+      storageService.isDriveFileDirectlyInFolder.mockResolvedValue(false);
 
       await expect(
         service.getAuthorizedRecordingLink(mockProfessor, 'event-1'),

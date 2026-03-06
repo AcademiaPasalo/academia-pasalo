@@ -61,12 +61,14 @@ import {
   buildDriveDownloadUrl,
   buildDrivePreviewUrl,
 } from '@modules/media-access/domain/media-access-url.util';
+import { DriveAccessScopeService } from '@modules/media-access/application/drive-access-scope.service';
 
 @Injectable()
 export class MaterialsService {
   private readonly logger = new Logger(MaterialsService.name);
   private readonly CACHE_TTL =
     technicalSettings.cache.materials.materialsExplorerCacheTtlSeconds;
+  private readonly maxFolderDepth = technicalSettings.materials.maxFolderDepth;
 
   constructor(
     private readonly dataSource: DataSource,
@@ -83,6 +85,7 @@ export class MaterialsService {
     private readonly auditService: AuditService,
     private readonly classEventRepository: ClassEventRepository,
     private readonly notificationsDispatchService: NotificationsDispatchService,
+    private readonly driveAccessScopeService: DriveAccessScopeService,
   ) {}
 
   async createFolder(
@@ -240,6 +243,9 @@ export class MaterialsService {
     );
 
     const now = new Date();
+    const documentsFolderId = this.storageService.isGoogleDriveStorageEnabled()
+      ? await this.resolveDocumentsFolderIdForEvaluation(folder.evaluationId)
+      : null;
     let savedResource: {
       storageProvider: (typeof STORAGE_PROVIDER_CODES)[keyof typeof STORAGE_PROVIDER_CODES];
       storageKey: string;
@@ -259,9 +265,10 @@ export class MaterialsService {
 
         const hash = await this.storageService.calculateHash(file.buffer);
         const existingResource =
-          await this.fileResourceRepository.findByHashAndSize(
+          await this.fileResourceRepository.findByHashAndSizeWithinEvaluation(
             hash,
             String(file.size),
+            folder.evaluationId,
           );
 
         let finalResource: FileResource;
@@ -277,6 +284,9 @@ export class MaterialsService {
             uniqueName,
             file.buffer,
             file.mimetype,
+            documentsFolderId
+              ? { targetDriveFolderId: documentsFolderId }
+              : undefined,
           );
           isNewFile = true;
 
@@ -299,9 +309,10 @@ export class MaterialsService {
             }
 
             const dedupResource =
-              await this.fileResourceRepository.findByHashAndSize(
+              await this.fileResourceRepository.findByHashAndSizeWithinEvaluation(
                 hash,
                 String(file.size),
+                folder.evaluationId,
               );
             if (!dedupResource) {
               throw error;
@@ -447,12 +458,19 @@ export class MaterialsService {
           freshMaterial.materialFolder.evaluationId,
           manager,
         );
+        const documentsFolderId =
+          this.storageService.isGoogleDriveStorageEnabled()
+            ? await this.resolveDocumentsFolderIdForEvaluation(
+                freshMaterial.materialFolder.evaluationId,
+              )
+            : null;
 
         const hash = await this.storageService.calculateHash(file.buffer);
         const existingResource =
-          await this.fileResourceRepository.findByHashAndSize(
+          await this.fileResourceRepository.findByHashAndSizeWithinEvaluation(
             hash,
             String(file.size),
+            freshMaterial.materialFolder.evaluationId,
           );
 
         let finalResource: FileResource;
@@ -467,6 +485,9 @@ export class MaterialsService {
             uniqueName,
             file.buffer,
             file.mimetype,
+            documentsFolderId
+              ? { targetDriveFolderId: documentsFolderId }
+              : undefined,
           );
           isNewFile = true;
 
@@ -489,9 +510,10 @@ export class MaterialsService {
             }
 
             const dedupResource =
-              await this.fileResourceRepository.findByHashAndSize(
+              await this.fileResourceRepository.findByHashAndSizeWithinEvaluation(
                 hash,
                 String(file.size),
+                freshMaterial.materialFolder.evaluationId,
               );
             if (!dedupResource) {
               throw error;
@@ -782,6 +804,28 @@ export class MaterialsService {
     const isDriveResource =
       resource.storageProvider === STORAGE_PROVIDER_CODES.GDRIVE;
     const driveFileId = isDriveResource ? resource.storageKey : null;
+    if (isDriveResource && driveFileId) {
+      const scope = await this.driveAccessScopeService.resolveForEvaluation(
+        folder.evaluationId,
+      );
+      const expectedDocumentsFolderId = scope.persisted?.driveDocumentsFolderId;
+      if (!expectedDocumentsFolderId) {
+        throw new ForbiddenException(
+          'El scope Drive de la evaluacion no esta provisionado para documentos',
+        );
+      }
+
+      const isInExpectedFolder =
+        await this.storageService.isDriveFileDirectlyInFolder(
+          driveFileId,
+          expectedDocumentsFolderId,
+        );
+      if (!isInExpectedFolder) {
+        throw new ForbiddenException(
+          'El documento no pertenece al scope Drive autorizado para esta evaluacion',
+        );
+      }
+    }
 
     const url =
       isDriveResource && driveFileId
@@ -1101,12 +1145,42 @@ export class MaterialsService {
         'Inconsistencia: La carpeta padre no pertenece a la misma evaluación',
       );
     }
-    if (parent && parent.parentFolderId) {
-      throw new BadRequestException(
-        ACCESS_MESSAGES.MATERIAL_FOLDER_DEPTH_EXCEEDED,
-      );
+    if (parent) {
+      const parentDepth = await this.resolveFolderDepth(parent);
+      if (parentDepth >= this.maxFolderDepth) {
+        throw new BadRequestException(
+          `${ACCESS_MESSAGES.MATERIAL_FOLDER_DEPTH_EXCEEDED} (max=${this.maxFolderDepth})`,
+        );
+      }
     }
     return parent;
+  }
+
+  private async resolveFolderDepth(folder: MaterialFolder): Promise<number> {
+    let depth = 1;
+    let current = folder;
+    const maxTraversalHops = this.maxFolderDepth + 10;
+
+    for (let hop = 0; hop < maxTraversalHops; hop += 1) {
+      const parentId = current.parentFolderId;
+      if (!parentId) {
+        return depth;
+      }
+
+      const parent = await this.folderRepository.findById(parentId);
+      if (!parent) {
+        throw new InternalServerErrorException(
+          'Integridad de datos corrupta: cadena de carpetas incompleta',
+        );
+      }
+
+      depth += 1;
+      current = parent;
+    }
+
+    throw new InternalServerErrorException(
+      'Integridad de datos corrupta: profundidad de carpetas invalida',
+    );
   }
 
   private async validateClassEventAssociation(
@@ -1141,6 +1215,22 @@ export class MaterialsService {
       resource.storageProvider,
       resource.storageUrl,
     );
+  }
+
+  private async resolveDocumentsFolderIdForEvaluation(
+    evaluationId: string,
+  ): Promise<string> {
+    const scope =
+      await this.driveAccessScopeService.resolveForEvaluation(evaluationId);
+    const documentsFolderId = String(
+      scope.persisted?.driveDocumentsFolderId || '',
+    ).trim();
+    if (!documentsFolderId) {
+      throw new ForbiddenException(
+        'El scope Drive de la evaluacion no esta provisionado para documentos',
+      );
+    }
+    return documentsFolderId;
   }
 
   private async invalidateFolderCache(folderId: string) {

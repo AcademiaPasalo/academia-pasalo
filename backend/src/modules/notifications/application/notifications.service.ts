@@ -24,7 +24,9 @@ export class NotificationsService implements OnApplicationBootstrap {
   ) {}
 
   async onApplicationBootstrap(): Promise<void> {
-    await this.setupCleanupScheduler();
+    if (technicalSettings.queue.enableRepeatSchedulers) {
+      await this.setupCleanupScheduler();
+    }
     this.validateReminderSettings();
   }
 

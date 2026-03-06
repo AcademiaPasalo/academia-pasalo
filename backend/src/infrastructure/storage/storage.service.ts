@@ -22,6 +22,10 @@ type StoredFileDescriptor = {
   storageUrl: string | null;
 };
 
+type SaveFileOptions = {
+  targetDriveFolderId?: string | null;
+};
+
 @Injectable()
 export class StorageService implements OnModuleInit {
   private readonly logger = new Logger(StorageService.name);
@@ -70,7 +74,7 @@ export class StorageService implements OnModuleInit {
 
   async onModuleInit() {
     if (this.isGoogleDriveEnabled()) {
-      await this.ensureDriveFolderStructure();
+      await this.getDriveRootFolderId();
       this.logger.log({
         message: 'Storage activo en Google Drive',
         provider: STORAGE_PROVIDER_CODES.GDRIVE,
@@ -91,9 +95,12 @@ export class StorageService implements OnModuleInit {
     fileName: string,
     buffer: Buffer,
     mimeType = 'application/octet-stream',
+    options?: SaveFileOptions,
   ): Promise<StoredFileDescriptor> {
     if (this.isGoogleDriveEnabled()) {
-      return await this.saveFileToGoogleDrive(fileName, buffer, mimeType);
+      return await this.saveFileToGoogleDrive(fileName, buffer, mimeType, {
+        targetDriveFolderId: options?.targetDriveFolderId,
+      });
     }
 
     const filePath = path.join(this.storagePath, fileName);
@@ -159,9 +166,54 @@ export class StorageService implements OnModuleInit {
     return fs.createReadStream(filePath);
   }
 
+  async isDriveFileDirectlyInFolder(
+    fileId: string,
+    expectedParentFolderId: string,
+  ): Promise<boolean> {
+    const normalizedFileId = String(fileId || '').trim();
+    const normalizedExpectedParent = String(expectedParentFolderId || '').trim();
+    if (!normalizedFileId || !normalizedExpectedParent) {
+      return false;
+    }
+
+    const client = await this.getGoogleAuth().getClient();
+    const response = await client.request<{ parents?: string[] }>({
+      url: `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(normalizedFileId)}?fields=parents&supportsAllDrives=true`,
+      method: 'GET',
+    });
+
+    const parents = response.data.parents || [];
+    return parents.includes(normalizedExpectedParent);
+  }
+
   calculateHash(buffer: Buffer): Promise<string> {
     const hash = crypto.createHash('sha256').update(buffer).digest('hex');
     return Promise.resolve(hash);
+  }
+
+  isGoogleDriveStorageEnabled(): boolean {
+    return this.isGoogleDriveEnabled();
+  }
+
+  async getOrCreateDriveFolderUnderRoot(folderName: string): Promise<string> {
+    if (!this.isGoogleDriveEnabled()) {
+      throw new InternalServerErrorException(
+        'getOrCreateDriveFolderUnderRoot solo aplica para STORAGE_PROVIDER=GDRIVE',
+      );
+    }
+
+    const normalizedFolderName = String(folderName || '').trim();
+    if (!normalizedFolderName) {
+      throw new InternalServerErrorException(
+        'Nombre de carpeta Drive invalido',
+      );
+    }
+
+    const rootFolderId = await this.getDriveRootFolderId();
+    return await this.findOrCreateDriveFolderUnderParent(
+      rootFolderId,
+      normalizedFolderName,
+    );
   }
 
   private isGoogleDriveEnabled(): boolean {
@@ -185,9 +237,13 @@ export class StorageService implements OnModuleInit {
     fileName: string,
     buffer: Buffer,
     mimeType: string,
+    options?: SaveFileOptions,
   ): Promise<StoredFileDescriptor> {
     const client = await this.getGoogleAuth().getClient();
-    const folderId = await this.getDriveObjectsFolderId();
+    const explicitTargetFolderId = String(
+      options?.targetDriveFolderId || '',
+    ).trim();
+    const folderId = explicitTargetFolderId || (await this.getDriveObjectsFolderId());
 
     const metadata = {
       name: fileName,

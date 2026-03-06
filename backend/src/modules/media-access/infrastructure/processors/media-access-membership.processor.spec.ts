@@ -31,6 +31,7 @@ describe('MediaAccessMembershipProcessor', () => {
       findOrCreateGroup: jest.fn(),
       ensureMemberInGroup: jest.fn(),
       removeMemberFromGroup: jest.fn(),
+      listGroupMembers: jest.fn().mockResolvedValue([]),
     } as unknown as jest.Mocked<WorkspaceGroupsService>;
     provisioningService = {
       provisionByEvaluationId: jest.fn(),
@@ -193,6 +194,80 @@ describe('MediaAccessMembershipProcessor', () => {
     expect(reconciliationService.runReconciliation).toHaveBeenCalledTimes(1);
   });
 
+  it('recupera scope y reconcilia miembros en job manual de recover', async () => {
+    provisioningService.provisionByEvaluationId.mockResolvedValue({
+      id: '1',
+      evaluationId: '20',
+      viewerGroupEmail: 'ev-20-viewers@academiapasalo.com',
+      isActive: true,
+    } as never);
+    (dataSource.query as jest.Mock).mockResolvedValueOnce([
+      { email: 'student@test.com' },
+      { email: 'other@test.com' },
+    ]);
+    (
+      workspaceGroupsService.listGroupMembers as unknown as jest.Mock
+    ).mockResolvedValueOnce([{ email: 'student@test.com' }]);
+
+    await processor.process({
+      id: 'job-recover',
+      name: MEDIA_ACCESS_JOB_NAMES.RECOVER_EVALUATION_SCOPE,
+      data: {
+        evaluationId: '20',
+        requestedByUserId: '1',
+        reconcileMembers: true,
+        pruneExtraMembers: false,
+        source: 'ADMIN_MANUAL_RECOVERY',
+      },
+    } as unknown as Job);
+
+    expect(provisioningService.provisionByEvaluationId).toHaveBeenCalledWith(
+      '20',
+    );
+    expect(workspaceGroupsService.ensureMemberInGroup).toHaveBeenCalledWith({
+      groupEmail: 'ev-20-viewers@academiapasalo.com',
+      memberEmail: 'other@test.com',
+    });
+    expect(workspaceGroupsService.removeMemberFromGroup).not.toHaveBeenCalled();
+  });
+
+  it('en pruneExtraMembers solo remueve miembros con rol removible', async () => {
+    provisioningService.provisionByEvaluationId.mockResolvedValue({
+      id: '1',
+      evaluationId: '20',
+      viewerGroupEmail: 'ev-20-viewers@academiapasalo.com',
+      isActive: true,
+    } as never);
+    (dataSource.query as jest.Mock).mockResolvedValueOnce([
+      { email: 'student@test.com' },
+    ]);
+    (
+      workspaceGroupsService.listGroupMembers as unknown as jest.Mock
+    ).mockResolvedValueOnce([
+      { email: 'student@test.com', role: 'MEMBER' },
+      { email: 'owner@test.com', role: 'OWNER' },
+      { email: 'legacy@test.com', role: 'MEMBER' },
+    ]);
+
+    await processor.process({
+      id: 'job-recover-prune',
+      name: MEDIA_ACCESS_JOB_NAMES.RECOVER_EVALUATION_SCOPE,
+      data: {
+        evaluationId: '20',
+        requestedByUserId: '1',
+        reconcileMembers: true,
+        pruneExtraMembers: true,
+        source: 'ADMIN_MANUAL_RECOVERY',
+      },
+    } as unknown as Job);
+
+    expect(workspaceGroupsService.removeMemberFromGroup).toHaveBeenCalledTimes(1);
+    expect(workspaceGroupsService.removeMemberFromGroup).toHaveBeenCalledWith({
+      groupEmail: 'ev-20-viewers@academiapasalo.com',
+      memberEmail: 'legacy@test.com',
+    });
+  });
+
   it('lanza error no recuperable para job desconocido', async () => {
     await expect(
       processor.process({
@@ -203,3 +278,4 @@ describe('MediaAccessMembershipProcessor', () => {
     ).rejects.toBeInstanceOf(UnrecoverableError);
   });
 });
+
