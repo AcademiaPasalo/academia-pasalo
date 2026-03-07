@@ -11,14 +11,14 @@ interface PromiseCard {
 const cards: PromiseCard[] = [
   {
     icon: "videocam",
-    iconBg: "bg-bg-warning-light",
-    iconColor: "text-icon-warning-primary",
+    iconBg: "bg-warning-light",
+    iconColor: "text-orange-600",
     title: "Clases en vivo interactivas",
     description:
       "Olvídate de las grabaciones aburridas. Partimos desde cero para que comprendas cada concepto incluso si no lograste comprenderlo en clase.",
   },
   {
-    icon: "support_agent",
+    icon: "question_answer",
     iconBg: "bg-bg-success-light",
     iconColor: "text-bg-success-solid",
     title: "Soporte directo y rápido",
@@ -26,7 +26,7 @@ const cards: PromiseCard[] = [
       "¿Te quedaste con una duda fuera de clase? Contamos con canales de WhatsApp exclusivos para brindarte asistencia académica ágil y personalizada.",
   },
   {
-    icon: "devices",
+    icon: "groups",
     iconBg: "bg-bg-info-primary-light",
     iconColor: "text-bg-info-primary-solid",
     title: "Plataforma integral",
