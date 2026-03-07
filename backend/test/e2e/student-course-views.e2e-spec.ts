@@ -222,7 +222,7 @@ describe('E2E: Student course views', () => {
     );
 
     expect(byId.get(currentEvalPastId)).toMatchObject({
-      label: 'Completado',
+      label: 'Bloqueado',
       evaluationTypeCode: 'PC',
     });
     expect(byId.get(currentEvalInProgressId)).toMatchObject({

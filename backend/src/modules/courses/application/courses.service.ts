@@ -627,7 +627,9 @@ export class CoursesService {
 
         let label: StudentEvaluationLabel;
         if (now > endDate) {
-          label = STUDENT_EVALUATION_LABELS.COMPLETED;
+          label = hasAccess
+            ? STUDENT_EVALUATION_LABELS.COMPLETED
+            : STUDENT_EVALUATION_LABELS.LOCKED;
         } else if (now >= startDate && now <= endDate) {
           label = STUDENT_EVALUATION_LABELS.IN_PROGRESS;
         } else {

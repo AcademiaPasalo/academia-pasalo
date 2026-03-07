@@ -171,7 +171,7 @@ describe('CoursesService student views', () => {
 
     expect(result.canViewPreviousCycles).toBe(true);
     expect(result.evaluations[0].label).toBe(
-      STUDENT_EVALUATION_LABELS.COMPLETED,
+      STUDENT_EVALUATION_LABELS.LOCKED,
     );
     expect(result.evaluations[1].label).toBe(
       STUDENT_EVALUATION_LABELS.IN_PROGRESS,

@@ -318,12 +318,14 @@ export default function PlataformaPage() {
               <span className="text-gray-600 text-[14px] font-normal leading-[1.14em]">
                 ¿Aún no eres parte de la academia?
               </span>
-              <Link
-                href="/#contacto"
+              <a
+                href="https://wa.me/51903006775?text=Hola%2C%20estoy%20interesado%20en%20inscribirme%20en%20la%20academia.%20%C2%BFPodr%C3%ADan%20darme%20m%C3%A1s%20informaci%C3%B3n%3F"
+                target="_blank"
+                rel="noopener noreferrer"
                 className="text-deep-blue-700 text-[13px] font-medium leading-[1em] tracking-[-0.012em] px-0.5 py-0.5 rounded hover:underline transition-all"
               >
                 ¡Inscríbete ahora!
-              </Link>
+              </a>
             </div>
           </div>
         </div>

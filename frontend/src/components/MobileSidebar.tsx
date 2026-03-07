@@ -55,9 +55,12 @@ export default function MobileSidebar({
     };
   }, [isOpen, onClose]);
 
-  const handleNavClick = (section: string) => {
+  const handleNavClick = (section: string, sectionId: string) => {
     onSectionChange(section);
     onClose();
+    setTimeout(() => {
+      document.getElementById(sectionId)?.scrollIntoView({ behavior: "smooth" });
+    }, 300);
   };
 
   return (
@@ -98,23 +101,25 @@ export default function MobileSidebar({
         <div className="flex-1 flex flex-col items-end p-5 rounded-br-[16px]">
           {/* Navigation Items - gap: 20px */}
           <nav className="flex flex-col w-full gap-5">
-            {navItems.map((item) => (
-              <Link
-                key={item.label}
-                href={item.href}
-                onClick={() => handleNavClick(item.label.toLowerCase())}
-                className={`flex items-stretch w-full gap-1 px-2 py-2 rounded-lg transition-colors ${activeSection === item.label.toLowerCase()
-                  ? "bg-deep-blue-900"
-                  : "bg-deep-blue-700 hover:bg-deep-blue-800"
-                  }`}
-              >
-                <span
-                  className="flex-1 text-base font-medium leading-[17px] tracking-[-0.18px] text-white"
+            {navItems.map((item) => {
+              const sectionId = item.href.replace("/#", "");
+              return (
+                <button
+                  key={item.label}
+                  onClick={() => handleNavClick(item.label.toLowerCase(), sectionId)}
+                  className={`flex items-stretch w-full gap-1 px-2 py-2 rounded-lg transition-colors cursor-pointer ${activeSection === item.label.toLowerCase()
+                    ? "bg-deep-blue-900"
+                    : "bg-deep-blue-700 hover:bg-deep-blue-800"
+                    }`}
                 >
-                  {item.label}
-                </span>
-              </Link>
-            ))}
+                  <span
+                    className="flex-1 text-base font-medium leading-[17px] tracking-[-0.18px] text-white text-left"
+                  >
+                    {item.label}
+                  </span>
+                </button>
+              );
+            })}
 
             {/* Botón Plataforma - Secondary button: padding: 16px 24px, gap: 8px, border 1px */}
             <Link

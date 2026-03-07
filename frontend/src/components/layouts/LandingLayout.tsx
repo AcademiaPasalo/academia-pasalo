@@ -9,7 +9,7 @@ export default function LandingLayout({
   return (
     <>
       <TopBar />
-      <main className="min-h-screen">{children}</main>
+      <main className="min-h-screen bg-gray-50">{children}</main>      
       <Footer />
     </>
   );

@@ -134,8 +134,13 @@ module.exports = {
           "success-light": "var(--bg-success-light)",
           "warning-solid": "var(--bg-warning-solid)",
           "info-primary-light": "var(--bg-info-primary-light)",
+          "info-primary-solid": "var(--bg-info-primary-solid)",
           "info-secondary-light": "var(--bg-info-secondary-light)",
+          "info-secondary-light-hover": "var(--bg-info-secondary-light-hover)",
+          "rating-solid": "var(--bg-rating-solid)",
           disabled: "var(--bg-disabled)",
+          "pucp-solid": "var(--bg-pucp-solid)",
+          "pucp-light": "var(--bg-pucp-light)",
         },
 
         // Semantic colors - Text
@@ -153,6 +158,7 @@ module.exports = {
           "warning-primary": "var(--text-warning-primary)",
           "info-primary": "var(--text-info-primary)",
           "info-secondary": "var(--text-info-secondary)",
+          "pucp-solid": "var(--bg-pucp-solid)",
         },
 
         // Semantic colors - Stroke/Border

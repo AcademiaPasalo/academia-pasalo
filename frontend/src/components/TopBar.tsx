@@ -56,27 +56,34 @@ export default function TopBar({ showBackButton = false }: { showBackButton?: bo
             ) : (
               // ...existing code...
               <>
-                {navItems.map((item) => (
-                  <Link
-                    key={item.label}
-                    href={item.href}
-                    onClick={() => setActiveSection(item.label.toLowerCase())}
-                    className="group relative flex items-center px-2 py-1"
-                  >
-                    <span
-                      className={`text-base transition-colors ${
-                        displayActiveSection === item.label.toLowerCase()
-                          ? "text-accent-primary font-medium"
-                          : "text-tertiary hover:text-accent-secondary"
-                      }`}
+                {navItems.map((item) => {
+                  const sectionId = item.href.replace("/#", "");
+                  return (
+                    <button
+                      key={item.label}
+                      onClick={() => {
+                        setActiveSection(item.label.toLowerCase());
+                        document
+                          .getElementById(sectionId)
+                          ?.scrollIntoView({ behavior: "smooth" });
+                      }}
+                      className="group relative flex items-center px-2 py-1 cursor-pointer"
                     >
-                      {item.label}
-                    </span>
-                    {displayActiveSection === item.label.toLowerCase() && (
-                      <div className="absolute bottom-0 left-0 right-0 h-[3px] bg-main rounded-full mx-2" />
-                    )}
-                  </Link>
-                ))}
+                      <span
+                        className={`text-base transition-colors ${
+                          displayActiveSection === item.label.toLowerCase()
+                            ? "text-accent-primary font-medium"
+                            : "text-tertiary hover:text-accent-secondary"
+                        }`}
+                      >
+                        {item.label}
+                      </span>
+                      {displayActiveSection === item.label.toLowerCase() && (
+                        <div className="absolute bottom-0 left-0 right-0 h-[3px] bg-main rounded-full mx-2" />
+                      )}
+                    </button>
+                  );
+                })}
 
                 {/* Botón Plataforma */}
                 <Link
