@@ -35,33 +35,33 @@ const modalities: Modality[] = [
 
 export default function ModalitiesSection() {
   return (
-    <section id="modalidades" className="scroll-mt-20 px-6 md:px-16 lg:px-28 py-20 flex flex-col items-center gap-10">
+    <section id="modalidades" className="scroll-mt-20 px-4 py-10 md:px-16 lg:px-28 md:py-20 flex flex-col items-center gap-6 md:gap-10">
       {/* Header */}
       <div className="w-full flex flex-col items-center gap-4 px-5">
-        <h2 className="w-full text-center text-text-primary text-3xl md:text-5xl font-bold leading-tight md:leading-[56px]">
+        <h2 className="w-full text-center text-text-primary text-3xl md:text-5xl font-bold leading-8 md:leading-[56px]">
           Nuestras Modalidades
         </h2>
         <div className="w-full lg:px-60">
-          <p className="text-center text-text-secondary text-base md:text-xl font-normal leading-6">
+          <p className="text-center text-text-secondary text-xs md:text-xl font-normal leading-4 md:leading-6">
             Ofrecemos distintos tipos de asesorías para cada tipo de estudiante.
           </p>
         </div>
       </div>
 
       {/* Cards */}
-      <div className="w-full grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="w-full grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6">
         {modalities.map((mod) => (
           <div
             key={mod.title}
-            className={`relative p-8 bg-bg-primary rounded-lg flex flex-col items-center gap-3 ${
+            className={`relative p-5 md:p-8 bg-bg-primary rounded-lg flex flex-col items-center gap-2 md:gap-3 ${
               mod.popular
                 ? "outline outline-2 outline-offset-[-2px] outline-stroke-accent-primary"
                 : "outline outline-1 outline-offset-[-1px] outline-stroke-secondary"
             }`}
           >
             {mod.popular && (
-              <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-0.5 bg-bg-accent-primary-solid rounded-full">
-                <span className="text-text-white text-xs font-medium leading-4 whitespace-nowrap">
+              <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 md:py-0.5 bg-bg-accent-primary-solid rounded-full">
+                <span className="text-text-white text-xs font-medium leading-3 md:leading-4 whitespace-nowrap">
                   MÁS POPULAR
                 </span>
               </div>
@@ -72,16 +72,16 @@ export default function ModalitiesSection() {
               alt={mod.title}
               width={192}
               height={192}
-              className="w-24 h-24 object-contain"
+              className="w-20 h-20 md:w-24 md:h-24 object-contain"
             />
 
-            <h3 className="w-full text-center text-text-primary text-xl font-semibold leading-6">
+            <h3 className="w-full text-center text-text-primary text-base md:text-xl font-semibold leading-5 md:leading-6">
               {mod.title}
             </h3>
-            <p className="w-full text-center text-text-accent-primary text-sm font-semibold leading-4">
+            <p className="w-full text-center text-text-accent-primary text-xs md:text-sm font-medium md:font-semibold leading-4">
               {mod.subtitle}
             </p>
-            <p className="w-full text-center text-text-secondary text-sm font-normal leading-4">
+            <p className="w-full text-center text-text-secondary text-xs md:text-sm font-normal leading-4">
               {mod.description}
             </p>
           </div>
