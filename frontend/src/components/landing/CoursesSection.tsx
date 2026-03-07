@@ -202,7 +202,7 @@ export default function CoursesSection() {
   };
 
   return (
-    <section className="px-6 md:px-16 lg:px-28 py-20 relative bg-gradient-to-b from-deep-blue-50 via-white to-muted-indigo-50 flex flex-col items-center gap-10">
+    <section id="cursos" className="scroll-mt-20 px-6 md:px-16 lg:px-28 py-20 relative bg-gradient-to-b from-deep-blue-50 via-white to-muted-indigo-50 flex flex-col items-center gap-10">
       {/* Header */}
       <div className="w-full flex flex-col items-center gap-5 px-5">
         <h2 className="w-full text-center text-3xl md:text-5xl font-bold leading-tight md:leading-[56px]">

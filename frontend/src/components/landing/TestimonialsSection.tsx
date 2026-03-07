@@ -64,7 +64,7 @@ function StarRating({ count }: { count: number }) {
 
 export default function TestimonialsSection() {
   return (
-    <section className="px-6 md:px-16 lg:px-28 py-20 bg-bg-primary flex flex-col items-center gap-10">
+    <section id="testimonios" className="scroll-mt-20 px-6 md:px-16 lg:px-28 py-20 bg-bg-primary flex flex-col items-center gap-10">
       {/* Header */}
       <div className="w-full flex flex-col items-center gap-4 px-5">
         <div className="flex flex-col items-center gap-3">

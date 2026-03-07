@@ -35,7 +35,7 @@ const modalities: Modality[] = [
 
 export default function ModalitiesSection() {
   return (
-    <section className="px-6 md:px-16 lg:px-28 py-20 flex flex-col items-center gap-10">
+    <section id="modalidades" className="scroll-mt-20 px-6 md:px-16 lg:px-28 py-20 flex flex-col items-center gap-10">
       {/* Header */}
       <div className="w-full flex flex-col items-center gap-4 px-5">
         <h2 className="w-full text-center text-text-primary text-3xl md:text-5xl font-bold leading-tight md:leading-[56px]">

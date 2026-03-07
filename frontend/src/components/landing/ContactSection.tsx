@@ -16,7 +16,7 @@ export default function ContactSection() {
   };
 
   return (
-    <section className="px-6 md:px-16 lg:px-28 py-20 flex flex-col lg:flex-row gap-6">
+    <section id="contacto" className="scroll-mt-20 px-6 md:px-16 lg:px-28 py-20 flex flex-col lg:flex-row gap-6">
       {/* Left column - Contact info */}
       <div className="flex-1 flex flex-col gap-8">
         <div className="flex flex-col gap-4">

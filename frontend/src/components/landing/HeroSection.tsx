@@ -3,7 +3,7 @@ import Icon from "@/components/ui/Icon";
 
 export default function HeroSection() {
   return (
-    <section className="relative px-6 md:px-16 lg:px-28 py-20 flex flex-col lg:flex-row justify-center items-center gap-10 overflow-hidden">
+    <section id="inicio" className="scroll-mt-20 relative px-6 md:px-16 lg:px-28 py-20 flex flex-col lg:flex-row justify-center items-center gap-10 overflow-hidden">
       {/* Decorative ellipses */}
       <img
         src="/images/ellipse-info-secondary-light.png"
