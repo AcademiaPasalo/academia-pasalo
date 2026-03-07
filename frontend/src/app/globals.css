@@ -494,3 +494,12 @@ body {
 .animate-slideUp {
   animation: slideUp 0.3s ease-out;
 }
+
+/* Hide scrollbar for carousels */
+.courses-carousel {
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE/Edge */
+}
+.courses-carousel::-webkit-scrollbar {
+  display: none; /* Chrome/Safari/Opera */
+}
