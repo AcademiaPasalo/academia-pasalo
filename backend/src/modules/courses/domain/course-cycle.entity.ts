@@ -23,6 +23,22 @@ export class CourseCycle {
   @Column({ name: 'academic_cycle_id', type: 'bigint' })
   academicCycleId: string;
 
+  @Column({
+    name: 'intro_video_url',
+    type: 'varchar',
+    length: 500,
+    nullable: true,
+  })
+  introVideoUrl: string | null;
+
+  @Column({
+    name: 'intro_video_file_id',
+    type: 'varchar',
+    length: 128,
+    nullable: true,
+  })
+  introVideoFileId: string | null;
+
   @ManyToOne(() => Course)
   @JoinColumn({ name: 'course_id' })
   course: Course;

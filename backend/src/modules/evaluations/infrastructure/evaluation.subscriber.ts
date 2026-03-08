@@ -6,6 +6,7 @@ import {
   DataSource,
   IsNull,
   MoreThan,
+  In,
 } from 'typeorm';
 import { Evaluation } from '@modules/evaluations/domain/evaluation.entity';
 import { Enrollment } from '@modules/enrollments/domain/enrollment.entity';
@@ -19,13 +20,18 @@ import { ENROLLMENT_TYPE_CODES } from '@modules/enrollments/domain/enrollment.co
 import { EVALUATION_TYPE_CODES } from '@modules/evaluations/domain/evaluation.constants';
 import { toUtcEndOfDay, toUtcStartOfDay } from '@common/utils/date.util';
 import { technicalSettings } from '@config/technical-settings';
+import { MediaAccessMembershipDispatchService } from '@modules/media-access/application/media-access-membership-dispatch.service';
+import { MEDIA_ACCESS_SYNC_SOURCES } from '@modules/media-access/domain/media-access.constants';
 
 @EventSubscriber()
 @Injectable()
 export class EvaluationSubscriber implements EntitySubscriberInterface<Evaluation> {
   private readonly logger = new Logger(EvaluationSubscriber.name);
 
-  constructor(@InjectDataSource() readonly dataSource: DataSource) {
+  constructor(
+    @InjectDataSource() readonly dataSource: DataSource,
+    private readonly mediaAccessMembershipDispatchService: MediaAccessMembershipDispatchService,
+  ) {
     dataSource.subscribers.push(this);
   }
 
@@ -100,8 +106,17 @@ export class EvaluationSubscriber implements EntitySubscriberInterface<Evaluatio
 
     if (evaluationType.code === EVALUATION_TYPE_CODES.BANCO_ENUNCIADOS) {
       let lastEnrollmentId = '0';
+      let processedBatches = 0;
+      const MAX_BATCHES = 10000;
 
       while (true) {
+        processedBatches += 1;
+        if (processedBatches > MAX_BATCHES) {
+          throw new InternalServerErrorException(
+            `Safety stop en subscriber: excedido maximo de lotes (${MAX_BATCHES}) para evaluacion ${evaluation.id}`,
+          );
+        }
+
         const enrollmentsBatch = await manager.find(Enrollment, {
           where: {
             courseCycleId: evaluation.courseCycleId,
@@ -116,9 +131,27 @@ export class EvaluationSubscriber implements EntitySubscriberInterface<Evaluatio
           break;
         }
 
-        const accessEntries: Array<Partial<EnrollmentEvaluation>> = [];
+        const enrollmentIds = enrollmentsBatch.map((enrollment) =>
+          String(enrollment.id),
+        );
+        const existingRows = await manager.find(EnrollmentEvaluation, {
+          where: {
+            evaluationId: evaluation.id,
+            enrollmentId: In(enrollmentIds),
+          },
+          select: {
+            enrollmentId: true,
+          },
+        });
+        const existingEnrollmentIds = new Set(
+          existingRows.map((row) => String(row.enrollmentId)),
+        );
+        const enrollmentsToGrant = enrollmentsBatch.filter(
+          (enrollment) => !existingEnrollmentIds.has(String(enrollment.id)),
+        );
 
-        for (const enrollment of enrollmentsBatch) {
+        const accessEntries: Array<Partial<EnrollmentEvaluation>> = [];
+        for (const enrollment of enrollmentsToGrant) {
           accessEntries.push({
             enrollmentId: enrollment.id,
             evaluationId: evaluation.id,
@@ -136,15 +169,38 @@ export class EvaluationSubscriber implements EntitySubscriberInterface<Evaluatio
             .values(accessEntries)
             .orIgnore()
             .execute();
+
+          await this.mediaAccessMembershipDispatchService.enqueueGrantForEvaluationUsers(
+            evaluation.id,
+            enrollmentsToGrant.map((enrollment) => String(enrollment.userId)),
+            MEDIA_ACCESS_SYNC_SOURCES.EVALUATION_CREATED_BANK,
+          );
         }
 
         totalProcessed += enrollmentsBatch.length;
-        lastEnrollmentId = enrollmentsBatch[enrollmentsBatch.length - 1].id;
+        const nextLastEnrollmentId = String(
+          enrollmentsBatch[enrollmentsBatch.length - 1].id,
+        );
+        if (nextLastEnrollmentId === lastEnrollmentId) {
+          throw new InternalServerErrorException(
+            `Safety stop en subscriber: cursor no avanza para evaluacion ${evaluation.id}`,
+          );
+        }
+        lastEnrollmentId = nextLastEnrollmentId;
       }
     } else {
       let lastEnrollmentId = '0';
+      let processedBatches = 0;
+      const MAX_BATCHES = 10000;
 
       while (true) {
+        processedBatches += 1;
+        if (processedBatches > MAX_BATCHES) {
+          throw new InternalServerErrorException(
+            `Safety stop en subscriber: excedido maximo de lotes (${MAX_BATCHES}) para evaluacion ${evaluation.id}`,
+          );
+        }
+
         const fullEnrollmentsBatch = await manager.find(Enrollment, {
           where: {
             courseCycleId: evaluation.courseCycleId,
@@ -160,8 +216,27 @@ export class EvaluationSubscriber implements EntitySubscriberInterface<Evaluatio
           break;
         }
 
+        const enrollmentIds = fullEnrollmentsBatch.map((enrollment) =>
+          String(enrollment.id),
+        );
+        const existingRows = await manager.find(EnrollmentEvaluation, {
+          where: {
+            evaluationId: evaluation.id,
+            enrollmentId: In(enrollmentIds),
+          },
+          select: {
+            enrollmentId: true,
+          },
+        });
+        const existingEnrollmentIds = new Set(
+          existingRows.map((row) => String(row.enrollmentId)),
+        );
+        const enrollmentsToGrant = fullEnrollmentsBatch.filter(
+          (enrollment) => !existingEnrollmentIds.has(String(enrollment.id)),
+        );
+
         const accessEntries: Array<Partial<EnrollmentEvaluation>> =
-          fullEnrollmentsBatch.map((enrollment) => ({
+          enrollmentsToGrant.map((enrollment) => ({
             enrollmentId: enrollment.id,
             evaluationId: evaluation.id,
             accessStartDate: new Date(unifiedAccessStartDate),
@@ -177,11 +252,24 @@ export class EvaluationSubscriber implements EntitySubscriberInterface<Evaluatio
             .values(accessEntries)
             .orIgnore()
             .execute();
+
+          await this.mediaAccessMembershipDispatchService.enqueueGrantForEvaluationUsers(
+            evaluation.id,
+            enrollmentsToGrant.map((enrollment) => String(enrollment.userId)),
+            MEDIA_ACCESS_SYNC_SOURCES.EVALUATION_CREATED_FULL,
+          );
         }
 
         totalProcessed += fullEnrollmentsBatch.length;
-        lastEnrollmentId =
-          fullEnrollmentsBatch[fullEnrollmentsBatch.length - 1].id;
+        const nextLastEnrollmentId = String(
+          fullEnrollmentsBatch[fullEnrollmentsBatch.length - 1].id,
+        );
+        if (nextLastEnrollmentId === lastEnrollmentId) {
+          throw new InternalServerErrorException(
+            `Safety stop en subscriber: cursor no avanza para evaluacion ${evaluation.id}`,
+          );
+        }
+        lastEnrollmentId = nextLastEnrollmentId;
       }
     }
 

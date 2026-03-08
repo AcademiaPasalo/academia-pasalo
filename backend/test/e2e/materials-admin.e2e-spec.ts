@@ -52,6 +52,8 @@ describe('E2E: Materials Admin Full Flow', () => {
     getFileStream: jest
       .fn()
       .mockResolvedValue(Readable.from(Buffer.from('%PDF-1.4 admin'))),
+    isGoogleDriveStorageEnabled: jest.fn().mockReturnValue(false),
+    isDriveFileDirectlyInFolder: jest.fn().mockResolvedValue(true),
     onModuleInit: jest.fn(),
   };
 

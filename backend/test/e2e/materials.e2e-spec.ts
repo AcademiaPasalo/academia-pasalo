@@ -63,6 +63,8 @@ describe('E2E: Gestion de Materiales y Seguridad', () => {
     getFileStream: jest.fn().mockImplementation(async () => {
       return Readable.from(Buffer.from('%PDF-1.4 downloaded'));
     }),
+    isGoogleDriveStorageEnabled: jest.fn().mockReturnValue(false),
+    isDriveFileDirectlyInFolder: jest.fn().mockResolvedValue(true),
     onModuleInit: jest.fn(),
   };
 
@@ -206,16 +208,18 @@ describe('E2E: Gestion de Materiales y Seguridad', () => {
       expect(childFolderId).toBeDefined();
     });
 
-    it('Admin NO debe poder crear subcarpeta de segundo nivel (profundidad > 2)', async () => {
-      await request(app.getHttpServer())
+    it('Admin debe poder crear subcarpeta de segundo nivel (profundidad <= 3)', async () => {
+      const res = await request(app.getHttpServer())
         .post('/api/v1/materials/folders')
         .set('Authorization', `Bearer ${admin.token}`)
         .send({
           evaluationId: evaluation.id,
           parentFolderId: childFolderId,
-          name: 'Nieta no permitida',
+          name: 'Nieta permitida',
         })
-        .expect(400);
+        .expect(201);
+
+      expect((res.body as MaterialFolderResponse).data.id).toBeDefined();
     });
 
     it('Admin debe poder crear estructura plantilla de 2 niveles', async () => {

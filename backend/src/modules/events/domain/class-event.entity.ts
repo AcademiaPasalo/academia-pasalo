@@ -45,6 +45,14 @@ export class ClassEvent {
   })
   recordingUrl: string | null;
 
+  @Column({
+    name: 'recording_file_id',
+    type: 'varchar',
+    length: 128,
+    nullable: true,
+  })
+  recordingFileId: string | null;
+
   @Column({ name: 'recording_status_id', type: 'bigint' })
   recordingStatusId: string;
 

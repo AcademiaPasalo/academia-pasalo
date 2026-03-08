@@ -40,6 +40,7 @@ export class ClassEventRepository {
   async findById(id: string): Promise<ClassEvent | null> {
     return await this.ormRepository
       .createQueryBuilder('classEvent')
+      .leftJoinAndSelect('classEvent.recordingStatus', 'recordingStatus')
       .leftJoinAndSelect('classEvent.evaluation', 'evaluation')
       .leftJoinAndSelect('evaluation.evaluationType', 'evaluationType')
       .leftJoinAndSelect('evaluation.courseCycle', 'courseCycle')
@@ -69,6 +70,7 @@ export class ClassEventRepository {
   async findByEvaluationId(evaluationId: string): Promise<ClassEvent[]> {
     return await this.ormRepository
       .createQueryBuilder('classEvent')
+      .leftJoinAndSelect('classEvent.recordingStatus', 'recordingStatus')
       .leftJoinAndSelect('classEvent.evaluation', 'evaluation')
       .leftJoinAndSelect('evaluation.evaluationType', 'evaluationType')
       .leftJoinAndSelect('evaluation.courseCycle', 'courseCycle')
@@ -203,6 +205,7 @@ export class ClassEventRepository {
     const now = new Date();
     const qb = this.ormRepository
       .createQueryBuilder('classEvent')
+      .leftJoinAndSelect('classEvent.recordingStatus', 'recordingStatus')
       .leftJoinAndSelect('classEvent.evaluation', 'evaluation')
       .leftJoinAndSelect('evaluation.evaluationType', 'evaluationType')
       .leftJoinAndSelect('evaluation.courseCycle', 'courseCycle')

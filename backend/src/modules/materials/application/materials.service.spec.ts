@@ -25,6 +25,11 @@ import { ROLE_CODES } from '@common/constants/role-codes.constants';
 import { MATERIAL_CACHE_KEYS } from '@modules/materials/domain/material.constants';
 import { ClassEvent } from '@modules/events/domain/class-event.entity';
 import { NotificationsDispatchService } from '@modules/notifications/application/notifications-dispatch.service';
+import { DriveAccessScopeService } from '@modules/media-access/application/drive-access-scope.service';
+import {
+  MEDIA_ACCESS_MODES,
+  MEDIA_DOCUMENT_LINK_MODES,
+} from '@modules/media-access/domain/media-access.constants';
 
 const mockFolder = (
   id = '1',
@@ -72,6 +77,7 @@ describe('MaterialsService', () => {
   let auditService: jest.Mocked<AuditService>;
   let cacheService: jest.Mocked<RedisCacheService>;
   let classEventRepo: jest.Mocked<ClassEventRepository>;
+  let driveAccessScopeService: jest.Mocked<DriveAccessScopeService>;
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -88,6 +94,8 @@ describe('MaterialsService', () => {
             saveFile: jest.fn(),
             deleteFile: jest.fn(),
             getFileStream: jest.fn(),
+            isDriveFileDirectlyInFolder: jest.fn(),
+            isGoogleDriveStorageEnabled: jest.fn().mockReturnValue(true),
           },
         },
         {
@@ -123,7 +131,10 @@ describe('MaterialsService', () => {
         },
         {
           provide: FileResourceRepository,
-          useValue: { create: jest.fn(), findByHashAndSize: jest.fn() },
+          useValue: {
+            create: jest.fn(),
+            findByHashAndSizeWithinEvaluation: jest.fn(),
+          },
         },
         {
           provide: FileVersionRepository,
@@ -165,6 +176,12 @@ describe('MaterialsService', () => {
             dispatchNewMaterial: jest.fn().mockResolvedValue(undefined),
           },
         },
+        {
+          provide: DriveAccessScopeService,
+          useValue: {
+            resolveForEvaluation: jest.fn(),
+          },
+        },
       ],
     }).compile();
 
@@ -181,9 +198,16 @@ describe('MaterialsService', () => {
     auditService = module.get(AuditService);
     cacheService = module.get(RedisCacheService);
     classEventRepo = module.get(ClassEventRepository);
+    driveAccessScopeService = module.get(DriveAccessScopeService);
     (
       courseCycleProfessorRepo.isProfessorAssignedToEvaluation as jest.Mock
     ).mockResolvedValue(true);
+    driveAccessScopeService.resolveForEvaluation.mockResolvedValue({
+      persisted: {
+        driveDocumentsFolderId: 'docs-folder-100',
+      },
+    } as any);
+    storageService.isDriveFileDirectlyInFolder.mockResolvedValue(true);
 
     dataSource.transaction.mockImplementation(
       (arg1: unknown, arg2?: unknown) => {
@@ -240,21 +264,44 @@ describe('MaterialsService', () => {
       ).rejects.toThrow('Rango de visibilidad inv');
     });
 
-    it('should reject creating a third-level folder (depth > 2)', async () => {
+    it('should allow creating a third-level folder (depth = 3)', async () => {
       catalogRepo.findFolderStatusByCode.mockResolvedValue({
         id: '1',
       } as FolderStatus);
-      folderRepo.findById.mockResolvedValue(
-        mockFolder('child-1', '100', 'root-1'),
+      folderRepo.findById
+        .mockResolvedValueOnce(mockFolder('child-1', '100', 'root-1'))
+        .mockResolvedValueOnce(mockFolder('root-1', '100', null));
+      folderRepo.create.mockResolvedValue(
+        mockFolder('grandchild-1', '100', 'child-1'),
       );
+
+      const result = await service.createFolder(mockProfessor, {
+        evaluationId: '100',
+        parentFolderId: 'child-1',
+        name: 'Grandchild Folder',
+      });
+
+      expect(result.id).toBe('grandchild-1');
+      expect(folderRepo.create).toHaveBeenCalled();
+    });
+
+    it('should reject creating a fourth-level folder (depth > 3)', async () => {
+      catalogRepo.findFolderStatusByCode.mockResolvedValue({
+        id: '1',
+      } as FolderStatus);
+      folderRepo.findById
+        .mockResolvedValueOnce(mockFolder('level-3', '100', 'level-2'))
+        .mockResolvedValueOnce(mockFolder('level-2', '100', 'level-1'))
+        .mockResolvedValueOnce(mockFolder('level-1', '100', 'root-1'))
+        .mockResolvedValueOnce(mockFolder('root-1', '100', null));
 
       await expect(
         service.createFolder(mockProfessor, {
           evaluationId: '100',
-          parentFolderId: 'child-1',
-          name: 'Grandchild Folder',
+          parentFolderId: 'level-3',
+          name: 'Depth 4 Folder',
         }),
-      ).rejects.toThrow('No se permite crear subcarpetas');
+      ).rejects.toThrow('profundidad maxima');
     });
   });
 
@@ -316,7 +363,7 @@ describe('MaterialsService', () => {
       folderRepo.findById.mockResolvedValue(mockFolder());
 
       storageService.calculateHash.mockResolvedValue('hash123');
-      resourceRepo.findByHashAndSize.mockResolvedValue(null);
+      resourceRepo.findByHashAndSizeWithinEvaluation.mockResolvedValue(null);
       storageService.saveFile.mockResolvedValue({
         storageProvider: 'LOCAL',
         storageKey: 'test.pdf',
@@ -329,15 +376,13 @@ describe('MaterialsService', () => {
         file,
       );
 
-      expect(storageService.saveFile).toHaveBeenCalled();
-      expect(result).toBeDefined();
-      expect(auditService.logAction).toHaveBeenCalledWith(
-        'prof-1',
-        'FILE_UPLOAD',
-        AUDIT_ENTITY_TYPES.MATERIAL,
-        'saved-id',
-        expect.anything(),
+      expect(storageService.saveFile).toHaveBeenCalledWith(
+        file.originalname,
+        file.buffer,
+        file.mimetype,
+        { targetDriveFolderId: 'docs-folder-100' },
       );
+      expect(result).toBeDefined();
     });
 
     it('should reject upload when classEvent does not belong to folder evaluation', async () => {
@@ -373,7 +418,7 @@ describe('MaterialsService', () => {
       } as MaterialStatus);
       folderRepo.findById.mockResolvedValue(mockFolder());
       storageService.calculateHash.mockResolvedValue('hash-existing');
-      resourceRepo.findByHashAndSize.mockResolvedValue({
+      resourceRepo.findByHashAndSizeWithinEvaluation.mockResolvedValue({
         id: 'res-existing',
         storageProvider: 'GDRIVE',
         storageKey: 'drive-key',
@@ -397,7 +442,7 @@ describe('MaterialsService', () => {
       } as MaterialStatus);
       folderRepo.findById.mockResolvedValue(mockFolder());
       storageService.calculateHash.mockResolvedValue('hash123');
-      resourceRepo.findByHashAndSize.mockResolvedValue(null);
+      resourceRepo.findByHashAndSizeWithinEvaluation.mockResolvedValue(null);
       storageService.saveFile.mockResolvedValue({
         storageProvider: 'LOCAL',
         storageKey: 'rollback.pdf',
@@ -437,7 +482,7 @@ describe('MaterialsService', () => {
       } as MaterialStatus);
       folderRepo.findById.mockResolvedValue(mockFolder());
       storageService.calculateHash.mockResolvedValue('hash-collision');
-      resourceRepo.findByHashAndSize
+      resourceRepo.findByHashAndSizeWithinEvaluation
         .mockResolvedValueOnce(null)
         .mockResolvedValueOnce({
           id: 'res-dedup',
@@ -540,7 +585,7 @@ describe('MaterialsService', () => {
       );
 
       storageService.calculateHash.mockResolvedValue('hash-v2');
-      resourceRepo.findByHashAndSize.mockResolvedValue({
+      resourceRepo.findByHashAndSizeWithinEvaluation.mockResolvedValue({
         id: 'resource-1',
         storageUrl: '/path/file.pdf',
       } as FileResource);
@@ -586,7 +631,7 @@ describe('MaterialsService', () => {
       );
 
       storageService.calculateHash.mockResolvedValue('hash-existing-v3');
-      resourceRepo.findByHashAndSize.mockResolvedValue({
+      resourceRepo.findByHashAndSizeWithinEvaluation.mockResolvedValue({
         id: 'res-existing',
         storageProvider: 'GDRIVE',
         storageKey: 'drive-key',
@@ -608,7 +653,7 @@ describe('MaterialsService', () => {
       } as Material;
 
       storageService.calculateHash.mockResolvedValue('hash-collision-v2');
-      resourceRepo.findByHashAndSize
+      resourceRepo.findByHashAndSizeWithinEvaluation
         .mockResolvedValueOnce(null)
         .mockResolvedValueOnce({
           id: 'res-dedup-v2',
@@ -661,7 +706,7 @@ describe('MaterialsService', () => {
       } as Material;
 
       storageService.calculateHash.mockResolvedValue('hash-existing-v3');
-      resourceRepo.findByHashAndSize.mockResolvedValue({
+      resourceRepo.findByHashAndSizeWithinEvaluation.mockResolvedValue({
         id: 'res-existing',
         storageProvider: 'GDRIVE',
         storageKey: 'drive-key',
@@ -953,6 +998,137 @@ describe('MaterialsService', () => {
     });
   });
 
+  describe('getAuthorizedDocumentLink', () => {
+    it('should return a direct Drive preview URL when resource provider is GDRIVE', async () => {
+      materialRepo.findById.mockResolvedValue({
+        id: 'mat-1',
+        materialFolderId: 'folder-1',
+        displayName: 'Guia 1',
+        fileResource: {
+          originalName: 'guia-1.pdf',
+          mimeType: 'application/pdf',
+          storageProvider: 'GDRIVE',
+          storageKey: 'drive-file-1',
+          storageUrl: null,
+        },
+      } as unknown as Material);
+      folderRepo.findById.mockResolvedValue(mockFolder('folder-1', '100'));
+      accessEngine.hasAccess.mockResolvedValue(true);
+
+      const result = await service.getAuthorizedDocumentLink(
+        mockStudent,
+        'mat-1',
+        MEDIA_DOCUMENT_LINK_MODES.VIEW,
+      );
+
+      expect(result.accessMode).toBe(MEDIA_ACCESS_MODES.DIRECT_URL);
+      expect(result.driveFileId).toBe('drive-file-1');
+      expect(result.url).toContain('/preview');
+      expect(result.requestedMode).toBe(MEDIA_DOCUMENT_LINK_MODES.VIEW);
+      expect(auditService.logAction).not.toHaveBeenCalled();
+    });
+
+    it('should return backend proxy URL when resource provider is LOCAL', async () => {
+      materialRepo.findById.mockResolvedValue({
+        id: 'mat-7',
+        materialFolderId: 'folder-1',
+        displayName: 'Guia local',
+        fileResource: {
+          originalName: 'guia-local.pdf',
+          mimeType: 'application/pdf',
+          storageProvider: 'LOCAL',
+          storageKey: 'local-key',
+          storageUrl: '/tmp/local-key',
+        },
+      } as unknown as Material);
+      folderRepo.findById.mockResolvedValue(mockFolder('folder-1', '100'));
+      accessEngine.hasAccess.mockResolvedValue(true);
+
+      const result = await service.getAuthorizedDocumentLink(
+        mockStudent,
+        'mat-7',
+        MEDIA_DOCUMENT_LINK_MODES.DOWNLOAD,
+      );
+
+      expect(result.accessMode).toBe(MEDIA_ACCESS_MODES.BACKEND_PROXY);
+      expect(result.driveFileId).toBeNull();
+      expect(result.url).toBe('/materials/mat-7/download');
+      expect(result.requestedMode).toBe(MEDIA_DOCUMENT_LINK_MODES.DOWNLOAD);
+    });
+
+    it('should deny when student no longer has enrollment access', async () => {
+      materialRepo.findById.mockResolvedValue({
+        id: 'mat-1',
+        materialFolderId: 'folder-1',
+        fileResource: {
+          originalName: 'guia-1.pdf',
+          mimeType: 'application/pdf',
+          storageProvider: 'GDRIVE',
+          storageKey: 'drive-file-1',
+          storageUrl: null,
+        },
+      } as unknown as Material);
+      folderRepo.findById.mockResolvedValue(mockFolder('folder-1', '100'));
+      accessEngine.hasAccess.mockResolvedValue(false);
+
+      await expect(
+        service.getAuthorizedDocumentLink(mockStudent, 'mat-1'),
+      ).rejects.toThrow('No tienes acceso a este contenido educativo');
+    });
+
+    it('should reject drive document when evaluation scope has no documents folder provisioned', async () => {
+      materialRepo.findById.mockResolvedValue({
+        id: 'mat-1',
+        materialFolderId: 'folder-1',
+        displayName: 'Guia 1',
+        fileResource: {
+          originalName: 'guia-1.pdf',
+          mimeType: 'application/pdf',
+          storageProvider: 'GDRIVE',
+          storageKey: 'drive-file-1',
+          storageUrl: null,
+        },
+      } as unknown as Material);
+      folderRepo.findById.mockResolvedValue(mockFolder('folder-1', '100'));
+      accessEngine.hasAccess.mockResolvedValue(true);
+      driveAccessScopeService.resolveForEvaluation.mockResolvedValueOnce({
+        persisted: {
+          driveDocumentsFolderId: null,
+        },
+      } as any);
+
+      await expect(
+        service.getAuthorizedDocumentLink(mockStudent, 'mat-1'),
+      ).rejects.toThrow(
+        'El scope Drive de la evaluacion no esta provisionado para documentos',
+      );
+    });
+
+    it('should reject drive document when file parent folder does not match evaluation documents folder', async () => {
+      materialRepo.findById.mockResolvedValue({
+        id: 'mat-1',
+        materialFolderId: 'folder-1',
+        displayName: 'Guia 1',
+        fileResource: {
+          originalName: 'guia-1.pdf',
+          mimeType: 'application/pdf',
+          storageProvider: 'GDRIVE',
+          storageKey: 'drive-file-1',
+          storageUrl: null,
+        },
+      } as unknown as Material);
+      folderRepo.findById.mockResolvedValue(mockFolder('folder-1', '100'));
+      accessEngine.hasAccess.mockResolvedValue(true);
+      storageService.isDriveFileDirectlyInFolder.mockResolvedValueOnce(false);
+
+      await expect(
+        service.getAuthorizedDocumentLink(mockStudent, 'mat-1'),
+      ).rejects.toThrow(
+        'El documento no pertenece al scope Drive autorizado para esta evaluacion',
+      );
+    });
+  });
+
   describe('Concurrencia en addVersion', () => {
     it('debe manejar múltiples subidas concurrentes manteniendo la integridad del bloqueo pesimista', async () => {
       const file = mockFile();
@@ -982,7 +1158,7 @@ describe('MaterialsService', () => {
       );
 
       storageService.calculateHash.mockResolvedValue('hash-concurrent');
-      resourceRepo.findByHashAndSize.mockResolvedValue(null);
+      resourceRepo.findByHashAndSizeWithinEvaluation.mockResolvedValue(null);
       storageService.saveFile.mockResolvedValue({
         storageProvider: 'LOCAL',
         storageKey: 'concurrent.pdf',

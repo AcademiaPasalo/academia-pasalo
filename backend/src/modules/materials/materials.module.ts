@@ -26,6 +26,7 @@ import { EnrollmentsModule } from '@modules/enrollments/enrollments.module';
 import { CoursesModule } from '@modules/courses/courses.module';
 import { ClassEventsModule } from '@modules/events/class-events.module';
 import { NotificationsModule } from '@modules/notifications/notifications.module';
+import { MediaAccessModule } from '@modules/media-access/media-access.module';
 
 @Module({
   imports: [
@@ -43,6 +44,7 @@ import { NotificationsModule } from '@modules/notifications/notifications.module
     EnrollmentsModule,
     CoursesModule,
     ClassEventsModule,
+    MediaAccessModule,
     AuditModule,
     NotificationsModule,
   ],

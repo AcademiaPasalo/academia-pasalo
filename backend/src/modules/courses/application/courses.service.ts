@@ -56,6 +56,19 @@ import {
 } from '@modules/courses/domain/student-course.constants';
 import { ROLE_CODES } from '@common/constants/role-codes.constants';
 import { ACCESS_MESSAGES } from '@common/constants/access-messages.constants';
+import {
+  MEDIA_ACCESS_MODES,
+  MEDIA_CONTENT_KINDS,
+  MEDIA_VIDEO_LINK_MODES,
+} from '@modules/media-access/domain/media-access.constants';
+import {
+  buildDrivePreviewUrl,
+  extractDriveFileIdFromUrl,
+} from '@modules/media-access/domain/media-access-url.util';
+import { STORAGE_PROVIDER_CODES } from '@modules/materials/domain/material.constants';
+import { AuthorizedCourseIntroVideoLinkDto } from '@modules/courses/dto/authorized-course-intro-video-link.dto';
+import { MediaAccessMembershipDispatchService } from '@modules/media-access/application/media-access-membership-dispatch.service';
+import { MEDIA_ACCESS_SYNC_SOURCES } from '@modules/media-access/domain/media-access.constants';
 
 type EvaluationWithAccess = Evaluation & {
   enrollmentEvaluations?: EnrollmentEvaluation[];
@@ -91,6 +104,7 @@ export class CoursesService {
     private readonly evaluationRepository: EvaluationRepository,
     private readonly cyclesService: CyclesService,
     private readonly cacheService: RedisCacheService,
+    private readonly mediaAccessMembershipDispatchService: MediaAccessMembershipDispatchService,
   ) {}
 
   async findAllCourses(): Promise<Course[]> {
@@ -316,6 +330,19 @@ export class CoursesService {
     await this.cacheService.invalidateGroup(
       COURSE_CACHE_KEYS.GLOBAL_PROFESSOR_LIST_GROUP,
     );
+
+    const evaluationIds =
+      await this.listEvaluationIdsByCourseCycle(courseCycleId);
+    await this.mediaAccessMembershipDispatchService.enqueueGrantForUserCourseCycles(
+      professorUserId,
+      [courseCycleId],
+      MEDIA_ACCESS_SYNC_SOURCES.PROFESSOR_ASSIGNED_COURSE_CYCLE,
+    );
+    await this.mediaAccessMembershipDispatchService.enqueueGrantForUserEvaluations(
+      professorUserId,
+      evaluationIds,
+      MEDIA_ACCESS_SYNC_SOURCES.PROFESSOR_ASSIGNED_COURSE_CYCLE,
+    );
   }
 
   async revokeProfessorFromCourseCycle(
@@ -341,6 +368,35 @@ export class CoursesService {
     await this.cacheService.invalidateGroup(
       COURSE_CACHE_KEYS.GLOBAL_PROFESSOR_LIST_GROUP,
     );
+
+    const evaluationIds =
+      await this.listEvaluationIdsByCourseCycle(courseCycleId);
+    await this.mediaAccessMembershipDispatchService.enqueueRevokeForUserCourseCycles(
+      professorUserId,
+      [courseCycleId],
+      MEDIA_ACCESS_SYNC_SOURCES.PROFESSOR_REVOKED_COURSE_CYCLE,
+    );
+    await this.mediaAccessMembershipDispatchService.enqueueRevokeForUserEvaluations(
+      professorUserId,
+      evaluationIds,
+      MEDIA_ACCESS_SYNC_SOURCES.PROFESSOR_REVOKED_COURSE_CYCLE,
+    );
+  }
+
+  private async listEvaluationIdsByCourseCycle(
+    courseCycleId: string,
+  ): Promise<string[]> {
+    const rows = await this.dataSource.query<Array<{ id: string }>>(
+      `
+        SELECT id
+        FROM evaluation
+        WHERE course_cycle_id = ?
+      `,
+      [courseCycleId],
+    );
+    return rows
+      .map((row) => String(row.id || '').trim())
+      .filter((id) => id.length > 0);
   }
 
   async getProfessorsByCourseCycle(courseCycleId: string): Promise<User[]> {
@@ -533,46 +589,151 @@ export class CoursesService {
       courseCode: rawData.cycle.course.code,
       cycleCode: rawData.cycle.academicCycle.code,
       isCurrentCycle: isCurrent,
-      evaluations: rawData.evaluations.map((ev) => {
-        const evStartDate = new Date(ev.startDate);
-        const evEndDate = new Date(ev.endDate);
+      evaluations: this.filterOutBankEvaluations(rawData.evaluations).map(
+        (ev) => {
+          const evStartDate = new Date(ev.startDate);
+          const evEndDate = new Date(ev.endDate);
 
-        const access =
-          ev.enrollmentEvaluations && ev.enrollmentEvaluations.length > 0
-            ? ev.enrollmentEvaluations[0]
-            : null;
+          const access =
+            ev.enrollmentEvaluations && ev.enrollmentEvaluations.length > 0
+              ? ev.enrollmentEvaluations[0]
+              : null;
 
-        const statusDto = new EvaluationStatusDto();
+          const statusDto = new EvaluationStatusDto();
 
-        if (!access || !access.isActive) {
-          statusDto.status = EVALUATION_ACCESS_STATUS_CODES.LOCKED;
-          statusDto.hasAccess = false;
-          statusDto.accessStart = null;
-          statusDto.accessEnd = null;
-        } else {
-          statusDto.hasAccess = true;
-          statusDto.accessStart = new Date(access.accessStartDate);
-          statusDto.accessEnd = new Date(access.accessEndDate);
-
-          if (now > statusDto.accessEnd) {
-            statusDto.status = EVALUATION_ACCESS_STATUS_CODES.COMPLETED;
-          } else if (now < statusDto.accessStart) {
-            statusDto.status = EVALUATION_ACCESS_STATUS_CODES.UPCOMING;
+          if (!access || !access.isActive) {
+            statusDto.status = EVALUATION_ACCESS_STATUS_CODES.LOCKED;
+            statusDto.hasAccess = false;
+            statusDto.accessStart = null;
+            statusDto.accessEnd = null;
           } else {
-            statusDto.status = EVALUATION_ACCESS_STATUS_CODES.IN_PROGRESS;
-          }
-        }
+            statusDto.hasAccess = true;
+            statusDto.accessStart = new Date(access.accessStartDate);
+            statusDto.accessEnd = new Date(access.accessEndDate);
 
-        return {
-          id: ev.id,
-          name: ev.name ?? '',
-          description: null as string | null,
-          evaluationType: ev.evaluationType.name,
-          startDate: evStartDate,
-          endDate: evEndDate,
-          userStatus: statusDto,
-        };
-      }),
+            if (now > statusDto.accessEnd) {
+              statusDto.status = EVALUATION_ACCESS_STATUS_CODES.COMPLETED;
+            } else if (now < statusDto.accessStart) {
+              statusDto.status = EVALUATION_ACCESS_STATUS_CODES.UPCOMING;
+            } else {
+              statusDto.status = EVALUATION_ACCESS_STATUS_CODES.IN_PROGRESS;
+            }
+          }
+
+          return {
+            id: ev.id,
+            name: ev.name ?? '',
+            description: null as string | null,
+            evaluationType: ev.evaluationType.name,
+            startDate: evStartDate,
+            endDate: evEndDate,
+            userStatus: statusDto,
+          };
+        },
+      ),
+    };
+  }
+
+  async updateCourseCycleIntroVideo(
+    courseCycleId: string,
+    introVideoUrl?: string | null,
+  ): Promise<void> {
+    const cycle = await this.courseCycleRepository.findById(courseCycleId);
+    if (!cycle) {
+      throw new NotFoundException('Ciclo del curso no encontrado');
+    }
+
+    const normalizedUrl = String(introVideoUrl || '').trim();
+    if (!normalizedUrl) {
+      await this.dataSource.query(
+        `
+          UPDATE course_cycle
+          SET intro_video_url = NULL,
+              intro_video_file_id = NULL
+          WHERE id = ?
+        `,
+        [courseCycleId],
+      );
+      await this.cacheService.invalidateGroup(
+        COURSE_CACHE_KEYS.CONTENT_BY_CYCLE_GROUP(courseCycleId),
+      );
+      return;
+    }
+
+    const introVideoFileId = extractDriveFileIdFromUrl(normalizedUrl);
+    if (!introVideoFileId) {
+      throw new BadRequestException(
+        'La URL del video introductorio debe ser un enlace de Google Drive valido',
+      );
+    }
+
+    await this.dataSource.query(
+      `
+        UPDATE course_cycle
+        SET intro_video_url = ?,
+            intro_video_file_id = ?
+        WHERE id = ?
+      `,
+      [normalizedUrl, introVideoFileId, courseCycleId],
+    );
+
+    await this.cacheService.invalidateGroup(
+      COURSE_CACHE_KEYS.CONTENT_BY_CYCLE_GROUP(courseCycleId),
+    );
+  }
+
+  async getAuthorizedCourseIntroVideoLink(
+    user: User,
+    courseCycleId: string,
+    requesterActiveRole: string | undefined,
+  ): Promise<AuthorizedCourseIntroVideoLinkDto> {
+    await this.assertCourseCycleExists(courseCycleId);
+    await this.assertCanAccessCourseCycleIntroVideo(
+      user.id,
+      courseCycleId,
+      requesterActiveRole,
+    );
+
+    const rows = await this.dataSource.query<
+      Array<{ introVideoUrl: string | null; introVideoFileId: string | null }>
+    >(
+      `
+        SELECT
+          intro_video_url AS introVideoUrl,
+          intro_video_file_id AS introVideoFileId
+        FROM course_cycle
+        WHERE id = ?
+        LIMIT 1
+      `,
+      [courseCycleId],
+    );
+    const row = rows[0];
+    if (!row) {
+      throw new NotFoundException('Ciclo del curso no encontrado');
+    }
+
+    const driveFileId =
+      String(row.introVideoFileId || '').trim() ||
+      extractDriveFileIdFromUrl(String(row.introVideoUrl || ''));
+    if (!driveFileId) {
+      throw new NotFoundException(
+        'Video introductorio no disponible para este curso',
+      );
+    }
+
+    const url = buildDrivePreviewUrl(driveFileId);
+
+    return {
+      contentKind: MEDIA_CONTENT_KINDS.VIDEO,
+      accessMode: MEDIA_ACCESS_MODES.DIRECT_URL,
+      courseCycleId,
+      driveFileId,
+      url,
+      expiresAt: null,
+      requestedMode: MEDIA_VIDEO_LINK_MODES.EMBED,
+      fileName: null,
+      mimeType: null,
+      storageProvider: STORAGE_PROVIDER_CODES.GDRIVE,
     };
   }
 
@@ -614,16 +775,18 @@ export class CoursesService {
       userId,
     );
 
+    const visibleEvaluations = this.filterOutBankEvaluations(
+      evaluations as EvaluationWithAccess[],
+    );
+
     return {
       courseCycleId: accessContext.cycle.id,
       cycleCode: accessContext.cycle.academicCycle.code,
       canViewPreviousCycles: accessContext.canViewPreviousCycles,
-      evaluations: evaluations.map((evaluation) => {
+      evaluations: visibleEvaluations.map((evaluation) => {
         const startDate = new Date(evaluation.startDate);
         const endDate = new Date(evaluation.endDate);
-        const hasAccess = this.hasActiveAccess(
-          evaluation as EvaluationWithAccess,
-        );
+        const hasAccess = this.hasActiveAccess(evaluation);
 
         let label: StudentEvaluationLabel;
         if (now > endDate) {
@@ -712,12 +875,14 @@ export class CoursesService {
       userId,
     );
 
+    const visibleEvaluations = this.filterOutBankEvaluations(
+      evaluations as EvaluationWithAccess[],
+    );
+
     return {
       cycleCode: previousCycleCode,
-      evaluations: evaluations.map((evaluation) => {
-        const hasAccess = this.hasActiveAccess(
-          evaluation as EvaluationWithAccess,
-        );
+      evaluations: visibleEvaluations.map((evaluation) => {
+        const hasAccess = this.hasActiveAccess(evaluation);
         return {
           id: evaluation.id,
           evaluationTypeCode: evaluation.evaluationType.code,
@@ -759,7 +924,10 @@ export class CoursesService {
       items = structure.map((item) => ({
         evaluationTypeId: String(item.evaluationTypeId),
         evaluationTypeCode: item.evaluationType.code,
-        evaluationTypeName: item.evaluationType.name,
+        evaluationTypeName: this.getBankEvaluationTypePluralName(
+          item.evaluationType.code,
+          item.evaluationType.name,
+        ),
       }));
 
       await this.cacheService.set(
@@ -830,12 +998,56 @@ export class CoursesService {
     return rows[0]?.typeCode ?? null;
   }
 
+  private async assertCanAccessCourseCycleIntroVideo(
+    userId: string,
+    courseCycleId: string,
+    requesterActiveRole: string | undefined,
+  ): Promise<void> {
+    if (
+      requesterActiveRole === ROLE_CODES.ADMIN ||
+      requesterActiveRole === ROLE_CODES.SUPER_ADMIN
+    ) {
+      return;
+    }
+
+    if (requesterActiveRole === ROLE_CODES.PROFESSOR) {
+      const isAssigned =
+        await this.courseCycleProfessorRepository.isProfessorAssigned(
+          courseCycleId,
+          userId,
+        );
+      if (!isAssigned) {
+        throw new ForbiddenException(ACCESS_MESSAGES.COURSE_CONTENT_FORBIDDEN);
+      }
+      return;
+    }
+
+    const enrollmentTypeCode = await this.getActiveEnrollmentTypeCode(
+      userId,
+      courseCycleId,
+    );
+    if (!enrollmentTypeCode) {
+      throw new ForbiddenException('No tienes matricula activa en este curso.');
+    }
+  }
+
   private hasActiveAccess(evaluation: EvaluationWithAccess): boolean {
     const access =
       evaluation.enrollmentEvaluations && evaluation.enrollmentEvaluations[0]
         ? evaluation.enrollmentEvaluations[0]
         : null;
     return !!access && access.isActive;
+  }
+
+  private filterOutBankEvaluations(
+    evaluations: EvaluationWithAccess[],
+  ): EvaluationWithAccess[] {
+    return (evaluations || []).filter(
+      (evaluation) =>
+        String(evaluation.evaluationType?.code || '')
+          .trim()
+          .toUpperCase() !== EVALUATION_TYPE_CODES.BANCO_ENUNCIADOS,
+    );
   }
 
   private buildEvaluationShortName(evaluation: Evaluation): string {
@@ -854,6 +1066,37 @@ export class CoursesService {
       .filter((word) => word.length > 0)
       .map((word) => word.charAt(0).toLocaleUpperCase('es-PE') + word.slice(1))
       .join(' ');
+  }
+
+  private getBankEvaluationTypePluralName(
+    evaluationTypeCode: string,
+    evaluationTypeName: string,
+  ): string {
+    const code = String(evaluationTypeCode || '')
+      .trim()
+      .toUpperCase();
+    switch (code) {
+      case 'PC':
+        return 'Practicas Calificadas';
+      case 'EX':
+        return 'Examenes';
+      case 'PD':
+        return 'Practicas Dirigidas';
+      case 'LAB':
+        return 'Laboratorios';
+      case 'TUTORING':
+        return 'Tutorias Especializadas';
+      default: {
+        const normalizedName = String(evaluationTypeName || '').trim();
+        if (!normalizedName) {
+          return normalizedName;
+        }
+        if (/[sS]$/.test(normalizedName)) {
+          return normalizedName;
+        }
+        return `${normalizedName}s`;
+      }
+    }
   }
 
   private async assertUserIsActiveProfessor(userId: string): Promise<void> {

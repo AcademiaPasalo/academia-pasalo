@@ -91,7 +91,7 @@ export default function ContactSection() {
           <div className="flex items-center gap-2">
             {/* Facebook */}
             <a
-              href="#"
+              href="https://www.facebook.com/profile.php?id=61571421159980"
               target="_blank"
               rel="noopener noreferrer"
               className="p-2 md:p-3 rounded-full outline outline-2 outline-offset-[-2px] outline-stroke-primary flex items-center hover:bg-bg-secondary transition-colors"
@@ -111,7 +111,7 @@ export default function ContactSection() {
 
             {/* Instagram */}
             <a
-              href="#"
+              href="https://www.instagram.com/academia.pasalo"
               target="_blank"
               rel="noopener noreferrer"
               className="p-2 md:p-3 rounded-full outline outline-2 outline-offset-[-2px] outline-stroke-primary flex items-center hover:bg-bg-secondary transition-colors"
@@ -133,7 +133,7 @@ export default function ContactSection() {
 
             {/* LinkedIn */}
             <a
-              href="#"
+              href="https://www.linkedin.com/company/academia-p%C3%A1salo"
               target="_blank"
               rel="noopener noreferrer"
               className="p-2 md:p-3 rounded-full outline outline-2 outline-offset-[-2px] outline-stroke-primary flex items-center hover:bg-bg-secondary transition-colors"

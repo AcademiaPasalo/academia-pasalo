@@ -1,4 +1,4 @@
-import { Processor, WorkerHost } from '@nestjs/bullmq';
+import { OnWorkerEvent, Processor, WorkerHost } from '@nestjs/bullmq';
 import { Logger } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import { Job, UnrecoverableError } from 'bullmq';
@@ -69,6 +69,15 @@ export class NotificationDispatchProcessor extends WorkerHost {
           jobId: job.id,
         });
     }
+  }
+
+  @OnWorkerEvent('error')
+  onWorkerError(error: Error): void {
+    this.logger.warn({
+      context: NotificationDispatchProcessor.name,
+      message: 'Worker notifications emitio error',
+      error: error instanceof Error ? error.message : String(error),
+    });
   }
 
   private async handleDispatch(job: Job<DispatchPayload>): Promise<void> {

@@ -4,6 +4,7 @@ import {
   Body,
   Get,
   Param,
+  Query,
   HttpStatus,
   HttpCode,
   UploadedFile,
@@ -17,6 +18,7 @@ import { UploadMaterialDto } from '@modules/materials/dto/upload-material.dto';
 import { CreateMaterialFolderDto } from '@modules/materials/dto/create-material-folder.dto';
 import { CreateFolderTemplateDto } from '@modules/materials/dto/create-folder-template.dto';
 import { RequestDeletionDto } from '@modules/materials/dto/request-deletion.dto';
+import { GetAuthorizedDocumentLinkQueryDto } from '@modules/materials/dto/get-authorized-document-link-query.dto';
 import { Auth } from '@common/decorators/auth.decorator';
 import { Roles } from '@common/decorators/roles.decorator';
 import { CurrentUser } from '@common/decorators/current-user.decorator';
@@ -148,6 +150,26 @@ export class MaterialsController {
     });
 
     return stream;
+  }
+
+  @Get(':id/authorized-link')
+  @Roles(
+    ROLE_CODES.STUDENT,
+    ROLE_CODES.ADMIN,
+    ROLE_CODES.PROFESSOR,
+    ROLE_CODES.SUPER_ADMIN,
+  )
+  @ResponseMessage('URL autorizada de documento obtenida exitosamente')
+  async getAuthorizedDocumentLink(
+    @CurrentUser() user: UserWithSession,
+    @Param('id') materialId: string,
+    @Query() query: GetAuthorizedDocumentLinkQueryDto,
+  ) {
+    return await this.materialsService.getAuthorizedDocumentLink(
+      user,
+      materialId,
+      query.mode,
+    );
   }
 
   @Get(':id/last-modified')

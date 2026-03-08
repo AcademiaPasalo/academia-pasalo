@@ -1,4 +1,4 @@
-import { Processor, WorkerHost } from '@nestjs/bullmq';
+import { OnWorkerEvent, Processor, WorkerHost } from '@nestjs/bullmq';
 import { Logger, InternalServerErrorException } from '@nestjs/common';
 import { Job } from 'bullmq';
 import { QUEUES } from '@infrastructure/queue/queue.constants';
@@ -32,6 +32,15 @@ export class AuditCleanupProcessor extends WorkerHost {
     if (job.name === AUDIT_JOB_NAMES.CLEANUP_OLD_LOGS) {
       await this.handleCleanup(job.name);
     }
+  }
+
+  @OnWorkerEvent('error')
+  onWorkerError(error: Error): void {
+    this.logger.warn({
+      context: AuditCleanupProcessor.name,
+      message: 'Worker audit emitio error',
+      error: error instanceof Error ? error.message : String(error),
+    });
   }
 
   private async handleCleanup(jobName: string): Promise<void> {

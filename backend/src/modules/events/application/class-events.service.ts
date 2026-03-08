@@ -29,6 +29,19 @@ import { ClassEventsPermissionService } from '@modules/events/application/class-
 import { ClassEventsSchedulingService } from '@modules/events/application/class-events-scheduling.service';
 import { ClassEventsCacheService } from '@modules/events/application/class-events-cache.service';
 import { NotificationsDispatchService } from '@modules/notifications/application/notifications-dispatch.service';
+import { STORAGE_PROVIDER_CODES } from '@modules/materials/domain/material.constants';
+import { AuthorizedMediaLinkDto } from '@modules/media-access/dto/authorized-media-link.dto';
+import {
+  MEDIA_ACCESS_MODES,
+  MEDIA_CONTENT_KINDS,
+  MEDIA_VIDEO_LINK_MODES,
+} from '@modules/media-access/domain/media-access.constants';
+import {
+  buildDrivePreviewUrl,
+  extractDriveFileIdFromUrl,
+} from '@modules/media-access/domain/media-access-url.util';
+import { DriveAccessScopeService } from '@modules/media-access/application/drive-access-scope.service';
+import { StorageService } from '@infrastructure/storage/storage.service';
 
 @Injectable()
 export class ClassEventsService {
@@ -49,6 +62,8 @@ export class ClassEventsService {
     private readonly cacheModuleService: ClassEventsCacheService,
     private readonly cacheService: RedisCacheService,
     private readonly notificationsDispatchService: NotificationsDispatchService,
+    private readonly driveAccessScopeService: DriveAccessScopeService,
+    private readonly storageService: StorageService,
   ) {}
 
   async createEvent(
@@ -220,6 +235,62 @@ export class ClassEventsService {
     return event;
   }
 
+  async getAuthorizedRecordingLink(
+    user: User,
+    eventId: string,
+  ): Promise<AuthorizedMediaLinkDto> {
+    const event = await this.getEventDetail(eventId, user.id);
+    if (!event.recordingUrl && !event.recordingFileId) {
+      throw new NotFoundException(
+        'Grabacion no disponible para este evento de clase',
+      );
+    }
+
+    const driveFileId =
+      String(event.recordingFileId || '').trim() ||
+      extractDriveFileIdFromUrl(event.recordingUrl || '');
+    if (!driveFileId) {
+      throw new BadRequestException(
+        'Grabacion sin ID de archivo Drive. Configure URL de Drive para control de acceso',
+      );
+    }
+    const scope = await this.driveAccessScopeService.resolveForEvaluation(
+      event.evaluationId,
+    );
+    const expectedVideosFolderId = scope.persisted?.driveVideosFolderId;
+    if (!expectedVideosFolderId) {
+      throw new ForbiddenException(
+        'El scope Drive de la evaluacion no esta provisionado para videos',
+      );
+    }
+
+    const isInExpectedFolder =
+      await this.storageService.isDriveFileDirectlyInFolder(
+        driveFileId,
+        expectedVideosFolderId,
+      );
+    if (!isInExpectedFolder) {
+      throw new ForbiddenException(
+        'La grabacion no pertenece al scope Drive autorizado para esta evaluacion',
+      );
+    }
+
+    const url = buildDrivePreviewUrl(driveFileId);
+
+    return {
+      contentKind: MEDIA_CONTENT_KINDS.VIDEO,
+      accessMode: MEDIA_ACCESS_MODES.DIRECT_URL,
+      evaluationId: event.evaluationId,
+      driveFileId,
+      url,
+      expiresAt: null,
+      requestedMode: MEDIA_VIDEO_LINK_MODES.EMBED,
+      fileName: null,
+      mimeType: null,
+      storageProvider: driveFileId ? STORAGE_PROVIDER_CODES.GDRIVE : null,
+    };
+  }
+
   async updateEvent(
     eventId: string,
     user: User,
@@ -255,6 +326,10 @@ export class ClassEventsService {
     if (liveMeetingUrl !== undefined)
       updateData.liveMeetingUrl = liveMeetingUrl;
     if (recordingUrl !== undefined) updateData.recordingUrl = recordingUrl;
+    if (recordingUrl !== undefined) {
+      const extractedFileId = extractDriveFileIdFromUrl(recordingUrl);
+      updateData.recordingFileId = extractedFileId;
+    }
 
     if (recordingUrl !== undefined) {
       const readyStatusId = await this.getRecordingStatusIdByCode(
@@ -456,10 +531,14 @@ export class ClassEventsService {
     return Promise.resolve(false);
   }
 
-  getEventAccess(): ClassEventAccess {
+  getEventAccess(event: ClassEvent): ClassEventAccess {
+    const recordingCode = String(event.recordingStatus?.code || '').trim();
+    const canWatchRecording =
+      recordingCode === CLASS_EVENT_RECORDING_STATUS_CODES.READY;
+
     return {
       canJoinLive: false,
-      canWatchRecording: false,
+      canWatchRecording,
       canCopyLiveLink: false,
       canCopyRecordingLink: false,
     };

@@ -71,10 +71,13 @@ export class FeedbackService {
         );
       }
       const uniqueName = `feedback-${Date.now()}-${file.originalname}`;
+      const targetDriveFolderId =
+        await this.resolveFeedbackDriveTargetFolderId();
       const storedPhoto = await this.storageService.saveFile(
         uniqueName,
         file.buffer,
         file.mimetype,
+        targetDriveFolderId ? { targetDriveFolderId } : undefined,
       );
       photoUrl = storedPhoto.storageUrl ?? storedPhoto.storageKey;
     } else if (dto.photoSource === PhotoSource.PROFILE) {
@@ -172,5 +175,15 @@ export class FeedbackService {
   private async invalidatePublicCache(cycleId: string): Promise<void> {
     const key = this.getPublicCacheKey(cycleId);
     await this.cacheService.del(key);
+  }
+
+  private async resolveFeedbackDriveTargetFolderId(): Promise<string | null> {
+    if (!this.storageService.isGoogleDriveStorageEnabled()) {
+      return null;
+    }
+
+    return await this.storageService.getOrCreateDriveFolderUnderRoot(
+      technicalSettings.uploads.feedback.feedbackDriveFolderName,
+    );
   }
 }

@@ -172,7 +172,7 @@ SELECT
   NULL
 FROM course_cycle cc
 INNER JOIN evaluation_type et
-  ON et.code IN ('PC', 'EX', 'TA', 'PD')
+  ON et.code IN ('PC', 'EX', 'PD')
 WHERE cc.course_id IN (@course_alg_id, @course_cal_id, @course_fis_id, @course_qui_id)
   AND cc.academic_cycle_id IN (
     @current_cycle_id,

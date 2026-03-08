@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { BullModule } from '@nestjs/bullmq';
 import { UsersService } from '@modules/users/application/users.service';
 import { IdentitySecurityService } from '@modules/users/application/identity-security.service';
 import { UsersController } from '@modules/users/presentation/users.controller';
@@ -12,10 +13,12 @@ import { RoleRepository } from '@modules/users/infrastructure/role.repository';
 import { UserSessionRepository } from '@modules/auth/infrastructure/user-session.repository';
 import { SessionStatusRepository } from '@modules/auth/infrastructure/session-status.repository';
 import { RedisCacheModule } from '@infrastructure/cache/redis-cache.module';
+import { QUEUES } from '@infrastructure/queue/queue.constants';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([User, Role, UserSession, SessionStatus]),
+    BullModule.registerQueue({ name: QUEUES.MEDIA_ACCESS }),
     RedisCacheModule,
   ],
   controllers: [UsersController],

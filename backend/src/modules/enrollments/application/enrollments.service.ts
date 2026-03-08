@@ -29,6 +29,8 @@ import {
 } from '@modules/enrollments/domain/enrollment.constants';
 import { EVALUATION_TYPE_CODES } from '@modules/evaluations/domain/evaluation.constants';
 import { CLASS_EVENT_CACHE_KEYS } from '@modules/events/domain/class-event.constants';
+import { MediaAccessMembershipDispatchService } from '@modules/media-access/application/media-access-membership-dispatch.service';
+import { MEDIA_ACCESS_SYNC_SOURCES } from '@modules/media-access/domain/media-access.constants';
 
 @Injectable()
 export class EnrollmentsService {
@@ -43,6 +45,7 @@ export class EnrollmentsService {
     private readonly enrollmentEvaluationRepository: EnrollmentEvaluationRepository,
     private readonly enrollmentTypeRepository: EnrollmentTypeRepository,
     private readonly cacheService: RedisCacheService,
+    private readonly mediaAccessMembershipDispatchService: MediaAccessMembershipDispatchService,
   ) {}
 
   async findMyEnrollments(userId: string): Promise<MyEnrollmentsResponseDto[]> {
@@ -83,7 +86,7 @@ export class EnrollmentsService {
               name: enrollment.courseCycle.course.courseType.name,
             },
             cycleLevel: {
-              name: `${enrollment.courseCycle.course.cycleLevel.levelNumber}° Ciclo`,
+              name: `${enrollment.courseCycle.course.cycleLevel.levelNumber} Ciclo`,
             },
           },
           academicCycle: {
@@ -109,198 +112,228 @@ export class EnrollmentsService {
   }
 
   async enroll(dto: CreateEnrollmentDto): Promise<Enrollment> {
-    return await this.dataSource.transaction(async (manager) => {
-      const existing =
-        await this.enrollmentRepository.findActiveByUserAndCourseCycle(
-          dto.userId,
-          dto.courseCycleId,
-          manager,
-        );
+    const transactionResult = await this.dataSource.transaction(
+      async (manager) => {
+        const existing =
+          await this.enrollmentRepository.findActiveByUserAndCourseCycle(
+            dto.userId,
+            dto.courseCycleId,
+            manager,
+          );
 
-      if (existing) {
-        throw new ConflictException(
-          'El usuario ya cuenta con una matrícula activa en este curso.',
-        );
-      }
-
-      const type = await this.enrollmentTypeRepository.findByCode(
-        dto.enrollmentTypeCode,
-        manager,
-      );
-      if (!type) {
-        throw new BadRequestException('Tipo de matrícula no válido.');
-      }
-
-      if (
-        type.code === ENROLLMENT_TYPE_CODES.PARTIAL &&
-        (!dto.evaluationIds || dto.evaluationIds.length === 0)
-      ) {
-        throw new BadRequestException(
-          'Las matrículas parciales deben especificar al menos una evaluación.',
-        );
-      }
-
-      const status = await this.enrollmentStatusRepository.findByCode(
-        ENROLLMENT_STATUS_CODES.ACTIVE,
-        manager,
-      );
-      if (!status) {
-        throw new InternalServerErrorException(
-          'Error de configuración del sistema.',
-        );
-      }
-
-      const courseCycle = await manager.getRepository(CourseCycle).findOne({
-        where: { id: dto.courseCycleId },
-        relations: { academicCycle: true },
-        lock: { mode: 'pessimistic_read' },
-      });
-
-      if (!courseCycle || !courseCycle.academicCycle) {
-        throw new InternalServerErrorException(
-          'Inconsistencia en datos del ciclo.',
-        );
-      }
-
-      const now = new Date();
-      const cycleEndDate = toUtcEndOfDay(courseCycle.academicCycle.endDate);
-
-      if (getEpoch(cycleEndDate) < getEpoch(now)) {
-        this.logger.warn({
-          message: 'Intento de matrícula en ciclo finalizado',
-          courseCycleId: dto.courseCycleId,
-          academicCycleCode: courseCycle.academicCycle.code,
-          cycleEndDate: cycleEndDate.toISOString(),
-          userId: dto.userId,
-        });
-        throw new BadRequestException(
-          `No se puede matricular en el ciclo ${courseCycle.academicCycle.code} porque ya ha finalizado.`,
-        );
-      }
-
-      const enrollment = await this.enrollmentRepository.create(
-        {
-          userId: dto.userId,
-          courseCycleId: dto.courseCycleId,
-          enrollmentStatusId: status.id,
-          enrollmentTypeId: type.id,
-          enrolledAt: new Date(),
-        },
-        manager,
-      );
-
-      const courseCycleIdsToFetch: string[] = [dto.courseCycleId];
-
-      if (
-        dto.historicalCourseCycleIds &&
-        dto.historicalCourseCycleIds.length > 0
-      ) {
-        const pastCycles = await manager.getRepository(CourseCycle).find({
-          where: {
-            id: In(dto.historicalCourseCycleIds),
-            courseId: courseCycle.courseId,
-            academicCycle: {
-              startDate: LessThan(courseCycle.academicCycle.startDate),
-            },
-          },
-        });
-
-        if (pastCycles.length !== dto.historicalCourseCycleIds.length) {
-          throw new BadRequestException(
-            'Uno o más ciclos históricos no son válidos o no pertenecen al curso.',
+        if (existing) {
+          throw new ConflictException(
+            'El usuario ya cuenta con una matricula activa en este curso.',
           );
         }
 
-        courseCycleIdsToFetch.push(...pastCycles.map((pc) => pc.id));
-      }
+        const type = await this.enrollmentTypeRepository.findByCode(
+          dto.enrollmentTypeCode,
+          manager,
+        );
+        if (!type) {
+          throw new BadRequestException('Tipo de matricula no valido.');
+        }
 
-      const allEvaluations = await manager.getRepository(Evaluation).find({
-        where: { courseCycleId: In(courseCycleIdsToFetch) },
-        relations: { evaluationType: true },
-      });
-
-      if (allEvaluations.length > 0) {
-        let evaluationsToGrant: Evaluation[] = [];
-
-        if (type.code === ENROLLMENT_TYPE_CODES.FULL) {
-          evaluationsToGrant = allEvaluations;
-        } else {
-          const requestedIds = new Set(dto.evaluationIds || []);
-          const academicEvaluations = allEvaluations.filter((e) =>
-            requestedIds.has(e.id),
+        if (
+          type.code === ENROLLMENT_TYPE_CODES.PARTIAL &&
+          (!dto.evaluationIds || dto.evaluationIds.length === 0)
+        ) {
+          throw new BadRequestException(
+            'Las matriculas parciales deben especificar al menos una evaluacion.',
           );
-          const bankEvaluation = allEvaluations.find(
-            (e) =>
-              e.evaluationType.code ===
-                EVALUATION_TYPE_CODES.BANCO_ENUNCIADOS &&
-              e.courseCycleId === dto.courseCycleId,
-          );
+        }
 
-          if (academicEvaluations.length === 0) {
+        const status = await this.enrollmentStatusRepository.findByCode(
+          ENROLLMENT_STATUS_CODES.ACTIVE,
+          manager,
+        );
+        if (!status) {
+          throw new InternalServerErrorException(
+            'Error de configuracion del sistema.',
+          );
+        }
+
+        const courseCycle = await manager.getRepository(CourseCycle).findOne({
+          where: { id: dto.courseCycleId },
+          relations: { academicCycle: true },
+          lock: { mode: 'pessimistic_read' },
+        });
+
+        if (!courseCycle || !courseCycle.academicCycle) {
+          throw new InternalServerErrorException(
+            'Inconsistencia en datos del ciclo.',
+          );
+        }
+
+        const now = new Date();
+        const cycleEndDate = toUtcEndOfDay(courseCycle.academicCycle.endDate);
+
+        if (getEpoch(cycleEndDate) < getEpoch(now)) {
+          this.logger.warn({
+            message: 'Intento de matricula en ciclo finalizado',
+            courseCycleId: dto.courseCycleId,
+            academicCycleCode: courseCycle.academicCycle.code,
+            cycleEndDate: cycleEndDate.toISOString(),
+            userId: dto.userId,
+          });
+          throw new BadRequestException(
+            `No se puede matricular en el ciclo ${courseCycle.academicCycle.code} porque ya ha finalizado.`,
+          );
+        }
+
+        const enrollment = await this.enrollmentRepository.create(
+          {
+            userId: dto.userId,
+            courseCycleId: dto.courseCycleId,
+            enrollmentStatusId: status.id,
+            enrollmentTypeId: type.id,
+            enrolledAt: new Date(),
+          },
+          manager,
+        );
+
+        const courseCycleIdsToFetch: string[] = [dto.courseCycleId];
+
+        if (
+          dto.historicalCourseCycleIds &&
+          dto.historicalCourseCycleIds.length > 0
+        ) {
+          const pastCycles = await manager.getRepository(CourseCycle).find({
+            where: {
+              id: In(dto.historicalCourseCycleIds),
+              courseId: courseCycle.courseId,
+              academicCycle: {
+                startDate: LessThan(courseCycle.academicCycle.startDate),
+              },
+            },
+          });
+
+          if (pastCycles.length !== dto.historicalCourseCycleIds.length) {
             throw new BadRequestException(
-              'Las evaluaciones solicitadas no son válidas para este ciclo.',
+              'Uno o mas ciclos historicos no son validos o no pertenecen al curso.',
             );
           }
 
-          evaluationsToGrant = [...academicEvaluations];
-
-          if (
-            bankEvaluation &&
-            !evaluationsToGrant.some(
-              (evaluation) => evaluation.id === bankEvaluation.id,
-            )
-          ) {
-            evaluationsToGrant.push(bankEvaluation);
-          }
+          courseCycleIdsToFetch.push(...pastCycles.map((pc) => pc.id));
         }
 
-        const unifiedAccessStartDate = toUtcStartOfDay(
-          courseCycle.academicCycle.startDate,
-        );
-        const unifiedAccessEndDate = toUtcEndOfDay(
-          courseCycle.academicCycle.endDate,
-        );
-        const accessEntries = evaluationsToGrant.map((evaluation) => {
-          return {
-            enrollmentId: enrollment.id,
-            evaluationId: evaluation.id,
-            accessStartDate: new Date(unifiedAccessStartDate),
-            accessEndDate: new Date(unifiedAccessEndDate),
-            isActive: true,
-          };
+        const allEvaluations = await manager.getRepository(Evaluation).find({
+          where: { courseCycleId: In(courseCycleIdsToFetch) },
+          relations: { evaluationType: true },
         });
 
-        await this.enrollmentEvaluationRepository.createMany(
-          accessEntries,
-          manager,
+        let grantedEvaluationIds: string[] = [];
+        if (allEvaluations.length > 0) {
+          let evaluationsToGrant: Evaluation[] = [];
+
+          if (type.code === ENROLLMENT_TYPE_CODES.FULL) {
+            evaluationsToGrant = allEvaluations;
+          } else {
+            const requestedIds = new Set(dto.evaluationIds || []);
+            const academicEvaluations = allEvaluations.filter((e) =>
+              requestedIds.has(e.id),
+            );
+            const bankEvaluation = allEvaluations.find(
+              (e) =>
+                e.evaluationType.code ===
+                  EVALUATION_TYPE_CODES.BANCO_ENUNCIADOS &&
+                e.courseCycleId === dto.courseCycleId,
+            );
+
+            if (academicEvaluations.length === 0) {
+              throw new BadRequestException(
+                'Las evaluaciones solicitadas no son validas para este ciclo.',
+              );
+            }
+
+            evaluationsToGrant = [...academicEvaluations];
+
+            if (
+              bankEvaluation &&
+              !evaluationsToGrant.some(
+                (evaluation) => evaluation.id === bankEvaluation.id,
+              )
+            ) {
+              evaluationsToGrant.push(bankEvaluation);
+            }
+          }
+
+          const unifiedAccessStartDate = toUtcStartOfDay(
+            courseCycle.academicCycle.startDate,
+          );
+          const unifiedAccessEndDate = toUtcEndOfDay(
+            courseCycle.academicCycle.endDate,
+          );
+          const accessEntries = evaluationsToGrant.map((evaluation) => {
+            return {
+              enrollmentId: enrollment.id,
+              evaluationId: evaluation.id,
+              accessStartDate: new Date(unifiedAccessStartDate),
+              accessEndDate: new Date(unifiedAccessEndDate),
+              isActive: true,
+            };
+          });
+
+          await this.enrollmentEvaluationRepository.createMany(
+            accessEntries,
+            manager,
+          );
+          grantedEvaluationIds = accessEntries.map((entry) =>
+            String(entry.evaluationId),
+          );
+        }
+
+        await this.cacheService.del(
+          ENROLLMENT_CACHE_KEYS.DASHBOARD(dto.userId),
         );
-      }
+        await this.cacheService.invalidateGroup(
+          ENROLLMENT_CACHE_KEYS.USER_ACCESS_GROUP(dto.userId),
+        );
+        await this.cacheService.invalidateGroup(
+          CLASS_EVENT_CACHE_KEYS.USER_SCHEDULE_GROUP(dto.userId),
+        );
 
-      await this.cacheService.del(ENROLLMENT_CACHE_KEYS.DASHBOARD(dto.userId));
-      await this.cacheService.invalidateGroup(
-        ENROLLMENT_CACHE_KEYS.USER_ACCESS_GROUP(dto.userId),
-      );
-      await this.cacheService.invalidateGroup(
-        CLASS_EVENT_CACHE_KEYS.USER_SCHEDULE_GROUP(dto.userId),
-      );
+        this.logger.log({
+          message: 'Matricula procesada exitosamente',
+          userId: dto.userId,
+          courseCycleId: dto.courseCycleId,
+          enrollmentId: enrollment.id,
+          grantedEvaluations: grantedEvaluationIds.length,
+          timestamp: new Date().toISOString(),
+        });
 
-      this.logger.log({
-        message: 'Matrícula procesada exitosamente',
-        userId: dto.userId,
-        courseCycleId: dto.courseCycleId,
-        enrollmentId: enrollment.id,
-        timestamp: new Date().toISOString(),
-      });
+        return {
+          enrollment,
+          grantedEvaluationIds,
+        };
+      },
+    );
 
-      return enrollment;
-    });
+    await this.mediaAccessMembershipDispatchService.enqueueGrantForUserEvaluations(
+      dto.userId,
+      transactionResult.grantedEvaluationIds,
+      MEDIA_ACCESS_SYNC_SOURCES.ENROLLMENT_CREATED,
+    );
+    await this.mediaAccessMembershipDispatchService.enqueueGrantForUserCourseCycles(
+      dto.userId,
+      [dto.courseCycleId],
+      MEDIA_ACCESS_SYNC_SOURCES.ENROLLMENT_CREATED_COURSE_CYCLE,
+    );
+
+    return transactionResult.enrollment;
   }
 
   async cancelEnrollment(enrollmentId: string): Promise<void> {
     const enrollment = await this.enrollmentRepository.findById(enrollmentId);
     if (!enrollment) {
-      throw new BadRequestException('Matrícula no encontrada.');
+      throw new BadRequestException('Matricula no encontrada.');
     }
+    const evaluationIdsToRevoke =
+      await this.enrollmentEvaluationRepository.findEvaluationIdsToRevokeAfterEnrollmentCancellation(
+        enrollment.userId,
+        enrollmentId,
+      );
 
     await this.enrollmentRepository.update(enrollmentId, {
       cancelledAt: new Date(),
@@ -315,11 +348,22 @@ export class EnrollmentsService {
     await this.cacheService.invalidateGroup(
       CLASS_EVENT_CACHE_KEYS.USER_SCHEDULE_GROUP(enrollment.userId),
     );
+    await this.mediaAccessMembershipDispatchService.enqueueRevokeForUserEvaluations(
+      enrollment.userId,
+      evaluationIdsToRevoke,
+      MEDIA_ACCESS_SYNC_SOURCES.ENROLLMENT_CANCELLED,
+    );
+    await this.mediaAccessMembershipDispatchService.enqueueRevokeForUserCourseCycles(
+      enrollment.userId,
+      [enrollment.courseCycleId],
+      MEDIA_ACCESS_SYNC_SOURCES.ENROLLMENT_CANCELLED_COURSE_CYCLE,
+    );
 
     this.logger.log({
-      message: 'Matrícula cancelada e invalidación de caché procesada',
+      message: 'Matricula cancelada e invalidacion de cache procesada',
       userId: enrollment.userId,
       enrollmentId,
+      revokedEvaluations: evaluationIdsToRevoke.length,
       timestamp: new Date().toISOString(),
     });
   }

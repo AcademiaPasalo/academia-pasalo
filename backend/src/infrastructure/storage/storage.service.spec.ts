@@ -121,7 +121,7 @@ describe('StorageService', () => {
     );
   });
 
-  it('should create uploads, objects and archivado folders under root on init', async () => {
+  it('should validate root folder on init without creating legacy uploads structure', async () => {
     const configService = createConfigService({
       STORAGE_PROVIDER: 'GDRIVE',
       GOOGLE_APPLICATION_CREDENTIALS: 'C:\\secret.json',
@@ -129,21 +129,13 @@ describe('StorageService', () => {
     });
     const service = new StorageService(configService);
     const mockClient = {
-      request: jest
-        .fn()
-        .mockResolvedValueOnce({
-          data: {
-            id: 'root-1',
-            mimeType: 'application/vnd.google-apps.folder',
-            trashed: false,
-          },
-        })
-        .mockResolvedValueOnce({ data: { files: [] } })
-        .mockResolvedValueOnce({ data: { id: 'uploads-id' } })
-        .mockResolvedValueOnce({ data: { files: [] } })
-        .mockResolvedValueOnce({ data: { id: 'objects-id' } })
-        .mockResolvedValueOnce({ data: { files: [] } })
-        .mockResolvedValueOnce({ data: { id: 'archivado-id' } }),
+      request: jest.fn().mockResolvedValueOnce({
+        data: {
+          id: 'root-1',
+          mimeType: 'application/vnd.google-apps.folder',
+          trashed: false,
+        },
+      }),
     };
     googleAuthMocks.__mockGetClient.mockResolvedValue(mockClient);
 
@@ -156,10 +148,7 @@ describe('StorageService', () => {
           req.method === 'POST' &&
           req.data?.mimeType === 'application/vnd.google-apps.folder',
       );
-    expect(createCalls).toHaveLength(3);
-    expect(createCalls[0].data.name).toBe('uploads');
-    expect(createCalls[1].data.name).toBe('objects');
-    expect(createCalls[2].data.name).toBe('archivado');
+    expect(createCalls).toHaveLength(0);
   });
 
   it('should upload files to Google Drive objects folder', async () => {

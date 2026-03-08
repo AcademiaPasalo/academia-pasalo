@@ -1,6 +1,9 @@
 import { ClassEventResponseDto } from '@modules/events/dto/class-event-response.dto';
 import { ClassEvent } from '@modules/events/domain/class-event.entity';
-import { CLASS_EVENT_STATUS } from '@modules/events/domain/class-event.constants';
+import {
+  CLASS_EVENT_RECORDING_STATUS_CODES,
+  CLASS_EVENT_STATUS,
+} from '@modules/events/domain/class-event.constants';
 
 describe('ClassEventResponseDto', () => {
   it('debe exponer URLs en el response', () => {
@@ -42,6 +45,10 @@ describe('ClassEventResponseDto', () => {
     expect(dto.canWatchRecording).toBe(false);
     expect(dto.canCopyLiveLink).toBe(false);
     expect(dto.canCopyRecordingLink).toBe(false);
+    expect(dto.sessionStatus).toBe(CLASS_EVENT_STATUS.PROGRAMADA);
+    expect(dto.recordingStatus).toBe(
+      CLASS_EVENT_RECORDING_STATUS_CODES.NOT_AVAILABLE,
+    );
     expect(dto.liveMeetingUrl).toBe('https://meet.example.com/room-1');
     expect(dto.recordingUrl).toBe('https://video.example.com/recording-1');
   });
@@ -102,5 +109,30 @@ describe('ClassEventResponseDto', () => {
     expect(dto.liveMeetingUrl).toBe('https://zoom.us/j/1');
     expect(dto.recordingUrl).toBe('https://vimeo.com/1');
     expect(dto.evaluationName).toBe('EX2');
+  });
+
+  it('debe normalizar recordingUrl de Drive a preview', () => {
+    const event = {
+      recordingUrl: 'https://drive.google.com/file/d/abc123/view',
+      recordingFileId: 'abc123',
+      creator: { id: '1', firstName: 'T', lastName1: 'P' },
+      professors: [],
+      evaluation: null,
+    } as unknown as ClassEvent;
+
+    const dto = ClassEventResponseDto.fromEntity(
+      event,
+      CLASS_EVENT_STATUS.FINALIZADA,
+      {
+        canJoinLive: false,
+        canWatchRecording: true,
+        canCopyLiveLink: false,
+        canCopyRecordingLink: false,
+      },
+    );
+
+    expect(dto.recordingUrl).toBe(
+      'https://drive.google.com/file/d/abc123/preview',
+    );
   });
 });

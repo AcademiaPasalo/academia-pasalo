@@ -22,6 +22,9 @@ export const CLASS_EVENT_RECORDING_STATUS_CODES = {
   FAILED: 'FAILED',
 } as const;
 
+export type ClassEventRecordingStatusCode =
+  (typeof CLASS_EVENT_RECORDING_STATUS_CODES)[keyof typeof CLASS_EVENT_RECORDING_STATUS_CODES];
+
 export const CLASS_EVENT_CACHE_KEYS = {
   EVALUATION_LIST: (evaluationId: string) =>
     `cache:class-events:evaluation:${evaluationId}`,

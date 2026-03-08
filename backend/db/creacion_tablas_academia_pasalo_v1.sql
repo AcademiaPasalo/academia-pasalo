@@ -180,6 +180,8 @@ CREATE TABLE course_cycle (
   id BIGINT PRIMARY KEY AUTO_INCREMENT,
   course_id BIGINT NOT NULL,
   academic_cycle_id BIGINT NOT NULL,
+  intro_video_url VARCHAR(500) NULL,
+  intro_video_file_id VARCHAR(128) NULL,
   FOREIGN KEY (course_id) REFERENCES course(id),
   FOREIGN KEY (academic_cycle_id) REFERENCES academic_cycle(id)
 );
@@ -236,6 +238,25 @@ CREATE TABLE enrollment_evaluation (
   FOREIGN KEY (revoked_by) REFERENCES user(id)
 );
 
+CREATE TABLE evaluation_drive_access (
+  id BIGINT PRIMARY KEY AUTO_INCREMENT,
+  evaluation_id BIGINT NOT NULL,
+  scope_key VARCHAR(64) NOT NULL,
+  drive_scope_folder_id VARCHAR(128) NULL,
+  drive_videos_folder_id VARCHAR(128) NULL,
+  drive_documents_folder_id VARCHAR(128) NULL,
+  drive_archived_folder_id VARCHAR(128) NULL,
+  viewer_group_email VARCHAR(320) NOT NULL,
+  viewer_group_id VARCHAR(128) NULL,
+  is_active BOOLEAN NOT NULL DEFAULT TRUE,
+  created_at DATETIME NOT NULL,
+  updated_at DATETIME,
+  CONSTRAINT uq_evaluation_drive_access_evaluation UNIQUE (evaluation_id),
+  CONSTRAINT uq_evaluation_drive_access_scope_key UNIQUE (scope_key),
+  CONSTRAINT uq_evaluation_drive_access_group_email UNIQUE (viewer_group_email),
+  FOREIGN KEY (evaluation_id) REFERENCES evaluation(id)
+);
+
 CREATE TABLE class_event (
   id BIGINT PRIMARY KEY AUTO_INCREMENT,
   evaluation_id BIGINT NOT NULL,
@@ -246,6 +267,7 @@ CREATE TABLE class_event (
   end_datetime DATETIME NOT NULL,
   live_meeting_url VARCHAR(500) NOT NULL,
   recording_url VARCHAR(500) NULL,
+  recording_file_id VARCHAR(128) NULL,
   recording_status_id BIGINT NOT NULL,
   is_cancelled BOOLEAN NOT NULL DEFAULT FALSE,
   created_by BIGINT NOT NULL,
@@ -491,6 +513,9 @@ ON course_cycle_professor(professor_user_id, revoked_at, course_cycle_id);
 
 CREATE INDEX idx_evaluation_type_number
 ON evaluation(evaluation_type_id, number);
+
+CREATE INDEX idx_eval_drive_access_group_active
+ON evaluation_drive_access(viewer_group_email, is_active);
 
 CREATE INDEX idx_folder_evaluation
 ON material_folder(evaluation_id);

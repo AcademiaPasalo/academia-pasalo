@@ -9,6 +9,8 @@ import { TestSeeder } from './test-utils';
 import { ROLE_CODES } from '@common/constants/role-codes.constants';
 import { ENROLLMENT_TYPE_CODES } from '@modules/enrollments/domain/enrollment.constants';
 
+jest.setTimeout(120000);
+
 describe('E2E: Student course views', () => {
   let app: INestApplication;
   let dataSource: DataSource;

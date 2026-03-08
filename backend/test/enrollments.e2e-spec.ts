@@ -32,6 +32,7 @@ import { EnrollmentRepository } from './../src/modules/enrollments/infrastructur
 import { EnrollmentStatusRepository } from './../src/modules/enrollments/infrastructure/enrollment-status.repository';
 import { EnrollmentEvaluationRepository } from './../src/modules/enrollments/infrastructure/enrollment-evaluation.repository';
 import { EnrollmentTypeRepository } from './../src/modules/enrollments/infrastructure/enrollment-type.repository';
+import { MediaAccessMembershipDispatchService } from './../src/modules/media-access/application/media-access-membership-dispatch.service';
 import { PhotoSource } from './../src/modules/users/domain/user.entity';
 
 const JWT_SECRET = 'test-jwt-secret';
@@ -123,6 +124,9 @@ describe('Enrollments E2E', () => {
 
   const enrollmentEvaluationRepositoryMock = {
     createMany: jest.fn().mockResolvedValue([]),
+    findEvaluationIdsToRevokeAfterEnrollmentCancellation: jest
+      .fn()
+      .mockResolvedValue([]),
   };
 
   const enrollmentTypeRepositoryMock = {
@@ -281,6 +285,24 @@ describe('Enrollments E2E', () => {
         {
           provide: SecurityEventRepository,
           useValue: { create: jest.fn() },
+        },
+        {
+          provide: MediaAccessMembershipDispatchService,
+          useValue: {
+            dispatchMembershipSync: jest.fn().mockResolvedValue(undefined),
+            enqueueGrantForUserEvaluations: jest
+              .fn()
+              .mockResolvedValue(undefined),
+            enqueueGrantForUserCourseCycles: jest
+              .fn()
+              .mockResolvedValue(undefined),
+            enqueueRevokeForUserEvaluations: jest
+              .fn()
+              .mockResolvedValue(undefined),
+            enqueueRevokeForUserCourseCycles: jest
+              .fn()
+              .mockResolvedValue(undefined),
+          },
         },
       ],
     }).compile();

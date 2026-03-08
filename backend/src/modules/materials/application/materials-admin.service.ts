@@ -33,7 +33,33 @@ import {
   DELETION_REQUEST_STATUS_CODES,
   MATERIAL_CACHE_KEYS,
   MATERIAL_STATUS_CODES,
+  STORAGE_PROVIDER_CODES,
 } from '@modules/materials/domain/material.constants';
+import {
+  buildDriveDownloadUrl,
+  buildDrivePreviewUrl,
+  buildDriveViewUrl,
+} from '@modules/media-access/domain/media-access-url.util';
+
+type PendingDeletionRequestWithMaterialRow = {
+  requestId: string;
+  entityType: string;
+  entityId: string;
+  reason: string | null;
+  createdAt: Date;
+  requestedById: string;
+  requestedByEmail: string | null;
+  requestedByFirstName: string | null;
+  requestedByLastName1: string | null;
+  requestedByLastName2: string | null;
+  materialId: string | null;
+  materialDisplayName: string | null;
+  originalName: string | null;
+  mimeType: string | null;
+  storageProvider: string | null;
+  storageKey: string | null;
+  storageUrl: string | null;
+};
 
 @Injectable()
 export class MaterialsAdminService {
@@ -50,7 +76,7 @@ export class MaterialsAdminService {
     private readonly notificationsDispatchService: NotificationsDispatchService,
   ) {}
 
-  async findAllPendingRequests(): Promise<DeletionRequest[]> {
+  async findAllPendingRequests(): Promise<Array<Record<string, unknown>>> {
     const pendingStatus =
       await this.catalogRepository.findDeletionRequestStatusByCode(
         DELETION_REQUEST_STATUS_CODES.PENDING,
@@ -60,7 +86,85 @@ export class MaterialsAdminService {
         `Error de configuración: Estado ${DELETION_REQUEST_STATUS_CODES.PENDING} faltante`,
       );
 
-    return await this.requestRepository.findByStatusId(pendingStatus.id);
+    const rows = await this.dataSource.query<
+      PendingDeletionRequestWithMaterialRow[]
+    >(
+      `SELECT
+         dr.id AS requestId,
+         dr.entity_type AS entityType,
+         dr.entity_id AS entityId,
+         dr.reason AS reason,
+         dr.created_at AS createdAt,
+         dr.requested_by AS requestedById,
+         u.email AS requestedByEmail,
+         u.first_name AS requestedByFirstName,
+         u.last_name_1 AS requestedByLastName1,
+         u.last_name_2 AS requestedByLastName2,
+         m.id AS materialId,
+         m.display_name AS materialDisplayName,
+         fr.original_name AS originalName,
+         fr.mime_type AS mimeType,
+         fr.storage_provider AS storageProvider,
+         fr.storage_key AS storageKey,
+         fr.storage_url AS storageUrl
+       FROM deletion_request dr
+       INNER JOIN user u ON u.id = dr.requested_by
+       LEFT JOIN material m
+         ON dr.entity_type = ?
+        AND m.id = dr.entity_id
+       LEFT JOIN file_version fv ON fv.id = m.file_version_id
+       LEFT JOIN file_resource fr ON fr.id = fv.file_resource_id
+       WHERE dr.deletion_request_status_id = ?
+       ORDER BY dr.created_at ASC`,
+      [AUDIT_ENTITY_TYPES.MATERIAL, pendingStatus.id],
+    );
+
+    return rows.map((row) => {
+      const storageProvider = String(row.storageProvider || '')
+        .trim()
+        .toUpperCase();
+      const driveFileId =
+        storageProvider === STORAGE_PROVIDER_CODES.GDRIVE
+          ? String(row.storageKey || '').trim()
+          : '';
+      const materialId = String(row.materialId || '').trim();
+
+      return {
+        id: String(row.requestId),
+        entityType: String(row.entityType || ''),
+        entityId: String(row.entityId || ''),
+        reason: row.reason,
+        createdAt: row.createdAt,
+        requestedBy: {
+          id: String(row.requestedById || ''),
+          email: row.requestedByEmail,
+          firstName: row.requestedByFirstName,
+          lastName1: row.requestedByLastName1,
+          lastName2: row.requestedByLastName2,
+        },
+        material: materialId
+          ? {
+              id: materialId,
+              displayName: row.materialDisplayName,
+              originalName: row.originalName,
+              mimeType: row.mimeType,
+              storageProvider: storageProvider || null,
+              previewUrl: driveFileId
+                ? buildDrivePreviewUrl(driveFileId)
+                : null,
+              viewUrl: driveFileId ? buildDriveViewUrl(driveFileId) : null,
+              downloadUrl: driveFileId
+                ? buildDriveDownloadUrl(driveFileId)
+                : materialId
+                  ? this.buildMaterialDownloadProxyPath(materialId)
+                  : null,
+              authorizedViewPath: materialId
+                ? this.buildMaterialAuthorizedLinkPath(materialId, 'view')
+                : null,
+            }
+          : null,
+      };
+    });
   }
 
   async findMaterialFiles(
@@ -283,6 +387,14 @@ export class MaterialsAdminService {
       reviewComment: adminComment?.trim() || null,
       updatedAt: new Date(),
     });
+
+    await this.auditService.logAction(
+      adminId,
+      AUDIT_ACTION_CODES.FILE_EDIT,
+      AUDIT_ENTITY_TYPES.DELETION_REQUEST,
+      requestId,
+      manager,
+    );
   }
 
   async hardDeleteMaterial(adminId: string, materialId: string): Promise<void> {
@@ -392,5 +504,17 @@ export class MaterialsAdminService {
     }
 
     await Promise.all(promises);
+  }
+
+  private buildMaterialDownloadProxyPath(materialId: string): string {
+    return `/materials/${encodeURIComponent(materialId)}/download`;
+  }
+
+  private buildMaterialAuthorizedLinkPath(
+    materialId: string,
+    mode: 'view' | 'download',
+  ): string {
+    const query = new URLSearchParams({ mode });
+    return `/materials/${encodeURIComponent(materialId)}/authorized-link?${query.toString()}`;
   }
 }

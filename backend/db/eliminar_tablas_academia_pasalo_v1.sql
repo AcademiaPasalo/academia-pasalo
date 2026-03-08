@@ -33,6 +33,7 @@ DROP TABLE IF EXISTS deletion_request;
 DROP TABLE IF EXISTS material;
 DROP TABLE IF EXISTS file_version;
 DROP TABLE IF EXISTS material_folder;
+DROP TABLE IF EXISTS evaluation_drive_access;
 DROP TABLE IF EXISTS enrollment;
 DROP TABLE IF EXISTS evaluation;
 DROP TABLE IF EXISTS course_cycle_allowed_evaluation_type;

@@ -1,4 +1,4 @@
-INSERT INTO role (code, name) VALUES
+﻿INSERT INTO role (code, name) VALUES
 ('SUPER_ADMIN', 'Super Administrador'),
 ('ADMIN', 'Administrador'),
 ('PROFESSOR', 'Profesor'),
@@ -19,6 +19,7 @@ INSERT INTO cycle_level (level_number, name) VALUES
 (7, 'Séptimo Ciclo'),
 (8, 'Octavo Ciclo'),
 (9, 'Noveno Ciclo'),
+(10, 'Décimo Ciclo'),
 (10, 'Décimo Ciclo');
 
 INSERT INTO enrollment_status (code, name) VALUES
@@ -28,6 +29,7 @@ INSERT INTO enrollment_status (code, name) VALUES
 
 INSERT INTO evaluation_type (code, name) VALUES
 ('PC', 'Práctica Calificada'),
+('PD', 'Práctica Dirigida'),
 ('EX', 'Examen'),
 ('LAB', 'Laboratorio'),
 ('TUTORING', 'Tutoría Especializada'),
@@ -151,11 +153,11 @@ VALUES
 (2, 1);
 
 INSERT INTO notification_type (code, name) VALUES
-('NEW_MATERIAL',    'Nuevo Material Disponible'),
+('NEW_MATERIAL', 'Nuevo Material Disponible'),
 ('CLASS_SCHEDULED', 'Nueva Clase Programada'),
-('CLASS_UPDATED',   'Clase Actualizada'),
+('CLASS_UPDATED', 'Clase Actualizada'),
 ('CLASS_CANCELLED', 'Clase Cancelada'),
-('CLASS_REMINDER',  'Recordatorio de Clase'),
+('CLASS_REMINDER', 'Recordatorio de Clase'),
 ('DELETION_REQUEST_APPROVED', 'Solicitud de Eliminación Aprobada'),
 ('DELETION_REQUEST_REJECTED', 'Solicitud de Eliminación Rechazada');
 

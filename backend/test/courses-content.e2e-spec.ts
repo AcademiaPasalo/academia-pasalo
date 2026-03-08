@@ -9,6 +9,7 @@ import { CourseRepository } from '../src/modules/courses/infrastructure/course.r
 import { CourseTypeRepository } from '../src/modules/courses/infrastructure/course-type.repository';
 import { CycleLevelRepository } from '../src/modules/courses/infrastructure/cycle-level.repository';
 import { CyclesService } from '../src/modules/cycles/application/cycles.service';
+import { MediaAccessMembershipDispatchService } from '../src/modules/media-access/application/media-access-membership-dispatch.service';
 import { DataSource } from 'typeorm';
 import { NotFoundException } from '@nestjs/common';
 
@@ -127,6 +128,15 @@ describe('Courses Content Logic (Integration)', () => {
           useValue: {
             get: jest.fn().mockResolvedValue(null),
             set: jest.fn().mockResolvedValue(null),
+          },
+        },
+        {
+          provide: MediaAccessMembershipDispatchService,
+          useValue: {
+            enqueueGrantForUserEvaluations: jest.fn(),
+            enqueueRevokeForUserEvaluations: jest.fn(),
+            enqueueGrantForUserCourseCycles: jest.fn(),
+            enqueueRevokeForUserCourseCycles: jest.fn(),
           },
         },
       ],

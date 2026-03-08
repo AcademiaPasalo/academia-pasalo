@@ -37,17 +37,17 @@ export class ClassEventsController {
     events: Awaited<ReturnType<ClassEventsService['getEventsByEvaluation']>>,
   ): ClassEventResponseDto[] {
     const now = new Date();
-    const access = this.classEventsService.getEventAccess();
 
     return events.map((event) => {
       const status = this.classEventsService.calculateEventStatus(event, now);
+      const access = this.classEventsService.getEventAccess(event);
       return ClassEventResponseDto.fromEntity(event, status, access);
     });
   }
 
   private mapEventToResponse(event: ClassEvent): ClassEventResponseDto {
     const status = this.classEventsService.calculateEventStatus(event);
-    const access = this.classEventsService.getEventAccess();
+    const access = this.classEventsService.getEventAccess(event);
     return ClassEventResponseDto.fromEntity(event, status, access);
   }
 
@@ -155,6 +155,21 @@ export class ClassEventsController {
   ): Promise<ClassEventResponseDto> {
     const event = await this.classEventsService.getEventDetail(id, user.id);
     return this.mapEventToResponse(event);
+  }
+
+  @Get(':id/recording-link')
+  @Roles(
+    ROLE_CODES.STUDENT,
+    ROLE_CODES.PROFESSOR,
+    ROLE_CODES.ADMIN,
+    ROLE_CODES.SUPER_ADMIN,
+  )
+  @ResponseMessage('URL autorizada de grabacion obtenida exitosamente')
+  async getAuthorizedRecordingLink(
+    @Param('id') id: string,
+    @CurrentUser() user: User,
+  ) {
+    return await this.classEventsService.getAuthorizedRecordingLink(user, id);
   }
 
   @Patch(':id')

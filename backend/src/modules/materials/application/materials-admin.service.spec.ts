@@ -24,6 +24,7 @@ describe('MaterialsAdminService', () => {
   let catalogRepo: jest.Mocked<MaterialCatalogRepository>;
   let cacheService: jest.Mocked<RedisCacheService>;
   let storageService: jest.Mocked<StorageService>;
+  let auditService: jest.Mocked<AuditService>;
 
   const mockMaterial = {
     id: 'mat-1',
@@ -91,6 +92,7 @@ describe('MaterialsAdminService', () => {
     catalogRepo = module.get(MaterialCatalogRepository);
     cacheService = module.get(RedisCacheService);
     storageService = module.get(StorageService);
+    auditService = module.get(AuditService);
   });
 
   describe('reviewRequest - Approval', () => {
@@ -189,6 +191,47 @@ describe('MaterialsAdminService', () => {
           action: DeletionReviewAction.APPROVE,
         }),
       ).rejects.toThrow('solo se admiten materiales');
+    });
+
+    it('should audit admin rejection flow', async () => {
+      const mockRequest = {
+        id: 'req-2',
+        entityId: 'mat-1',
+        entityType: 'material',
+        deletionRequestStatusId: 'status-pending',
+      } as DeletionRequest;
+
+      catalogRepo.findDeletionRequestStatusByCode.mockImplementation(
+        async (code) => {
+          if (code === DELETION_REQUEST_STATUS_CODES.PENDING)
+            return { id: 'status-pending' } as any;
+          if (code === DELETION_REQUEST_STATUS_CODES.REJECTED)
+            return { id: 'status-rejected' } as any;
+          return null;
+        },
+      );
+      materialRepo.findById.mockResolvedValue(mockMaterial);
+
+      dataSource.transaction.mockImplementation(async (cb: any) => {
+        const manager = {
+          findOne: jest.fn().mockResolvedValue(mockRequest),
+          update: jest.fn().mockResolvedValue({}),
+        } as any;
+        return cb(manager);
+      });
+
+      await service.reviewRequest('admin-1', 'req-2', {
+        action: DeletionReviewAction.REJECT,
+        adminComment: 'no procede',
+      });
+
+      expect(auditService.logAction).toHaveBeenCalledWith(
+        'admin-1',
+        'FILE_EDIT',
+        'deletion_request',
+        'req-2',
+        expect.anything(),
+      );
     });
   });
 

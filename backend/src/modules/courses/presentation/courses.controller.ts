@@ -31,6 +31,8 @@ import { UpdateCourseDto } from '@modules/courses/dto/update-course.dto';
 import { AssignCourseToCycleDto } from '@modules/courses/dto/assign-course-to-cycle.dto';
 import { AssignCourseCycleProfessorDto } from '@modules/courses/dto/assign-course-cycle-professor.dto';
 import { UpdateCourseCycleEvaluationStructureDto } from '@modules/courses/dto/update-course-cycle-evaluation-structure.dto';
+import { UpdateCourseCycleIntroVideoDto } from '@modules/courses/dto/update-course-cycle-intro-video.dto';
+import { CreateCourseSetupDto } from '@modules/courses/dto/create-course-setup.dto';
 import {
   AdminCourseCycleListQueryDto,
   AdminCourseCycleListResponseDto,
@@ -43,11 +45,26 @@ import { ResponseMessage } from '@common/decorators/response-message.decorator';
 import { plainToInstance } from 'class-transformer';
 import { ROLE_CODES } from '@common/constants/role-codes.constants';
 import type { UserWithSession } from '@modules/auth/strategies/jwt.strategy';
+import { CourseSetupService } from '@modules/courses/application/course-setup.service';
 
 @Controller('courses')
 @Auth()
 export class CoursesController {
-  constructor(private readonly coursesService: CoursesService) {}
+  constructor(
+    private readonly coursesService: CoursesService,
+    private readonly courseSetupService: CourseSetupService,
+  ) {}
+
+  @Post('setup')
+  @Roles(ROLE_CODES.ADMIN, ROLE_CODES.SUPER_ADMIN)
+  @HttpCode(HttpStatus.CREATED)
+  @ResponseMessage('Configuracion integral de curso creada exitosamente')
+  async createCourseSetup(
+    @CurrentUser() user: UserWithSession,
+    @Body() dto: CreateCourseSetupDto,
+  ) {
+    return await this.courseSetupService.createFullCourseSetup(user, dto);
+  }
 
   @Get('cycle/:id/content')
   @Roles(ROLE_CODES.PROFESSOR, ROLE_CODES.ADMIN, ROLE_CODES.SUPER_ADMIN)
@@ -138,6 +155,27 @@ export class CoursesController {
     });
   }
 
+  @Get('cycle/:id/intro-video-link')
+  @Roles(
+    ROLE_CODES.STUDENT,
+    ROLE_CODES.PROFESSOR,
+    ROLE_CODES.ADMIN,
+    ROLE_CODES.SUPER_ADMIN,
+  )
+  @ResponseMessage(
+    'URL autorizada de video introductorio obtenida exitosamente',
+  )
+  async getAuthorizedIntroVideoLink(
+    @Param('id') courseCycleId: string,
+    @CurrentUser() user: User,
+  ) {
+    return await this.coursesService.getAuthorizedCourseIntroVideoLink(
+      user,
+      courseCycleId,
+      (user as UserWithSession).activeRole,
+    );
+  }
+
   @Post()
   @Roles(ROLE_CODES.ADMIN, ROLE_CODES.SUPER_ADMIN)
   @HttpCode(HttpStatus.CREATED)
@@ -185,6 +223,19 @@ export class CoursesController {
     return await this.coursesService.updateCourseCycleEvaluationStructure(
       courseCycleId,
       dto.evaluationTypeIds,
+    );
+  }
+
+  @Patch('cycle/:id/intro-video')
+  @Roles(ROLE_CODES.ADMIN, ROLE_CODES.SUPER_ADMIN)
+  @ResponseMessage('Video introductorio del curso actualizado exitosamente')
+  async updateCourseCycleIntroVideo(
+    @Param('id') courseCycleId: string,
+    @Body() dto: UpdateCourseCycleIntroVideoDto,
+  ): Promise<void> {
+    await this.coursesService.updateCourseCycleIntroVideo(
+      courseCycleId,
+      dto.introVideoUrl,
     );
   }
 

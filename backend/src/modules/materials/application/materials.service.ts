@@ -7,6 +7,8 @@ import {
   ForbiddenException,
 } from '@nestjs/common';
 import { DataSource, EntityManager } from 'typeorm';
+import { randomUUID } from 'crypto';
+import * as path from 'path';
 import { StorageService } from '@infrastructure/storage/storage.service';
 import { AccessEngineService } from '@modules/enrollments/application/access-engine.service';
 import { RedisCacheService } from '@infrastructure/cache/redis-cache.service';
@@ -50,12 +52,25 @@ import {
   STORAGE_PROVIDER_CODES,
 } from '@modules/materials/domain/material.constants';
 import { NotificationsDispatchService } from '@modules/notifications/application/notifications-dispatch.service';
+import { AuthorizedMediaLinkDto } from '@modules/media-access/dto/authorized-media-link.dto';
+import {
+  MEDIA_ACCESS_MODES,
+  MEDIA_CONTENT_KINDS,
+  MEDIA_DOCUMENT_LINK_MODES,
+} from '@modules/media-access/domain/media-access.constants';
+import type { MediaDocumentLinkMode } from '@modules/media-access/domain/media-access.constants';
+import {
+  buildDriveDownloadUrl,
+  buildDrivePreviewUrl,
+} from '@modules/media-access/domain/media-access-url.util';
+import { DriveAccessScopeService } from '@modules/media-access/application/drive-access-scope.service';
 
 @Injectable()
 export class MaterialsService {
   private readonly logger = new Logger(MaterialsService.name);
   private readonly CACHE_TTL =
     technicalSettings.cache.materials.materialsExplorerCacheTtlSeconds;
+  private readonly maxFolderDepth = technicalSettings.materials.maxFolderDepth;
 
   constructor(
     private readonly dataSource: DataSource,
@@ -72,6 +87,7 @@ export class MaterialsService {
     private readonly auditService: AuditService,
     private readonly classEventRepository: ClassEventRepository,
     private readonly notificationsDispatchService: NotificationsDispatchService,
+    private readonly driveAccessScopeService: DriveAccessScopeService,
   ) {}
 
   async createFolder(
@@ -229,6 +245,9 @@ export class MaterialsService {
     );
 
     const now = new Date();
+    const documentsFolderId = this.storageService.isGoogleDriveStorageEnabled()
+      ? await this.resolveDocumentsFolderIdForEvaluation(folder.evaluationId)
+      : null;
     let savedResource: {
       storageProvider: (typeof STORAGE_PROVIDER_CODES)[keyof typeof STORAGE_PROVIDER_CODES];
       storageKey: string;
@@ -248,24 +267,24 @@ export class MaterialsService {
 
         const hash = await this.storageService.calculateHash(file.buffer);
         const existingResource =
-          await this.fileResourceRepository.findByHashAndSize(
+          await this.fileResourceRepository.findByHashAndSizeWithinEvaluation(
             hash,
             String(file.size),
+            folder.evaluationId,
           );
 
         let finalResource: FileResource;
         let finalVersion: FileVersion;
 
         if (!existingResource) {
-          const sanitizedOriginalName = file.originalname.replace(
-            /[^a-zA-Z0-9.-]/g,
-            '_',
-          );
-          const uniqueName = `${Date.now()}-${sanitizedOriginalName}`;
+          const uniqueName = this.buildStorageObjectName(file.originalname);
           savedResource = await this.storageService.saveFile(
             uniqueName,
             file.buffer,
             file.mimetype,
+            documentsFolderId
+              ? { targetDriveFolderId: documentsFolderId }
+              : undefined,
           );
           isNewFile = true;
 
@@ -288,9 +307,10 @@ export class MaterialsService {
             }
 
             const dedupResource =
-              await this.fileResourceRepository.findByHashAndSize(
+              await this.fileResourceRepository.findByHashAndSizeWithinEvaluation(
                 hash,
                 String(file.size),
+                folder.evaluationId,
               );
             if (!dedupResource) {
               throw error;
@@ -366,14 +386,6 @@ export class MaterialsService {
         });
         const savedMaterial = await manager.save(materialEntity);
 
-        await this.auditService.logAction(
-          user.id,
-          AUDIT_ACTION_CODES.FILE_UPLOAD,
-          AUDIT_ENTITY_TYPES.MATERIAL,
-          savedMaterial.id,
-          manager,
-        );
-
         return savedMaterial;
       });
 
@@ -444,26 +456,32 @@ export class MaterialsService {
           freshMaterial.materialFolder.evaluationId,
           manager,
         );
+        const documentsFolderId =
+          this.storageService.isGoogleDriveStorageEnabled()
+            ? await this.resolveDocumentsFolderIdForEvaluation(
+                freshMaterial.materialFolder.evaluationId,
+              )
+            : null;
 
         const hash = await this.storageService.calculateHash(file.buffer);
         const existingResource =
-          await this.fileResourceRepository.findByHashAndSize(
+          await this.fileResourceRepository.findByHashAndSizeWithinEvaluation(
             hash,
             String(file.size),
+            freshMaterial.materialFolder.evaluationId,
           );
 
         let finalResource: FileResource;
 
         if (!existingResource) {
-          const sanitizedOriginalName = file.originalname.replace(
-            /[^a-zA-Z0-9.-]/g,
-            '_',
-          );
-          const uniqueName = `${Date.now()}-${sanitizedOriginalName}`;
+          const uniqueName = this.buildStorageObjectName(file.originalname);
           savedResource = await this.storageService.saveFile(
             uniqueName,
             file.buffer,
             file.mimetype,
+            documentsFolderId
+              ? { targetDriveFolderId: documentsFolderId }
+              : undefined,
           );
           isNewFile = true;
 
@@ -486,9 +504,10 @@ export class MaterialsService {
             }
 
             const dedupResource =
-              await this.fileResourceRepository.findByHashAndSize(
+              await this.fileResourceRepository.findByHashAndSizeWithinEvaluation(
                 hash,
                 String(file.size),
+                freshMaterial.materialFolder.evaluationId,
               );
             if (!dedupResource) {
               throw error;
@@ -578,14 +597,6 @@ export class MaterialsService {
         freshMaterial.updatedAt = now;
 
         const updatedMaterial = await manager.save(freshMaterial);
-
-        await this.auditService.logAction(
-          user.id,
-          AUDIT_ACTION_CODES.FILE_EDIT,
-          AUDIT_ENTITY_TYPES.MATERIAL,
-          updatedMaterial.id,
-          manager,
-        );
 
         return updatedMaterial;
       });
@@ -753,6 +764,88 @@ export class MaterialsService {
     };
   }
 
+  async getAuthorizedDocumentLink(
+    user: UserWithSession,
+    materialId: string,
+    mode: MediaDocumentLinkMode = MEDIA_DOCUMENT_LINK_MODES.VIEW,
+  ): Promise<AuthorizedMediaLinkDto> {
+    const material = await this.materialRepository.findById(materialId);
+    if (!material) {
+      throw new NotFoundException('Material no encontrado');
+    }
+
+    const folder = await this.folderRepository.findById(
+      material.materialFolderId,
+    );
+    if (!folder) {
+      throw new NotFoundException('Carpeta contenedora no encontrada');
+    }
+
+    await this.checkAuthorizedAccess(
+      user,
+      folder.evaluationId,
+      folder,
+      material,
+    );
+
+    const resource = material.fileResource;
+    if (!resource) {
+      throw new InternalServerErrorException(
+        'Integridad de datos corrupta: Material sin recurso fisico',
+      );
+    }
+
+    const isDriveResource =
+      resource.storageProvider === STORAGE_PROVIDER_CODES.GDRIVE;
+    const driveFileId = isDriveResource ? resource.storageKey : null;
+    if (isDriveResource && driveFileId) {
+      const scope = await this.driveAccessScopeService.resolveForEvaluation(
+        folder.evaluationId,
+      );
+      const expectedDocumentsFolderId = scope.persisted?.driveDocumentsFolderId;
+      if (!expectedDocumentsFolderId) {
+        throw new ForbiddenException(
+          'El scope Drive de la evaluacion no esta provisionado para documentos',
+        );
+      }
+
+      const isInExpectedFolder =
+        await this.storageService.isDriveFileDirectlyInFolder(
+          driveFileId,
+          expectedDocumentsFolderId,
+        );
+      if (!isInExpectedFolder) {
+        throw new ForbiddenException(
+          'El documento no pertenece al scope Drive autorizado para esta evaluacion',
+        );
+      }
+    }
+
+    const url =
+      isDriveResource && driveFileId
+        ? mode === MEDIA_DOCUMENT_LINK_MODES.DOWNLOAD
+          ? buildDriveDownloadUrl(driveFileId)
+          : buildDrivePreviewUrl(driveFileId)
+        : this.buildMaterialDownloadProxyPath(material.id);
+
+    const accessMode = isDriveResource
+      ? MEDIA_ACCESS_MODES.DIRECT_URL
+      : MEDIA_ACCESS_MODES.BACKEND_PROXY;
+
+    return {
+      contentKind: MEDIA_CONTENT_KINDS.DOCUMENT,
+      accessMode,
+      evaluationId: folder.evaluationId,
+      driveFileId,
+      url,
+      expiresAt: null,
+      requestedMode: mode,
+      fileName: material.displayName || resource.originalName,
+      mimeType: resource.mimeType,
+      storageProvider: resource.storageProvider,
+    };
+  }
+
   async getMaterialLastModified(
     user: UserWithSession,
     materialId: string,
@@ -878,6 +971,10 @@ export class MaterialsService {
       visibleFrom: startDate,
       visibleUntil: endDate,
     };
+  }
+
+  private buildMaterialDownloadProxyPath(materialId: string): string {
+    return `/materials/${encodeURIComponent(materialId)}/download`;
   }
 
   private async assertCanManageEvaluation(
@@ -1042,12 +1139,42 @@ export class MaterialsService {
         'Inconsistencia: La carpeta padre no pertenece a la misma evaluación',
       );
     }
-    if (parent && parent.parentFolderId) {
-      throw new BadRequestException(
-        ACCESS_MESSAGES.MATERIAL_FOLDER_DEPTH_EXCEEDED,
-      );
+    if (parent) {
+      const parentDepth = await this.resolveFolderDepth(parent);
+      if (parentDepth >= this.maxFolderDepth) {
+        throw new BadRequestException(
+          `${ACCESS_MESSAGES.MATERIAL_FOLDER_DEPTH_EXCEEDED} (max=${this.maxFolderDepth})`,
+        );
+      }
     }
     return parent;
+  }
+
+  private async resolveFolderDepth(folder: MaterialFolder): Promise<number> {
+    let depth = 1;
+    let current = folder;
+    const maxTraversalHops = this.maxFolderDepth + 10;
+
+    for (let hop = 0; hop < maxTraversalHops; hop += 1) {
+      const parentId = current.parentFolderId;
+      if (!parentId) {
+        return depth;
+      }
+
+      const parent = await this.folderRepository.findById(parentId);
+      if (!parent) {
+        throw new InternalServerErrorException(
+          'Integridad de datos corrupta: cadena de carpetas incompleta',
+        );
+      }
+
+      depth += 1;
+      current = parent;
+    }
+
+    throw new InternalServerErrorException(
+      'Integridad de datos corrupta: profundidad de carpetas invalida',
+    );
   }
 
   private async validateClassEventAssociation(
@@ -1084,6 +1211,22 @@ export class MaterialsService {
     );
   }
 
+  private async resolveDocumentsFolderIdForEvaluation(
+    evaluationId: string,
+  ): Promise<string> {
+    const scope =
+      await this.driveAccessScopeService.resolveForEvaluation(evaluationId);
+    const documentsFolderId = String(
+      scope.persisted?.driveDocumentsFolderId || '',
+    ).trim();
+    if (!documentsFolderId) {
+      throw new ForbiddenException(
+        'El scope Drive de la evaluacion no esta provisionado para documentos',
+      );
+    }
+    return documentsFolderId;
+  }
+
   private async invalidateFolderCache(folderId: string) {
     await this.cacheService.del(MATERIAL_CACHE_KEYS.CONTENTS(folderId));
   }
@@ -1094,5 +1237,23 @@ export class MaterialsService {
 
   private async invalidateClassEventMaterialsCache(classEventId: string) {
     await this.cacheService.del(MATERIAL_CACHE_KEYS.CLASS_EVENT(classEventId));
+  }
+
+  private buildStorageObjectName(originalName: string): string {
+    const normalizedOriginalName = String(originalName || '')
+      .replace(/[\r\n\t]/g, ' ')
+      .trim();
+    if (!normalizedOriginalName) {
+      return randomUUID();
+    }
+
+    if (this.storageService.isGoogleDriveStorageEnabled()) {
+      // For Drive, keep original file name so operators and teachers see expected names.
+      return normalizedOriginalName;
+    }
+
+    // For local storage, keep technical uniqueness to prevent overwrite collisions.
+    const extension = path.extname(normalizedOriginalName).trim();
+    return extension ? `${randomUUID()}${extension}` : randomUUID();
   }
 }

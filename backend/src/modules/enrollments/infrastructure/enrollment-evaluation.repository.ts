@@ -56,4 +56,37 @@ export class EnrollmentEvaluationRepository {
 
     return Number(result[0]?.hasAccess) === 1;
   }
+
+  async findEvaluationIdsToRevokeAfterEnrollmentCancellation(
+    userId: string,
+    enrollmentId: string,
+    manager?: EntityManager,
+  ): Promise<string[]> {
+    const repo = manager
+      ? manager.getRepository(EnrollmentEvaluation)
+      : this.ormRepository;
+    const now = new Date();
+    const result = await repo.query<Array<{ evaluationId: string | number }>>(
+      `SELECT DISTINCT ee.evaluation_id AS evaluationId
+       FROM enrollment_evaluation ee
+       INNER JOIN enrollment e ON e.id = ee.enrollment_id
+       WHERE ee.enrollment_id = ?
+         AND ee.is_active = 1
+         AND NOT EXISTS (
+           SELECT 1
+           FROM enrollment_evaluation ee2
+           INNER JOIN enrollment e2 ON e2.id = ee2.enrollment_id
+           WHERE ee2.evaluation_id = ee.evaluation_id
+             AND ee2.enrollment_id <> ee.enrollment_id
+             AND ee2.is_active = 1
+             AND ee2.access_start_date <= ?
+             AND ee2.access_end_date >= ?
+             AND e2.user_id = ?
+             AND e2.cancelled_at IS NULL
+         )`,
+      [enrollmentId, now, now, userId],
+    );
+
+    return result.map((row) => String(row.evaluationId));
+  }
 }

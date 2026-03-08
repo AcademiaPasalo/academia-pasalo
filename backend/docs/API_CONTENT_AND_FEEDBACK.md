@@ -51,12 +51,11 @@ Obtiene todas las sesiones programadas para el usuario (alumno o profesor) dentr
         "startDatetime": "ISO-8601",
         "endDatetime": "ISO-8601",
         "liveMeetingUrl": string | null, // URL de Zoom/Meet (sin enmascarado en este DTO)
-        "recordingUrl": string | null,   // URL de grabación (sin enmascarado en este DTO)
+        "recordingUrl": string | null,   // URL de grabacion en formato preview/embed
         "recordingStatus": "NOT_AVAILABLE" | "PROCESSING" | "READY" | "FAILED",
         "isCancelled": boolean,
-        "status": "PROGRAMADA" | "EN_CURSO" | "FINALIZADA" | "CANCELADA",
         "canJoinLive": boolean,
-        "canWatchRecording": boolean,
+        "canWatchRecording": boolean, // true solo cuando recordingStatus = READY
         "canCopyLiveLink": boolean,
         "canCopyRecordingLink": boolean,
         "courseName": string,
@@ -129,46 +128,6 @@ Obtiene sesiones agrupadas por curso-ciclo para pintar calendario comparativo.
     ]
     ```
 
-### 4. Listar Eventos de una Evaluación
-- **Endpoint:** `GET /class-events/evaluation/:evaluationId`
-- **Roles:** `STUDENT`, `PROFESSOR`, `ADMIN`, `SUPER_ADMIN`
-- **Data (Response):** `[ { ...ClassEventResponseDto } ]` (Ver estructura arriba).
-
-### 5. Detalle de un Evento
-- **Endpoint:** `GET /class-events/:id`
-- **Data (Response):** Mismo objeto que en Calendario Unificado.
-
-### 6. Crear Nuevo Evento (Docente/Admin)
-- **Endpoint:** `POST /class-events`
-- **Roles:** `PROFESSOR`, `ADMIN`, `SUPER_ADMIN`
-- **Request Body:**
-    ```typescript
-    {
-      "evaluationId": string,
-      "sessionNumber": number,
-      "title": string,
-      "topic": string,
-      "startDatetime": "ISO-8601",
-      "endDatetime": "ISO-8601",
-      "liveMeetingUrl": string // URL válida de Zoom/Meet/Teams
-    }
-    ```
-- **Regla de colisión vigente:**
-  - El backend valida solapamiento contra todos los cursos del mismo `course_type` dentro del mismo `academic_cycle`.
-  - Excepción actual: `FACULTAD` queda aislado por su propio tipo.
-
-### 7. Actualizar / Cancelar Evento
-- **Patch:** `PATCH /class-events/:id` (Actualiza campos opcionales).
-    * **Fields:** `title`, `topic`, `startDatetime`, `endDatetime`, `liveMeetingUrl`, `recordingUrl`.
-- **Cancel:** `DELETE /class-events/:id/cancel` (Marca como cancelada).
-
-### 8. Gestión de Profesores Invitados (Admin)
-Permite que otros profesores también sean anfitriones del evento.
-- **POST /class-events/:id/professors:** `body: { professorUserId: string }`
-- **DELETE /class-events/:id/professors/:professorId:** Quitar acceso.
-- **Roles:** `ADMIN`, `SUPER_ADMIN`.
-
----
 
 ## ÉPICA: GESTIÓN ACADÉMICA CORE (`/cycles`, `/courses`)
 
@@ -296,6 +255,47 @@ El endpoint legado GET /courses/cycle/:courseCycleId/content queda para roles de
     * Incluye courseCycleId, datos de curso, datos de ciclo, bandera isCurrent y métricas agregadas: evaluations, activeEnrollments, activeProfessors.
 - **POST /courses/assign-cycle**: Aperturar materia en un ciclo (Crea CourseCycle).
     * `body: { "courseId": "ID", "academicCycleId": "ID" }`
+- **POST /courses/setup**: Alta integral de curso/ciclo (orquestado en un solo endpoint).
+    * **Roles:** `ADMIN`, `SUPER_ADMIN`
+    * **Objetivo:** crear curso + course_cycle + estructura de evaluaciones + evaluaciones reales + plantilla de carpetas de materiales + provision Drive (evaluaciones y course_cycle).
+    * **Body (resumen):**
+      ```json
+      {
+        "course": {
+          "code": "MATE101",
+          "name": "Calculo I",
+          "courseTypeId": "1",
+          "cycleLevelId": "1",
+          "primaryColor": "#0E7490",
+          "secondaryColor": "#F59E0B"
+        },
+        "academicCycleId": "8",
+        "allowedEvaluationTypeIds": ["1", "2", "3"],
+        "evaluationsToCreate": [
+          {
+            "evaluationTypeId": "1",
+            "number": 1,
+            "startDate": "2026-03-10",
+            "endDate": "2026-07-20"
+          }
+        ],
+        "professorUserIds": ["2"],
+        "materialsTemplate": {
+          "applyToEachEvaluation": true,
+          "roots": [
+            { "name": "Sesiones", "subfolderNames": [] },
+            { "name": "Material Adicional", "subfolderNames": ["Resumenes", "Enunciados"] }
+          ]
+        }
+      }
+      ```
+    * **Notas clave:**
+      - `evaluationsToCreate` define las evaluaciones reales (type + number). No se envia count.
+      - El banco enunciados (number=0) se crea por `assign-cycle`.
+      - Las cards/carpetas de banco se derivan de las evaluaciones reales creadas.
+      - Provisiona inmediatamente:
+        - scope Drive por evaluacion (`evaluations/.../ev_*`)
+        - scope Drive por course_cycle (`course_cycles/.../cc_*`) con `intro_video` y `bank_documents`.
 - **POST /courses/cycle/:id/professors**: Asignar profesor a la plana del curso.
     * `body: { "professorUserId": "ID" }`
 - **DELETE /courses/cycle/:id/professors/:professorUserId**: Remover profesor del curso.
@@ -344,6 +344,11 @@ Permite navegar la jerarquía de una evaluación. Requiere matrícula en la eval
     * `GET /materials/folders/:folderId` (Contenido de una carpeta)
 - **GET /materials/class-event/:classEventId**: Obtiene materiales vinculados a una sesión específica.
 - **Roles:** `STUDENT`, `PROFESSOR`, `ADMIN`, `SUPER_ADMIN`
+- **Flujo frontend recomendado (tab Material adicional):
+    * Paso 1: al abrir el tab, llamar GET /materials/folders/evaluation/:evaluationId.
+    * Paso 2: tomar el id de la carpeta raiz Material adicional y llamar GET /materials/folders/:folderId.
+    * Resultado esperado: cards Resumenes y Enunciados con su contador en subfolderMaterialCount.
+    * Lazy loading: solo cuando el usuario haga click en una card, volver a llamar GET /materials/folders/:folderId de esa subcarpeta para listar archivos.
 - **Data (Response de Contenido):**
     ```json
     {
@@ -364,15 +369,37 @@ Permite navegar la jerarquía de una evaluación. Requiere matrícula en la eval
     }
     ```
 
-### 2. Descarga de Archivos
+### 2. Descarga y Link Autorizado de Archivos
 - **Endpoint:** `GET /materials/:id/download`
 - **Roles:** `STUDENT` (con acceso), `PROFESSOR`, `ADMIN`, `SUPER_ADMIN`
-- **Comportamiento:** Retorna stream binario con headers `Content-Type` y `Content-Disposition`.
+- **Comportamiento:** retorna stream binario con headers `Content-Type` y `Content-Disposition`.
+- **Notas de backend:**
+    * Para recursos locales/proxy, este endpoint es la salida principal de descarga.
+    * Para recursos Drive, el backend igual valida alcance por evaluacion antes de devolver datos.
 
+- **Endpoint:** `GET /materials/:id/authorized-link?mode=view|download`
+- **Roles:** `STUDENT` (con acceso), `PROFESSOR`, `ADMIN`, `SUPER_ADMIN`
+- **Query Params:**
+    * `mode`: `view` | `download`
+- **Response (`data`):**
+    * `contentKind`: `DOCUMENT`
+    * `accessMode`: `DIRECT_URL` | `BACKEND_PROXY`
+    * `evaluationId`: string
+    * `driveFileId`: string | null
+    * `url`: string
+    * `expiresAt`: string | null
+    * `requestedMode`: `view` | `download`
+    * `fileName`: string
+    * `mimeType`: string
+    * `storageProvider`: `LOCAL` | `GDRIVE` | `S3`
+- **Validaciones criticas (si storage es GDRIVE):**
+    * valida que el material pertenezca a la evaluacion autorizada para el usuario.
+    * valida que el archivo este dentro de la subcarpeta de documentos del scope Drive de esa evaluacion.
+    * si el archivo esta fuera del scope esperado, responde `403`.
 ### 3. Gestión Administrativa (Upload/Config)
 - **POST /materials/folders:** Crear carpeta.
     * `body: { evaluationId: string, parentFolderId?: string, name: string, visibleFrom?: string, visibleUntil?: string }`
-    * Regla: solo se permiten 2 niveles (raíz y un nivel de subcarpeta). Un tercer nivel responde `400`.
+    * Regla: se permiten hasta 3 niveles maximos. Intentar crear un cuarto nivel responde `400`.
 - **POST /materials/folders/template:** Crear estructura fija de 2 niveles en una sola petición.
     * `body: { evaluationId: string, rootName: string, subfolderNames: string[], visibleFrom?: string, visibleUntil?: string }`
     * Validación: `subfolderNames` (1..50), sin vacíos, sin duplicados case-insensitive.
@@ -398,15 +425,41 @@ Permite navegar la jerarquía de una evaluación. Requiere matrícula en la eval
 - **POST /materials/request-deletion:** Flujo seguro de borrado.
     * `body: { entityType: 'material', entityId: string, reason: string }`
 
-### 4. Gestión Administrativa Avanzada (Moderación)
-- **GET /admin/materials/requests/pending:** Listar solicitudes de eliminación pendientes.
+### 4. Gestion Administrativa Avanzada (Moderacion)
+- **GET /admin/materials/requests/pending:** listar solicitudes pendientes de eliminacion con metadata del material para decision administrativa.
     * **Roles:** `ADMIN`, `SUPER_ADMIN`
+    * **Response (`data`):** array con objetos:
+      - `id`: string (requestId)
+      - `entityType`: string
+      - `entityId`: string
+      - `reason`: string | null
+      - `createdAt`: string ISO
+      - `requestedBy`: object
+      - `requestedBy.id`: string
+      - `requestedBy.email`: string | null
+      - `requestedBy.firstName`: string | null
+      - `requestedBy.lastName1`: string | null
+      - `requestedBy.lastName2`: string | null
+      - `material`: object | null
+      - `material.id`: string
+      - `material.displayName`: string | null
+      - `material.originalName`: string | null
+      - `material.mimeType`: string | null
+      - `material.storageProvider`: `LOCAL` | `GDRIVE` | `S3` | null
+      - `material.previewUrl`: string | null (Drive `/preview` cuando aplica)
+      - `material.viewUrl`: string | null (Drive `/view` cuando aplica)
+      - `material.downloadUrl`: string | null (Drive directo o proxy `/materials/:id/download`)
+      - `material.authorizedViewPath`: string | null (`/materials/:id/authorized-link?mode=view`)
+    * **Notas de integracion frontend:**
+      - usar `material.displayName` como etiqueta principal en tabla/listado.
+      - usar `material.originalName` como apoyo tecnico para distinguir archivos similares.
+      - en UI de revision, priorizar `authorizedViewPath` para abrir contenido validado por backend.
+      - `previewUrl/viewUrl/downloadUrl` son utilidades para inspeccion/operacion administrativa.
 - **POST /admin/materials/requests/:id/review:** Aprobar o rechazar solicitud.
     * **Roles:** `ADMIN`, `SUPER_ADMIN`
     * `body: { action: 'APPROVE' | 'REJECT', adminComment?: string }`
-- **DELETE /admin/materials/:id/hard-delete:** Eliminación física permanente (irreversible).
+- **DELETE /admin/materials/:id/hard-delete:** Eliminacion fisica permanente (irreversible).
     * **Roles:** `SUPER_ADMIN`
-
 ---
 
 ## ÉPICA: FEEDBACK Y REPUTACIÓN (`/feedback`)
@@ -448,16 +501,6 @@ Permite navegar la jerarquía de una evaluación. Requiere matrícula en la eval
 - **POST /feedback/admin/:testimonyId/feature:** Destacar testimonio en la web.
     * `body: { isActive: boolean, displayOrder: number }`
     * **Efecto:** Invalida automáticamente el caché público.
-
-
-
-
-
-
-
-
-
-
 
 
 
@@ -572,3 +615,55 @@ Objetivo:
 1. Permitir que `bank-structure` devuelva data real desde seed.
 2. Permitir que `POST /evaluations` valide contra estructura activa desde seed.
 3. Mantener entorno reproducible al recrear schema+data.
+
+## UPDATE FRONTEND CONTRACT - INTRO VIDEO POR CURSO/CICLO (2026-03-06)
+
+Se agrega soporte para video introductorio a nivel `course_cycle` (no por evaluacion).
+
+### 1) Admin - Configurar video introductorio
+
+- Endpoint: `PATCH /courses/cycle/:id/intro-video`
+- Roles: `ADMIN`, `SUPER_ADMIN`
+- Body:
+```json
+{
+  "introVideoUrl": "https://drive.google.com/file/d/<FILE_ID>/view"
+}
+```
+- Reglas:
+1. La URL debe ser de Google Drive.
+2. Backend extrae y guarda internamente `intro_video_file_id`.
+3. Si `introVideoUrl` viene vacio/null, se limpia el video introductorio del curso-ciclo.
+
+### 2) Alumno/Profesor/Admin - Obtener link autorizado
+
+- Endpoint: `GET /courses/cycle/:id/intro-video-link`
+- Roles: `STUDENT`, `PROFESSOR`, `ADMIN`, `SUPER_ADMIN`
+- Control de acceso:
+1. `STUDENT`: requiere matricula activa en ese `course_cycle`.
+2. `PROFESSOR`: requiere estar asignado a ese `course_cycle`.
+3. `ADMIN`/`SUPER_ADMIN`: acceso permitido.
+- Comportamiento de enlace:
+1. Siempre retorna URL de Drive en formato `preview` (embed).
+2. No expone opcion `mode` para video.
+- Response 200:
+```json
+{
+  "contentKind": "VIDEO",
+  "accessMode": "DIRECT_URL",
+  "courseCycleId": "4",
+  "driveFileId": "<FILE_ID>",
+  "url": "https://drive.google.com/file/d/<FILE_ID>/preview",
+  "expiresAt": null,
+  "requestedMode": "embed",
+  "fileName": null,
+  "mimeType": null,
+  "storageProvider": "GDRIVE"
+}
+```
+
+
+
+
+
+

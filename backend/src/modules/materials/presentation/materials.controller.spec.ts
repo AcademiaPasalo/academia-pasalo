@@ -14,6 +14,7 @@ const mockMaterialsService = {
   getClassEventMaterials: jest.fn(),
   addVersion: jest.fn(),
   download: jest.fn(),
+  getAuthorizedDocumentLink: jest.fn(),
   getMaterialLastModified: jest.fn(),
   requestDeletion: jest.fn(),
 };
@@ -119,6 +120,14 @@ describe('MaterialsController RBAC Security', () => {
 
     it('endpoint "download" should ALLOW STUDENT', () => {
       const roles = Reflect.getMetadata('roles', materialsController.download);
+      expect(roles).toContain(ROLE_CODES.STUDENT);
+    });
+
+    it('endpoint "getAuthorizedDocumentLink" should ALLOW STUDENT', () => {
+      const roles = Reflect.getMetadata(
+        'roles',
+        materialsController.getAuthorizedDocumentLink,
+      );
       expect(roles).toContain(ROLE_CODES.STUDENT);
     });
 

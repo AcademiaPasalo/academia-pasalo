@@ -1,8 +1,14 @@
 import { ClassEvent } from '@modules/events/domain/class-event.entity';
 import {
   ClassEventAccess,
+  ClassEventRecordingStatusCode,
+  CLASS_EVENT_RECORDING_STATUS_CODES,
   ClassEventStatus,
 } from '@modules/events/domain/class-event.constants';
+import {
+  buildDrivePreviewUrl,
+  extractDriveFileIdFromUrl,
+} from '@modules/media-access/domain/media-access-url.util';
 
 export class ClassEventResponseDto {
   id: string;
@@ -14,7 +20,8 @@ export class ClassEventResponseDto {
   liveMeetingUrl: string | null;
   recordingUrl: string | null;
   isCancelled: boolean;
-  status: ClassEventStatus;
+  sessionStatus: ClassEventStatus;
+  recordingStatus: ClassEventRecordingStatusCode;
   canJoinLive: boolean;
   canWatchRecording: boolean;
   canCopyLiveLink: boolean;
@@ -46,6 +53,13 @@ export class ClassEventResponseDto {
     status: ClassEventStatus,
     access: ClassEventAccess,
   ): ClassEventResponseDto {
+    const recordingFileId =
+      String(event.recordingFileId || '').trim() ||
+      extractDriveFileIdFromUrl(event.recordingUrl || '');
+    const recordingUrl = recordingFileId
+      ? buildDrivePreviewUrl(recordingFileId)
+      : event.recordingUrl;
+
     return {
       id: event.id,
       sessionNumber: event.sessionNumber,
@@ -54,9 +68,12 @@ export class ClassEventResponseDto {
       startDatetime: event.startDatetime,
       endDatetime: event.endDatetime,
       liveMeetingUrl: event.liveMeetingUrl,
-      recordingUrl: event.recordingUrl,
+      recordingUrl,
       isCancelled: event.isCancelled,
-      status,
+      sessionStatus: status,
+      recordingStatus:
+        (event.recordingStatus?.code as ClassEventRecordingStatusCode) ||
+        CLASS_EVENT_RECORDING_STATUS_CODES.NOT_AVAILABLE,
       canJoinLive: access.canJoinLive,
       canWatchRecording: access.canWatchRecording,
       canCopyLiveLink: access.canCopyLiveLink,

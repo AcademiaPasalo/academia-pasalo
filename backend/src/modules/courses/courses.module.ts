@@ -13,10 +13,12 @@ import { CourseCycleRepository } from '@modules/courses/infrastructure/course-cy
 import { CourseCycleProfessorRepository } from '@modules/courses/infrastructure/course-cycle-professor.repository';
 import { CourseCycleAllowedEvaluationTypeRepository } from '@modules/courses/infrastructure/course-cycle-allowed-evaluation-type.repository';
 import { CoursesService } from '@modules/courses/application/courses.service';
+import { CourseSetupService } from '@modules/courses/application/course-setup.service';
 import { CoursesController } from '@modules/courses/presentation/courses.controller';
 import { AuthModule } from '@modules/auth/auth.module';
 import { EvaluationsModule } from '@modules/evaluations/evaluations.module';
 import { CyclesModule } from '@modules/cycles/cycles.module';
+import { MediaAccessModule } from '@modules/media-access/media-access.module';
 
 @Module({
   imports: [
@@ -31,6 +33,7 @@ import { CyclesModule } from '@modules/cycles/cycles.module';
     AuthModule,
     forwardRef(() => EvaluationsModule),
     CyclesModule,
+    MediaAccessModule,
   ],
   controllers: [CoursesController],
   providers: [
@@ -41,6 +44,7 @@ import { CyclesModule } from '@modules/cycles/cycles.module';
     CourseCycleProfessorRepository,
     CourseCycleAllowedEvaluationTypeRepository,
     CoursesService,
+    CourseSetupService,
   ],
   exports: [
     CourseRepository,
@@ -50,6 +54,7 @@ import { CyclesModule } from '@modules/cycles/cycles.module';
     CourseCycleProfessorRepository,
     CourseCycleAllowedEvaluationTypeRepository,
     CoursesService,
+    CourseSetupService,
   ],
 })
 export class CoursesModule {}
