@@ -168,7 +168,7 @@ function TeacherAvatars({ teachers }: { teachers: Teacher[] }) {
         <img
           src={teachers[1].photo}
           alt={teachers[1].name}
-          className="w-7 h-7 md:w-8 md:h-8 absolute left-6 md:left-7 top-0 rounded-full outline outline-1 outline-black object-cover"
+          className="w-7 h-7 md:w-8 md:h-8 absolute left-6 md:left-7 top-0 rounded-full outline outline-1 outline-white object-cover"
         />
       ) : (
         <div className={`w-7 h-7 md:w-8 md:h-8 absolute left-6 md:left-7 top-0 ${teachers[1].avatarColor} rounded-full outline outline-[1.5px] md:outline-2 outline-stroke-white flex justify-center items-center p-1`}>
