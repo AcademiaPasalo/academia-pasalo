@@ -4,6 +4,23 @@ APP_DIR="/home/ubuntu/academia-pasalo"
 COMPOSE_FILE="$APP_DIR/backend/docker-compose.prod.yml"
 DB_HOST="172.31.65.82"
 DB_PORT="3306"
+# --- Leer secretos desde AWS SSM Parameter Store ---
+echo "Leyendo secretos desde AWS SSM..."
+SSM_PATH="/academia-pasalo"
+PARAMS=$(aws ssm get-parameters-by-path \
+  --path "$SSM_PATH" \
+  --with-decryption \
+  --query "Parameters[*].{Name:Name,Value:Value}" \
+  --output json \
+  --region us-east-1)
+
+DB_PASSWORD=$(echo "$PARAMS" | python3 -c "import sys,json; params=json.load(sys.stdin); print(next(p['Value'] for p in params if p['Name']=='$SSM_PATH/DB_PASSWORD'))")
+JWT_SECRET=$(echo "$PARAMS" | python3 -c "import sys,json; params=json.load(sys.stdin); print(next(p['Value'] for p in params if p['Name']=='$SSM_PATH/JWT_SECRET'))")
+GOOGLE_CLIENT_SECRET=$(echo "$PARAMS" | python3 -c "import sys,json; params=json.load(sys.stdin); print(next(p['Value'] for p in params if p['Name']=='$SSM_PATH/GOOGLE_CLIENT_SECRET'))")
+MAXMIND_LICENSE_KEY=$(echo "$PARAMS" | python3 -c "import sys,json; params=json.load(sys.stdin); print(next(p['Value'] for p in params if p['Name']=='$SSM_PATH/MAXMIND_LICENSE_KEY'))")
+GOOGLE_DRIVE_SA_JSON=$(echo "$PARAMS" | python3 -c "import sys,json; params=json.load(sys.stdin); print(next(p['Value'] for p in params if p['Name']=='$SSM_PATH/GOOGLE_DRIVE_SA_JSON'))")
+echo "✅ Secretos cargados desde SSM"
+
 MYSQL="mysql -u \"$DB_USER\" -p\"$DB_PASSWORD\" -h \"$DB_HOST\" -P \"$DB_PORT\""
 cd "$APP_DIR"
 git fetch origin
